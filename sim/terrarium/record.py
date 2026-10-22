@@ -1,4 +1,5 @@
-# Run one arena with random actions and write it as a replay.
+# Run one arena with random actions and write it as a replay, until the time
+# asked for or the end of its episode, whichever comes first.
 #
 #   uv run python -m terrarium.record out.jsonl.gz --seconds 30 --seed 0
 
@@ -31,6 +32,8 @@ def record(cfg: Config, path: Path | str, ticks: int, seed: int = 0) -> World:
         for _ in range(ticks):
             world.step(act())
             out.write(replay.frame(world, 0))
+            if world.ended[0]:
+                break
     log.info('replay written', path=str(path), frames=out.frames, bytes=Path(path).stat().st_size)
     return world
 

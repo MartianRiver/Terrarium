@@ -69,6 +69,18 @@ class Block:
 
 
 @dataclass(frozen=True)
+class Vision:
+    rays: int
+    fov: float
+    range: float
+
+
+@dataclass(frozen=True)
+class Episode:
+    seconds: float
+
+
+@dataclass(frozen=True)
 class Config:
     tick_hz: int
     substeps: int
@@ -79,6 +91,8 @@ class Config:
     colonies: Colonies
     food: Food
     ground: Ground
+    vision: Vision
+    episode: Episode
     block: tuple[Block, ...]
 
     @property

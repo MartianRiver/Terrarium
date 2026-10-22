@@ -50,6 +50,17 @@ clearance = 1.5
 # how fast a sliding block slows, m/s² (friction coefficient times g)
 friction = 1.2
 
+[vision]
+# a fan of rays spread evenly across fov, centred on the heading
+rays = 16
+# 200°
+fov = 3.49
+range = 8.0
+
+[episode]
+# a training arena starts over after this long, or once everyone in it is dead
+seconds = 180.0
+
 [[block]]
 x = 3.5
 y = 3.0
