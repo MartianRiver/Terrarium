@@ -16,6 +16,11 @@ def test_default_loads_and_round_trips():
     assert build(Config, cfg.to_dict()) == cfg
 
 
+@pytest.mark.parametrize('path', sorted(DEFAULT.parent.glob('*.toml')), ids=lambda p: p.name)
+def test_every_config_loads(path):
+    load(path)
+
+
 def test_unknown_key_is_refused():
     data = raw()
     data['creature']['legs'] = 4

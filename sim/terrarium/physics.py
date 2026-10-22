@@ -5,6 +5,7 @@
 import numpy as np
 import pymunk
 import pymunk.batch
+from pymunk.constraints import GearJoint, PivotJoint
 
 from .config import Config
 
@@ -61,8 +62,8 @@ class Physics:
             space.add(body, shape)
             bodies.append(body)
             # top-down ground friction: joints to the ground that resist up to a set force and torque
-            slide = pymunk.PivotJoint(space.static_body, body, (0, 0), (0, 0))
-            spin = pymunk.GearJoint(space.static_body, body, 0, 1)
+            slide = PivotJoint(space.static_body, body, (0, 0), (0, 0))
+            spin = GearJoint(space.static_body, body, 0, 1)
             slide.max_bias = spin.max_bias = 0
             slide.max_force = b.mass * cfg.ground.friction
             spin.max_force = friction_torque(cfg, b.w, b.h, b.mass)
@@ -89,6 +90,20 @@ class Physics:
         self.vel = d[:, :n, 3:5].copy()
         self.block_pos = d[:, n:-1, 0:2].copy()
         self.block_angle = d[:, n:-1, 2].copy()
+
+    def place(self, arenas, creatures: np.ndarray):
+        """Creatures to these positions (len(arenas), creatures, 2), standing still, and blocks back where they started."""
+        for a, pos in zip(arenas, creatures):
+            bodies = self.bodies[a]
+            for body, (x, y) in zip(bodies, pos):
+                body.position = (float(x), float(y))
+                body.velocity = (0, 0)
+            for body, b in zip(bodies[self.creatures:], self.cfg.block):
+                body.position = (b.x, b.y)
+                body.angle = b.angle
+                body.velocity = (0, 0)
+                body.angular_velocity = 0
+        self.read()
 
     def step(self, force: np.ndarray):
         """Push each creature with force (arenas, creatures, 2) for one tick."""

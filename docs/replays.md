@@ -32,6 +32,6 @@ From `sim/`:
 uv run python -m terrarium.record ../samples/0.1-random.jsonl.gz --seconds 30 --seed 0
 ```
 
-That runs one arena with random actions. A 30 second replay is about 165 kB.
+That runs one arena with random actions. A 30 second replay is about 165 kB. It stops early if the episode ends: everyone dead, or `[episode] seconds` up. `--config configs/solo.toml` records the solo forager on its own.
 
 To watch one, use **Open replay** in the viewer or drop the file anywhere on the page. It loops at the end; R restarts it.
