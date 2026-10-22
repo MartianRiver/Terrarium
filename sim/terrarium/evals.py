@@ -3,7 +3,7 @@
 # are the baseline every brain has to beat; greedy is a scripted forager that
 # heads for the nearest food it can see, there to show what the senses allow.
 #
-#   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml
+#   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt]
 
 import argparse
 import json
@@ -12,7 +12,9 @@ from pathlib import Path
 
 import numpy as np
 
+from .brain import load as load_brain
 from .config import DEFAULT, Config, load
+from .forage import observe
 from .log import Logger
 from .random_actions import RandomActions
 from .vision import FOOD, NOTHING, look
@@ -52,6 +54,22 @@ def greedy_policy(world: World) -> Policy:
 POLICIES = {'random': random_policy, 'greedy': greedy_policy}
 
 
+def brain_policy(path: Path | str) -> Callable[[World], Policy]:
+    """A trained brain, taking its mean action: evals score what it's learned, not its exploration."""
+    brain, _ = load_brain(path)
+    brain.eval()
+
+    def make(world: World) -> Policy:
+        last = np.zeros((world.arenas, len(world.colony), 2))
+
+        def act(w: World) -> np.ndarray:
+            nonlocal last
+            last = np.clip(brain.act(observe(w, last), sample=False), -1, 1).reshape(last.shape)
+            return last
+        return act
+    return make
+
+
 def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES) -> dict:
     """Every episode to its end. Returns per-creature food per minute and seconds alive, with their means and errors."""
     world = World(cfg, episodes, SEED)
@@ -86,6 +104,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--policy', nargs='+', choices=sorted(POLICIES), default=['random'])
     parser.add_argument('--config', default=str(DEFAULT))
+    parser.add_argument('--brain', nargs='*', default=[], help='checkpoints to score alongside the policies')
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--out', help='write the results here as JSON')
     args = parser.parse_args()
@@ -93,11 +112,13 @@ def main():
 
     results = {}
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {SEED}')
-    print(f'{"policy":<8}  {"food/min":>14}  {"seconds alive":>16}')
-    for name in args.policy:
-        r = results[name] = run(cfg, POLICIES[name], args.episodes)
+    width = max(8, *(len(Path(b).name) for b in args.brain))
+    print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}')
+    makers = {name: POLICIES[name] for name in args.policy} | {Path(b).name: brain_policy(b) for b in args.brain}
+    for name, make in makers.items():
+        r = results[name] = run(cfg, make, args.episodes)
         f, s = r['food_per_minute'], r['seconds_alive']
-        print(f'{name:<8}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}')
+        print(f'{name:<{width}}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}')
         log.info('eval done', policy=name, food_per_minute=round(f['mean'], 3), seconds_alive=round(s['mean'], 1))
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
