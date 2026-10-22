@@ -1,0 +1,114 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #cfe8f2;
+  font: 13px/1.4 ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  color: #2c3a33;
+}
+
+#world {
+  position: fixed;
+  inset: 0;
+}
+
+#world canvas {
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  left: 16px;
+  top: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.7);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+#hud .hint {
+  margin-left: 10px;
+  opacity: 0.6;
+}
+
+#status {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  text-align: center;
+  font-size: 15px;
+}
+
+#status[data-kind='error'] {
+  background: #fde3df;
+  color: #8a2a1d;
+}
+
+#status[hidden] {
+  display: none;
+}
+
+.devlog-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+}
+
+.devlog {
+  position: fixed;
+  right: 16px;
+  bottom: 52px;
+  width: min(640px, calc(100vw - 32px));
+  height: 40vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: rgb(20 24 28 / 0.92);
+  color: #d6e2dc;
+  z-index: 2;
+}
+
+.devlog[hidden] {
+  display: none;
+}
+
+.devlog header {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+}
+
+.devlog pre {
+  flex: 1;
+  margin: 0;
+  padding: 0 10px 10px;
+  overflow: auto;
+  font: 11px/1.45 ui-monospace, Menlo, monospace;
+  white-space: pre-wrap;
+}
+
+.devlog-toggle,
+.devlog button,
+.devlog select {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #8899;
+  background: #fff;
+  color: #222;
+}
+
+@media (max-width: 640px) {
+  #hud .hint {
+    display: none;
+  }
+}

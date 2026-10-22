@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+dist/
+# my own working notes, any folder
+CLAUDE.md
