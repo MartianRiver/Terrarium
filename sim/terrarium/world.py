@@ -50,6 +50,8 @@ class World:
             for f in range(cfg.food.count):
                 self._grow(a, f)
         self.eaten = 0
+        # food each creature has eaten since its arena started
+        self.meals = np.zeros((arenas, n), int)
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -106,6 +108,7 @@ class World:
         self.energy[idx] = self.cfg.energy.start
         self.alive[idx] = True
         self.age[idx] = 0
+        self.meals[idx] = 0
         self.food_regrow[idx] = 0
         for a in idx:
             for f in range(self.cfg.food.count):
@@ -151,6 +154,7 @@ class World:
         arena, food = np.nonzero(eaten)
         who = touching.argmax(1)[arena, food]
         np.add.at(self.energy, (arena, who), self.cfg.energy.food)
+        np.add.at(self.meals, (arena, who), 1)
         np.clip(self.energy, 0, 1, out=self.energy)
         hz = self.cfg.tick_hz
         lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)

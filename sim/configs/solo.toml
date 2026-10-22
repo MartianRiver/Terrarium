@@ -39,7 +39,9 @@ nest_distance = 0.68
 spawn_ring = 2.5
 
 [food]
-count = 28
+# scarce enough that finding food decides survival: random actions die within a minute,
+# the scripted forager in evals lives the whole episode
+count = 8
 radius = 0.25
 regrow_min = 6.0
 regrow_max = 12.0
