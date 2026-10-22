@@ -8,7 +8,7 @@ What each mechanic is for is in [VISION.md](VISION.md). This is the order they a
 
 *Mac, no AI.* A small 3D scene of blobs wobbling around under scripted movement, food, pushable blocks and flashing signal bulbs. The renderer is the window for everything after, and it's driven by the same frame format the sim will write.
 
-## 0.1: Sim core and replays
+## 0.1: Sim core and replays (done)
 
 *Mac.* A headless 2.5D sim with recordings the viewer can play back, and a known speed to plan compute from.
 

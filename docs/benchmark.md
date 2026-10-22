@@ -14,5 +14,6 @@ Ticks a second for the whole batch, arena-ticks a second in brackets. Real time 
 | when | what changed | 1 arena | 16 arenas | 64 arenas |
 |---|---|---|---|---|
 | 0.1, sim-world | first sim: 18 creatures, 28 food, 2 blocks, pymunk with 2 substeps | 23,280 | 4,998 (79,970) | 1,431 (91,587) |
+| 0.1.0 release | replays added, nothing on the step path | 23,222 | 5,052 (80,833) | 1,432 (91,671) |
 
 No vision or brain yet; from 0.2 those come into the number, and rays alone cost more than all of this ([physics.md](physics.md)).
