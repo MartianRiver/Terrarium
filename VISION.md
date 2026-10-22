@@ -110,7 +110,7 @@ A blend of **self** (energy, health, survival) and **colony** (food stored, popu
 Starting suggestions, to be checked stage by stage, not decisions.
 
 - **Language/ML:** Python + PyTorch.
-- **Physics:** the 2.5D design probably doesn't need PyBullet. A lightweight 2D physics engine or a custom vectorised sim may train far faster. Evaluate early, because simulation speed is the biggest factor in training cost.
+- **Physics:** the 2.5D design probably doesn't need PyBullet. A lightweight 2D physics engine or a custom vectorised sim may train far faster. Evaluate early, because simulation speed is the biggest factor in training cost. (Measured in 0.1: pymunk, see [docs/physics.md](docs/physics.md).)
 - **Viewer:** a 3D renderer (e.g. a browser-based Three.js viewer) that plays back recorded episodes and, later, streams the live main world. Kept fully separate from the sim.
 - **Algorithm:** PPO-style multi-agent training with one shared policy. Self-play against past checkpoints once colonies compete, so brains don't overfit to one opponent.
 - **Brain architecture built to grow:** an entity-based design (attention over "things I can see", each with a type) handles new object types, food kinds and creature types by adding new types rather than reshaping the network. This is the main way earlier training survives new features.

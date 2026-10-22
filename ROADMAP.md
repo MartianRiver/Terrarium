@@ -13,7 +13,7 @@ What each mechanic is for is in [VISION.md](VISION.md). This is the order they a
 *Mac.* A headless 2.5D sim with recordings the viewer can play back, and a known speed to plan compute from.
 
 - The sim in Python: creatures, food, blocks, walls and nests on a flat plane, with sliding, collisions and pushing.
-- Physics picked by measuring, not guessing: a custom vectorised sim against a 2D engine, on the same scene.
+- Physics picked by measuring, not guessing: a custom vectorised sim against a 2D engine, on the same scene. Picked pymunk; the numbers are in [docs/physics.md](docs/physics.md).
 - Every balance number in a config file.
 - **Replay format v1:** a world header plus frames, matching what the viewer already draws, with a format version from the first file. The viewer opens a replay file.
 - A small sample replay kept in the repo, so every later version can prove it still plays the old format.

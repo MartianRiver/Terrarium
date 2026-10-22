@@ -1,0 +1,5 @@
+{
+  "venvPath": "sim",
+  "venv": ".venv",
+  "executionEnvironments": [{ "root": "sim/bench" }, { "root": "sim" }]
+}
