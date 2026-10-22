@@ -1,0 +1,9 @@
+# Training: what's rewarded. The world it trains in is a separate file (solo.toml for 0.2).
+
+[reward]
+# per food eaten
+food = 1.0
+# once, on the tick a creature dies
+death = -1.0
+# per second alive; off, since paying for time alone teaches standing still
+alive = 0.0
