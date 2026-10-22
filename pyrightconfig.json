@@ -1,5 +1,6 @@
 {
   "venvPath": "sim",
   "venv": ".venv",
+  "pythonVersion": "3.13",
   "executionEnvironments": [{ "root": "sim/bench" }, { "root": "sim" }]
 }
