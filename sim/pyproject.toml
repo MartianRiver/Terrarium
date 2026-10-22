@@ -1,0 +1,25 @@
+[project]
+name = "terrarium-sim"
+version = "0.1.0"
+description = "Headless sim for Terrarium"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.5.4",
+    "pymunk>=7.3.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "terrarium"
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

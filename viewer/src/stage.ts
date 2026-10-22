@@ -21,7 +21,7 @@ function seeded(seed: number) {
   };
 }
 
-export function createStage(container: HTMLElement, info: WorldInfo) {
+export function createStage(container: HTMLElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
@@ -44,10 +44,9 @@ export function createStage(container: HTMLElement, info: WorldInfo) {
   controls.maxDistance = 60;
   controls.target.set(0, 0, 0);
 
-  addLights(scene, info);
-  addGround(scene, info);
-  for (const nest of info.nests) addNest(scene, nest);
-  addDecor(scene, info);
+  scene.add(new THREE.HemisphereLight(0xdff2ff, 0x6b7f4a, 1.4));
+  // everything that depends on the world's layout, rebuilt when a different one opens
+  let world = new THREE.Group();
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -68,6 +67,17 @@ export function createStage(container: HTMLElement, info: WorldInfo) {
 
   return {
     renderer, scene, camera,
+    setWorld(info: WorldInfo) {
+      scene.remove(world);
+      disposeAll(world);
+      world = new THREE.Group();
+      addSun(world, info);
+      addGround(world, info);
+      for (const nest of info.nests) addNest(world, nest);
+      addDecor(world, info);
+      scene.add(world);
+      log.debug('world built', { width: info.width, height: info.height, nests: info.nests.length });
+    },
     render() {
       controls.update();
       composer.render();
@@ -75,8 +85,17 @@ export function createStage(container: HTMLElement, info: WorldInfo) {
   };
 }
 
-function addLights(scene: THREE.Scene, info: WorldInfo) {
-  scene.add(new THREE.HemisphereLight(0xdff2ff, 0x6b7f4a, 1.4));
+function disposeAll(root: THREE.Object3D) {
+  root.traverse((o) => {
+    if (o instanceof THREE.DirectionalLight) o.shadow.dispose();
+    if (o instanceof THREE.InstancedMesh) o.dispose();
+    if (!(o instanceof THREE.Mesh)) return;
+    o.geometry.dispose();
+    for (const m of [o.material].flat()) m.dispose();
+  });
+}
+
+function addSun(scene: THREE.Object3D, info: WorldInfo) {
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
   sun.position.set(12, 24, 8);
   sun.castShadow = true;
@@ -89,7 +108,7 @@ function addLights(scene: THREE.Scene, info: WorldInfo) {
   scene.add(sun);
 }
 
-function addGround(scene: THREE.Scene, info: WorldInfo) {
+function addGround(scene: THREE.Object3D, info: WorldInfo) {
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(80, 64).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: GROUND, roughness: 1 }),
@@ -124,7 +143,7 @@ function addGround(scene: THREE.Scene, info: WorldInfo) {
   }
 }
 
-function addNest(scene: THREE.Scene, nest: NestInfo) {
+function addNest(scene: THREE.Object3D, nest: NestInfo) {
   const tint = COLONY_COLOURS[nest.colony % COLONY_COLOURS.length];
   const mound = new THREE.Mesh(
     new THREE.SphereGeometry(nest.radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.32, 1),
@@ -149,7 +168,7 @@ function addNest(scene: THREE.Scene, nest: NestInfo) {
   scene.add(ring);
 }
 
-function addDecor(scene: THREE.Scene, info: WorldInfo) {
+function addDecor(scene: THREE.Object3D, info: WorldInfo) {
   const rng = seeded(42);
   const dummy = new THREE.Object3D();
 

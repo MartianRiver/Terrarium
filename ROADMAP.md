@@ -8,16 +8,16 @@ What each mechanic is for is in [VISION.md](VISION.md). This is the order they a
 
 *Mac, no AI.* A small 3D scene of blobs wobbling around under scripted movement, food, pushable blocks and flashing signal bulbs. The renderer is the window for everything after, and it's driven by the same frame format the sim will write.
 
-## 0.1: Sim core and replays
+## 0.1: Sim core and replays (done)
 
 *Mac.* A headless 2.5D sim with recordings the viewer can play back, and a known speed to plan compute from.
 
 - The sim in Python: creatures, food, blocks, walls and nests on a flat plane, with sliding, collisions and pushing.
-- Physics picked by measuring, not guessing: a custom vectorised sim against a 2D engine, on the same scene.
+- Physics picked by measuring, not guessing: a custom vectorised sim against a 2D engine, on the same scene. Picked pymunk; the numbers are in [docs/physics.md](docs/physics.md).
 - Every balance number in a config file.
-- **Replay format v1:** a world header plus frames, matching what the viewer already draws, with a format version from the first file. The viewer opens a replay file.
+- **Replay format v1:** a world header plus frames, matching what the viewer already draws, with a format version from the first file. The viewer opens a replay file. The format is in [docs/replays.md](docs/replays.md).
 - A small sample replay kept in the repo, so every later version can prove it still plays the old format.
-- **The benchmark:** steps per second for 1, 16 and 64 arenas on the M3, written down as the baseline later stages are held to.
+- **The benchmark:** steps per second for 1, 16 and 64 arenas on the M3, written down as the baseline later stages are held to. Kept in [docs/benchmark.md](docs/benchmark.md).
 - Checks in CI: the sim's tests, and a replay written by the sim and read by the viewer's loader.
 
 Done when random creatures in the sim replay in 3D, and the speed number is recorded.

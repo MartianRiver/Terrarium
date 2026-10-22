@@ -63,6 +63,19 @@ export class WorldView {
     });
   }
 
+  // take everything out of the scene, before a replay starts over or another opens
+  dispose() {
+    for (const blob of this.blobs.values()) {
+      this.scene.remove(blob.root);
+      blob.dispose();
+    }
+    for (const f of [...this.food.values(), ...this.dyingFood]) this.scene.remove(f.root);
+    for (const block of this.blocks.values()) {
+      this.scene.remove(block.root);
+      block.dispose();
+    }
+  }
+
   get creatureCount() {
     return this.frame?.creatures.length ?? 0;
   }

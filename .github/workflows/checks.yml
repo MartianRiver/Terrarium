@@ -21,3 +21,39 @@ jobs:
           cache-dependency-path: viewer/package-lock.json
       - run: npm ci
       - run: npm run build
+      - run: npm test
+
+  sim:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          working-directory: sim
+      - run: uv sync --locked
+      - run: uv run pytest -q
+
+  # a replay the sim writes now has to load in the viewer
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          working-directory: sim
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - run: uv sync --locked
+        working-directory: sim
+      - run: uv run python -m terrarium.record "$RUNNER_TEMP/ci.jsonl.gz" --seconds 10
+        working-directory: sim
+      - run: npm ci
+        working-directory: viewer
+      - run: REPLAY="$RUNNER_TEMP/ci.jsonl.gz" npx vitest run --reporter verbose
+        working-directory: viewer
