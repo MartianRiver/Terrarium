@@ -84,7 +84,7 @@ def test_eating_gives_energy_and_food_regrows_elsewhere():
     world.step(np.zeros((1, len(world.colony), 2)))
     assert not world.food_present[0, 0]
     assert world.energy[0, 0] == pytest.approx(min(1, before + CFG.energy.food - CFG.energy.drain * CFG.dt))
-    assert world.eaten == 1
+    assert world.eaten == 1 and world.meals[0].sum() == 1
 
     hz = CFG.tick_hz
     for _ in range(round(CFG.food.regrow_max * hz) + 1):
@@ -186,6 +186,7 @@ def test_reset_starts_only_those_arenas_over():
     assert world.age[1] == 0 and world.age[0] == world.age[2] == 200
     assert world.alive[1].all() and (world.energy[1] == CFG.energy.start).all()
     assert world.food_present[1].all() and world.food_id[1].min() > before[1][1].max()
+    assert (world.meals[1] == 0).all()
     assert np.array_equal(world.block_pos[1], [(b.x, b.y) for b in CFG.block])
     assert (world.vel[1] == 0).all() and worst_overlap(world) < 0.15
     for a in (0, 2):

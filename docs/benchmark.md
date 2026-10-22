@@ -36,3 +36,4 @@ Vision is 14× the cost of everything else at 64 arenas, as [physics.md](physics
 | when | what changed | 1 arena | 64 arenas | 256 arenas | 1 arena, vision | 64, vision | 256, vision |
 |---|---|---|---|---|---|---|---|
 | 0.2, episodes-vision | first solo numbers | 24,071 | 2,635 (168,648) | 690 (176,549) | 8,731 | 1,288 (82,416) | 351 (89,835) |
+| 0.2, evals | solo food 28 → 8 (docs/evals.md) | 24,034 | 2,748 (175,867) | 719 (184,121) | 8,966 | 1,581 (101,154) | 444 (113,756) |
