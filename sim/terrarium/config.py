@@ -112,8 +112,27 @@ class Reward:
 
 
 @dataclass(frozen=True)
+class PPO:
+    samples: int
+    arenas: int
+    steps: int
+    epochs: int
+    minibatches: int
+    lr: float
+    gamma: float
+    lam: float
+    clip: float
+    entropy: float
+    value: float
+    max_grad_norm: float
+    checkpoint_every: int
+    device: str
+
+
+@dataclass(frozen=True)
 class Train:
     reward: Reward
+    ppo: PPO
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)

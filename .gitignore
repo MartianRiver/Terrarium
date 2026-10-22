@@ -6,3 +6,6 @@ __pycache__/
 .pytest_cache/
 # my own working notes, any folder
 CLAUDE.md
+
+# training runs (sim/terrarium/runs.py); weights never go in git
+runs/
