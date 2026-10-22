@@ -21,3 +21,16 @@ jobs:
           cache-dependency-path: viewer/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  sim:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10
+        with:
+          working-directory: sim
+      - run: uv sync --locked
+      - run: uv run pytest -q

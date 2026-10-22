@@ -12,3 +12,14 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "terrarium"
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
