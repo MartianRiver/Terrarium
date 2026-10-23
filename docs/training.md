@@ -73,6 +73,17 @@ Running the Mac isn't counted in dollars.
 ## Watching a brain
 
 ```
+uv run python -m terrarium.serve    # in sim/
+npm run dev                         # in viewer/, then open /runs.html
+```
+
+The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (food per episode, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent. Watch opens one in the viewer.
+
+The replay is recorded the first time it's asked for, in the run's own world from `run.json` rather than today's config, and kept in the run's `replays/` folder. One takes a second or two. The replay seed picks the arena: the same seed gives every generation the same layout, which is the fair way to compare them. A run on another machine shows up once it's fetched.
+
+Or by hand:
+
+```
 uv run python -m terrarium.evals --config configs/solo.toml --policy random greedy --brain runs/<run>/checkpoints/<n>.pt
 uv run python -m terrarium.record out.jsonl.gz --config configs/solo.toml --seconds 180 --brain runs/<run>/checkpoints/<n>.pt
 ```

@@ -89,35 +89,46 @@ function boot() {
     acc = 0;
   }
 
-  async function open(file: File) {
+  async function open(name: string, read: () => Promise<ArrayBuffer>) {
     opening = true;
-    setStatus('loading', `Reading ${file.name}…`);
+    setStatus('loading', `Reading ${name}…`);
     try {
-      const replay = await readReplay(new Uint8Array(await file.arrayBuffer()));
-      log.info('replay opened', { name: file.name, version: replay.version, frames: replay.frames.length, source: replay.source.commit });
-      make = () => replaySource(replay, file.name);
+      const replay = await readReplay(new Uint8Array(await read()));
+      log.info('replay opened', { name, version: replay.version, frames: replay.frames.length, source: replay.source.commit });
+      make = () => replaySource(replay, name);
       restart(true);
       setStatus('ok');
     } catch (err) {
-      log.error('replay failed to open', { name: file.name, err });
+      log.error('replay failed to open', { name, err });
       const why = err instanceof ReplayError ? err.message : `something broke (${String(err)})`;
-      setStatus('error', `Couldn’t open ${file.name}: ${why}. Click or press Esc to close this.`);
+      setStatus('error', `Couldn’t open ${name}: ${why}. Click or press Esc to close this.`);
     } finally {
       opening = false;
     }
+  }
+  const openFile = (file: File) => open(file.name, () => file.arrayBuffer());
+
+  // ?replay=/api/runs/<id>/replay/<checkpoint> from the runs page; only this server's own urls
+  async function fetchReplay(url: URL) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ReplayError(body?.error ?? `the server said ${res.status}`);
+    }
+    return res.arrayBuffer();
   }
 
   openButton.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     fileInput.value = '';
-    if (file) void open(file);
+    if (file) void openFile(file);
   });
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('drop', (e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files[0];
-    if (file) void open(file);
+    if (file) void openFile(file);
   });
 
   const dismiss = () => status.dataset.kind === 'error' && view && setStatus('ok');
@@ -135,6 +146,14 @@ function boot() {
   });
 
   restart(true);
+  const params = new URLSearchParams(location.search);
+  const wanted = params.get('replay');
+  if (wanted) {
+    const url = new URL(wanted, location.href);
+    const name = params.get('name') ?? url.pathname.split('/').pop()!;
+    if (url.origin === location.origin) void open(name, () => fetchReplay(url));
+    else setStatus('error', `Won’t fetch a replay from another site (${url.origin}). Click or press Esc to close this.`);
+  }
 
   function frame(now: number) {
     const dt = Math.min(0.1, (now - last) / 1000);
