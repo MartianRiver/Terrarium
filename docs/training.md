@@ -13,6 +13,8 @@ PPO trains one brain for every creature, CleanRL-style:
 
 The learning rate falls linearly to zero over `samples`. Every number is in `sim/configs/train.toml`, along with the reward, and the world comes from its own file. The brain is in [brain.md](brain.md).
 
+The 0.2 brain took the default 20M samples, 52 minutes on the M3. Food per episode was at 50 by 3M samples and within a few percent of its final 55 by 5M, so most of that run was polish.
+
 Arenas that end start over at once, and running out of time counts as an end like dying does. Not bootstrapping that cut-off costs nothing here: episodes last minutes, and `gamma` looks a few seconds ahead.
 
 ## Run records

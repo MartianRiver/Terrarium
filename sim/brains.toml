@@ -2,3 +2,32 @@
 # (docs/training.md). Weights never go in git: each brain is attached to its
 # stage's GitHub release as `file`, with a copy in brains/ in the local backups.
 # `parent` is empty for a brain trained from scratch.
+
+[[brain]]
+stage = "0.2"
+id = "17cc35ad7932ad7fd460c511ddfcc0eae68320cab4dbb2447184d47edd7e9748"
+file = "17cc35ad7932.pt"
+parent = ""
+commit = "47a19513e17a06989d79f54eb317f0f95229b06b"
+run = "20261023-112747-solo"
+samples = 19988480
+schema = 1
+promoted = "2026-10-23"
+release = "v0.2.0"
+
+[brain.evals]
+config = "solo.toml"
+seed = 1000000
+episodes = 64
+
+[brain.evals.brain]
+food_per_minute = 18.401
+food_per_minute_stderr = 0.139
+seconds_alive = 180.0
+seconds_alive_stderr = 0.0
+
+[brain.evals.random]
+food_per_minute = 0.257
+food_per_minute_stderr = 0.074
+seconds_alive = 49.6
+seconds_alive_stderr = 2.1

@@ -22,7 +22,7 @@ What each mechanic is for is in [VISION.md](VISION.md). This is the order they a
 
 Done when random creatures in the sim replay in 3D, and the speed number is recorded.
 
-## 0.2: Solo forager
+## 0.2: Solo forager (done)
 
 *Mac.* One creature, ray vision, energy, common food. Reward: stay alive and fed. The first trained brain.
 
@@ -32,7 +32,7 @@ Done when random creatures in the sim replay in 3D, and the speed number is reco
 - Loading a checkpoint checks its schema version and refuses one that doesn't fit, saying why.
 - **Evals v1:** fixed seeds and a few numbers (food per minute, time alive), against a random baseline.
 
-Done when the trained blob clearly beats random on the evals, and there's a clip of it hunting for food.
+Done when the trained blob clearly beats random on the evals, and there's a clip of it hunting for food. The promoted brain eats 18.4 food a minute and lives every episode out, against random's 0.26 and 50 s ([docs/evals.md](docs/evals.md)).
 
 ## 0.3: Colony basics
 
