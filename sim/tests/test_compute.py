@@ -26,8 +26,12 @@ def test_a_run_counts_start_to_finish_or_up_to_its_last_update(tmp_path):
     make_run(tmp_path, 'done', '2026-10-23T10:00:00+1100', '2026-10-23T10:30:00+1100', last=1700)
     make_run(tmp_path, 'stopped', '2026-10-23T10:00:00+1100', last=563.1)
     make_run(tmp_path, 'crashed', '2026-10-23T10:00:00+1100')
+    live = make_run(tmp_path, 'live', '2026-10-23T10:00:00+1100', last=20.5)['id']
+    with open(tmp_path / live / 'metrics.jsonl', 'a') as f:
+        f.write('{"seconds": 2')
     assert seconds(tmp_path / 'done') == 1800
     assert seconds(tmp_path / 'stopped') == 563.1
+    assert seconds(tmp_path / 'live') == 20.5
     assert seconds(tmp_path / 'crashed') == 0
 
 

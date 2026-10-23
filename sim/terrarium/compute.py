@@ -30,13 +30,20 @@ def read_run(run: Path) -> dict:
     return json.loads((run / 'run.json').read_text())
 
 
+def metrics(run: Path) -> list[dict]:
+    path = run / 'metrics.jsonl'
+    text = path.read_text() if path.exists() else ''
+    # a live run may be halfway through writing its last line
+    return [json.loads(line) for line in text[:text.rfind('\n') + 1].splitlines()]
+
+
 def seconds(run: Path) -> float:
     record = read_run(run)
     if 'finished' in record:
         return (when(record['finished']) - when(record['started'])).total_seconds()
     # stopped or still going: as far as its last update
-    rows = (run / 'metrics.jsonl').read_text().splitlines() if (run / 'metrics.jsonl').exists() else []
-    return json.loads(rows[-1])['seconds'] if rows else 0.0
+    rows = metrics(run)
+    return rows[-1]['seconds'] if rows else 0.0
 
 
 def sessions(path: Path = SESSIONS) -> list[dict]:
