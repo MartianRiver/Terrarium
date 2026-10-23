@@ -22,6 +22,9 @@ uv run python -m terrarium.evals --policy random greedy --config configs/solo.to
 |---|---|---|
 | random | 0.26 ± 0.07 | 49.6 ± 2.1 |
 | greedy | 13.79 ± 0.16 | 180.0 ± 0.0 |
+| 0.2 brain (`17cc35ad7932`) | 18.40 ± 0.14 | 180.0 ± 0.0 |
+
+The promoted brain lives every episode out and eats a third more than greedy. Its worst episode (14.7 food per minute) beats greedy's mean.
 
 The food count was set from these, by running both policies at a few counts:
 
