@@ -6,10 +6,12 @@ One brain acts for every creature. It's built so later stages can add senses, ki
 
 Each creature is one sample, made of tokens:
 
-- **A self token:** energy, forward speed and side speed (as shares of top speed), and its last thrust and turn.
-- **A token per ray:** what the ray hit (nothing, wall, creature, food, block), how far it got as a share of the range, and the sin and cos of its angle off the heading.
+- **A self token:** energy, forward speed and side speed (as shares of top speed), its last thrust and turn, and the way home: the distance to its own nest's centre (in vision ranges) and the sin and cos of its direction off the heading. It may get fuzzier later, so remembering and scent trails have something to do.
+- **A token per ray:** what the ray hit (nothing, wall, creature, food, block), how far it got as a share of the range, the sin and cos of its angle off the heading, whether a creature it hit is a nestmate, and how far it got before reaching its own nest and any other colony's.
 
 Rays come from `terrarium.vision`, as many as `[vision] rays` says. Since each ray is its own token, changing the count needs no retraining of the shape, though a brain will see differently with a different fan.
+
+Nests are flat ground, so they don't stop a ray. A ray reports reaching one only if it does so before whatever it hit (a creature in front hides the nest behind it), and the full range when it doesn't. One standing on a nest sees it straight away. Nestmates are a flag rather than a colony number, so one brain works for every colony.
 
 ## What it does
 
@@ -22,7 +24,7 @@ Rays come from `terrarium.vision`, as many as `[vision] rays` says. Since each r
 1. Each ray token is an embedding for its kind plus a linear map of its features; the self token has its own linear map.
 2. A 2-layer transformer encoder (width 64, 4 heads, pre-norm) attends over all the tokens.
 3. The self token's output gives the mean action and the value estimate.
-4. 68,229 weights, roughly 300 kB on disk.
+4. 68,613 weights (68,229 in the 0.2 brain, before the home sense, nests and nestmates), roughly 300 kB on disk.
 
 ## Sort of on the level of
 

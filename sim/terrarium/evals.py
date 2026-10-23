@@ -40,7 +40,8 @@ def greedy_policy(world: World) -> Policy:
     ahead = np.abs(angles) < 0.5
 
     def act(w: World) -> np.ndarray:
-        dist, kind = look(w)
+        sight = look(w)
+        dist, kind = sight.dist, sight.kind
         food = np.where(kind == FOOD, dist, np.inf)
         nearest = food.argmin(-1)
         sees = np.isfinite(food.min(-1))

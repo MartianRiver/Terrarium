@@ -25,17 +25,23 @@ class Observation:
 def observe(world: World, last: np.ndarray) -> Observation:
     """last is each creature's previous action, (arenas, creatures, 2)."""
     cfg, v = world.cfg, world.cfg.vision
-    dist, kind = look(world)
+    sight = look(world)
     facing = directions(world.heading, 1, 0.0)[..., 0, :]          # A,N,2
     vel = world.vel / cfg.creature.max_speed
     forward = (vel * facing).sum(-1)
     side = facing[..., 0] * vel[..., 1] - facing[..., 1] * vel[..., 0]
-    me = np.stack([world.energy, forward, side, last[..., 0], last[..., 1]], -1)
+    # the way home, as an ant keeps track of it: how far, and which way off the heading
+    home = world.nests[world.colony] - world.pos
+    bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
+    me = np.stack([world.energy, forward, side, last[..., 0], last[..., 1],
+                   np.hypot(home[..., 0], home[..., 1]) / v.range, np.sin(bearing), np.cos(bearing)], -1)
 
     angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
-    rays = np.stack([dist / v.range, *(np.broadcast_to(f(angles), dist.shape) for f in (np.sin, np.cos))], -1)
+    shape = sight.dist.shape
+    rays = np.stack([sight.dist / v.range, *(np.broadcast_to(f(angles), shape) for f in (np.sin, np.cos)),
+                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range], -1)
     return Observation(me.reshape(-1, me.shape[-1]).astype(np.float32),
-                       kind.reshape(-1, v.rays).astype(np.int64),
+                       sight.kind.reshape(-1, v.rays).astype(np.int64),
                        rays.reshape(-1, v.rays, rays.shape[-1]).astype(np.float32))
 
 

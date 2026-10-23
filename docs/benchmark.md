@@ -28,8 +28,11 @@ The same, with every creature casting its rays each tick (16 rays over 200°, ou
 |---|---|---|---|---|
 | 0.2, episodes-vision | rays in the sim | 3,804 | 407 (6,506) | 99 (6,327) |
 | 0.2.0 release | nothing on the step path | 3,813 | 410 (6,555) | 103 (6,603) |
+| 0.3, colony-senses | rays also see nests and nestmates; circle tests keep x and y apart | 3,712 | 482 (7,715) | 118 (7,562) |
 
 Vision is 14× the cost of everything else at 64 arenas, as [physics.md](physics.md) measured: every ray is tested against every other creature. It doesn't matter yet, since 0.2 trains one creature per arena (below), but it's the thing to speed up before 0.3 puts colonies back.
+
+It still doesn't, with colonies: training 12 creatures per arena, the PPO update is about 90% of each round and collecting the samples (rays included) about 10%. So the speed-up so far is just the circle tests computing x and y apart instead of with `einsum`, about 45% faster each, which more than pays for seeing nests.
 
 ### Solo
 
@@ -40,5 +43,8 @@ Vision is 14× the cost of everything else at 64 arenas, as [physics.md](physics
 | 0.2, episodes-vision | first solo numbers | 24,071 | 2,635 (168,648) | 690 (176,549) | 8,731 | 1,288 (82,416) | 351 (89,835) |
 | 0.2, evals | solo food 28 → 8 (docs/evals.md) | 24,034 | 2,748 (175,867) | 719 (184,121) | 8,966 | 1,581 (101,154) | 444 (113,756) |
 | 0.2.0 release | nothing on the step path | 24,144 | 2,829 (181,085) | 736 (188,528) | 8,846 | 1,600 (102,409) | 453 (115,854) |
+| 0.3, colony-senses | rays also see nests and nestmates | 24,361 | 2,786 (178,289) | 734 (187,932) | 7,295 | 1,597 (102,233) | 468 (119,876) |
+
+One arena with vision is about 18% slower from 0.3: seeing nests is more numpy calls a tick, a fixed cost that's gone by 64 arenas.
 
 Two runs in a row of the same code differed by up to 7% at 64 arenas (1,388 then 1,486), so a change smaller than that needs a few runs before it means anything.
