@@ -1,0 +1,4 @@
+# The brain each stage settled on, oldest first, added by terrarium.promote
+# (docs/training.md). Weights never go in git: each brain is attached to its
+# stage's GitHub release as `file`, with a copy in brains/ in the local backups.
+# `parent` is empty for a brain trained from scratch.

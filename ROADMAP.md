@@ -28,7 +28,7 @@ Done when random creatures in the sim replay in 3D, and the speed number is reco
 
 - The brain: attention over the things it can see, each with a type, so later stages add types instead of reshaping it. Trained with PPO.
 - **Run records:** every training run gets its own folder (outside git) with the commit it ran from, the full config, the parent checkpoint and the observation/action schema version. Uncommitted changes only train as a scratch run, and only runs from committed code can be promoted, so every brain that matters traces back to exact code.
-- **Brain lineage:** a small file in the repo naming each stage's promoted brain, its hash, parent, commit, eval scores and where the weights are backed up. Where that is gets decided here.
+- **Brain lineage:** a small file in the repo naming each stage's promoted brain, its hash, parent, commit, eval scores and where the weights are backed up: on the stage's GitHub release, with a copy in a local backups folder.
 - Loading a checkpoint checks its schema version and refuses one that doesn't fit, saying why.
 - **Evals v1:** fixed seeds and a few numbers (food per minute, time alive), against a random baseline.
 

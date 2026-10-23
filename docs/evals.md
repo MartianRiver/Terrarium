@@ -34,4 +34,4 @@ The food count was set from these, by running both policies at a few counts:
 
 At 8, random actions starve within a minute and good foraging lives the whole episode, so time alive separates them as well as food does. If training struggles to get started because meals are too rare at first, this is the dial to turn up.
 
-A brain clearly beats random when its food per minute is at least twice random's, and both its numbers are ahead by more than three standard errors. The scores of the promoted brain go in its lineage entry.
+A brain clearly beats random when its food per minute is at least twice random's, and both its numbers are ahead by more than three standard errors of the difference. `promote` holds a brain to this. The scores of the promoted brain go in its lineage entry.
