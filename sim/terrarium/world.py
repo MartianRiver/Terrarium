@@ -1,6 +1,8 @@
 # The world: colonies of creatures around their nests, food that's eaten and
 # regrows, pushable blocks, walls. Runs many independent arenas at once; every
 # array is (arenas, ...) and an action is (thrust, turn) per creature in [-1, 1].
+# A creature dies when its energy runs out; an arena has ended once everyone in
+# it is dead or its episode is up, and the caller starts it over with reset().
 
 import numpy as np
 
@@ -28,8 +30,12 @@ class World:
         n = len(self.colony)
         self._check_layout()
 
-        pos, self.heading = self._spawn()
+        pos, self.heading = self._spawn(arenas)
         self.energy = np.full((arenas, n), cfg.energy.start)
+        self.alive = np.ones((arenas, n), bool)
+        # ticks since the arena last started
+        self.age = np.zeros(arenas, int)
+        self.episode_ticks = round(cfg.episode.seconds * cfg.tick_hz)
         self.physics = Physics(cfg, pos)
 
         # ids the viewer keys on: creatures and blocks keep theirs, food gets a new one each time it regrows
@@ -44,6 +50,8 @@ class World:
             for f in range(cfg.food.count):
                 self._grow(a, f)
         self.eaten = 0
+        # food each creature has eaten since its arena started
+        self.meals = np.zeros((arenas, n), int)
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -67,6 +75,10 @@ class World:
     def food_present(self):
         return self.food_regrow == 0
 
+    @property
+    def ended(self):
+        return ~self.alive.any(1) | (self.age >= self.episode_ticks)
+
     def _check_layout(self):
         # the spawn ring turns randomly, so every block has to be clear of the whole ring
         reach = self.cfg.colonies.spawn_ring + self.cfg.creature.radius
@@ -75,19 +87,38 @@ class World:
             if (gap <= reach).any():
                 raise ConfigError(f'block[{i}] at ({b.x}, {b.y}) is close enough to a nest for creatures to spawn inside it')
 
-    def _spawn(self):
+    def _spawn(self, arenas):
         """Each colony on an evenly spaced ring around its nest, turned a random amount per arena."""
         size = self.cfg.colonies.size
         ring = np.arange(size) / size * 2 * np.pi
-        turn = self.rng.uniform(0, 2 * np.pi, (self.arenas, len(self.nests), 1))
-        a = (ring + turn).reshape(self.arenas, -1)
+        turn = self.rng.uniform(0, 2 * np.pi, (arenas, len(self.nests), 1))
+        a = (ring + turn).reshape(arenas, -1)
         pos = self.nests[self.colony] + np.stack([np.cos(a), np.sin(a)], -1) * self.cfg.colonies.spawn_ring
         heading = self.rng.uniform(-np.pi, np.pi, a.shape)
         return pos, heading
 
+    def reset(self, arenas: np.ndarray):
+        """Start the arenas in this mask over: creatures respawn, blocks go back, all the food regrows somewhere new."""
+        idx = np.flatnonzero(arenas)
+        if not len(idx):
+            return
+        pos, heading = self._spawn(len(idx))
+        self.heading[idx] = heading
+        self.physics.place(idx, pos)
+        self.energy[idx] = self.cfg.energy.start
+        self.alive[idx] = True
+        self.age[idx] = 0
+        self.meals[idx] = 0
+        self.food_regrow[idx] = 0
+        for a in idx:
+            for f in range(self.cfg.food.count):
+                self._grow(a, f)
+        log.debug('arenas reset', tick=self.tick, count=len(idx))
+
     def step(self, actions: np.ndarray):
         cfg, c = self.cfg, self.cfg.creature
-        actions = np.clip(actions, -1, 1)
+        # the dead don't move, though their bodies still get pushed around
+        actions = np.clip(actions, -1, 1) * self.alive[..., None]
         thrust, turn = actions[..., 0], actions[..., 1]
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
@@ -101,7 +132,13 @@ class World:
         e = cfg.energy
         self.energy = np.clip(self.energy - (e.drain + e.move * np.abs(thrust)) * cfg.dt, 0, 1)
         self._regrow()
+        # eating on the tick it would have run out still saves it
         self._eat()
+        dying = self.alive & (self.energy <= 0)
+        if dying.any():
+            self.alive &= ~dying
+            log.debug('creatures died', tick=self.tick, count=int(dying.sum()))
+        self.age += 1
         self.tick += 1
 
     def _eat(self):
@@ -109,7 +146,7 @@ class World:
         # x and y apart: summing over a length-2 last axis is much slower in numpy
         dx = self.pos[:, :, None, 0] - self.food_pos[:, None, :, 0]
         dy = self.pos[:, :, None, 1] - self.food_pos[:, None, :, 1]
-        touching = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None]
+        touching = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None] & self.alive[..., None]
         eaten = touching.any(1)
         if not eaten.any():
             return
@@ -117,6 +154,7 @@ class World:
         arena, food = np.nonzero(eaten)
         who = touching.argmax(1)[arena, food]
         np.add.at(self.energy, (arena, who), self.cfg.energy.food)
+        np.add.at(self.meals, (arena, who), 1)
         np.clip(self.energy, 0, 1, out=self.energy)
         hz = self.cfg.tick_hz
         lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)

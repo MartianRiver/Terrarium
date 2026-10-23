@@ -84,7 +84,7 @@ def test_eating_gives_energy_and_food_regrows_elsewhere():
     world.step(np.zeros((1, len(world.colony), 2)))
     assert not world.food_present[0, 0]
     assert world.energy[0, 0] == pytest.approx(min(1, before + CFG.energy.food - CFG.energy.drain * CFG.dt))
-    assert world.eaten == 1
+    assert world.eaten == 1 and world.meals[0].sum() == 1
 
     hz = CFG.tick_hz
     for _ in range(round(CFG.food.regrow_max * hz) + 1):
@@ -138,3 +138,69 @@ def test_pushed_blocks_move_and_heavy_ones_less():
     light, heavy = push(0), push(1)
     assert light[0] > 1.0 and abs(light[1]) < 0.2
     assert heavy[0] > 0 and light[0] > 2 * heavy[0]
+
+
+def test_running_out_of_energy_kills_and_ends_the_arena():
+    world = alone()
+    world.energy[0, 0] = 0.01
+    world.food_regrow[:] = 1
+    ticks = 0
+    while world.alive[0, 0]:
+        world.step(np.array([[[1.0, 0.0]]]))
+        ticks += 1
+    assert ticks == int(np.ceil(0.01 / ((CFG.energy.drain + CFG.energy.move) * CFG.dt)))
+    assert world.ended[0]
+    # dead bodies coast to a stop and don't eat
+    world.food_regrow[0, 0] = 0
+    world.food_pos[0, 0] = world.pos[0, 0]
+    for _ in range(40):
+        world.step(np.array([[[1.0, 1.0]]]))
+    assert np.hypot(*world.vel[0, 0]) < 0.01 and world.food_present[0, 0] and world.energy[0, 0] == 0
+
+
+def test_eating_on_the_last_tick_saves_it():
+    world = alone()
+    world.energy[0, 0] = 0.0001
+    world.food_pos[0, 0] = world.pos[0, 0]
+    world.step(np.zeros((1, 1, 2)))
+    assert world.alive[0, 0] and world.energy[0, 0] > 0.3
+
+
+def test_episode_runs_out():
+    cfg = replace(CFG, episode=replace(CFG.episode, seconds=2.0))
+    world = World(cfg, 2)
+    run(world, 39)
+    assert not world.ended.any()
+    run(world, 1)
+    assert world.ended.all()
+
+
+def test_reset_starts_only_those_arenas_over():
+    world = World(CFG, 3, seed=5)
+    run(world, 200)
+    world.alive[1, :3] = False
+    world.energy[1, :3] = 0
+    before = world.pos.copy(), world.food_id.copy(), world.block_pos.copy()
+    world.reset(np.array([False, True, False]))
+
+    assert world.age[1] == 0 and world.age[0] == world.age[2] == 200
+    assert world.alive[1].all() and (world.energy[1] == CFG.energy.start).all()
+    assert world.food_present[1].all() and world.food_id[1].min() > before[1][1].max()
+    assert (world.meals[1] == 0).all()
+    assert np.array_equal(world.block_pos[1], [(b.x, b.y) for b in CFG.block])
+    assert (world.vel[1] == 0).all() and worst_overlap(world) < 0.15
+    for a in (0, 2):
+        assert np.array_equal(world.pos[a], before[0][a]) and np.array_equal(world.food_id[a], before[1][a])
+        assert np.array_equal(world.block_pos[a], before[2][a])
+    # and it carries on from there like a fresh start
+    run(world, 100)
+    assert world.age[1] == 100
+
+
+def test_reset_is_deterministic():
+    worlds = [World(CFG, 2, seed=9) for _ in range(2)]
+    for w in worlds:
+        run(w, 100)
+        w.reset(np.array([True, False]))
+        run(w, 100)
+    assert np.array_equal(worlds[0].pos, worlds[1].pos) and np.array_equal(worlds[0].food_pos, worlds[1].food_pos)

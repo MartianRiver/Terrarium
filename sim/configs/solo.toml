@@ -1,0 +1,82 @@
+# The solo forager (0.2): one creature on its own, otherwise world.toml.
+# Metres, seconds, kilograms, radians.
+
+tick_hz = 20
+# pymunk steps per tick, and the overlap it allows before pushing apart (see docs/physics.md)
+substeps = 2
+slop = 0.01
+
+[arena]
+size = 26.0
+
+[creature]
+radius = 0.45
+mass = 1.0
+max_speed = 2.4
+# backing up, as a share of max_speed
+reverse = 0.3
+turn_rate = 3.5
+# how quickly velocity catches up with what the creature asks for, per second
+accel = 8.0
+friction = 0.2
+
+[energy]
+start = 0.8
+# per second, just for being alive
+drain = 0.01
+# extra per second at full thrust
+move = 0.02
+# from one common food
+food = 0.4
+
+[colonies]
+count = 1
+size = 1
+nest_radius = 1.6
+# nests sit this far from the centre, as a share of half the arena
+nest_distance = 0.68
+# creatures start on a ring this far from their nest's centre
+spawn_ring = 2.5
+
+[food]
+# scarce enough that finding food decides survival: random actions die within a minute,
+# the scripted forager in evals lives the whole episode
+count = 8
+radius = 0.25
+regrow_min = 6.0
+regrow_max = 12.0
+# food never grows closer than this to a nest's edge or a wall
+clearance = 1.5
+
+[ground]
+# how fast a sliding block slows, m/s² (friction coefficient times g)
+friction = 1.2
+
+[vision]
+# a fan of rays spread evenly across fov, centred on the heading
+rays = 16
+# 200°
+fov = 3.49
+range = 8.0
+
+[episode]
+# a training arena starts over after this long, or once everyone in it is dead
+seconds = 180.0
+
+[[block]]
+x = 3.5
+y = 3.0
+angle = 0.0
+w = 1.3
+h = 1.3
+mass = 4.0
+friction = 0.6
+
+[[block]]
+x = -3.0
+y = -2.5
+angle = 0.0
+w = 2.4
+h = 1.1
+mass = 12.0
+friction = 0.6

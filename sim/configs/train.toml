@@ -1,0 +1,33 @@
+# Training: what's rewarded. The world it trains in is a separate file (solo.toml for 0.2).
+
+[reward]
+# per food eaten
+food = 1.0
+# once, on the tick a creature dies
+death = -1.0
+# per second alive; off, since paying for time alone teaches standing still
+alive = 0.0
+
+[ppo]
+# samples to train on in all: one creature for one tick is one sample
+samples = 20_000_000
+# arenas run side by side, and ticks each one runs per rollout
+arenas = 256
+steps = 128
+# passes over each rollout, and how many pieces each pass is cut into
+epochs = 4
+minibatches = 8
+# learning rate, falling linearly to 0 over the run
+lr = 3e-4
+# discount per tick (0.99 looks about 5 s ahead at 20 Hz) and the GAE trade-off
+gamma = 0.99
+lam = 0.95
+clip = 0.2
+# loss weights: entropy bonus and value error
+entropy = 0.0
+value = 0.5
+max_grad_norm = 0.5
+# save a checkpoint every this many updates, and always at the end
+checkpoint_every = 50
+# where the update runs: "mps" or "cpu" (rollouts are always on the CPU)
+device = "mps"

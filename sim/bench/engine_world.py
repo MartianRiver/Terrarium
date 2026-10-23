@@ -6,6 +6,7 @@
 import numpy as np
 import pymunk
 import pymunk.batch
+from pymunk.constraints import GearJoint, PivotJoint
 
 from rays import START
 from scene import (BLOCK_START, BLOCKS, CREATURE_MASS, CREATURES, DT, FOOD, FOOD_RADIUS, GROUND_FRICTION, HALF,
@@ -55,8 +56,8 @@ class EngineWorld:
             shape.filter = pymunk.ShapeFilter(categories=BLOCK, mask=CREATURE | BLOCK | WALL)
             space.add(body, shape)
             # top-down ground friction: joints to the ground that resist up to a set force and torque
-            slide = pymunk.PivotJoint(space.static_body, body, (0, 0), (0, 0))
-            spin = pymunk.GearJoint(space.static_body, body, 0, 1)
+            slide = PivotJoint(space.static_body, body, (0, 0), (0, 0))
+            spin = GearJoint(space.static_body, body, 0, 1)
             slide.max_bias = spin.max_bias = 0
             slide.max_force = m * GROUND_FRICTION
             spin.max_force = friction_torque(w, h, m)
@@ -108,6 +109,7 @@ class EngineWorld:
         self._read()
 
     def sync_food(self, food_pos, moved):
+        assert self.food_shapes is not None, 'built without food shapes'
         for a, i in zip(*np.nonzero(moved)):
             shape = self.food_shapes[a][i]
             shape.unsafe_set_offset((float(food_pos[a, i, 0]), float(food_pos[a, i, 1])))

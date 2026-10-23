@@ -2,7 +2,7 @@ import tomllib
 
 import pytest
 
-from terrarium.config import DEFAULT, Config, ConfigError, build, load
+from terrarium.config import DEFAULT, TRAIN, Config, ConfigError, Train, build, load, load_train
 
 
 def raw():
@@ -14,6 +14,19 @@ def test_default_loads_and_round_trips():
     cfg = load()
     assert len(cfg.block) == 2
     assert build(Config, cfg.to_dict()) == cfg
+
+
+@pytest.mark.parametrize('path', sorted(DEFAULT.parent.glob('*.toml')), ids=lambda p: p.name)
+def test_every_config_loads(path):
+    load_train(path) if path == TRAIN else load(path)
+
+
+def test_train_config_is_strict_too():
+    with open(TRAIN, 'rb') as f:
+        data = tomllib.load(f)
+    data['reward']['bonus'] = 1.0
+    with pytest.raises(ConfigError, match=r'train\.reward: unknown key\(s\) bonus'):
+        build(Train, data, 'train')
 
 
 def test_unknown_key_is_refused():

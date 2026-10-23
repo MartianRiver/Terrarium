@@ -1,5 +1,5 @@
-# World config, read from a TOML file. There are no defaults here on purpose:
-# every number lives in the file, so a run record's copy of it is the whole story.
+# World and training config, read from TOML files. There are no defaults here on
+# purpose: every number lives in a file, so a run record's copy is the whole story.
 
 import dataclasses
 import tomllib
@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT = Path(__file__).resolve().parent.parent / 'configs' / 'world.toml'
+TRAIN = DEFAULT.parent / 'train.toml'
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,18 @@ class Block:
 
 
 @dataclass(frozen=True)
+class Vision:
+    rays: int
+    fov: float
+    range: float
+
+
+@dataclass(frozen=True)
+class Episode:
+    seconds: float
+
+
+@dataclass(frozen=True)
 class Config:
     tick_hz: int
     substeps: int
@@ -79,11 +92,47 @@ class Config:
     colonies: Colonies
     food: Food
     ground: Ground
+    vision: Vision
+    episode: Episode
     block: tuple[Block, ...]
 
     @property
     def dt(self) -> float:
         return 1 / self.tick_hz
+
+    def to_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
+
+@dataclass(frozen=True)
+class Reward:
+    food: float
+    death: float
+    alive: float
+
+
+@dataclass(frozen=True)
+class PPO:
+    samples: int
+    arenas: int
+    steps: int
+    epochs: int
+    minibatches: int
+    lr: float
+    gamma: float
+    lam: float
+    clip: float
+    entropy: float
+    value: float
+    max_grad_norm: float
+    checkpoint_every: int
+    device: str
+
+
+@dataclass(frozen=True)
+class Train:
+    reward: Reward
+    ppo: PPO
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -123,3 +172,8 @@ def convert(kind, value, where):
 def load(path: Path | str = DEFAULT) -> Config:
     with open(path, 'rb') as f:
         return build(Config, tomllib.load(f))
+
+
+def load_train(path: Path | str = TRAIN) -> Train:
+    with open(path, 'rb') as f:
+        return build(Train, tomllib.load(f), 'train')

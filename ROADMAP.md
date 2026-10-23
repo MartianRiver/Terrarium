@@ -22,17 +22,17 @@ What each mechanic is for is in [VISION.md](VISION.md). This is the order they a
 
 Done when random creatures in the sim replay in 3D, and the speed number is recorded.
 
-## 0.2: Solo forager
+## 0.2: Solo forager (done)
 
 *Mac.* One creature, ray vision, energy, common food. Reward: stay alive and fed. The first trained brain.
 
 - The brain: attention over the things it can see, each with a type, so later stages add types instead of reshaping it. Trained with PPO.
-- **Run records:** every training run gets its own folder (outside git) with the commit it ran from, the full config, the parent checkpoint and the observation/action schema version. Training won't start with uncommitted changes, so every brain traces back to exact code.
-- **Brain lineage:** a small file in the repo naming each stage's promoted brain, its hash, parent, commit, eval scores and where the weights are backed up. Where that is gets decided here.
+- **Run records:** every training run gets its own folder (outside git) with the commit it ran from, the full config, the parent checkpoint and the observation/action schema version. Uncommitted changes only train as a scratch run, and only runs from committed code can be promoted, so every brain that matters traces back to exact code.
+- **Brain lineage:** a small file in the repo naming each stage's promoted brain, its hash, parent, commit, eval scores and where the weights are backed up: on the stage's GitHub release, with a copy in a local backups folder.
 - Loading a checkpoint checks its schema version and refuses one that doesn't fit, saying why.
 - **Evals v1:** fixed seeds and a few numbers (food per minute, time alive), against a random baseline.
 
-Done when the trained blob clearly beats random on the evals, and there's a clip of it hunting for food.
+Done when the trained blob clearly beats random on the evals, and there's a clip of it hunting for food. The promoted brain eats 18.4 food a minute and lives every episode out, against random's 0.26 and 50 s ([docs/evals.md](docs/evals.md)).
 
 ## 0.3: Colony basics
 

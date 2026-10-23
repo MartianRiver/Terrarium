@@ -49,7 +49,8 @@ def hit_boxes(origin, dirs, bpos, bang, half):
 def hit_walls(origin, dirs):
     with np.errstate(divide='ignore', invalid='ignore'):
         t = (np.sign(dirs) * HALF - origin[:, :, None]) / dirs
-    return np.where(t > START, t, np.inf).min(-1)
+    # a creature squeezed a little into a wall starts its rays beyond it, which is a hit straight away
+    return np.where(np.isfinite(t), np.maximum(t, START), np.inf).min(-1)
 
 
 def cast(pos, heading, food_pos, food_alive, bpos, bang, half):
