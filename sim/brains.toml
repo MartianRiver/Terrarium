@@ -2,6 +2,9 @@
 # (docs/training.md). Weights never go in git: each brain is attached to its
 # stage's GitHub release as `file`, with a copy in brains/ in the local backups.
 # `parent` is empty for a brain trained from scratch.
+# `like` is the animal it's sort of on the level of (docs/brain.md). `compute` is
+# what got it here (terrarium.compute): its own runs and its parents', every run
+# and rental in the stage (scratch and abandoned ones too), and all stages so far.
 
 [[brain]]
 stage = "0.2"
@@ -14,6 +17,7 @@ samples = 19988480
 schema = 1
 promoted = "2026-10-23"
 release = "v0.2.0"
+like = "a nematode worm (C. elegans), by wiring; simpler in what it does"
 
 [brain.evals]
 config = "solo.toml"
@@ -31,3 +35,12 @@ food_per_minute = 0.257
 food_per_minute_stderr = 0.074
 seconds_alive = 49.6
 seconds_alive_stderr = 2.1
+
+[brain.compute]
+until = "2026-10-23T12:20:14+11:00"
+lineage_hours = 0.87
+runs = 3
+hours = 1.1
+dollars = 0.0
+total_hours = 1.1
+total_dollars = 0.0

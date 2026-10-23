@@ -27,20 +27,23 @@ def fake_run(tmp_path, scores=GOOD, **record):
     (run / 'run.json').write_text(json.dumps({
         'id': run.name, 'commit': runs.git('rev-parse', 'HEAD'), 'dirty': False, 'scratch': False,
         'world': {'file': 'solo.toml'}, 'parent': None, 'schema': {'version': 1},
-        'finished': 'now', 'samples': 32768, 'checkpoint': checkpoint.name, 'brain': brain_id(checkpoint),
+        'started': '2026-10-23T12:00:00+1100', 'finished': '2026-10-23T12:30:00+1100', 'samples': 32768, 'checkpoint': checkpoint.name, 'brain': brain_id(checkpoint),
         **record}))
     return run
 
 
 def test_promote_writes_lineage_and_backup(tmp_path):
     run, path = fake_run(tmp_path), tmp_path / 'brains.toml'
-    entry = promote(run, '0.2', tmp_path / 'backups', path, branch='HEAD')
+    entry = promote(run, '0.2', tmp_path / 'backups', path, branch='HEAD', like='a worm',
+                    sessions=tmp_path / 'compute.toml')
     copy = tmp_path / 'backups' / 'brains' / entry['file']
     assert brain_id(copy) == entry['id'] == json.loads((run / 'run.json').read_text())['brain']
     [saved] = lineage(path)
     assert saved == entry
     assert saved['parent'] == '' and saved['release'] == 'v0.2.0'
     assert saved['evals']['brain']['food_per_minute'] == 9.8
+    assert saved['like'] == 'a worm'
+    assert (saved['compute']['runs'], saved['compute']['hours'], saved['compute']['total_hours']) == (1, 0.5, 0.5)
     with pytest.raises(Refused, match='already has a brain'):
         promote(run, '0.2', tmp_path / 'backups', path, branch='HEAD')
 

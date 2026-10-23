@@ -1,0 +1,13 @@
+# Rented machines, one [[session]] each, oldest first. The hours of training come
+# from the runs themselves (runs/); this is what each rental cost, setup,
+# downloads and idle time included. `ended` decides which stage a session counts
+# towards, and `python -m terrarium.compute vast` checks `dollars` against Vast.
+
+[[session]]
+provider = "vast"
+instance = 57306018
+gpu = "RTX 3060"
+started = "2026-10-23T13:02:00+11:00"
+ended = "2026-10-23T13:53:00+11:00"
+dollars = 0.271
+note = "measuring training speed: worker sweep, update profile, one 20M-sample scratch run. $0.151 of it was 3.9 GB of downloads (CUDA torch) at $0.039/GB"
