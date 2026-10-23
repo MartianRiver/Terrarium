@@ -33,6 +33,11 @@ function webglAvailable() {
   }
 }
 
+// the public site (`npm run site`) opens the newest replay instead of the scripted demo,
+// and has no runs page (that needs terrarium.serve)
+const SITE = import.meta.env.MODE === 'site';
+const SITE_REPLAY = '/replays/latest.jsonl.gz';
+
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 function demoSource(): Source {
@@ -69,6 +74,9 @@ function boot() {
   let source!: Source;
   let view: WorldView | undefined;
   let paused = false;
+  let following = false;
+  // after a restart the camera jumps to the blob rather than sweeping across the arena after it
+  let snap = true;
   let opening = false;
   let acc = 0;
   let last = performance.now();
@@ -79,14 +87,23 @@ function boot() {
     setStatus('error', 'Lost the graphics context. Reload to try again.');
   });
 
+  const params = new URLSearchParams(location.search);
+
   // from the top: a replay that has run out loops, and R does the same by hand
   function restart(newWorld = false) {
     view?.dispose();
     source = make();
     if (newWorld) stage.setWorld(source.info);
-    view = new WorldView(stage.scene, source.info);
+    view = new WorldView(stage.scene, source.info, !params.has('nodroppings'));
     view.push(source.step()!);
     acc = 0;
+    snap = true;
+  }
+
+  function follow(on: boolean) {
+    following = on;
+    stage.view(on);
+    log.info(on ? 'following' : 'overview');
   }
 
   async function open(name: string, read: () => Promise<ArrayBuffer>) {
@@ -110,7 +127,8 @@ function boot() {
 
   // ?replay=/api/runs/<id>/replay/<checkpoint> from the runs page; only this server's own urls
   async function fetchReplay(url: URL) {
-    const res = await fetch(url);
+    // Cloudflare has browsers keep replays for hours; revalidate so a new latest shows up
+    const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new ReplayError(body?.error ?? `the server said ${res.status}`);
@@ -143,11 +161,14 @@ function boot() {
       paused = !paused;
       log.info(paused ? 'paused' : 'resumed');
     }
+    if (e.key === 'f' || e.key === 'F') follow(!following);
   });
 
   restart(true);
-  const params = new URLSearchParams(location.search);
-  const wanted = params.get('replay');
+  if (params.has('intro')) stage.intro();
+  if (params.has('follow')) follow(true);
+  if (SITE) document.querySelector('a[href="/runs.html"]')?.remove();
+  const wanted = params.get('replay') ?? (SITE ? SITE_REPLAY : null);
   if (wanted) {
     const url = new URL(wanted, location.href);
     const name = params.get('name') ?? url.pathname.split('/').pop()!;
@@ -172,7 +193,9 @@ function boot() {
       }
     }
     view!.render(acc / tickSeconds, paused ? 0 : dt, now / 1000);
-    stage.render();
+    stage.track(following ? view!.focus : null, snap ? Infinity : paused ? 0 : dt);
+    snap = false;
+    stage.render(now / 1000);
 
     const label = source.label();
     if (sourceLabel.textContent !== label) sourceLabel.textContent = label;
