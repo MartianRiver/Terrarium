@@ -2,6 +2,11 @@
 # giving how far it went and the kind of thing it hit first. Plain numpy on the
 # positions physics reports. Rays start just outside the body, and anything
 # already covering that point counts as hit there, as pymunk's queries do.
+#
+# Nests are flat ground, so they don't stop a ray: it says how far it went
+# before reaching one, if that's before whatever it hit.
+
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -17,9 +22,17 @@ def directions(heading, rays, fov):
     return np.stack([np.cos(a), np.sin(a)], -1)
 
 
-def look(world: World) -> tuple[np.ndarray, np.ndarray]:
-    """How far each ray got from the creature's centre (metres, at most the range) and the kind of thing it hit.
-    Both are (arenas, creatures, rays)."""
+@dataclass
+class Sight:
+    """All (arenas, creatures, rays), distances in metres from the creature's centre, at most the range."""
+    dist: np.ndarray        # to the first thing hit
+    kind: np.ndarray        # what that was
+    nestmate: np.ndarray    # it's a creature from the same colony
+    own_nest: np.ndarray    # to the edge of its colony's nest, the range when it hit something first
+    other_nest: np.ndarray  # the same for any other colony's
+
+
+def look(world: World) -> Sight:
     cfg, v = world.cfg, world.cfg.vision
     start = cfg.creature.radius + GAP
     pos = world.pos
@@ -28,26 +41,39 @@ def look(world: World) -> tuple[np.ndarray, np.ndarray]:
     others = np.broadcast_to(~np.eye(n, dtype=bool), (arenas, n, n))
     food = np.broadcast_to(world.food_present[:, None], (arenas, n, cfg.food.count))
     half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2)
+    creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start)
     hits = np.stack([
         hit_walls(pos, dirs, cfg.arena.size / 2, start),
-        hit_circles(pos, dirs, pos, cfg.creature.radius, others, start),
-        hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start),
+        creatures.min(-1),
+        hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start).min(-1, initial=np.inf),
         hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start),
     ], -1)
     dist = hits.min(-1)
     seen = dist < v.range
-    return np.where(seen, dist, v.range), np.where(seen, hits.argmin(-1) + WALL, NOTHING)
+    dist, kind = np.where(seen, dist, v.range), np.where(seen, hits.argmin(-1) + WALL, NOTHING)
+    theirs = world.colony[creatures.argmin(-1)]
+    nestmate = (kind == CREATURE) & (theirs == world.colony[:, None])
+
+    nests = np.broadcast_to(world.nests, (arenas, *world.nests.shape))
+    every = np.ones((arenas, n, len(world.nests)), bool)
+    reach = hit_circles(pos, dirs, nests, cfg.colonies.nest_radius, every, start)
+    own = world.colony[:, None, None] == np.arange(len(world.nests))      # N,1,C
+    own_nest, other_nest = (np.where(mask, reach, np.inf).min(-1) for mask in (own, ~own))
+    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, v.range) for t in (own_nest, other_nest)))
 
 
 def hit_circles(origin, dirs, centres, radius, valid, start):
-    """origin (A,N,2), dirs (A,N,R,2), centres (A,M,2), valid (A,N,M): nearest hit per ray, inf for none."""
-    oc = centres[:, None] - origin[:, :, None]                      # A,N,M,2
-    along = np.einsum('anrk,anmk->anrm', dirs, oc)
-    miss2 = (oc * oc).sum(-1)[:, :, None] - along * along
+    """origin (A,N,2), dirs (A,N,R,2), centres (A,M,2), valid (A,N,M): where each ray hits each circle,
+    (A,N,R,M), inf for none."""
+    # x and y apart: einsum and sums over a length-2 axis are much slower in numpy
+    ox = centres[:, None, :, 0] - origin[:, :, None, 0]             # A,N,M
+    oy = centres[:, None, :, 1] - origin[:, :, None, 1]
+    along = dirs[..., 0, None] * ox[:, :, None] + dirs[..., 1, None] * oy[:, :, None]
+    miss2 = (ox * ox + oy * oy)[:, :, None] - along * along
     inside = radius * radius - miss2
     root = np.sqrt(np.maximum(inside, 0))
     ok = (inside > 0) & (along + root > start) & valid[:, :, None]
-    return np.where(ok, np.maximum(along - root, start), np.inf).min(-1, initial=np.inf)
+    return np.where(ok, np.maximum(along - root, start), np.inf)
 
 
 def hit_boxes(origin, dirs, bpos, bang, half, start):
