@@ -40,6 +40,8 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 
 - Colony ID and body traits as inputs, added so the 0.2 brain still loads.
 - The reward blend as a config dial.
+- A crop, like an ant's social stomach: food eaten when already full is carried instead, slows the creature down, and is unloaded into the nest's store. Being full starts to mean something.
+- Memory: a few numbers the brain carries from one tick to the next. The 0.2 brain forgets food the moment it's out of sight, and finding the way home needs more than that.
 
 Done when creatures stream between food and nest, and a lone creature still forages as well as the 0.2 brain did.
 

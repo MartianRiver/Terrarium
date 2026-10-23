@@ -126,7 +126,6 @@ class PPO:
     value: float
     max_grad_norm: float
     checkpoint_every: int
-    device: str
 
 
 @dataclass(frozen=True)
