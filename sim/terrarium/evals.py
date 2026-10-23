@@ -126,7 +126,7 @@ def main():
 
     results = {}
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {SEED}')
-    width = max(8, *(len(Path(b).name) for b in args.brain))
+    width = max([8, *(len(Path(b).name) for b in args.brain)])
     print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}')
     makers = {name: POLICIES[name] for name in args.policy} | {Path(b).name: brain_policy(b) for b in args.brain}
     for name, make in makers.items():
