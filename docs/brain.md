@@ -22,7 +22,29 @@ Rays come from `terrarium.vision`, as many as `[vision] rays` says. Since each r
 1. Each ray token is an embedding for its kind plus a linear map of its features; the self token has its own linear map.
 2. A 2-layer transformer encoder (width 64, 4 heads, pre-norm) attends over all the tokens.
 3. The self token's output gives the mean action and the value estimate.
-4. About 70k parameters, roughly 300 kB on disk.
+4. 68,229 weights, roughly 300 kB on disk.
+
+## Sort of on the level of
+
+Each promoted brain gets a `like` in `sim/brains.toml`: the animal it's roughly on the level of, for showing a stage to people. It's a loose ladder, not neuroscience. A weight isn't a synapse, which has timing and chemistry and changes as the animal lives, and an animal's nervous system runs its whole life, not one task. So it compares two things, and says both:
+
+- **wiring:** weights against synapses;
+- **what it does:** what the brain has to work with and what it's been trained to do.
+
+| | wiring | what it does |
+|---|---|---|
+| **0.2 brain** | 68,229 weights | 16 rays and its own energy and speed; no memory from one tick to the next; one drive, eating |
+| C. elegans, a nematode worm | 302 neurons, about 6,400 chemical synapses and 900 gap junctions | its whole nervous system |
+| Fruit fly | 139,255 neurons, 5 × 10⁷ synapses | its whole brain |
+
+So the 0.2 brain is about ten times a worm's synapse count and a seven-hundredth of a fly's. It does much less than a worm: wiring on the scale of a worm, doing a small part of what one does.
+
+Sources, checked 2026-10-23:
+
+- WormAtlas, the hermaphrodite nervous system: "elegans hermaphrodite has 302 neurons that belong to two distinct and independent nervous systems", and "The neurons communicate through approximately 6400 chemical synapses, 900 gap junctions, and 1500 neuromuscular junctions".
+- Dorkenwald et al., Nature 2024 (FlyWire): "a neuronal wiring diagram of a whole brain containing 5 × 10^7 chemical synapses between 139,255 neurons reconstructed from an adult female Drosophila melanogaster".
+
+Rungs to source before a stage needs them: an ant, a honeybee, a zebrafish larva, a jumping spider.
 
 ## Growing it
 

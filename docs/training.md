@@ -25,7 +25,7 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 
 | file | what |
 |---|---|
-| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, device, workers, torch threads, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
+| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, device, GPU, workers, torch threads, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
 | `metrics.jsonl` | one line per update: samples, speed, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread |
 | `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
@@ -41,6 +41,8 @@ On the M3 (4 performance and 4 efficiency cores), one 32k-sample update of the s
 
 On a rented RTX 3060 with 32 shared EPYC cores ($0.15 an hour), 8 workers and the update on CUDA, the same 20M-sample run took 25 minutes instead of 52, at about 13k samples a second, and learned the same way. Collect stops getting faster past 8 workers there (each EPYC core is about half an M3 core, and other renters share the machine). The update is 1.6 s, and it's the GPU's own time: the brain is small enough that the attention kernels mostly work on padding. `torch.compile` with bf16 halves it on that GPU, but isn't used yet.
 
+That session cost $0.27 for 51 minutes: $0.10 of GPU time, $0.01 of disk, and $0.15 for the 3.9 GB it downloaded, which was mostly CUDA torch, at $0.039 a GB. Bandwidth is priced per host, so it's worth looking at when picking one.
+
 ## Training on another machine
 
 ```
@@ -54,6 +56,19 @@ Rented containers often show the host's cores rather than their own share; one p
 `start` needs a clean tree. It sends the current commit as a git bundle over ssh, installs git, rsync and uv if they're missing, checks the commit out in `~/terrarium`, and starts training in the background, so a dropped connection doesn't stop it. Runs stay in `~/terrarium/runs/` between starts. `fetch` copies them into `runs/` here, where they can be promoted like any other once their commit is on `next`.
 
 On Linux torch comes with an extra: `uv sync --extra cpu`, or `--extra cuda` for an NVIDIA GPU (CUDA 12.6 builds, which need a driver that supports 12.6). PyPI's Linux wheels would bring CUDA whether it's wanted or not. Every `uv run` there needs the same extra, or uv syncs torch away; `start` picks `cuda` when the machine has `nvidia-smi`. macOS takes torch from PyPI, with MPS.
+
+## What it cost
+
+```
+uv run python -m terrarium.compute         # hours and dollars per stage, and since the last promotion
+uv run python -m terrarium.compute vast    # Vast's charges per instance, checked against compute.toml
+```
+
+The hours come from every run in `runs/`: start to finish, or up to its last update for one that was stopped. Scratch runs and abandoned ones count, since they're part of what it took. A run on a rented machine counts once it's fetched.
+
+The dollars come from [`sim/compute.toml`](../sim/compute.toml), one `[[session]]` per rented machine, written when it's destroyed. The bill includes setup, downloads and idle time, so it's more than the training hours at the list price. `compute vast` reads the charges with `VAST_API_KEY` from the environment or `.env`, and says which instances are missing or differ.
+
+Running the Mac isn't counted in dollars.
 
 ## Watching a brain
 
@@ -74,4 +89,6 @@ uv run python -m terrarium.promote runs/<run> --stage 0.2 --backups ~/backups/te
 
 It refuses a run that didn't finish, a scratch run, and one whose commit isn't on `next`. A run from a feature branch counts as not on `next`, because the squash merge leaves its commits behind, so the brain to promote is trained again once the code is merged. It also refuses a last checkpoint that has changed since the run, one that doesn't fit today's schema, one that doesn't clearly beat random in the run's `evals.json` ([evals.md](evals.md)), and a stage that already has a brain.
 
-A promoted brain is copied to `brains/<first 12 of its sha256>.pt` in the backups folder, then gets an entry in [`sim/brains.toml`](../sim/brains.toml): its id, parent, commit, run, samples, schema version and its evals next to random's. At release, the same file is attached to the stage's GitHub release, which the entry names.
+A promoted brain is copied to `brains/<first 12 of its sha256>.pt` in the backups folder, then gets an entry in [`sim/brains.toml`](../sim/brains.toml): its id, parent, commit, run, samples, schema version and its evals next to random's. At release, the same file is attached to the stage's GitHub release, which the entry names. `--like` adds the animal it's sort of on the level of ([brain.md](brain.md)).
+
+The entry's `compute` says what it took. Every run and rental since the last promotion counts towards this stage, and the totals carry on from the last brain. `lineage_hours` is narrower: the run that made this brain, plus its parents' runs, found in `runs/` or in their own entries.

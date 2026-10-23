@@ -1,9 +1,10 @@
 # Promote a finished run's last checkpoint to be a stage's brain: it has to come
 # from committed code that's on next and clearly beat random on the evals. The
 # weights are copied to a backups folder outside the repo and the brain gets an
-# entry in the lineage file, brains.toml.
+# entry in the lineage file, brains.toml, with what the stage's training cost
+# (compute.py): every run next to it in runs/ since the last promotion.
 #
-#   uv run python -m terrarium.promote runs/<run> --stage 0.2 --backups DIR
+#   uv run python -m terrarium.promote runs/<run> --stage 0.2 --backups DIR [--like "..."]
 
 import argparse
 import json
@@ -11,9 +12,10 @@ import shutil
 import subprocess
 import time
 import tomllib
+from datetime import datetime
 from pathlib import Path
 
-from . import evals
+from . import compute, evals
 from .brain import brain_id, load
 from .log import Logger
 from .schema import SchemaError
@@ -81,9 +83,13 @@ def tables(name: str, entry: dict) -> list[str]:
 
 
 def promote(run_dir: Path | str, stage: str, backups: Path | str, path: Path = LINEAGE,
-            branch: str = 'next') -> dict:
+            branch: str = 'next', like: str = '', sessions: Path = compute.SESSIONS) -> dict:
     run_dir = Path(run_dir)
     record, scores, checkpoint = check(run_dir, stage, path, branch)
+    try:
+        cost = compute.totals(run_dir.parent, record, lineage(path), datetime.now().astimezone(), sessions)
+    except LookupError as e:
+        raise Refused(str(e))
     sha = record['brain']
     file = f'{sha[:12]}.pt'
     copy = Path(backups) / 'brains' / file
@@ -96,9 +102,11 @@ def promote(run_dir: Path | str, stage: str, backups: Path | str, path: Path = L
         'stage': stage, 'id': sha, 'file': file, 'parent': (record['parent'] or {}).get('id', ''),
         'commit': record['commit'], 'run': record['id'], 'samples': record['samples'],
         'schema': record['schema']['version'], 'promoted': time.strftime('%Y-%m-%d'), 'release': f'v{stage}.0',
+        **({'like': like} if like else {}),
         'evals': {'config': record['world']['file'], 'seed': scores['brain']['seed'],
                   'episodes': scores['brain']['episodes'],
                   'brain': numbers(scores['brain']), 'random': numbers(scores['random'])},
+        'compute': cost,
     }
     with open(path, 'a') as f:
         f.write('\n'.join(tables('brain', entry)) + '\n')
@@ -111,9 +119,10 @@ def main():
     parser.add_argument('run', help='the run folder, runs/<date>-<time>-<name>')
     parser.add_argument('--stage', required=True, help='e.g. 0.2')
     parser.add_argument('--backups', required=True, help='a folder outside the repo; the weights go in its brains/')
+    parser.add_argument('--like', default='', help='the animal its brain is sort of on the level of (docs/brain.md)')
     args = parser.parse_args()
     try:
-        promote(args.run, args.stage, args.backups)
+        promote(args.run, args.stage, args.backups, like=args.like)
     except Refused as e:
         raise SystemExit(f'not promoted: {e}')
 

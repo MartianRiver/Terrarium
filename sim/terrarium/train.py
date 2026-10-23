@@ -61,7 +61,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         'world': {'file': Path(world_path).name, 'config': world_cfg.to_dict()},
         'train': {'file': Path(train_path).name, 'config': cfg.to_dict()},
         'parent': parent_record, 'schema': schema.current(), 'shape': learner.shape, 'seed': seed,
-        'device': device, 'workers': workers, 'threads': torch.get_num_threads(),
+        'device': device, 'gpu': torch.cuda.get_device_name() if device == 'cuda' else None,
+        'workers': workers, 'threads': torch.get_num_threads(),
     }, scratch=scratch, root=root)
 
     learner.to(device)
