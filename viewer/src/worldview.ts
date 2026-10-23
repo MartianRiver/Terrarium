@@ -4,6 +4,7 @@
 
 import type * as THREE from 'three';
 import { BlobView } from './blob';
+import { Droppings } from './droppings';
 import { createLogger } from './lib/logger';
 import { BlockView, FoodView } from './props';
 import type { CreatureState, Frame, WorldInfo } from './world';
@@ -13,6 +14,16 @@ const log = createLogger('worldview');
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
+function nearest(creatures: CreatureState[], at: { x: number; y: number }) {
+  let best: CreatureState | undefined;
+  let bestD = Infinity;
+  for (const c of creatures) {
+    const d = (c.x - at.x) ** 2 + (c.y - at.y) ** 2;
+    if (d < bestD) [best, bestD] = [c, d];
+  }
+  return best;
+}
+
 export class WorldView {
   private blobs = new Map<number, BlobView>();
   private food = new Map<number, FoodView>();
@@ -21,9 +32,14 @@ export class WorldView {
   private prevCreatures = new Map<number, CreatureState>();
   private prevBlocks = new Map<number, Frame['blocks'][number]>();
   private frame: Frame | null = null;
+  // where the first creature was last drawn, for the follow camera
+  focus: { x: number; y: number } | null = null;
+  private droppings: Droppings | null;
   private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1 };
 
-  constructor(private scene: THREE.Scene, private info: WorldInfo) {}
+  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
+    this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
+  }
 
   // call once per sim tick
   push(frame: Frame) {
@@ -35,6 +51,7 @@ export class WorldView {
     this.syncCreatures(frame);
     this.syncFood(frame);
     this.syncBlocks(frame);
+    this.droppings?.push(frame);
   }
 
   // alpha: 0..1 progress from the previous frame to the current one
@@ -49,12 +66,14 @@ export class WorldView {
       s.heading = lerpAngle(p.heading, c.heading, alpha);
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
+      if (c === this.frame.creatures[0]) this.focus = { x: s.x, y: s.y };
       this.blobs.get(c.id)!.update(s, this.info.maxSpeed, dt, time);
     }
     for (const b of this.frame.blocks) {
       const p = this.prevBlocks.get(b.id) ?? b;
       this.blocks.get(b.id)!.update({ ...b, x: lerp(p.x, b.x, alpha), y: lerp(p.y, b.y, alpha), angle: lerpAngle(p.angle, b.angle, alpha) });
     }
+    this.droppings?.render(this.frame.tick, alpha);
     for (const f of this.food.values()) f.update(dt, time);
     this.dyingFood = this.dyingFood.filter((f) => {
       const alive = f.update(dt, time);
@@ -70,6 +89,7 @@ export class WorldView {
       blob.dispose();
     }
     for (const f of [...this.food.values(), ...this.dyingFood]) this.scene.remove(f.root);
+    this.droppings?.clear();
     for (const block of this.blocks.values()) {
       this.scene.remove(block.root);
       block.dispose();
@@ -110,6 +130,9 @@ export class WorldView {
     }
     for (const [id, view] of this.food) {
       if (seen.has(id)) continue;
+      // food only goes when it's eaten, so the nearest creature had it
+      const eater = nearest(frame.creatures, view.state);
+      if (eater) this.droppings?.meal(eater.id, frame.tick);
       view.despawn();
       this.dyingFood.push(view);
       this.food.delete(id);

@@ -34,4 +34,4 @@ uv run python -m terrarium.record ../samples/0.1-random.jsonl.gz --seconds 30 --
 
 That runs one arena with random actions. A 30 second replay is about 165 kB. It stops early if the episode ends: everyone dead, or `[episode] seconds` up. `--config configs/solo.toml` records the solo forager on its own.
 
-To watch one, use **Open replay** in the viewer or drop the file anywhere on the page. It loops at the end; R restarts it.
+To watch one, use **Open replay** in the viewer or drop the file anywhere on the page. It loops at the end; R restarts it. F follows the creature from close up (the first one, while there are colonies), and `&follow` in the address does the same from the start. `&nodroppings` hides the droppings (viewer-only, after every third meal). `&intro` starts low outside the dome, circling slowly until the first F swoops down to the creature.

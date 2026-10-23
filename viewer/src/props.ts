@@ -2,15 +2,16 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { BlockState, FoodKind, FoodState } from './world';
 
-const berryGeo = new THREE.SphereGeometry(0.11, 14, 10);
+const berryGeo = new THREE.SphereGeometry(0.11, 20, 14);
 const leafGeo = new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.25, 1.8);
-const berryMat = new THREE.MeshPhysicalMaterial({ color: 0xd8344f, roughness: 0.3, clearcoat: 0.8 });
-const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f9a3c, roughness: 0.7 });
+const berryMat = new THREE.MeshPhysicalMaterial({ color: 0xff5a6e, roughness: 0.5, sheen: 0.5 });
+const leafMat = new THREE.MeshStandardMaterial({ color: 0x5fae4e, roughness: 0.7 });
 const richGeo = new THREE.IcosahedronGeometry(0.32, 0);
 const richMat = new THREE.MeshStandardMaterial({
-  color: 0xffc94a, emissive: 0xffa21f, emissiveIntensity: 1.4, roughness: 0.2, metalness: 0.1, flatShading: true,
+  color: 0xffd166, emissive: 0xffb12b, emissiveIntensity: 1.0, roughness: 0.3, flatShading: true,
 });
-const blockMat = new THREE.MeshStandardMaterial({ color: 0xb8ad9c, roughness: 0.85 });
+// a wooden toy block, like the rest of the garden
+const blockMat = new THREE.MeshPhysicalMaterial({ color: 0xe2bf8f, roughness: 0.6, sheen: 0.4, sheenColor: new THREE.Color(0xfff3dd) });
 
 const SPAWN_TIME = 0.45;
 const DESPAWN_TIME = 0.25;
