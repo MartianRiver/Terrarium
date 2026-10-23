@@ -39,3 +39,15 @@ uv run python -m terrarium.record out.jsonl.gz --config configs/solo.toml --seco
 ```
 
 Open the replay in the viewer.
+
+## Promoting a brain
+
+When a stage is done, its brain is promoted from a run on `next`:
+
+```
+uv run python -m terrarium.promote runs/<run> --stage 0.2 --backups ~/backups/terrarium
+```
+
+It refuses a run that didn't finish, a scratch run, and one whose commit isn't on `next`. A run from a feature branch counts as not on `next`, because the squash merge leaves its commits behind, so the brain to promote is trained again once the code is merged. It also refuses a last checkpoint that has changed since the run, one that doesn't fit today's schema, one that doesn't clearly beat random in the run's `evals.json` ([evals.md](evals.md)), and a stage that already has a brain.
+
+A promoted brain is copied to `brains/<first 12 of its sha256>.pt` in the backups folder, then gets an entry in [`sim/brains.toml`](../sim/brains.toml): its id, parent, commit, run, samples, schema version and its evals next to random's. At release, the same file is attached to the stage's GitHub release, which the entry names.

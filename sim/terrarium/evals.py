@@ -100,6 +100,20 @@ def summary(x: np.ndarray) -> dict:
             'min': float(x.min()), 'max': float(x.max())}
 
 
+def beats(brain: dict, baseline: dict) -> list[str]:
+    """Why brain doesn't clearly beat baseline (docs/evals.md), or nothing if it does."""
+    why = []
+    food, base = brain['food_per_minute']['mean'], baseline['food_per_minute']['mean']
+    if food < 2 * base:
+        why.append(f'food/min {food:.2f} is under twice {base:.2f}')
+    for m in ('food_per_minute', 'seconds_alive'):
+        b, r = brain[m], baseline[m]
+        gap, err = b['mean'] - r['mean'], np.hypot(b['stderr'], r['stderr'])
+        if gap <= 3 * err:
+            why.append(f'{m} is ahead by {gap:.2f}, not more than three standard errors ({3 * err:.2f})')
+    return why
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--policy', nargs='+', choices=sorted(POLICIES), default=['random'])

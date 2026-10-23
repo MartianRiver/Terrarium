@@ -24,7 +24,7 @@ Earlier work has to stay usable. That's the whole point of building in stages.
 
 - **Replays.** Every version of the viewer plays every replay ever recorded. The format only gains fields; a change that can't keep to that bumps the format version, and the loader keeps reading the old one. A sample replay from each released version stays in the repo to prove it.
 - **Brains.** The observation and action layout only grows. New inputs and actions are added switched off or zero-weighted and turned on during training, so the previous stage's brain still loads. Each checkpoint records the schema version it was trained on, and loading one that doesn't fit fails with the reason.
-- **Training runs.** Weights never go in git. Every run records the commit, config and parent it came from, and only runs from committed code can be promoted. The lineage file is the one place that says which brain each stage settled on.
+- **Training runs.** Weights never go in git. Every run records the commit, config and parent it came from, and only runs from committed code can be promoted. The lineage file, `sim/brains.toml`, is the one place that says which brain each stage settled on.
 - **The world (from 1.0).** The main world's state is saved apart from the brains, carries its own version, and is moved forward when that changes, never reset to fit new code.
 
 ## Making a release
