@@ -29,5 +29,3 @@ value = 0.5
 max_grad_norm = 0.5
 # save a checkpoint every this many updates, and always at the end
 checkpoint_every = 50
-# where the update runs: "mps" or "cpu" (rollouts are always on the CPU)
-device = "mps"

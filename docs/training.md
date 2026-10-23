@@ -7,13 +7,15 @@ uv run python -m terrarium.train solo-first --world configs/solo.toml
 
 PPO trains one brain for every creature, CleanRL-style:
 
-1. **Rollouts on the CPU.** `[ppo] arenas` run side by side, each for `steps` ticks per rollout.
+1. **Rollouts on the CPU.** `[ppo] arenas` run side by side, each for `steps` ticks per rollout. `--workers N` splits the arenas between N processes.
 2. **Advantages** from GAE.
-3. **Updates.** A few clipped passes over each rollout, on `[ppo] device` (MPS on the Mac).
+3. **Updates.** A few clipped passes over each rollout, on CUDA if there is a GPU, else MPS on a Mac, else the CPU. `--device` picks one.
 
 The learning rate falls linearly to zero over `samples`. Every number is in `sim/configs/train.toml`, along with the reward, and the world comes from its own file. The brain is in [brain.md](brain.md).
 
 The 0.2 brain took the default 20M samples, 52 minutes on the M3. Food per episode was at 50 by 3M samples and within a few percent of its final 55 by 5M, so most of that run was polish.
+
+Where it runs and how many workers are facts about the machine, not the training, so they're flags rather than config, and a run on a rented machine doesn't dirty the tree. With one worker the rollouts happen in the training process, seeded as they always were: the same seed gives the same brain. With more, worker i's arenas and sampling are seeded from (seed, i), so a run repeats for the same worker count but not across counts.
 
 Arenas that end start over at once, and running out of time counts as an end like dying does. Not bootstrapping that cut-off costs nothing here: episodes last minutes, and `gamma` looks a few seconds ahead.
 
@@ -23,7 +25,7 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 
 | file | what |
 |---|---|
-| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
+| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, device, workers, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
 | `metrics.jsonl` | one line per update: samples, speed, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread |
 | `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
@@ -32,6 +34,22 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 Training refuses to start with uncommitted changes unless it's given `--scratch`. A scratch run is for trying things: it keeps the diff so it can be understood later, and can never be promoted.
 
 `--parent X.pt` carries on from a checkpoint, which has to fit the schema. Its id is recorded as the new brain's parent.
+
+## Speed
+
+On the M3 (4 performance and 4 efficiency cores), one 32k-sample update of the solo world is about 0.9 s of rollout and 3.5 s of update on MPS, so about 8k samples a second, and the update is the limit. A worker's rollout is two thirds the brain choosing actions and one third the sim; shipping a rollout back from a worker takes a few milliseconds. More workers only bring the rollout down to about 0.55 s here, with the efficiency cores and whatever else the Mac is doing in the way, which is why one worker stays the default. They're for machines with a GPU and many cores, where the update stops being the limit.
+
+## Training on another machine
+
+```
+uv run python -m terrarium.remote start root@HOST -p PORT -- solo --world configs/solo.toml --workers 12
+uv run python -m terrarium.remote log root@HOST -p PORT      # the end of the training log
+uv run python -m terrarium.remote fetch root@HOST -p PORT    # copy runs/ back here
+```
+
+`start` needs a clean tree. It sends the current commit as a git bundle over ssh, installs git, rsync and uv if they're missing, checks the commit out in `~/terrarium`, and starts training in the background, so a dropped connection doesn't stop it. Runs stay in `~/terrarium/runs/` between starts. `fetch` copies them into `runs/` here, where they can be promoted like any other once their commit is on `next`.
+
+On Linux torch comes with an extra: `uv sync --extra cpu`, or `--extra cuda` for an NVIDIA GPU (CUDA 12.6 builds, which need a driver that supports 12.6). PyPI's Linux wheels would bring CUDA whether it's wanted or not. Every `uv run` there needs the same extra, or uv syncs torch away; `start` picks `cuda` when the machine has `nvidia-smi`. macOS takes torch from PyPI, with MPS.
 
 ## Watching a brain
 

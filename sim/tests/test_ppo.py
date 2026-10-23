@@ -47,8 +47,7 @@ def short(tmp_path):
     world = tmp_path / 'world.toml'
     world.write_text((DEFAULT.parent / 'solo.toml').read_text().replace('seconds = 180.0', 'seconds = 3.0'))
     text = TRAIN.read_text()
-    for key, value in (('samples', 256), ('arenas', 4), ('steps', 16), ('minibatches', 2), ('checkpoint_every', 2),
-                       ('device', '"cpu"')):
+    for key, value in (('samples', 256), ('arenas', 4), ('steps', 16), ('minibatches', 2), ('checkpoint_every', 2)):
         text = '\n'.join(f'{key} = {value}' if line.startswith(f'{key} =') else line for line in text.splitlines())
     trainer = tmp_path / 'train.toml'
     trainer.write_text(text + '\n')
@@ -57,7 +56,7 @@ def short(tmp_path):
 
 def test_a_short_run_leaves_a_full_record(tmp_path):
     world, trainer = short(tmp_path)
-    run = train('smoke', world, trainer, scratch=True, root=tmp_path / 'runs')
+    run = train('smoke', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
     record = json.loads((run.dir / 'run.json').read_text())
     assert record['train']['config']['ppo']['samples'] == 256 and record['world']['file'] == 'world.toml'
     assert record['samples'] == 256 and record['parent'] is None and 'finished' in record and record['id'] == run.id
@@ -69,7 +68,7 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
 
     # and a second run carries on from it, recording where it came from
     child = train('child', world, trainer, parent=run.dir / 'checkpoints' / '00000000256.pt', scratch=True,
-                  root=tmp_path / 'runs')
+                  root=tmp_path / 'runs', device='cpu')
     child_record = json.loads((child.dir / 'run.json').read_text())
     assert child_record['parent']['id'] == record['brain'] and child_record['id'] == child.id
     _, meta = load_brain(child.dir / 'checkpoints' / '00000000256.pt')
@@ -79,8 +78,20 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
 def test_training_changes_the_brain(tmp_path):
     world, trainer = short(tmp_path)
     torch.manual_seed(0)
-    run = train('moves', world, trainer, scratch=True, root=tmp_path / 'runs')
+    run = train('moves', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
     trained, _ = load_brain(run.dir / 'checkpoints' / '00000000256.pt')
     torch.manual_seed(0)
     fresh = Brain(**SHAPE)
     assert not torch.equal(trained.policy.weight, fresh.policy.weight)
+
+
+def test_workers_split_the_arenas(tmp_path):
+    world, trainer = short(tmp_path)
+    run = train('split', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', workers=3)
+    record = json.loads((run.dir / 'run.json').read_text())
+    assert record['workers'] == 3 and record['device'] == 'cpu' and record['samples'] == 256
+    rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
+    assert [r['update'] for r in rows] == [1, 2, 3, 4] and sum(r['episodes'] for r in rows) > 0
+    with pytest.raises(ValueError, match='at least one arena'):
+        train('too-many', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', workers=5)
+    assert len(list((tmp_path / 'runs').iterdir())) == 1

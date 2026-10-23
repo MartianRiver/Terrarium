@@ -33,8 +33,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           working-directory: sim
-      - run: uv sync --locked
-      - run: uv run pytest -q
+      - run: uv sync --locked --extra cpu
+      - run: uv run --extra cpu pytest -q
 
   # a replay the sim writes now has to load in the viewer
   replay:
@@ -49,9 +49,9 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: viewer/package-lock.json
-      - run: uv sync --locked
+      - run: uv sync --locked --extra cpu
         working-directory: sim
-      - run: uv run python -m terrarium.record "$RUNNER_TEMP/ci.jsonl.gz" --seconds 10
+      - run: uv run --extra cpu python -m terrarium.record "$RUNNER_TEMP/ci.jsonl.gz" --seconds 10
         working-directory: sim
       - run: npm ci
         working-directory: viewer
