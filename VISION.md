@@ -44,7 +44,7 @@ This document is the shared picture. It describes **what** the world is and **wh
 ### Senses
 - **Vision:** a fan of rays (lidar-style) returning distance and *what* was hit, including its colour category: food type, creature, colony tint, signal colour, queen, brood, block, wall, scent mark. Much cheaper than pixel vision and ideal for colour-based behaviour.
 - **Self-state:** energy, health, what it's carrying, colony ID, body traits.
-- Possibly a rough sense of direction to its own nest.
+- A sense of distance and direction to its own nest, as ants keep track of the way home. It may get fuzzier later, so memory and scent trails have something to do.
 
 ### Actions
 - Move (direction + speed) and turn.
@@ -77,7 +77,7 @@ A blend of **self** (energy, health, survival) and **colony** (food stored, popu
 - The queen starts as a **scripted heart of the nest**: she stays in the nest and lays eggs when fed. She may become a thinking agent later.
 - **Brood:** eggs → larvae/pupae → hatchlings. Brood must be fed and protected. Rivals can attack or steal it.
 - **Hatchlings** start small and weak, which naturally keeps them near the nest tending brood before they grow into foragers. This gives honeybee-style age-based roles without castes.
-- **Losing the queen** is a crisis, not instant death. A queenless colony can raise a new queen by pouring food into one member over time, while defending the nest until she matures.
+- **Losing the queen** is a crisis, not instant death. A queenless colony can raise a new queen by pouring jelly into one member over time, while defending the nest until she matures.
 - The colony grows by succeeding and shrinks by starving, being raided, or losing fights.
 
 ---
@@ -90,6 +90,8 @@ A blend of **self** (energy, health, survival) and **colony** (food stored, popu
 | Rich food | Heavy, high value, in contested patches; needs two creatures to carry | Cooperation, signalling "help me", fighting over hotspots |
 | Seeds | Can be carried and planted; grow slowly; thrive only on fertile soil | Farming, staying put, guarding territory |
 
+**Jelly** is what food becomes once it's carried home, and the colony's one currency. Stored in the nest, it hatches new members and feeds the young; later it feeds the queen and raises a new one. Eating it back gives less than the food was worth, so foraging always pays better than living off the store.
+
 **Movable blocks** of varying weight, some needing two creatures to move. Used for barriers, walling off farms and nests, and blocking chokepoints.
 
 ---
@@ -101,6 +103,7 @@ A blend of **self** (energy, health, survival) and **colony** (food stored, popu
 - **Fertile soil** patches spread unevenly, so some nests have good farmland and others don't. This asymmetry pushes colonies toward different strategies (farm-and-defend vs raid).
 - **Lean seasons:** wild food periodically stops regrowing. This is the main pressure that makes farming and food storage pay off.
 - **Day/night (later):** shorter vision at night, glowing signals easier to spot, night raids possible.
+- **Dust devils** wander across the map, knocking creatures over and scattering what they carry. Weather, not a creature.
 - **Training maps are randomised** every episode so creatures learn general skills. The main world uses one fixed layout.
 
 ---
