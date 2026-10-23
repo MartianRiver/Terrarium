@@ -25,7 +25,7 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 
 | file | what |
 |---|---|
-| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, device, workers, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
+| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, device, workers, torch threads, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
 | `metrics.jsonl` | one line per update: samples, speed, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread |
 | `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
@@ -37,7 +37,9 @@ Training refuses to start with uncommitted changes unless it's given `--scratch`
 
 ## Speed
 
-On the M3 (4 performance and 4 efficiency cores), one 32k-sample update of the solo world is about 0.9 s of rollout and 3.5 s of update on MPS, so about 8k samples a second, and the update is the limit. A worker's rollout is two thirds the brain choosing actions and one third the sim; shipping a rollout back from a worker takes a few milliseconds. More workers only bring the rollout down to about 0.55 s here, with the efficiency cores and whatever else the Mac is doing in the way, which is why one worker stays the default. They're for machines with a GPU and many cores, where the update stops being the limit.
+On the M3 (4 performance and 4 efficiency cores), one 32k-sample update of the solo world is about 0.9 s of rollout and 3.5 s of update on MPS, so about 8k samples a second, and the update is the limit. A worker's rollout is two thirds the brain choosing actions and one third the sim; shipping a rollout back from a worker takes a few milliseconds. More workers only bring the rollout down to about 0.55 s here, with the efficiency cores and whatever else the Mac is doing in the way, which is why one worker stays the default. They're for machines with a GPU and many cores.
+
+On a rented RTX 3060 with 32 shared EPYC cores ($0.15 an hour), 8 workers and the update on CUDA, the same 20M-sample run took 25 minutes instead of 52, at about 13k samples a second, and learned the same way. Collect stops getting faster past 8 workers there (each EPYC core is about half an M3 core, and other renters share the machine). The update is 1.6 s, and it's the GPU's own time: the brain is small enough that the attention kernels mostly work on padding. `torch.compile` with bf16 halves it on that GPU, but isn't used yet.
 
 ## Training on another machine
 
@@ -46,6 +48,8 @@ uv run python -m terrarium.remote start root@HOST -p PORT -- solo --world config
 uv run python -m terrarium.remote log root@HOST -p PORT      # the end of the training log
 uv run python -m terrarium.remote fetch root@HOST -p PORT    # copy runs/ back here
 ```
+
+Rented containers often show the host's cores rather than their own share; one pod reported 255 to torch while allowed 30. torch then runs far too many threads, so training caps them at the container's quota (cgroup `cpu.max`) and records the count in `run.json`.
 
 `start` needs a clean tree. It sends the current commit as a git bundle over ssh, installs git, rsync and uv if they're missing, checks the commit out in `~/terrarium`, and starts training in the background, so a dropped connection doesn't stop it. Runs stay in `~/terrarium/runs/` between starts. `fetch` copies them into `runs/` here, where they can be promoted like any other once their commit is on `next`.
 

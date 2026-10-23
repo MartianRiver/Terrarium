@@ -28,8 +28,9 @@ cd terrarium/sim
 extra=cpu
 command -v nvidia-smi >/dev/null && extra=cuda
 uv sync -q --locked --extra $extra
-nohup uv run --extra $extra python -m terrarium.train {args} > ../train.log 2>&1 &
-echo "training {commit:.7} with the $extra extra; log in terrarium/train.log"
+# the log lives outside the checkout: inside, it would make the tree dirty and training would refuse to start
+nohup uv run --extra $extra python -m terrarium.train {args} > ~/train.log 2>&1 &
+echo "training {commit:.7} with the $extra extra; log in ~/train.log"
 '''
 
 
@@ -51,7 +52,7 @@ def start(target: str, port: str, train_args: list[str]):
 
 
 def log(target: str, port: str, lines: int):
-    subprocess.run([*ssh(target, port), f'tail -n {lines} terrarium/train.log'], check=True)
+    subprocess.run([*ssh(target, port), f'tail -n {lines} train.log'], check=True)
 
 
 def fetch(target: str, port: str):

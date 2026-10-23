@@ -14,6 +14,9 @@ const grey = new THREE.Color(0x8a8a90);
 
 const HOP_HEIGHT = 0.16;
 const HOP_RATE = 11; // rad/s at full speed
+// energy where starving starts to show, and where full does
+const HUNGRY_BELOW = 0.3;
+const FULL_ABOVE = 0.85;
 
 function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number, number, number], scale: [number, number, number]) {
   const m = new THREE.Mesh(geo, mat);
@@ -46,6 +49,10 @@ export class BlobView {
   private blinkIn = 1 + Math.random() * 3;
   private blinkLeft = 0;
   private glow = new THREE.Color();
+  // shown energy eases toward the sim's, so a meal visibly fills the blob out
+  private energy: number | null = null;
+  private hunger = 0;
+  private full = 0;
 
   constructor(colony: number) {
     this.tint = COLONY_COLOURS[colony % COLONY_COLOURS.length];
@@ -96,15 +103,17 @@ export class BlobView {
     }
     this.lastYaw = yaw;
 
+    this.applyEnergy(s.energy, dt);
     this.animateHop(s.speed / maxSpeed, dt, time);
     this.animateEyes(dt, time);
-    this.applyEnergy(s.energy);
     this.applySignal(s.signal, dt);
   }
 
   private animateHop(moving: number, dt: number, time: number) {
     moving = Math.min(1, Math.max(0, moving));
-    this.hopAmp += ((moving > 0.08 ? 0.5 + moving * 0.5 : 0) - this.hopAmp) * Math.min(1, dt * 6);
+    // a starving blob drags itself along
+    const spring = 1 - this.hunger * 0.6;
+    this.hopAmp += ((moving > 0.08 ? (0.5 + moving * 0.5) * spring : 0) - this.hopAmp) * Math.min(1, dt * 6);
 
     const before = Math.floor(this.phase / Math.PI);
     if (this.hopAmp > 0.02) this.phase += dt * HOP_RATE * (0.6 + 0.4 * moving);
@@ -118,7 +127,8 @@ export class BlobView {
     this.squash += this.squashVel * dt;
 
     const sy = 1 + this.squash;
-    const sxz = 1 / Math.sqrt(Math.max(0.5, sy));
+    const girth = 1 + this.full * 0.14 - this.hunger * 0.12;
+    const sxz = girth / Math.sqrt(Math.max(0.5, sy));
     this.body.scale.set(sxz, sy, sxz);
     this.body.position.y = air * HOP_HEIGHT;
 
@@ -126,10 +136,11 @@ export class BlobView {
     this.body.rotation.x = this.lean;
     this.body.rotation.z = Math.max(-0.25, Math.min(0.25, -this.turn * 0.08));
 
-    const flap = 0.25 + air * 0.9;
+    const flap = (0.25 + air * 0.9) * (1 - this.hunger * 0.7);
     this.arms[0].rotation.z = -flap;
     this.arms[1].rotation.z = flap;
     this.stalk.rotation.z = Math.sin(time * 3 + this.seed) * 0.08 + this.turn * 0.05;
+    this.stalk.rotation.x = this.hunger * 0.9;
 
     this.feet.forEach((foot, i) => {
       const step = Math.sin(this.phase + i * Math.PI) * this.hopAmp;
@@ -145,7 +156,8 @@ export class BlobView {
       this.blinkIn = 2 + Math.random() * 4;
     }
     this.blinkLeft = Math.max(0, this.blinkLeft - dt);
-    const eyeHeight = this.blinkLeft > 0 ? 0.015 : 0.12;
+    // heavy lids when starving
+    const eyeHeight = this.blinkLeft > 0 ? 0.015 : 0.12 - this.hunger * 0.06;
 
     // pupils lead into the turn, with a little idle wander
     const lookX = Math.max(-0.35, Math.min(0.35, -this.turn * 0.15)) + Math.sin(time * 0.7 + this.seed) * 0.08;
@@ -157,10 +169,14 @@ export class BlobView {
     }
   }
 
-  private applyEnergy(energy: number) {
-    // low energy: duller tint, glow fades
-    this.bodyMat.color.copy(this.tint).lerp(grey, (1 - energy) * 0.5);
-    this.bodyMat.emissiveIntensity = 0.03 + energy * 0.22;
+  private applyEnergy(energy: number, dt: number) {
+    this.energy = this.energy === null ? energy : this.energy + (energy - this.energy) * Math.min(1, dt * 4);
+    const e = this.energy;
+    this.hunger = Math.min(1, Math.max(0, (HUNGRY_BELOW - e) / HUNGRY_BELOW));
+    this.full = Math.min(1, Math.max(0, (e - FULL_ABOVE) / (1 - FULL_ABOVE)));
+    // duller as energy falls, grey when starving; full ones glow
+    this.bodyMat.color.copy(this.tint).lerp(grey, (1 - e) * 0.35 + this.hunger * 0.4);
+    this.bodyMat.emissiveIntensity = 0.03 + e * 0.2 + this.full * 0.15;
   }
 
   private applySignal(signal: number, dt: number) {

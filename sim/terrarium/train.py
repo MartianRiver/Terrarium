@@ -26,6 +26,15 @@ from .runs import ROOT, Run
 log = Logger('train')
 
 
+def cpu_quota(path: Path = Path('/sys/fs/cgroup/cpu.max')) -> int | None:
+    """CPUs a container is allowed (cgroup v2). torch and os count the host's cores, which can be eight times as many."""
+    try:
+        quota, period = path.read_text().split()
+        return None if quota == 'max' else max(1, int(quota) // int(period))
+    except (OSError, ValueError):
+        return None
+
+
 def best_device() -> str:
     if torch.cuda.is_available():
         return 'cuda'
@@ -40,6 +49,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     device = device or best_device()
     if not 1 <= workers <= ppo.arenas:
         raise ValueError(f'{workers} workers for {ppo.arenas} arenas; it takes at least one arena each')
+    if (quota := cpu_quota()) and quota < torch.get_num_threads():
+        torch.set_num_threads(quota)
     torch.manual_seed(seed)
     if parent:
         learner, _ = load_brain(parent)
@@ -50,7 +61,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         'world': {'file': Path(world_path).name, 'config': world_cfg.to_dict()},
         'train': {'file': Path(train_path).name, 'config': cfg.to_dict()},
         'parent': parent_record, 'schema': schema.current(), 'shape': learner.shape, 'seed': seed,
-        'device': device, 'workers': workers,
+        'device': device, 'workers': workers, 'threads': torch.get_num_threads(),
     }, scratch=scratch, root=root)
 
     learner.to(device)

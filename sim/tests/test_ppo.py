@@ -9,7 +9,7 @@ from terrarium.brain import SHAPE, Brain
 from terrarium.brain import load as load_brain
 from terrarium.config import DEFAULT, TRAIN
 from terrarium.ppo import Episodes, advantages
-from terrarium.train import train
+from terrarium.train import cpu_quota, train
 
 
 def test_advantages_by_hand():
@@ -95,3 +95,13 @@ def test_workers_split_the_arenas(tmp_path):
     with pytest.raises(ValueError, match='at least one arena'):
         train('too-many', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', workers=5)
     assert len(list((tmp_path / 'runs').iterdir())) == 1
+
+
+def test_cpu_quota_reads_cgroup(tmp_path):
+    # a rented container showed 255 cores to torch but was allowed 30.6
+    f = tmp_path / 'cpu.max'
+    f.write_text('3060000 100000\n')
+    assert cpu_quota(f) == 30
+    f.write_text('max 100000\n')
+    assert cpu_quota(f) is None
+    assert cpu_quota(tmp_path / 'missing') is None
