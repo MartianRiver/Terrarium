@@ -21,18 +21,9 @@ from .config import DEFAULT, TRAIN, load, load_train
 from .log import Logger
 from .ppo import advantages, update
 from .rollouts import Collector
-from .runs import ROOT, Run
+from .runs import ROOT, Run, cpu_quota
 
 log = Logger('train')
-
-
-def cpu_quota(path: Path = Path('/sys/fs/cgroup/cpu.max')) -> int | None:
-    """CPUs a container is allowed (cgroup v2). torch and os count the host's cores, which can be eight times as many."""
-    try:
-        quota, period = path.read_text().split()
-        return None if quota == 'max' else max(1, int(quota) // int(period))
-    except (OSError, ValueError):
-        return None
 
 
 def best_device() -> str:
@@ -53,8 +44,9 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         torch.set_num_threads(quota)
     torch.manual_seed(seed)
     if parent:
-        learner, _ = load_brain(parent)
-        parent_record = {'file': str(parent), 'id': brain_id(parent)}
+        learner, made = load_brain(parent)
+        # the checkpoint's own meta names the run (and samples) it came from, wherever the file was copied to
+        parent_record = {'file': str(parent), 'id': brain_id(parent), 'meta': made}
     else:
         learner, parent_record = Brain(**SHAPE), None
     run = Run(name, {

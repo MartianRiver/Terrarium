@@ -1,6 +1,7 @@
 # What training has cost: the hours of every run in runs/ (scratch and
 # unfinished ones too) and the dollars of every rented machine in compute.toml.
-# promote writes a stage's totals into its brain's entry in brains.toml.
+# promote writes a stage's totals into its brain's entry in brains.toml, and
+# the runs page shows what went into each brain, per machine (behind()).
 #
 #   uv run python -m terrarium.compute         # per stage, and what's been spent since the last promotion
 #   uv run python -m terrarium.compute vast    # Vast's charges per instance, next to what compute.toml says
@@ -58,19 +59,121 @@ def spent(root: Path, since: datetime, until: datetime, path: Path = SESSIONS) -
             'dollars': round(sum(float(s['dollars']) for s in rented), 2)}
 
 
+def seconds_to(run: Path, samples: int | None) -> float:
+    """How long the run took to get this far: a parent can be a checkpoint partway through."""
+    rows = metrics(run)
+    if samples is None or not rows or samples >= rows[-1]['samples']:
+        return seconds(run)
+    return next(r['seconds'] for r in rows if r['samples'] >= samples)
+
+
+def maker(root: Path, parent: dict) -> Path | None:
+    """The run a parent brain came out of: named in its checkpoint, or the run that ended with it."""
+    named = (parent.get('meta') or {}).get('run')
+    if named and (root / named / 'run.json').exists():
+        return root / named
+    for run in root.iterdir():
+        if (run / 'run.json').exists() and read_run(run).get('brain') == parent['id']:
+            return run
+    return None
+
+
+def line(root: Path, run: Path) -> tuple[list[tuple[Path, float]], str | None]:
+    """The run and the runs behind its parent brain, newest first, each with the seconds that went into this
+    brain; and the id of a parent none of them made (None when the line goes all the way back)."""
+    out, parent = [(run, seconds(run))], read_run(run).get('parent')
+    while parent:
+        meta = parent.get('meta') or {}
+        if found := maker(root, parent):
+            out.append((found, seconds_to(found, meta.get('samples'))))
+            parent = read_run(found).get('parent')
+        elif 'run' not in meta and meta.get('parent'):
+            # made from another brain without training (new actions set up, say)
+            parent = {'id': meta['parent']}
+        else:
+            return out, parent['id']
+    return out, None
+
+
 def lineage_hours(root: Path, record: dict, brains: list[dict]) -> float:
     """The run that made this brain, plus the runs behind its parent, and theirs."""
-    hours = seconds(root / record['id']) / 3600
-    parent = (record['parent'] or {}).get('id')
-    if not parent:
-        return round(hours, 2)
-    for run in root.iterdir():
-        if (run / 'run.json').exists() and read_run(run).get('brain') == parent:
-            return round(hours + lineage_hours(root, read_run(run), brains), 2)
-    for brain in brains:
-        if brain['id'] == parent:
-            return round(hours + brain['compute']['lineage_hours'], 2)
-    raise LookupError(f'the parent {parent[:12]} is neither a run in {root} nor a brain in the lineage')
+    runs, missing = line(root, root / record['id'])
+    hours = sum(s for _, s in runs) / 3600
+    if missing:
+        brain = next((b for b in brains if b['id'] == missing), None)
+        if not brain:
+            raise LookupError(f'the parent {missing[:12]} is neither a run in {root} nor a brain in the lineage')
+        hours += brain['compute']['lineage_hours']
+    return round(hours, 2)
+
+
+def rented_on(record: dict, session: dict) -> bool:
+    # a queue worker on a pod writes its instance in; before that, the time window and the GPU have to do
+    if instance := record.get('machine', {}).get('instance'):
+        return session.get('instance') == instance
+    if record.get('device') != 'cuda' or not when(session['started']) <= when(record['started']) <= when(session['ended']):
+        return False
+    return not record.get('gpu') or session['gpu'] in record['gpu']
+
+
+def hardware(record: dict, rentals: list[dict]) -> str:
+    if record.get('device') == 'cuda':
+        gpu = record.get('gpu') or next((s['gpu'] for s in rentals if rented_on(record, s)), 'a GPU')
+        return gpu.removeprefix('NVIDIA ').removeprefix('GeForce ')
+    m = record.get('machine', {})
+    if 'cpu' in m:
+        return f'{m["cpu"]}, {m["memory_gb"]} GB'
+    return f'{m["platform"].split("-")[0]} {m["processor"]}' if m else 'not recorded'
+
+
+def shares(root: Path, rentals: list[dict]) -> dict[str, float]:
+    """Each rental's dollars split across the runs it hosted by their hours, idle time and all. Rentals that
+    overlap with the same GPU can't be told apart, so their runs share both."""
+    runs = [read_run(r) | {'seconds': seconds(r)} for r in root.iterdir() if (r / 'run.json').exists()]
+    out = defaultdict(float)
+    for s in rentals:
+        hosted = [r for r in runs if rented_on(r, s)]
+        total = sum(r['seconds'] for r in hosted)
+        for r in hosted:
+            out[r['id']] += float(s['dollars']) * r['seconds'] / total if total else 0
+    return dict(out)
+
+
+def by_hardware(rows: list[dict]) -> list[dict]:
+    groups = defaultdict(lambda: {'runs': 0, 'hours': 0.0, 'dollars': 0.0})
+    for r in rows:
+        g = groups[r['hardware']]
+        g['runs'] += 1
+        g['hours'] += r['hours']
+        g['dollars'] += r['dollars']
+    return sorted(({'hardware': k, **v} for k, v in groups.items()), key=lambda g: -g['hours'])
+
+
+def behind(root: Path, run: Path, path: Path = SESSIONS) -> dict:
+    """What went into the brain this run ends with: its runs, per machine, in hours and dollars."""
+    rentals = sessions(path)
+    cost = shares(root, rentals)
+    runs, missing = line(root, run)
+    rows = []
+    for r, secs in runs:
+        rec, whole = read_run(r), seconds(r)
+        rows.append({'id': rec['id'], 'hardware': hardware(rec, rentals), 'hours': secs / 3600,
+                     'dollars': cost.get(rec['id'], 0.0) * (secs / whole if whole else 1)})
+    return {'runs': rows, 'hardware': by_hardware(rows), 'hours': sum(r['hours'] for r in rows),
+            'dollars': sum(r['dollars'] for r in rows), 'missing': missing}
+
+
+def everything(root: Path, path: Path = SESSIONS) -> dict:
+    """Every run and rental so far, dead ends and pods that never ran anything included."""
+    rentals = sessions(path)
+    cost = shares(root, rentals)
+    records = [read_run(r) | {'seconds': seconds(r)} for r in root.iterdir() if (r / 'run.json').exists()]
+    rows = [{'hardware': hardware(r, rentals), 'hours': r['seconds'] / 3600, 'dollars': cost.get(r['id'], 0.0)}
+            for r in records]
+    unused = [s for s in rentals if not any(rented_on(r, s) for r in records)]
+    return {'hardware': by_hardware(rows), 'hours': sum(r['hours'] for r in rows),
+            'unused': {'rentals': len(unused), 'dollars': sum(float(s['dollars']) for s in unused)},
+            'dollars': sum(float(s['dollars']) for s in rentals)}
 
 
 def totals(root: Path, record: dict, brains: list[dict], until: datetime, path: Path = SESSIONS) -> dict:

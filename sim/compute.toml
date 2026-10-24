@@ -47,3 +47,39 @@ started = "2026-10-24T10:16:00+11:00"
 ended = "2026-10-24T11:18:00+11:00"
 dollars = 0.263
 note = "jelly grid (docs/notes/0.3.md): 6 scratch runs, 4M samples, 3 side by side; last run finished 10:41, idle 37 min after it"
+
+[[session]]
+provider = "vast"
+instance = 57456101
+gpu = "RTX A4000"
+started = "2026-10-24T13:44:47+11:00"
+ended = "2026-10-24T13:48:34+11:00"
+dollars = 0.008
+note = "job queue test on a pod: running but no ssh within 3 min, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57456578
+gpu = "RTX 3060"
+started = "2026-10-24T13:49:31+11:00"
+ended = "2026-10-24T13:59:40+11:00"
+dollars = 0.002
+note = "job queue test on a pod: never left loading in 10 min, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57457495
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T14:00:15+11:00"
+ended = "2026-10-24T14:00:59+11:00"
+dollars = 0.014
+note = "job queue test on a pod: up in 38 s, then destroyed by a bug in the test script before the worker started"
+
+[[session]]
+provider = "vast"
+instance = 57457702
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T14:02:32+11:00"
+ended = "2026-10-24T14:12:41+11:00"
+dollars = 0.089
+note = "job queue test on a pod: worker through an ssh tunnel to the Mac's coordinator, two chained 1M-sample solo jobs (rented-only), both done and synced"

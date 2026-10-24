@@ -25,7 +25,7 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 
 | file | what |
 |---|---|
-| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file and id), schema, brain shape, seed, device, GPU, workers, torch threads, machine, python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
+| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file, id, and the meta saved in it: the run and samples it came from), schema, brain shape, seed, device, GPU, workers, torch threads, machine (platform, CPU, memory), python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
 | `metrics.jsonl` | one line per update: samples, speed, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread |
 | `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
@@ -78,6 +78,8 @@ npm run dev                         # in viewer/, then open /runs.html
 ```
 
 The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (reward per life, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent. Watch opens one in the viewer.
+
+Each run's page also says what went into the brain it ends with, per machine: hours and dollars for the run and every run behind its parent, back to the first. A parent that was a checkpoint partway through a run counts up to that checkpoint, and a brain made from another without training (new actions set up, say) is followed through to the one it came from, if its checkpoint's meta names it as `parent`. A rented machine's bill is shared across the runs it hosted by their hours, idle time included; rentals with the same GPU at the same time can't be told apart, so they share their runs. The list ends with everything so far per machine, including rentals that never ran anything.
 
 The replay is recorded the first time it's asked for, in the run's own world from `run.json` rather than today's config, and kept in the run's `replays/` folder. One takes a second or two. The replay seed picks the arena: the same seed gives every generation the same layout, which is the fair way to compare them. A run on another machine shows up once it's fetched.
 
