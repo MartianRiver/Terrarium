@@ -1,0 +1,2 @@
+# keys that sign Terrarium training jobs; workers refuse any job not signed by one of these (docs/compute.md)
+terrarium namespaces="terrarium-job" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBEr9C7jkYyZy5SoAHJWdrVQm/GtJPQIVG0Sdc+QgFMt
