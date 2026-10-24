@@ -1,4 +1,4 @@
-# Blob Colonies — Vision & Roadmap
+# Vision
 
 A small, persistent 3D world of cute blob creatures, trained with reinforcement learning, that form colonies, forage, farm, guard, signal with colour, raid each other, and raise a queen. Inspired by OpenAI's hide-and-seek emergent tool use, ant scent trails and farming, and honeybee colony life.
 
