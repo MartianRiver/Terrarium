@@ -37,6 +37,19 @@ def cpu() -> str:
     return names[0] if names else platform.processor() or platform.machine()
 
 
+def cpu_quota(cgroup: Path = Path('/sys/fs/cgroup')) -> int | None:
+    """CPUs a container is allowed. torch and os count the host's cores, which can be eight times as many."""
+    try:
+        if (cgroup / 'cpu.max').exists():
+            quota, period = (cgroup / 'cpu.max').read_text().split()
+        else:
+            # cgroup v1, still on some Vast hosts; -1 is no limit
+            quota, period = ((cgroup / 'cpu' / f'cpu.cfs_{k}_us').read_text().strip() for k in ('quota', 'period'))
+        return None if quota in ('max', '-1') else max(1, int(quota) // int(period))
+    except (OSError, ValueError):
+        return None
+
+
 def memory_gb() -> int:
     return round(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / 2**30)
 

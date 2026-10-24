@@ -31,7 +31,7 @@ import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import jobs, snapshot
+from . import jobs, runs, snapshot
 from .log import Logger
 from .store import sha256
 
@@ -46,13 +46,7 @@ VERSION = 1
 
 def cpus() -> int:
     # containers report the host's cores; the cgroup quota is what this one may use
-    try:
-        quota, period = Path('/sys/fs/cgroup/cpu.max').read_text().split()
-        if quota != 'max':
-            return max(1, int(quota) // int(period))
-    except (OSError, ValueError):
-        pass
-    return os.cpu_count() or 1
+    return runs.cpu_quota() or os.cpu_count() or 1
 
 
 def torch_extra() -> list[str]:

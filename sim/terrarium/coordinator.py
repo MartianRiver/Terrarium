@@ -4,6 +4,8 @@
 #
 #   admin    adds jobs and blobs, lists, cancels, retries, fetches results
 #   trusted  River's own machines: any job, including uncommitted code
+#   rented   machines River rents (Vast pods): the same jobs as trusted, and
+#            the ones kept to rented machines (on = "rented")
 #   donor    someone else's machine: only jobs on public code, and only the
 #            blobs of the job it holds right now
 #
@@ -27,7 +29,7 @@ from .store import Full, Gone, Store, sha256, write_atomic
 log = Logger('coordinator')
 
 PORT = 5194
-ROLES = ('admin', 'trusted', 'donor')
+ROLES = ('admin', *jobs.MACHINES)
 LIMITS = {'blob': 16_000_000, 'result': 8_000_000, 'json': 64_000}
 
 
@@ -99,7 +101,7 @@ class Queue:
         return [j | {'blocked': self.store.blocked(j), 'sig': None} for j in self.store.all()]
 
     def claim(self, who: dict) -> dict | None:
-        job = self.store.claim(who['name'], trusted=who['role'] != 'donor')
+        job = self.store.claim(who['name'], trusted=who['role'] != 'donor', role=who['role'])
         if job is None:
             return None
         return {'spec': job['spec'], 'sig': job['sig'], 'parent': self.store.parent_blob(job)}

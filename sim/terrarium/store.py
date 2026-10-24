@@ -155,12 +155,14 @@ class Store:
         job['worker'], job['lease'] = None, None
         self.save(job)
 
-    def claim(self, worker: str, trusted: bool, now: float | None = None) -> dict | None:
+    def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None) -> dict | None:
         now = now or time.time()
         with self.lock:
             self.expire(now)
             for job in self.all():
                 if job['state'] != 'pending' or (job['spec']['trusted'] and not trusted) or not self.ready(job):
+                    continue
+                if job['spec'].get('on') not in (None, role):
                     continue
                 job |= {'state': 'running', 'worker': worker, 'lease': now + LEASE, 'progress': None,
                         'attempts': job['attempts'] + 1}

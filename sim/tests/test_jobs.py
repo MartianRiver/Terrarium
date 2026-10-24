@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,13 @@ from terrarium import coordinator, jobs, snapshot, worker
 from terrarium.store import LEASE, Gone, Store, sha256
 
 needs_ssh = pytest.mark.skipif(not shutil.which('ssh-keygen'), reason='no ssh-keygen')
+
+
+@pytest.fixture(autouse=True)
+def own_repos_only(monkeypatch):
+    # under a git hook GIT_DIR points at the real repo, and git init there marked it bare
+    for name in [k for k in os.environ if k.startswith('GIT_')]:
+        monkeypatch.delenv(name)
 
 
 def git(repo, *args):
@@ -45,11 +53,11 @@ def key(tmp_path):
     return key, signers
 
 
-def spec(id='a' * 12, trusted=False, parent=None, added=1.0, overlay=None):
+def spec(id='a' * 12, trusted=False, parent=None, added=1.0, overlay=None, on=None):
     return {'format': 1, 'id': id, 'batch': 'b', 'name': f'n{id[:3]}', 'added': added,
             'code': {'commit': 'c' * 40, 'bundle': None, 'overlay': overlay}, 'trusted': trusted,
             'world': sha256(b'w'), 'world_file': 'world.toml', 'train': sha256(b't'), 'train_file': 'train.toml',
-            'parent': parent, 'seed': 0, 'samples': 64}
+            'parent': parent, 'seed': 0, 'samples': 64, 'on': on}
 
 
 def result(name='20261024-120000-run', checkpoint='00000000064.pt', weights=b'brain') -> bytes:
@@ -70,8 +78,8 @@ def store(tmp_path) -> Store:
     return s
 
 
-def claimed(s: Store, worker: str, trusted: bool, now: float | None = None) -> dict:
-    job = s.claim(worker, trusted, now)
+def claimed(s: Store, worker: str, trusted: bool, now: float | None = None, role: str | None = None) -> dict:
+    job = s.claim(worker, trusted, now, role)
     assert job is not None
     return job
 
@@ -83,6 +91,18 @@ def test_jobs_go_out_oldest_first_and_trusted_ones_only_to_trusted_workers(tmp_p
     assert claimed(s, 'donor', trusted=False)['spec']['id'] == 'b' * 12
     assert s.claim('donor', trusted=False) is None
     assert claimed(s, 'mac', trusted=True)['spec']['id'] == 'a' * 12
+
+
+def test_a_job_kept_to_rented_machines_only_goes_to_one(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, trusted=True, on='rented'), 'sig')
+    assert s.claim('mac', True, role='trusted') is None
+    assert claimed(s, 'pod', True, role='rented')['spec']['id'] == 'a' * 12
+    for bad in ('mac', 'admin'):
+        with pytest.raises(jobs.BadJob, match='bad on'):
+            jobs.check(spec(on=bad))
+    with pytest.raises(jobs.BadJob, match='donor'):
+        jobs.check(spec(trusted=True, on='donor'))
 
 
 def test_a_job_waits_for_its_parent_job_and_gets_its_final_checkpoint(tmp_path):
@@ -213,8 +233,9 @@ def test_a_batch_file_becomes_specs_with_every_input_named_by_hash(repo, tmp_pat
     (tmp_path / 'brain.pt').write_bytes(b'parent weights')
     batch = tmp_path / 'grid.toml'
     batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n'
+                     'on = "rented"\n'
                      '[[job]]\nname = "first"\nparent = "brain.pt"\n'
-                     '[[job]]\nname = "second"\nparent = "job:first"\nseed = 2\n')
+                     '[[job]]\nname = "second"\nparent = "job:first"\nseed = 2\non = "trusted"\n')
     made, blobs = jobs.specs(batch, tmp_path / 'runs', repo)
     for s in made:
         jobs.check(s)
@@ -222,11 +243,15 @@ def test_a_batch_file_becomes_specs_with_every_input_named_by_hash(repo, tmp_pat
     assert not first['trusted'] and first['code']['overlay'] is None and first['samples'] == 64
     assert blobs[first['parent']['blob']] == b'parent weights' and second['parent'] == {'job': first['id']}
     assert blobs[first['world']] == b'size = 8\n' and second['seed'] == 2
+    assert first['on'] == 'rented' and second['on'] == 'trusted'
     (repo / 'sim' / 'a.py').write_text('a = 9\n')
     dirty, _ = jobs.specs(batch, tmp_path / 'runs', repo)
     assert dirty[0]['trusted'] and dirty[0]['code']['overlay']
     batch.write_text('world = "w"\ntrain = "t"\nlr = 3\n[[job]]\nname = "x"\n')
     with pytest.raises(jobs.BadJob, match='unknown key'):
+        jobs.load_batch(batch)
+    batch.write_text('world = "w"\ntrain = "t"\non = "mac"\n[[job]]\nname = "x"\n')
+    with pytest.raises(jobs.BadJob, match='on is one of'):
         jobs.load_batch(batch)
 
 
@@ -269,6 +294,10 @@ def test_a_donor_gets_public_jobs_and_only_their_blobs(server, tmp_path, monkeyp
     assert c['donor'].call('POST', '/api/claim', {})[0] == 204
     assert c['donor'].call('GET', f'/api/blobs/{sha256(b"w")}') == (200, b'w')
     assert c['donor'].call('GET', f'/api/blobs/{sha256(b"private code")}')[0] == 403
+    upload(c['admin'], spec('c' * 12, trusted=True, overlay=sha256(b'private code'), added=3, on='rented'))
+    assert c['trusted'].json('POST', '/api/claim', {})['spec']['id'] == 'a' * 12
+    assert c['trusted'].call('POST', '/api/claim', {})[0] == 204
+    assert c['rented'].json('POST', '/api/claim', {})['spec']['id'] == 'c' * 12
     c['donor'].json('POST', f'/api/jobs/{"b" * 12}/beat', {'progress': {'samples': 32}})
     c['donor'].json('PUT', f'/api/jobs/{"b" * 12}/result', result(f'20261024-120000-nbbb-{"b" * 12}'))
     runs = tmp_path / 'runs'

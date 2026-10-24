@@ -6,6 +6,8 @@ Kept as we go: each branch adds what it changed before it's merged, and the rele
 
 The runs page shows the compute behind each brain: hours and dollars per machine for its run and every run behind its parent, back to the first, plus all training so far per machine, rented machines that never ran anything included. A rented machine's bill is split across the runs it hosted. Run records now keep the CPU, memory and the parent checkpoint's own notes (which run and how far in).
 
+Training runs can go through a job queue (`docs/compute.md`): I sign each job, a coordinator hands jobs out, and workers on my machines, rented GPUs and later lent ones check the signature and every input, train, and send the run back. Donated machines only run code that's public on `main` or `next`. Rented machines have their own kind of token, and a batch can say `on = "rented"` to keep its jobs off my own machines (or `"trusted"` to keep them on).
+
 The repo has a README, the MIT licence, and issue templates for bugs and ideas (issues are welcome; pull requests aren't taken).
 
 ## 0.2.0: Solo forager
