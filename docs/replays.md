@@ -16,7 +16,7 @@ Line 1 is the header:
 
 Every line after it is one `Frame`, one per tick, starting from the tick before the first step. `info` and `Frame` are the types in [viewer/src/world.ts](../viewer/src/world.ts). `source` says where the run came from (commit, with `-dirty` if the working tree had changes; seed; brain; the full config). The viewer logs it and never depends on it.
 
-From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty.
+From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty. Worlds with nights also give each frame `light`, from 1 by day to 0 at night; without it, it's always day.
 
 A dead creature stays in the frames with `energy` 0 where it fell, and the viewer draws a tombstone there that fades after 20 s. From 0.3 the sim takes a dead body out of the world (nothing bumps into it or sees it); in older replays it could still be pushed, and its stone stays where it died.
 

@@ -3,7 +3,8 @@
 #   uv run python -m terrarium.train NAME --world configs/solo.toml [--parent X.pt] [--seed 0] [--scratch]
 #                                         [--device cuda|mps|cpu] [--workers N]
 #
-# Ends by scoring the last checkpoint on the evals next to random, into the run's evals.json.
+# Ends by scoring the last checkpoint on the evals next to random, three ways (evals.MODES: yes/no drawn,
+# all by the mean, all drawn as in training), into the run's evals.json.
 
 import argparse
 import copy
@@ -34,8 +35,9 @@ def best_device() -> str:
 
 def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, parent: Path | str | None = None,
           seed: int = 0, scratch: bool = False, root: Path = ROOT, device: str | None = None,
-          workers: int = 1) -> Run:
+          workers: int = 1, score: bool = True, mix: list[tuple[Path | str, int]] | None = None) -> Run:
     world_cfg, cfg = load(world_path), load_train(train_path)
+    mixed = [(Path(w), load(w), n) for w, n in (mix or [])]
     ppo = cfg.ppo
     device = device or best_device()
     if not 1 <= workers <= ppo.arenas:
@@ -49,8 +51,10 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         parent_record = {'file': str(parent), 'id': brain_id(parent), 'meta': made}
     else:
         learner, parent_record = Brain(**SHAPE), None
+    learner.restart(cfg.start.fresh)
     run = Run(name, {
         'world': {'file': Path(world_path).name, 'config': world_cfg.to_dict()},
+        'mix': [{'file': w.name, 'arenas': n, 'config': c.to_dict()} for w, c, n in mixed],
         'train': {'file': Path(train_path).name, 'config': cfg.to_dict()},
         'parent': parent_record, 'schema': schema.current(), 'shape': learner.shape, 'seed': seed,
         'device': device, 'gpu': torch.cuda.get_device_name() if device == 'cuda' else None,
@@ -59,18 +63,19 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
 
     learner.to(device)
     optimizer = torch.optim.Adam(learner.parameters(), lr=ppo.lr, eps=1e-5)
-    rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers)
+    rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers,
+                         [(c, n) for _, c, n in mixed])
     per_update = rollouts.samples * ppo.steps
     updates = max(1, ppo.samples // per_update)
     meta = {'run': run.id, 'commit': run.record['commit'], 'scratch': scratch,
-            'parent': parent_record and parent_record['id']}
+            'parent': parent_record and parent_record['id'], 'repeat': ppo.repeat}
     log.info('training', run=run.id, updates=updates, per_update=per_update, device=device, workers=workers)
 
     started = time.perf_counter()
     checkpoint = None
     for u in range(1, updates + 1):
         for group in optimizer.param_groups:
-            group['lr'] = ppo.lr * (1 - (u - 1) / updates)
+            group['lr'] = ppo.lr * (1 - (u - 1) / updates) if ppo.anneal else ppo.lr
         tick = time.perf_counter()
         roll, last_value = rollouts.collect({k: v.cpu() for k, v in learner.state_dict().items()}, ppo.steps)
         adv, returns = advantages(roll.rewards, roll.values, roll.dones, last_value, ppo.gamma, ppo.lam)
@@ -93,8 +98,13 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
 
     rollouts.close()
     assert checkpoint is not None
+    if not score:
+        run.finish(samples=updates * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint))
+        return run
     scores = {'random': evals.run(world_cfg, evals.random_policy),
-              'brain': evals.run(world_cfg, evals.brain_policy(checkpoint))}
+              'brain': evals.run(world_cfg, evals.brain_policy(checkpoint)),
+              'mean': evals.run(world_cfg, evals.brain_policy(checkpoint, 'mean')),
+              'sampled': evals.run(world_cfg, evals.brain_policy(checkpoint, 'sampled'))}
     (run.dir / 'evals.json').write_text(json.dumps({'checkpoint': checkpoint.name, **scores}, indent=2) + '\n')
     run.finish(samples=updates * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint),
                evals={k: {m: round(v[m]['mean'], 3) for m in ('food_per_minute', 'seconds_alive')}
@@ -112,9 +122,13 @@ def main():
     parser.add_argument('--scratch', action='store_true', help='allow uncommitted changes; the run can never be promoted')
     parser.add_argument('--device', choices=['cuda', 'mps', 'cpu'], help='where the update runs (default: the best there is)')
     parser.add_argument('--workers', type=int, default=1, help='processes playing rollouts; the arenas are split between them')
+    parser.add_argument('--mix', nargs='*', default=[], metavar='WORLD:ARENAS',
+                        help='arenas of other worlds to train in beside --world, e.g. configs/solo.toml:64')
+    parser.add_argument('--no-evals', action='store_true', help="skip the evals at the end (when something else scores the run)")
     args = parser.parse_args()
     train(args.name, args.world, args.train, args.parent, args.seed, args.scratch, device=args.device,
-          workers=args.workers)
+          workers=args.workers, score=not args.no_evals,
+          mix=[(w, int(n)) for w, n in (m.rsplit(':', 1) for m in args.mix)])
 
 
 if __name__ == '__main__':

@@ -14,6 +14,18 @@ Colonies carry food home (schema v3). Food eaten past full goes into a crop, lik
 
 A dead Terrikin's body now leaves the world: nothing bumps into it or sees it. The viewer puts a small tombstone where it fell, which fades after 20 s. The replay clock runs on into hours and days.
 
+The viewer can follow training: `/?latest` plays the newest checkpoint of each live run in turn (or `/?latest=text`, of the newest run with that in its name) and looks for a newer one each time the replay ends.
+
+Evals v2: errors are taken over arenas rather than creatures, each number has a p10, and colonies get jelly eaten, deaths with jelly in their own store, colonies lost, and how often `unload` and `eat` say yes where they matter. A brain's `unload` and `eat` are drawn at the odds it gives them, in evals and replays, while it steers by its mean; `--modes mean` and `--modes sampled` score it all by the mean or all drawn as in training, and training ends by scoring it all three ways. `--held-out` plays the worlds kept for promotion.
+
+Running out of time in training is no longer counted as an end: with `[ppo] bootstrap`, a creature cut off alive at the time limit is paid what its value says the rest is worth. Train configs can now hold true/false settings.
+
+Brain schema v4: a Terrikin senses how much jelly its colony has, and how light it is. Older brains load with no weight on either and act as before. A train config's `[start] fresh` starts named actions of the parent brain over, as new actions start.
+
+Nights, off unless a world turns them on (`[night]`): at nightfall the food standing goes and none grows back until dawn, the light fades at dusk and comes back after dawn, and the dark is cold, draining energy faster except in the nest or close to nestmates. Replays of worlds with nights carry the light. Evals count the nights each creature lives through, deaths in the dark and colonies still going at the first dawn, and `nester` joins the scripted baselines: carrier that heads home at dusk and waits out the night in the nest. A train config's `[start] staggered` starts each training arena at a random time of day, so a batch isn't all day or all night; evals still start at dawn.
+
+A choice can be held for several ticks (`[ppo] repeat`): rewards over those ticks are summed, `gamma` and `lam` then count choices rather than ticks, and a brain trained that way acts that way in evals and replays. `[ppo] anneal = false` keeps the learning rate constant, for training in chunks. Two new rewards pay for warmth (`snug` at any time, `warm` in the dark), `train --no-evals` skips the end evals, and `train --mix WORLD:ARENAS` trains in arenas of other worlds beside the main one (solo ones, so a colony brain keeps foraging alone). Evals cap torch's threads on rented machines like training does.
+
 The runs page shows the compute behind each brain: hours and dollars per machine for its run and every run behind its parent, back to the first, plus all training so far per machine, rented machines that never ran anything included. A rented machine's bill is split across the runs it hosted. Run records now keep the CPU, memory and the parent checkpoint's own notes (which run and how far in).
 
 Training runs can go through a job queue (`docs/compute.md`): I sign each job, a coordinator hands jobs out, and workers on my machines, rented GPUs and later lent ones check the signature and every input, train, and send the run back. Donated machines only run code that's public on `main` or `next`. Rented machines have their own kind of token, and a batch can say `on = "rented"` to keep its jobs off my own machines (or `"trusted"` to keep them on).

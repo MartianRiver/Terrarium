@@ -6,7 +6,7 @@ One brain acts for every creature. It's built so later stages can add senses, ki
 
 Each creature is one sample, made of tokens:
 
-- **A self token:** energy, forward speed and side speed (as shares of top speed), its last thrust and turn, how full its crop is (as a share of what it holds), whether it's in its own nest, and the way home: the distance to its own nest's centre (in vision ranges) and the sin and cos of its direction off the heading. It may get fuzzier later, so remembering and scent trails have something to do.
+- **A self token:** energy, forward speed and side speed (as shares of top speed), its last thrust and turn, how full its crop is (as a share of what it holds), whether it's in its own nest, how much jelly its colony has (near 1 at a jelly a member, the way an ant knows how hungry its nest is), how light it is (1 by day, 0 at night, fading at dusk; always 1 without nights), and the way home: the distance to its own nest's centre (in vision ranges) and the sin and cos of its direction off the heading. It may get fuzzier later, so remembering and scent trails have something to do.
 - **A token per ray:** what the ray hit (nothing, wall, creature, food, block), how far it got as a share of the range, the sin and cos of its angle off the heading, whether a creature it hit is a nestmate, and how far it got before reaching its own nest and any other colony's.
 
 Rays come from `terrarium.vision`, as many as `[vision] rays` says. Since each ray is its own token, changing the count needs no retraining of the shape, though a brain will see differently with a different fan.
@@ -25,7 +25,7 @@ Nests are flat ground, so they don't stop a ray. A ray reports reaching one only
 1. Each ray token is an embedding for its kind plus a linear map of its features; the self token has its own linear map.
 2. A 2-layer transformer encoder (width 64, 4 heads, pre-norm) attends over all the tokens.
 3. The self token's output gives the mean action and the value estimate.
-4. 68,873 weights (68,229 in the 0.2 brain, before the crop, the home sense, knowing it's home, nests, nestmates, unload and eat), roughly 300 kB on disk.
+4. 69,001 weights (68,229 in the 0.2 brain, before the crop, the home sense, knowing it's home, the store, the light, nests, nestmates, unload and eat), roughly 300 kB on disk.
 
 ## Sort of on the level of
 
@@ -56,7 +56,7 @@ Rungs to source before a stage needs them: an ant, a honeybee, a zebrafish larva
 A checkpoint stores the lists it was trained with:
 
 - **Loading** checks that each saved list is the start of today's. Anything else is refused, naming the list and entry where they part: a renamed input, a reordered kind, or a brain from newer code.
-- **A brain from shorter lists loads** with every weight for the new entries set to zero. A new input then has no effect and a new kind looks like nothing at all, until training starts using them. A new action starts as in a fresh brain (std about 0.6), and a yes/no one (unload, eat) with its mean at −1: it says yes on about 5% of training samples, so it gets tried without wrecking everything else, and never in evals, which take the mean. At mean 0 it said yes on half of all samples, and an unload can't be taken back, so a crop never lasted the walk home (docs/notes/0.3.md).
+- **A brain from shorter lists loads** with every weight for the new entries set to zero. A new input then has no effect and a new kind looks like nothing at all, until training starts using them. A new action starts as in a fresh brain (std about 0.6), and a yes/no one (unload, eat) with its mean at −1: it says yes on about 5% of training samples, so it gets tried without wrecking everything else. Evals and replays draw yes/no actions at those odds too, so an untrained one still comes up now and then there, as it did in training ([evals.md](evals.md)). At mean 0 it said yes on half of all samples, and an unload can't be taken back, so a crop never lasted the walk home (docs/notes/0.3.md).
 - **A test checks this:** a brain saved with shorter lists gives the same actions and values after loading.
 
 ## Checkpoints

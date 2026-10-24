@@ -102,7 +102,7 @@ A blend of **self** (energy, health, survival) and **colony** (food stored, popu
 - **Rocks and walls** create corridors and chokepoints to defend, ambush or block.
 - **Fertile soil** patches spread unevenly, so some nests have good farmland and others don't. This asymmetry pushes colonies toward different strategies (farm-and-defend vs raid).
 - **Lean seasons:** wild food periodically stops regrowing. This is the main pressure that makes farming and food storage pay off.
-- **Day/night (later):** shorter vision at night, glowing signals easier to spot, night raids possible.
+- **Day/night:** from 0.3, nights with no food and a cold that huddling and the nest keep off, so the store has a job. Later, shorter vision at night, glowing signals easier to spot, night raids possible.
 - **Dust devils** wander across the map, knocking creatures over and scattering what they carry. Weather, not a creature.
 - **Training maps are randomised** every episode so creatures learn general skills. The main world uses one fixed layout.
 

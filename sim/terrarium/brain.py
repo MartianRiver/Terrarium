@@ -63,6 +63,18 @@ class Brain(nn.Module):
                 self.log_std[i] = LOG_STD
                 self.policy.bias[i] = NO if name in schema.YES_NO else 0.0
 
+    def restart(self, names: tuple[str, ...]):
+        """Start these actions over as new ones start: nothing it sees moves them yet."""
+        actions = self.schema['actions']
+        if unknown := sorted(set(names) - set(actions)):
+            raise ValueError(f'no such action: {", ".join(unknown)}')
+        with torch.no_grad():
+            for name in names:
+                i = actions.index(name)
+                self.policy.weight[i] = 0
+                self.log_std[i] = LOG_STD
+                self.policy.bias[i] = NO if name in schema.YES_NO else 0.0
+
     def forward(self, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Mean action and value per sample."""
         tokens = torch.cat([self.me(me)[:, None], self.kind(kinds) + self.ray(rays)], 1)

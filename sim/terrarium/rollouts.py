@@ -3,6 +3,7 @@
 # parts are joined along the sample axis. One worker plays in this process with
 # the run's seed, the same as before there were workers; with more, worker i's
 # world and sampling are seeded from (seed, i), so a run is repeatable for a given count.
+# Arenas of other worlds (mix) play beside them, one share per world, so a brain keeps what it can do there.
 
 import multiprocessing as mp
 
@@ -19,7 +20,7 @@ class Share:
     def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain):
         self.env = Forage(cfg, train, arenas, seed)
         self.actor = actor
-        self.episodes = Episodes(self.env.samples, cfg.dt)
+        self.episodes = Episodes(self.env.samples, cfg.dt * train.ppo.repeat)
         self.obs = self.env.observe()
 
     def play(self, state: dict, steps: int) -> tuple[Rollout, np.ndarray, list]:
@@ -46,27 +47,31 @@ def serve(conn, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain)
 
 
 class Collector:
-    def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain, workers: int = 1):
-        self.samples = arenas * cfg.colonies.count * cfg.colonies.size
-        self.episodes = Episodes(self.samples, cfg.dt)
-        self.local, self.pipes, self.procs = None, [], []
+    def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain, workers: int = 1,
+                 mix: list[tuple[Config, int]] | None = None):
+        mix = mix or []
+        self.samples = sum(n * c.colonies.count * c.colonies.size for c, n in [(cfg, arenas), *mix])
+        self.episodes = Episodes(self.samples, cfg.dt * train.ppo.repeat)
+        self.local, self.pipes, self.procs = [], [], []
+        own = lambda i: int(np.random.SeedSequence([seed, i]).generate_state(1)[0])
         if workers == 1:
-            self.local = Share(cfg, train, arenas, seed, actor)
+            self.local = [Share(cfg, train, arenas, seed, actor)]
+            self.local += [Share(c, train, n, own(1 + j), actor) for j, (c, n) in enumerate(mix)]
             return
+        parts = [(cfg, len(a)) for a in np.array_split(np.arange(arenas), workers)] + mix
         # spawn, not fork: a forked child of a process holding CUDA or MPS can hang
         ctx = mp.get_context('spawn')
-        for i, n in enumerate(len(a) for a in np.array_split(np.arange(arenas), workers)):
+        for i, (c, n) in enumerate(parts):
             mine, theirs = ctx.Pipe()
-            own = int(np.random.SeedSequence([seed, i]).generate_state(1)[0])
-            proc = ctx.Process(target=serve, args=(theirs, cfg, train, n, own, actor), daemon=True)
+            proc = ctx.Process(target=serve, args=(theirs, c, train, n, own(i), actor), daemon=True)
             proc.start()
             self.pipes.append(mine)
             self.procs.append(proc)
 
     def collect(self, state: dict, steps: int) -> tuple[Rollout, np.ndarray]:
         """A rollout from every share, joined, and the value of the observation after it."""
-        if self.local is not None:
-            parts = [self.local.play(state, steps)]
+        if self.local:
+            parts = [share.play(state, steps) for share in self.local]
         else:
             for pipe in self.pipes:
                 pipe.send((state, steps))

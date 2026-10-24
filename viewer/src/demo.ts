@@ -222,6 +222,7 @@ export function createDemo(seed = 7) {
       food: food.map((f) => ({ ...f })),
       blocks: blocks.map((b) => ({ ...b })),
       stores: [],
+      light: 1,
     };
   }
 

@@ -48,7 +48,10 @@ def frame(world: World, a: int) -> dict:
     blocks = [{'id': int(i), 'x': _r(x), 'y': _r(y), 'angle': _r(t), 'w': b.w, 'h': b.h}
               for i, b, (x, y), t in zip(world.block_id, cfg.block, world.block_pos[a], world.block_angle[a])]
     stores = [{'colony': c, 'jelly': int(j)} for c, j in enumerate(world.store[a])]
-    return {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
+    out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
+    if cfg.night.on:
+        out['light'] = _r(world.light()[a])
+    return out
 
 
 class Writer:

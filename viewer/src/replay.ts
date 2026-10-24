@@ -101,6 +101,7 @@ function readFrame(o: Obj, where: string): Frame {
       id: int(b, 'id', w), x: num(b, 'x', w), y: num(b, 'y', w), angle: num(b, 'angle', w), w: num(b, 'w', w), h: num(b, 'h', w),
     })),
     stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: int(s, 'jelly', w) })),
+    light: o.light === undefined ? 1 : num(o, 'light', where),
   };
 }
 

@@ -68,9 +68,13 @@ def collect(env: Forage, actor: Brain, steps: int, obs: Observation, episodes: E
             active = env.active
             keep['active'].append(active)
             obs, reward, done, _ = env.step(action.numpy())
+            episodes.add(reward, done, active)
+            if env.final is not None:
+                # cut off by the time limit, not ended: what's left is worth what the value says it is
+                _, after = actor(*tensors(env.final, 'cpu'))
+                reward = reward + env.gamma * after.numpy() * env.cut
             keep['rewards'].append(reward)
             keep['dones'].append(done)
-            episodes.add(reward, done, active)
     return Rollout(**{k: np.stack(v) for k, v in keep.items()}), obs
 
 

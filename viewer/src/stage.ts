@@ -55,7 +55,13 @@ export function createStage(container: HTMLElement) {
   let drifting = false;
   const offset = new THREE.Vector3();
 
-  scene.add(new THREE.HemisphereLight(GARDEN.skyLight, GARDEN.groundLight, 1.45));
+  const ambient = new THREE.HemisphereLight(GARDEN.skyLight, GARDEN.groundLight, 1.45);
+  scene.add(ambient);
+  // day and night: everything that lights the scene, at full day, and the same at full night
+  const day = { sky: new THREE.Color(GARDEN.sky), skyLight: new THREE.Color(GARDEN.skyLight), ground: new THREE.Color(GARDEN.groundLight) };
+  const night = { sky: new THREE.Color(GARDEN.nightSky), skyLight: new THREE.Color(GARDEN.nightSkyLight), ground: new THREE.Color(GARDEN.nightGroundLight) };
+  let sun: THREE.DirectionalLight | null = null;
+  let shown = -1;
   // everything that depends on the world's layout, rebuilt when a different one opens
   let garden: ReturnType<typeof buildGarden> | null = null;
 
@@ -85,6 +91,9 @@ export function createStage(container: HTMLElement) {
       }
       garden = buildGarden(info);
       scene.add(garden.group);
+      sun = null;
+      garden.group.traverse((o) => { if (o instanceof THREE.DirectionalLight) sun = o; });
+      shown = -1;
       log.debug('world built', { width: info.width, height: info.height, nests: info.nests.length });
     },
     // slides the orbit after the blob (or back to the middle with null), keeping whatever angle and
@@ -107,6 +116,18 @@ export function createStage(container: HTMLElement) {
       swinging -= dt;
       offset.subVectors(camera.position, controls.target).lerp(close ? CLOSE_UP : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
       camera.position.addVectors(controls.target, offset);
+    },
+    // 1 by day, 0 at night
+    light(level: number) {
+      if (Math.abs(level - shown) < 0.005) return;
+      shown = level;
+      (scene.background as THREE.Color).lerpColors(night.sky, day.sky, level);
+      (scene.fog as THREE.Fog).color.copy(scene.background as THREE.Color);
+      ambient.color.lerpColors(night.skyLight, day.skyLight, level);
+      ambient.groundColor.lerpColors(night.ground, day.ground, level);
+      ambient.intensity = 0.55 + 0.9 * level;
+      if (sun) (sun as THREE.DirectionalLight).intensity = 2.7 * level;
+      renderer.toneMappingExposure = 1.08 * (0.75 + 0.25 * level);
     },
     view(closeUp: boolean) {
       drifting = false;

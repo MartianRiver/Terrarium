@@ -5,12 +5,22 @@ How a brain is scored. A policy plays 64 episodes, one per arena, all from seed 
 - **food per minute** of its own life
 - **seconds alive**, which tops out at the episode length
 
-Each is reported as a mean ± standard error over the creatures.
+Each is reported as a mean ± standard error. Since evals v2 (0.3) the error is over arenas, not creatures: creatures sharing an arena share its food and its luck, so 18 of them aren't 18 independent tries. Evals v1 counted every creature, which got colony errors wrong both ways: in the full world time alive's error is up to 60% bigger counted by arena, and food per minute's is half the size, since nestmates compete for the same food. Solo has one creature an arena, so its numbers didn't change. Each also gets a **p10**, the creature a tenth of the way up, because a good mean can hide a bad tail.
 
 ```
 cd sim
-uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--out results.json]
+uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled] [--held-out] [--out results.json]
 ```
+
+What else v2 counts, for colonies:
+
+- **jelly** eaten from the store, per creature
+- **deaths**: how many died, how many of them with jelly in their own store (**by jelly**), how many in their own nest, and whole **colonies lost**
+- how often each yes/no action says yes where it matters: `unload` at home with something in the crop, `unload` away from any nest with something in it (dumping), `eat` when hungry with something in the crop, and `eat` when hungry at home with no crop and jelly in the store
+
+A brain steers by its mean action, so the evals score what it's learned rather than its exploration. Its yes/no actions (`unload`, `eat`) are drawn instead, at the odds the brain gives them, with seeded noise so the numbers repeat: a yes/no action taken by its mean is never yes until the brain is sure, and in 0.3 that hid a brain that couldn't eat on purpose ([notes/0.3.md](notes/0.3.md), "Evals v2"). Replays use the same. `--modes mean` scores it all by the mean, the way evals v1 did, and `--modes sampled` with everything drawn, as in training. Training ends by scoring the last checkpoint all three ways.
+
+`--held-out` plays seed 2,000,000 instead: worlds kept for promotion, which nothing gets tuned on.
 
 `random` is the stand-in brain from 0.1, and the baseline every trained brain has to beat. `greedy` is scripted: it heads for the nearest food any ray sees, and otherwise goes straight and turns away from anything close ahead. It's not a brain and never trains anything. It shows what the senses make possible, so if a trained brain can't get near it, the brain is the problem, not the rays.
 

@@ -10,13 +10,15 @@
 # hands back a full batch; a creature that has died is still in it, marked
 # inactive, until its arena starts over.
 #
-# Running out of time is treated like any other end. With episodes of minutes
-# and a discount horizon of seconds, not bootstrapping the cut-off costs nothing.
+# Running out of time is an end like any other unless [ppo] bootstrap is on: then a
+# creature cut off alive is marked in `cut` and its last look kept in `final`, so the
+# learner can carry on its value instead of teaching it that time running out is death.
 
 from dataclasses import dataclass
 
 import numpy as np
 
+from . import night
 from .config import Config, Reward, Train
 from .vision import directions, look
 from .world import World
@@ -39,10 +41,13 @@ def observe(world: World, last: np.ndarray) -> Observation:
     side = facing[..., 0] * vel[..., 1] - facing[..., 1] * vel[..., 0]
     # the way home, as an ant keeps track of it: how far, and which way off the heading
     home = world.nests[world.colony] - world.pos
+    # how much jelly its colony has, as an ant knows how hungry its nest is: near 1 at a jelly a member
+    store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
     me = np.stack([world.energy, forward, side, last[..., 0], last[..., 1],
                    np.hypot(home[..., 0], home[..., 1]) / v.range, np.sin(bearing), np.cos(bearing),
-                   world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony], -1)
+                   world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony, store,
+                   np.broadcast_to(world.light()[:, None], store.shape)], -1)
 
     angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
     shape = sight.dist.shape
@@ -56,10 +61,19 @@ def observe(world: World, last: np.ndarray) -> Observation:
 class Forage:
     def __init__(self, cfg: Config, train: Train, arenas: int, seed: int):
         self.world = World(cfg, arenas, seed)
+        self.staggered = train.start.staggered and cfg.night.on
+        self._stagger(np.ones(arenas, bool))
         self.reward = train.reward
+        self.repeat = train.ppo.repeat
+        if self.world.episode_ticks % self.repeat:
+            raise ValueError(f'{self.world.episode_ticks} ticks an episode is not a whole number of {self.repeat}-tick choices')
         # the shaping has to be discounted the way PPO discounts, or it isn't neutral
         self.gamma = train.ppo.gamma
         self.last = np.zeros((arenas, len(self.world.colony), 2))
+        self.bootstrap = train.ppo.bootstrap
+        # after a step where arenas ran out of time: which samples were cut off alive, and where they got to
+        self.cut = np.zeros(self.samples, bool)
+        self.final: Observation | None = None
 
     @property
     def samples(self) -> int:
@@ -81,17 +95,35 @@ class Forage:
         before = {k: getattr(w, k).copy() for k in ('fed', 'stored', 'jelly', 'alive')}
         alive = before['alive']
         worth = carried_worth(w, r)
-        w.step(actions)
+        # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
+        # tick, and an arena where everyone has died only ticks on with nobody in it
+        lived, snug = np.zeros(alive.shape), np.zeros(alive.shape)
+        for _ in range(self.repeat):
+            w.step(actions)
+            lived += w.alive
+            if r.snug or r.warm:
+                warm = night.warmth(w.pos, w.alive, w.colony, w.nest_at() == w.colony, w.cfg.night)
+                snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
         self.last = actions[..., :2].copy()
         own = (r.food * (w.fed - before['fed']) / w.cfg.energy.food + r.stored * (w.stored - before['stored'])
-               + r.jelly * (w.jelly - before['jelly']) + r.death * (alive & ~w.alive) + r.alive * w.cfg.dt * w.alive)
+               + r.jelly * (w.jelly - before['jelly']) + r.death * (alive & ~w.alive) + w.cfg.dt * (r.alive * lived + snug))
         ended = w.ended.copy()
-        done = (alive & ~w.alive) | ended[:, None]
-        own += self.gamma * np.where(done, 0, carried_worth(w, r)) - worth
+        died = alive & ~w.alive
+        done = died | ended[:, None]
+        cut = ended[:, None] & w.alive & self.bootstrap
+        own += self.gamma * np.where(done & ~cut, 0, carried_worth(w, r)) - worth
         reward = (1 - r.colony) * own + r.colony * colony_mean(own, alive, w.colony)
+        self.cut = cut.reshape(-1)
+        self.final = self.observe() if cut.any() else None
         w.reset(ended)
+        self._stagger(ended)
         self.last[ended] = 0
         return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
+
+    def _stagger(self, arenas: np.ndarray):
+        # a start in the dark loses its standing food on the first step, as at nightfall
+        if self.staggered:
+            self.world.clock[arenas] = self.world.rng.uniform(0, self.world.cfg.night.cycle, int(arenas.sum()))
 
 
 def carried_worth(world: World, r: Reward) -> np.ndarray:

@@ -188,6 +188,21 @@ def test_carrying_home_pays_on_the_way_and_walking_off_takes_it_back():
     assert reward[0] == 0, 'nothing carried, nothing paid'
 
 
+def test_a_choice_held_for_ticks_is_those_ticks_played_one_by_one():
+    # with no discount the shaping adds up the same either way, so the rewards must too
+    train = replace(TRAIN, ppo=replace(TRAIN.ppo, gamma=1.0))
+    held = Forage(SOLO, replace(train, ppo=replace(train.ppo, repeat=4)), 2, seed=3)
+    ticked = Forage(SOLO, train, 2, seed=3)
+    action = np.tile([[1.0, 0.3, -1.0, -1.0]], (2, 1))
+    for _ in range(25):
+        _, reward, done, _ = held.step(action)
+        total = sum(ticked.step(action)[1] for _ in range(4))
+        assert reward == pytest.approx(total)
+        assert (held.world.pos == ticked.world.pos).all() and (held.world.fed == ticked.world.fed).all()
+    with pytest.raises(ValueError, match='whole number'):
+        Forage(SOLO, replace(train, ppo=replace(train.ppo, repeat=7)), 1, seed=0)
+
+
 def test_unloading_at_home_pays_the_store_less_what_carrying_it_there_paid():
     env = carrying(0.0)
     worth = carried_worth(env.world, REWARD)[0, 0]
@@ -215,6 +230,31 @@ def test_it_knows_when_its_home():
     assert env.observe().me[0, at_home] == 1
     env = carrying(SOLO.colonies.nest_radius + 1.0)
     assert env.observe().me[0, at_home] == 0
+
+
+def test_an_action_can_start_over(tmp_path):
+    brain = Brain(**SHAPE)
+    eat = schema.ACTIONS.index('eat')
+    with torch.no_grad():
+        brain.policy.weight[eat] = 1.0
+        brain.policy.bias[eat] = 3.0
+    obs = Forage(SOLO, TRAIN, 2, seed=0).observe()
+    before = brain.act(obs, sample=False)
+    brain.restart(('eat',))
+    after = brain.act(obs, sample=False)
+    assert np.allclose(after[:, eat], -1.0) and np.allclose(after[:, :eat], before[:, :eat])
+    with pytest.raises(ValueError):
+        brain.restart(('fly',))
+
+
+def test_it_knows_whether_its_colony_has_jelly():
+    env = Forage(load(DEFAULT), TRAIN, 1, seed=0)
+    store = schema.SELF.index('store')
+    assert (env.observe().me[:, store] == 0).all()
+    env.world.store[0, 1] = env.world.cfg.colonies.size
+    seen = env.observe().me[:, store].reshape(env.world.colony.shape)
+    mine = env.world.colony == 1
+    assert seen[mine] == pytest.approx(np.tanh(1.0)) and (seen[~mine] == 0).all()
 
 
 def test_forward_and_side_speed():

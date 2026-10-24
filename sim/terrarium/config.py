@@ -69,6 +69,21 @@ class Jelly:
 
 
 @dataclass(frozen=True)
+class Night:
+    cycle: float
+    length: float
+    dusk: float
+    cold: float
+    nest: float
+    huddle: float
+    reach: float
+
+    @property
+    def on(self) -> bool:
+        return self.cycle > 0 and self.length > 0
+
+
+@dataclass(frozen=True)
 class Ground:
     friction: float
 
@@ -108,6 +123,7 @@ class Config:
     food: Food
     crop: Crop
     jelly: Jelly
+    night: Night
     ground: Ground
     vision: Vision
     episode: Episode
@@ -130,17 +146,22 @@ class Reward:
     jelly: float
     colony: float
     home: float
+    snug: float
+    warm: float
 
 
 @dataclass(frozen=True)
 class PPO:
     samples: int
+    repeat: int
     arenas: int
     steps: int
     epochs: int
     minibatches: int
     lr: float
+    anneal: bool
     gamma: float
+    bootstrap: bool
     lam: float
     clip: float
     entropy: float
@@ -150,9 +171,16 @@ class PPO:
 
 
 @dataclass(frozen=True)
+class Start:
+    fresh: tuple[str, ...]
+    staggered: bool
+
+
+@dataclass(frozen=True)
 class Train:
     reward: Reward
     ppo: PPO
+    start: Start
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -183,10 +211,24 @@ def convert(kind, value, where):
         if not isinstance(value, (list, tuple)):
             raise ConfigError(f'{where}: expected a list of tables')
         return tuple(convert(item, v, f'{where}[{i}]') for i, v in enumerate(value))
+    if kind is bool:
+        if not isinstance(value, bool):
+            raise ConfigError(f'{where}: expected true or false, got {value!r}')
+        return value
     # TOML ints are fine where a float is wanted, but not the other way round, and never bools
     if isinstance(value, bool) or not (isinstance(value, kind) or (kind is float and isinstance(value, int))):
         raise ConfigError(f'{where}: expected {kind.__name__}, got {value!r}')
     return kind(value)
+
+
+# sections added after worlds were first recorded, as they were before: off. Only for reading old run
+# records (serve.py), never for configs on disk, which have every key
+SINCE = {'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0}}
+
+
+def upgrade(data: dict) -> dict:
+    """A recorded world config with the sections it predates filled in, so the world it describes is unchanged."""
+    return {**SINCE, **data}
 
 
 def load(path: Path | str = DEFAULT) -> Config:

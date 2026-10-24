@@ -60,8 +60,22 @@ start = 0
 [jelly]
 # what one food in the store gives back when eaten, against [energy] food fresh
 energy = 0.25
-# only a creature below this energy eats from the store, or from its own crop
+# only a creature below this energy eats from the store (from its own crop, any with room for it)
 hunger = 0.3
+
+[night]
+# a day and its night take this long, the night being the last `length` of it; 0 turns nights off.
+# At nightfall the food standing goes, and none grows back until dawn
+cycle = 0.0
+length = 0.0
+# the light fades over this long before nightfall, and comes back over this long after dawn
+dusk = 10.0
+# extra energy per second at full dark, for the cold
+cold = 0.02
+# share of the cold kept off in its own nest, and by each nestmate within reach (m, centre to centre)
+nest = 1.0
+huddle = 0.25
+reach = 1.5
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)

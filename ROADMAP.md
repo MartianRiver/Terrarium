@@ -47,17 +47,18 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 - **The jelly store.** One number per nest in the sim, drawn as a pile that grows. Above a threshold it hatches a new Terrikin, up to a cap: a hatchling is small and slow, feeds itself from the store while it's at the nest, and grows into an adult. Below the threshold the store feeds the colony, but eating jelly gives back less than the food was worth and takes from the colony's share of the reward, and at first only a hungry creature can eat from it at all. Foraging should always pay better.
 - Memory: a few numbers the brain carries from one tick to the next. The 0.2 brain forgets food the moment it's out of sight, and getting back to a patch it found needs more than that.
 - Food grows in patches rather than evenly, since streams only form when food is clumped.
-- Trained on a mix of colony arenas and solo ones, so the 0.2 skill isn't lost.
+- **Day and night.** Food stops growing at night and what's left standing goes, so the store is what gets a colony through to morning. Nights are cold: energy drains faster, less so in the nest or close to nestmates, so huddling can pay. They can sense the light, and dusk dims slowly, so night can be seen coming. Nights have to be longer than a Terrikin can last on what's in its body, or there's no point keeping a store.
+- Sprint: faster, costs energy, has a cooldown. First for getting to food before another colony does, once nights make daytime food worth racing for, and later for getting out of the way. Food richest in the middle, between the nests, so colonies meet over it.
+- Foraging is checked in the colony world, not alone. Isolated ant workers die young even with food to hand (Koto et al. 2015), and a colony brain alone turned out the same way, so a lone Terrikin is scored as a number to watch, not held to what the 0.2 brain did.
 - **Evals v2:** a scripted forager that carries food home as the baseline, like greedy was for 0.2. Trips home, how much food is stored rather than eaten, and how big the colony gets.
 
-Done when creatures stream between food and nest, the colony grows from its store, and a lone creature still forages as well as the 0.2 brain did.
+Done when creatures stream between food and nest, the colony grows from its store and gets through the night on it, and foragers away from the nest still keep themselves fed.
 
 ## 0.4 Elderflower: Signals, scent and cooperation
 
 *Mac, maybe RunPod.* Signal patch (free at first), scent marks (cost energy), and rich food that needs two carriers. And the first danger: dust devils.
 
 - A dust devil drifts across the arena, knocking creatures over (they lie still for a moment) and making them drop what they carry. It's weather, not a creature: nothing about it learns.
-- Sprint: faster, costs energy, has a cooldown. For getting out of the way.
 - With something to warn about, a signal has more to mean than "help me carry this".
 
 Done when pairs team up on heavy food, and creatures keep clear of dust devils. Watch for signals or trails starting to mean something, warnings especially.
@@ -112,7 +113,7 @@ Done when it's running and worth checking in on.
 
 ## Later
 
-- Day/night cycle
+- More to night: shorter sight in the dark, glowing signals easier to spot, night raids
 - Castes (different body traits at spawn; the colony chooses what to spawn)
 - A small energy cost for colour signalling (more honest signals)
 - Disguise and impersonation as a deliberate unlock

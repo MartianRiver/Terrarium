@@ -83,3 +83,111 @@ started = "2026-10-24T14:02:32+11:00"
 ended = "2026-10-24T14:12:41+11:00"
 dollars = 0.089
 note = "job queue test on a pod: worker through an ssh tunnel to the Mac's coordinator, two chained 1M-sample solo jobs (rented-only), both done and synced"
+
+[[session]]
+provider = "vast"
+instance = 57463941
+gpu = "A10"
+started = "2026-10-24T15:12:54+11:00"
+ended = "2026-10-24T15:27:59+11:00"
+dollars = 0.082
+note = "jelly: two 8M-sample jobs side by side from the 24M brain through the job queue (jelly eaten paid 0 and 0.2), runs mirrored to the Mac while training"
+
+[[session]]
+provider = "vast"
+instance = 57477264
+gpu = "RTX 3060"
+started = "2026-10-24T17:27:04+11:00"
+ended = "2026-10-24T18:06:33+11:00"
+dollars = 0.058
+note = "jelly: scripted world probes (greedy vs carrier) on 16 CPU cores, ten worlds side by side: nights, lean spells, 720 s episodes, bigger arena, colonies of 12; no training"
+
+[[session]]
+provider = "vast"
+instance = 57482599
+gpu = "RTX 3060"
+started = "2026-10-24T18:19:13+11:00"
+ended = "2026-10-24T18:30:06+11:00"
+dollars = 0.009
+note = "jelly: night probes (scripted), ssh dropped after 3 min and the results were lost; the probe runner now runs detached"
+
+[[session]]
+provider = "vast"
+instance = 57483714
+gpu = "RTX 3060"
+started = "2026-10-24T18:31:17+11:00"
+ended = "2026-10-24T18:41:16+11:00"
+dollars = 0.009
+note = "jelly: night probes, never got going: ssh up after 9 min, then dropped during setup"
+
+[[session]]
+provider = "vast"
+instance = 57484660
+gpu = "RTX 3080"
+started = "2026-10-24T18:41:48+11:00"
+ended = "2026-10-24T19:23:18+11:00"
+dollars = 0.075
+note = "jelly: night probes, about 25x slower than the Mac per core for no clear reason (old Xeon E5-2698 v4); destroyed after the greedy rows, rest run on the Mac"
+
+[[session]]
+provider = "vast"
+instance = 57493929
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T20:15:05+11:00"
+ended = "2026-10-24T20:25:11+11:00"
+dollars = 0.003
+note = "jelly: night grid, never got going: still pulling the image after 10 min, destroyed"
+
+[[session]]
+provider = "vast"
+instance = 57494241
+gpu = "RTX 4070"
+started = "2026-10-24T20:17:05+11:00"
+ended = "2026-10-24T20:25:16+11:00"
+dollars = 0.018
+note = "jelly: night grid, never got going: running, but ssh refused the key for 3 min, destroyed"
+
+[[session]]
+provider = "vast"
+instance = 57494196
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T20:16:41+11:00"
+ended = "2026-10-24T21:07:01+11:00"
+dollars = 0.194
+note = "jelly: night grid (8M samples each from the 24M brain in the night world), two jobs side by side, then two more: night-base, night-jelly04, night-720, night-nofresh"
+
+[[session]]
+provider = "vast"
+instance = 57493853
+gpu = "RTX 3070"
+started = "2026-10-24T20:14:44+11:00"
+ended = "2026-10-24T21:42:46+11:00"
+dollars = 0.180
+note = "jelly: night grid: night-g999 and night-stored0, then night-noboot and night-entropy, whose results never came back (the worker lost the coordinator at the end of training, so both were cancelled); up ~35 min longer than needed"
+
+[[session]]
+provider = "vast"
+instance = 57505793
+gpu = "RTX 3070"
+started = "2026-10-24T22:15:05+11:00"
+ended = "2026-10-25T06:07:17+11:00"
+dollars = 0.905
+note = "jelly night lab: choices held 4 ticks, gamma 0.999 and 0.996 (16M each), then kept warm as two slots of the automated forks (population-based training) until 06:00"
+
+[[session]]
+provider = "vast"
+instance = 57505948
+gpu = "RTX 3070"
+started = "2026-10-24T22:15:59+11:00"
+ended = "2026-10-25T06:07:23+11:00"
+dollars = 1.024
+note = "jelly night lab: choices held 8 ticks with gamma 0.998, and lam 0.99 (16M each), then two slots of the automated forks until 06:00"
+
+[[session]]
+provider = "vast"
+instance = 57507754
+gpu = "RTX 3060"
+started = "2026-10-24T22:34:01+11:00"
+ended = "2026-10-25T06:07:30+11:00"
+dollars = 0.677
+note = "jelly night lab: two slots of the automated forks from 22:38 to 06:00 (its evals ran 20 min oversubscribed once: the host shows 128 cores)"

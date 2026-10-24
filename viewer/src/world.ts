@@ -65,4 +65,5 @@ export interface Frame {
   food: FoodState[];
   blocks: BlockState[];
   stores: StoreState[]; // empty in replays from before 0.3
+  light: number; // 1 by day, 0 at night; always 1 in worlds without nights
 }

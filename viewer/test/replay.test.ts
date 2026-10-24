@@ -54,6 +54,12 @@ describe('reading', () => {
     refuses(lines(header, { ...later, stores: [{ colony: 0, jelly: 0.5 }] }), /jelly: expected a whole number/);
   });
 
+  test('the light is read when there, and full day in worlds without nights', () => {
+    const replay = parseReplay(lines(header, frame, { ...frame, light: 0.25 }));
+    expect(replay.frames.map((f) => f.light)).toEqual([1, 0.25]);
+    refuses(lines(header, { ...frame, light: 'dusk' }), /light/);
+  });
+
   test('fields it doesn\'t know are ignored', () => {
     const replay = parseReplay(lines({ ...header, later: 1 }, { ...frame, weather: 'rain', creatures: [{ ...frame.creatures[0], mood: 2 }] }));
     expect(replay.frames[0].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0 });

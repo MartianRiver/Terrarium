@@ -12,9 +12,14 @@
 # takes from its crop once there's room for a whole food (the line that decides
 # stomach or crop), or in its own nest from the store, which only a hungry one
 # ([jelly] hunger) can. Jelly gives back less than the food it came from.
+#
+# With nights on ([night], night.py), the food standing at nightfall goes and
+# none grows back until dawn, and the dark is cold: it drains energy faster,
+# except in the nest or close to nestmates.
 
 import numpy as np
 
+from . import night
 from .config import Config, ConfigError
 from .log import Logger
 from .physics import Physics
@@ -44,8 +49,11 @@ class World:
         pos, self.heading = self._spawn(arenas)
         self.energy = np.full((arenas, n), cfg.energy.start)
         self.alive = np.ones((arenas, n), bool)
-        # ticks since the arena last started
+        # ticks since the arena last started, and the time of day (s) it started at: 0 is dawn
         self.age = np.zeros(arenas, int)
+        self.clock = np.zeros(arenas)
+        # it's night in the arena: no food grows
+        self.dark = np.zeros(arenas, bool)
         self.episode_ticks = round(cfg.episode.seconds * cfg.tick_hz)
         self.physics = Physics(cfg, pos)
 
@@ -137,6 +145,7 @@ class World:
         self.energy[idx] = self.cfg.energy.start
         self.alive[idx] = True
         self.age[idx] = 0
+        self.dark[idx] = False
         self.meals[idx] = 0
         self.crop[idx] = self.cfg.crop.start
         self.fed[idx] = 0
@@ -169,7 +178,8 @@ class World:
         self.physics.step(change * (c.mass / cfg.dt))
 
         e = cfg.energy
-        self.energy = np.clip(self.energy - (e.drain + e.move * np.abs(thrust)) * cfg.dt, 0, 1)
+        self.energy = np.clip(self.energy - (e.drain + e.move * np.abs(thrust) + self._cold()) * cfg.dt, 0, 1)
+        self._nightfall()
         self._regrow()
         # eating on the tick it would have run out still saves it
         self._eat()
@@ -270,8 +280,34 @@ class World:
             self.jelly[gets] += 1
         np.clip(self.energy, 0, 1, out=self.energy)
 
+    def light(self) -> np.ndarray:
+        """How light it is in each arena, 1 by day and 0 at night, (arenas,)."""
+        return night.light(self.age / self.cfg.tick_hz + self.clock, self.cfg.night)
+
+    def _cold(self) -> np.ndarray | float:
+        """Energy per second the dark takes, on top of the drain, (arenas, creatures)."""
+        n = self.cfg.night
+        if not n.on or n.cold <= 0:
+            return 0.0
+        kept = night.warmth(self.pos, self.alive, self.colony, self.nest_at() == self.colony, n)
+        return n.cold * (1 - self.light())[:, None] * (1 - kept)
+
+    def _nightfall(self):
+        """The food standing where night has just fallen goes, to grow back after dawn."""
+        dark = night.dark(self.age / self.cfg.tick_hz + self.clock, self.cfg.night)
+        fell = dark & ~self.dark
+        self.dark = dark
+        if not fell.any():
+            return
+        standing = (self.food_regrow[:, :self.wild] == 0) & fell[:, None]
+        hz = self.cfg.tick_hz
+        lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)
+        self.food_regrow[:, :self.wild][standing] = self.rng.integers(lo, hi + 1, int(standing.sum()))
+        log.debug('night fell', tick=self.tick, arenas=int(fell.sum()), food=int(standing.sum()))
+
     def _regrow(self):
-        growing = self.food_regrow > 0
+        # nothing grows at night
+        growing = (self.food_regrow > 0) & ~self.dark[:, None]
         self.food_regrow[growing] -= 1
         for a, f in zip(*np.nonzero(growing & (self.food_regrow == 0))):
             self._grow(a, f)
