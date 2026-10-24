@@ -91,7 +91,7 @@ parent = "job:home1"
 train = "train-full-more.toml"
 ```
 
-`parent` is a `.pt` file, `run:<run id>/<checkpoint>` from `runs/`, or `job:<name>` for the final checkpoint of an earlier job in the batch, which then waits for it. Parent files are sent byte for byte, so the run they came from can still be traced through the meta saved inside.
+`parent` is a `.pt` file, `run:<run id>/<checkpoint>` from `runs/`, or `job:<name>` for the final checkpoint of an earlier job in the batch, which then waits for it. `on = "rented"` keeps a job to rented machines (`"trusted"` to my own, `"donor"` to donated ones); without it, any machine allowed to run the job can take it. Which kind a machine is comes from its token, not from anything the worker says. I use it to test on a rented GPU while the Mac sits out. Parent files are sent byte for byte, so the run they came from can still be traced through the meta saved inside.
 
 ```
 uv run python -m terrarium.jobs add grid.toml     # signs with ~/.ssh/terrarium_jobs_ed25519

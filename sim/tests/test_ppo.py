@@ -9,7 +9,8 @@ from terrarium.brain import SHAPE, Brain
 from terrarium.brain import load as load_brain
 from terrarium.config import DEFAULT, TRAIN
 from terrarium.ppo import Episodes, advantages
-from terrarium.train import cpu_quota, train
+from terrarium.runs import cpu_quota
+from terrarium.train import train
 
 
 def test_advantages_by_hand():
@@ -101,7 +102,17 @@ def test_cpu_quota_reads_cgroup(tmp_path):
     # a rented container showed 255 cores to torch but was allowed 30.6
     f = tmp_path / 'cpu.max'
     f.write_text('3060000 100000\n')
-    assert cpu_quota(f) == 30
+    assert cpu_quota(tmp_path) == 30
     f.write_text('max 100000\n')
-    assert cpu_quota(f) is None
+    assert cpu_quota(tmp_path) is None
     assert cpu_quota(tmp_path / 'missing') is None
+
+
+def test_cpu_quota_reads_cgroup_v1(tmp_path):
+    # another showed 128 and was allowed 15.4, on cgroup v1
+    (tmp_path / 'cpu').mkdir()
+    (tmp_path / 'cpu' / 'cpu.cfs_period_us').write_text('100000\n')
+    (tmp_path / 'cpu' / 'cpu.cfs_quota_us').write_text('1536000\n')
+    assert cpu_quota(tmp_path) == 15
+    (tmp_path / 'cpu' / 'cpu.cfs_quota_us').write_text('-1\n')
+    assert cpu_quota(tmp_path) is None

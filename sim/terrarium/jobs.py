@@ -16,6 +16,7 @@
 # [[job]], and each job can override them. Paths are relative to the batch file.
 # parent is a .pt path, "run:<run id>/<checkpoint>" from runs/, or
 # "job:<name>" for the final checkpoint of an earlier job in the same batch.
+# on = "rented" (or "trusted", "donor") keeps a job to that kind of machine.
 
 import argparse
 import io
@@ -50,7 +51,9 @@ SERVER = os.environ.get('TERRARIUM_JOBS', 'http://127.0.0.1:5194')
 AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
-FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int}
+FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str}
+# the kinds of machine a job can be kept to; a token's role says which one a worker is
+MACHINES = ('trusted', 'rented', 'donor')
 
 
 class BadJob(ValueError):
@@ -100,6 +103,8 @@ def check(spec: dict):
     for key in ('bundle', 'overlay'):
         need(code.get(key) is None or (isinstance(code[key], str) and DIGEST.match(code[key])), f'bad {key}')
     need(spec['trusted'] or not code.get('overlay'), 'an overlay job must be trusted')
+    need(spec.get('on') in (None, *MACHINES), 'bad on')
+    need(not (spec['trusted'] and spec.get('on') == 'donor'), 'a trusted job can never run on a donor')
     parent = spec.get('parent')
     need(parent is None or (isinstance(parent, dict) and (
         (set(parent) == {'blob', 'file'} and DIGEST.match(parent['blob']) and NAME.match(parent['file'])) or
@@ -129,6 +134,8 @@ def load_batch(path: Path) -> list[dict]:
         for key in ('world', 'train'):
             if key not in job:
                 raise BadJob(f'{path.name} job {name}: no {key}')
+        if job.get('on') not in (None, *MACHINES):
+            raise BadJob(f'{path.name} job {name}: on is one of {", ".join(MACHINES)}')
         out.append(job)
     return out
 
@@ -166,7 +173,8 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
                 'added': time.time() + n * 1e-3, 'code': code, 'trusted': trusted,
                 'world': blob(world.read_bytes()), 'world_file': world.name,
                 'train': blob(train.read_bytes()), 'train_file': train.name,
-                'parent': parent(job['parent'], path.parent, runs, ids, blob), 'seed': job['seed'], 'samples': samples}
+                'parent': parent(job['parent'], path.parent, runs, ids, blob), 'seed': job['seed'], 'samples': samples,
+                'on': job.get('on')}
         ids[job['name']] = spec['id']
         out.append(spec)
     return out, blobs
@@ -283,8 +291,9 @@ def main():
             for job in client.json('GET', '/api/jobs'):
                 spec, p = job['spec'], job['progress'] or {}
                 done = f'{p.get("samples", 0) / spec["samples"]:.0%}' if job['state'] == 'running' else ''
+                on = f'on {spec["on"]}' if spec.get('on') else ''
                 print(f'{spec["id"]}  {spec["batch"]:<16} {spec["name"]:<24} {job["state"]:<9} {done:>4}  '
-                      f'{job["worker"] or ""}{"  blocked" if job.get("blocked") else ""}')
+                      f'{on:<10} {job["worker"] or ""}{"  blocked" if job.get("blocked") else ""}')
         case 'cancel' | 'retry':
             for id in args.ids:
                 client.json('POST', f'/api/jobs/{id}/{args.command}')
