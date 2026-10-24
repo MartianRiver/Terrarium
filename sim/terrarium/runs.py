@@ -4,6 +4,7 @@
 # it keeps the diff so it can be understood, and can never be promoted.
 
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -25,6 +26,19 @@ def git(*args) -> str:
 def dirty() -> bool:
     # untracked files count too, so a new module isn't missed
     return bool(git('status', '--porcelain'))
+
+
+def cpu() -> str:
+    if sys.platform == 'darwin':
+        return subprocess.run(['sysctl', '-n', 'machdep.cpu.brand_string'], capture_output=True, text=True).stdout.strip()
+    info = Path('/proc/cpuinfo')
+    names = [line.split(':', 1)[1].strip() for line in info.read_text().splitlines() if line.startswith('model name')] \
+        if info.exists() else []
+    return names[0] if names else platform.processor() or platform.machine()
+
+
+def memory_gb() -> int:
+    return round(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / 2**30)
 
 
 def commit() -> str:
@@ -51,7 +65,8 @@ class Run:
         self.record = {
             'id': self.id, 'started': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
             'commit': git('rev-parse', 'HEAD'), 'dirty': is_dirty, 'scratch': scratch,
-            'machine': {'platform': platform.platform(), 'processor': platform.processor() or platform.machine()},
+            'machine': {'platform': platform.platform(), 'processor': platform.processor() or platform.machine(),
+                        'cpu': cpu(), 'memory_gb': memory_gb()},
             'versions': {'python': sys.version.split()[0],
                          **{p: version(p) for p in ('numpy', 'pymunk', 'torch')}},
             **record,

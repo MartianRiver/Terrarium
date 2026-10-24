@@ -6,7 +6,8 @@
 #   uv run python -m terrarium.serve [--port 5190]
 #
 #   GET /api/runs
-#   GET /api/runs/<id>
+#   GET /api/runs/<id>  (with what went into its brain, per machine)
+#   GET /api/compute    (every run and rental so far, per machine)
 #   GET /api/runs/<id>/replay/<checkpoint.pt | random>?seed=0
 
 import argparse
@@ -48,12 +49,12 @@ def checkpoints(run: Path) -> list[dict]:
     return [{'file': p.name, 'samples': int(p.stem)} for p in sorted((run / 'checkpoints').glob('*.pt'))]
 
 
-def summary(run: Path) -> dict:
+def summary(run: Path, rentals: list[dict]) -> dict:
     rec = compute.read_run(run)
     rows = compute.metrics(run)
     return {'id': rec['id'], 'started': rec['started'], 'finished': rec.get('finished'), 'state': state(run, rec),
             'scratch': rec['scratch'], 'world': rec['world']['file'], 'device': rec.get('device'),
-            'gpu': rec.get('gpu'), 'samples': rows[-1]['samples'] if rows else 0,
+            'gpu': rec.get('gpu'), 'hardware': compute.hardware(rec, rentals), 'samples': rows[-1]['samples'] if rows else 0,
             'target': rec['train']['config']['ppo']['samples'], 'seconds': compute.seconds(run),
             'evals': rec.get('evals')}
 
@@ -70,7 +71,8 @@ class Runs:
         return run
 
     def list(self) -> list[dict]:
-        runs = [summary(p) for p in self.root.iterdir() if (p / 'run.json').exists()] if self.root.exists() else []
+        rentals = compute.sessions()
+        runs = [summary(p, rentals) for p in self.root.iterdir() if (p / 'run.json').exists()] if self.root.exists() else []
         # newest first, by start time: a pod names its runs in UTC
         return sorted(runs, key=lambda r: compute.when(r['started']), reverse=True)
 
@@ -79,7 +81,8 @@ class Runs:
         rec = compute.read_run(run)
         evals = run / 'evals.json'
         return {'run': rec, 'state': state(run, rec), 'metrics': compute.metrics(run), 'checkpoints': checkpoints(run),
-                'evals': json.loads(evals.read_text()) if evals.exists() else None}
+                'evals': json.loads(evals.read_text()) if evals.exists() else None,
+                'compute': compute.behind(self.root, run)}
 
     def replay(self, id: str, checkpoint: str, seed: int) -> Path:
         """random is generation 0: how a brain trained from scratch starts out."""
@@ -107,6 +110,8 @@ def handler(runs: Runs):
                 match parts:
                     case ['api', 'runs']:
                         self.json(runs.list())
+                    case ['api', 'compute']:
+                        self.json(compute.everything(runs.root))
                     case ['api', 'runs', id]:
                         self.json(runs.detail(id))
                     case ['api', 'runs', id, 'replay', checkpoint]:

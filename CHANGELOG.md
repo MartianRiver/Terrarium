@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased: 0.3 Daisy, colony basics
+
+Kept as we go: each branch adds what it changed before it's merged, and the release turns this into the 0.3.0 entry.
+
+The runs page shows the compute behind each brain: hours and dollars per machine for its run and every run behind its parent, back to the first, plus all training so far per machine, rented machines that never ran anything included. A rented machine's bill is split across the runs it hosted. Run records now keep the CPU, memory and the parent checkpoint's own notes (which run and how far in).
+
 ## 0.2.0: Solo forager
 
 The first trained brain. One creature alone in the arena with 8 berries learns to keep itself fed. On the evals it eats 18.4 berries a minute and lives out every 3-minute episode. Random actions manage 0.26 and starve in under a minute. A scripted forager that beelines for the nearest berry it sees gets 13.8, so the brain beats that too.
