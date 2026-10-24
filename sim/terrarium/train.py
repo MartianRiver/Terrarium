@@ -53,8 +53,9 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         torch.set_num_threads(quota)
     torch.manual_seed(seed)
     if parent:
-        learner, _ = load_brain(parent)
-        parent_record = {'file': str(parent), 'id': brain_id(parent)}
+        learner, made = load_brain(parent)
+        # the checkpoint's own meta names the run (and samples) it came from, wherever the file was copied to
+        parent_record = {'file': str(parent), 'id': brain_id(parent), 'meta': made}
     else:
         learner, parent_record = Brain(**SHAPE), None
     run = Run(name, {
