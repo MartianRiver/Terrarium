@@ -4,7 +4,7 @@
 
 Kept as we go: each branch adds what it changed before it's merged, and the release turns this into the 0.3.0 entry.
 
-Terrikins now live in a garden under a glass dome on Mars: a clay body with feet and a waddle, a face, a colony-coloured tail, droppings (drawn only), a follow camera (F) and a flyby into the dome (`&intro`). The public site at terrarium.martianriver.com plays the latest brain (`npm run site`). The tools that made the first Instagram reel are in `viewer/reel/`.
+Terrikins now live in a garden under a glass dome on Mars: a clay body with feet and a waddle, a face, a colony-coloured tail, droppings (drawn only), a follow camera (F) and a flyby into the dome (`&intro`). The public site at terrarium.martianriver.com plays the latest brain (`npm run site`). The tools that made the first Instagram reel are in `viewer/reel/`. Droppings are smaller now. `viewer/reel/0.3.json` is the second reel's script, and `viewer/reel/sound.py` gives a reel sound that matches what's on screen (bites, unloads, deaths, day and night ambience, music).
 
 Training got faster and accounted for. torch has CPU and CUDA extras on Linux, `--device` and `--workers` split episodes over processes, and `terrarium.remote` trains on a rented GPU from a committed checkout. `terrarium.compute` adds up the hours of every run and the dollars of every rented machine (`sim/compute.toml`), and a promoted brain records what it took. The runs page (`runs.html`, with `terrarium.serve`) lists every run with its curves, live while it trains, and each checkpoint as a generation to watch.
 
