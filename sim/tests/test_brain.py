@@ -9,11 +9,12 @@ from terrarium.brain import SHAPE, Brain, brain_id, save, tensors
 from terrarium.brain import load as load_brain
 from terrarium.config import DEFAULT, load_train
 from terrarium.evals import brain_policy, run
-from terrarium.forage import Forage
+from terrarium.forage import Forage, carried_worth
 from terrarium.schema import SchemaError
 
 SOLO = load(DEFAULT.parent / 'solo.toml')
-REWARD = load_train().reward
+TRAIN = load_train()
+REWARD = TRAIN.reward
 
 
 def observation(seed=0, kinds=len(schema.KINDS), batch=32, rays=16):
@@ -75,6 +76,21 @@ def test_a_brain_from_shorter_lists_acts_the_same(tmp_path):
     assert (mean2[:, 1] == 0).all()
 
 
+def test_a_new_yes_no_action_is_tried_now_and_then(tmp_path):
+    """Grown unload and eat lean no: yes on about 5% of samples, and never when acting on the mean."""
+    torch.manual_seed(2)
+    now = schema.current()
+    brain = Brain(**SHAPE, lists=now | {'actions': now['actions'][:2]})
+    save(brain, tmp_path / 'old.pt')
+    grown, _ = load_brain(tmp_path / 'old.pt')
+    obs = Forage(SOLO, TRAIN, 64, seed=0).observe()
+    yes = np.concatenate([grown.act(obs) for _ in range(50)]) > 0
+    for name in schema.YES_NO:
+        i = schema.ACTIONS.index(name)
+        assert 0.03 < yes[:, i].mean() < 0.07
+        assert (grown.act(obs, sample=False)[:, i] < 0).all()
+
+
 def test_not_a_brain_is_refused(tmp_path):
     torch.save({'weights': {}}, tmp_path / 'x.pt')
     with pytest.raises(SchemaError, match="isn't a Terrarium brain"):
@@ -82,7 +98,7 @@ def test_not_a_brain_is_refused(tmp_path):
 
 
 def test_forage_observes_every_creature():
-    env = Forage(SOLO, REWARD, 3, seed=0)
+    env = Forage(SOLO, TRAIN, 3, seed=0)
     obs = env.observe()
     rays = SOLO.vision.rays
     assert obs.me.shape == (3, len(schema.SELF)) and obs.kinds.shape == (3, rays)
@@ -93,8 +109,9 @@ def test_forage_observes_every_creature():
 
 
 def test_forage_rewards_eating_and_dying_and_starts_over():
-    env = Forage(SOLO, REWARD, 2, seed=0)
+    env = Forage(SOLO, TRAIN, 2, seed=0)
     w = env.world
+    w.energy[0, 0] = 0.5
     w.food_pos[0, 0] = w.pos[0, 0]
     w.energy[1, 0] = 0.0001
     w.food_regrow[1] = 1
@@ -105,8 +122,103 @@ def test_forage_rewards_eating_and_dying_and_starts_over():
     assert w.alive[1, 0] and w.age[1] == 0 and w.energy[1, 0] == SOLO.energy.start
 
 
+COLONY = replace(load(), block=(), colonies=replace(load().colonies, count=2, size=2))
+
+
+def test_a_creature_dying_ends_only_its_own_stream():
+    env = Forage(COLONY, TRAIN, 1, seed=0)
+    env.world.energy[0, 1] = 0.0001
+    _, _, done, ended = env.step(np.zeros((4, 2)))
+    assert list(done) == [False, True, False, False] and not ended[0]
+    assert list(env.active) == [True, False, True, True]
+
+
+def test_reward_is_shared_with_the_colony():
+    env = Forage(COLONY, TRAIN, 1, seed=0)
+    w = env.world
+    w.energy[:] = 0.5
+    w.food_pos[0, 0] = w.pos[0, 0]
+    _, reward, *_ = env.step(np.zeros((4, 2)))
+    share = REWARD.colony * REWARD.food / 2
+    assert reward == pytest.approx([(1 - REWARD.colony) * REWARD.food + share, share, 0, 0])
+
+
+def test_food_pays_when_eaten_not_when_picked_up():
+    env = Forage(SOLO, replace(TRAIN, reward=replace(REWARD, home=0.0)), 1, seed=0)
+    w = env.world
+    w.energy[:] = 0.9
+    w.food_pos[0, 0] = w.pos[0, 0]
+    _, reward, *_ = env.step(np.zeros((1, 4)))
+    assert w.crop[0, 0] == 1 and reward[0] == 0, 'carried, not eaten'
+    _, reward, *_ = env.step(np.array([[0.0, 0.0, -1.0, 1.0]]))
+    assert w.crop[0, 0] == 1 and reward[0] == 0, 'too full to eat it'
+    w.energy[:] = 0.5
+    _, reward, *_ = env.step(np.array([[0.0, 0.0, -1.0, 1.0]]))
+    assert w.crop[0, 0] == 0 and reward[0] == pytest.approx(REWARD.food)
+
+
+def carrying(at):
+    """A solo Terrikin with a full crop and no food about, standing this far east of its nest."""
+    env = Forage(replace(SOLO, block=()), TRAIN, 1, seed=0)
+    w = env.world
+    w.food_regrow[:] = 1
+    w.crop[:] = SOLO.crop.capacity
+    w.physics.bodies[0][0].position = tuple(w.nests[0] + (at, 0.0))
+    w.physics.read()
+    return env
+
+
+def test_carrying_home_pays_on_the_way_and_walking_off_takes_it_back():
+    # holding worth costs (1 - gamma) of it a tick, so what matters is home against away, not the sign
+    last = {}
+    for heading in (np.pi, 0.0):
+        env = carrying(6.0)
+        w = env.world
+        w.heading[:] = heading
+        for _ in range(9):
+            env.step(np.array([[1.0, 0.0]]))
+        worth = carried_worth(w, REWARD)[0, 0]
+        _, reward, *_ = env.step(np.array([[1.0, 0.0]]))
+        assert reward[0] == pytest.approx(TRAIN.ppo.gamma * carried_worth(w, REWARD)[0, 0] - worth)
+        last[heading] = reward[0]
+    assert last[np.pi] > 0.005 + last[0.0]
+    env = carrying(6.0)
+    env.world.crop[:] = 0
+    _, reward, *_ = env.step(np.array([[1.0, 0.0]]))
+    assert reward[0] == 0, 'nothing carried, nothing paid'
+
+
+def test_unloading_at_home_pays_the_store_less_what_carrying_it_there_paid():
+    env = carrying(0.0)
+    worth = carried_worth(env.world, REWARD)[0, 0]
+    assert worth == pytest.approx(REWARD.home * SOLO.crop.capacity)
+    _, reward, *_ = env.step(np.array([[0.0, 0.0, 1.0, -1.0]]))
+    assert reward[0] == pytest.approx(REWARD.stored * SOLO.crop.capacity - worth)
+
+
+def test_dying_with_a_full_crop_loses_what_it_was_worth():
+    env = carrying(0.0)
+    env.world.energy[:] = 0.0001
+    _, reward, done, _ = env.step(np.zeros((1, 2)))
+    assert done[0] and reward[0] == pytest.approx(REWARD.death - REWARD.home * SOLO.crop.capacity)
+
+
+def test_carrying_is_seen():
+    env = Forage(SOLO, TRAIN, 1, seed=0)
+    env.world.crop[:] = 1
+    assert env.observe().me[0, schema.SELF.index('carrying')] == pytest.approx(1 / SOLO.crop.capacity)
+
+
+def test_it_knows_when_its_home():
+    env = carrying(0.0)
+    at_home = schema.SELF.index('at_home')
+    assert env.observe().me[0, at_home] == 1
+    env = carrying(SOLO.colonies.nest_radius + 1.0)
+    assert env.observe().me[0, at_home] == 0
+
+
 def test_forward_and_side_speed():
-    env = Forage(replace(SOLO, block=()), REWARD, 1, seed=0)
+    env = Forage(replace(SOLO, block=()), TRAIN, 1, seed=0)
     env.world.heading[:] = np.pi / 2
     obs = env.observe()
     for _ in range(20):
@@ -116,11 +228,11 @@ def test_forward_and_side_speed():
 
 
 def test_home_sense():
-    env = Forage(replace(SOLO, block=()), REWARD, 1, seed=0)
+    env = Forage(replace(SOLO, block=()), TRAIN, 1, seed=0)
     w = env.world
     w.physics.bodies[0][0].position = tuple(w.nests[0] + (3.0, 0))
     w.physics.read()
-    home = slice(len(schema.SELF) - 3, None)
+    home = slice(schema.SELF.index('home_distance'), schema.SELF.index('home_cos') + 1)
     w.heading[:] = np.pi
     assert list(env.observe().me[0, home]) == pytest.approx([3.0 / SOLO.vision.range, 0, 1], abs=1e-6)
     # facing up, home is a quarter turn to its left

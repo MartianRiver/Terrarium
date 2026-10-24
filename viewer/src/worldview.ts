@@ -6,6 +6,7 @@ import type * as THREE from 'three';
 import { BlobView } from './blob';
 import { Droppings } from './droppings';
 import { createLogger } from './lib/logger';
+import { JellyPile } from './jelly';
 import { BlockView, FoodView } from './props';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
@@ -35,10 +36,16 @@ export class WorldView {
   // where the first creature was last drawn, for the follow camera
   focus: { x: number; y: number } | null = null;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0 };
+  private piles = new Map<number, JellyPile>();
 
   constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
     this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
+    for (const nest of info.nests) {
+      const pile = new JellyPile(nest);
+      this.piles.set(nest.colony, pile);
+      scene.add(pile.root);
+    }
   }
 
   // call once per sim tick
@@ -52,6 +59,7 @@ export class WorldView {
     this.syncFood(frame);
     this.syncBlocks(frame);
     this.droppings?.push(frame);
+    for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
   // alpha: 0..1 progress from the previous frame to the current one
@@ -93,6 +101,10 @@ export class WorldView {
     for (const block of this.blocks.values()) {
       this.scene.remove(block.root);
       block.dispose();
+    }
+    for (const pile of this.piles.values()) {
+      this.scene.remove(pile.root);
+      pile.dispose();
     }
   }
 

@@ -24,12 +24,21 @@ def test_advantages_by_hand():
 
 def test_episodes_add_up_and_reset():
     e = Episodes(2, dt=0.5)
-    e.add(np.array([1.0, 0.0]), np.array([False, False]))
-    e.add(np.array([1.0, 2.0]), np.array([True, False]))
+    both = np.array([True, True])
+    e.add(np.array([1.0, 0.0]), np.array([False, False]), both)
+    e.add(np.array([1.0, 2.0]), np.array([True, False]), both)
     assert e.take() == {'episodes': 1, 'episode_return': 2.0, 'episode_seconds': 1.0}
     assert e.take() == {'episodes': 0}
-    e.add(np.array([0.0, 1.0]), np.array([False, True]))
+    e.add(np.array([0.0, 1.0]), np.array([False, True]), both)
     assert e.take()['episode_return'] == 3.0
+
+
+def test_the_dead_add_nothing_until_their_arena_starts_over():
+    e = Episodes(2, dt=0.5)
+    e.add(np.array([1.0, 1.0]), np.array([True, False]), np.array([True, True]))
+    # the first died; its arena ending later isn't a second episode
+    e.add(np.array([5.0, 1.0]), np.array([True, True]), np.array([False, True]))
+    assert e.take() == {'episodes': 2, 'episode_return': 1.5, 'episode_seconds': 0.75}
 
 
 def test_dirty_tree_needs_scratch(tmp_path, monkeypatch):

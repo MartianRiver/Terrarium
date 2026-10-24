@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { dropGeo, jellyMat } from './jelly';
 import type { BlockState, FoodKind, FoodState } from './world';
 
 const berryGeo = new THREE.SphereGeometry(0.11, 20, 14);
@@ -24,6 +25,14 @@ function easeOutBack(t: number) {
 
 function buildFood(kind: FoodKind): THREE.Group {
   const g = new THREE.Group();
+  if (kind === 'jelly') {
+    const drop = new THREE.Mesh(dropGeo, jellyMat);
+    drop.scale.setScalar(1.6);
+    drop.position.y = 0.11;
+    drop.castShadow = true;
+    g.add(drop);
+    return g;
+  }
   if (kind === 'rich') {
     const gem = new THREE.Mesh(richGeo, richMat);
     gem.position.y = 0.55;

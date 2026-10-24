@@ -39,7 +39,7 @@ def look(world: World) -> Sight:
     arenas, n = pos.shape[:2]
     dirs = directions(world.heading, v.rays, v.fov)
     others = np.broadcast_to(~np.eye(n, dtype=bool), (arenas, n, n))
-    food = np.broadcast_to(world.food_present[:, None], (arenas, n, cfg.food.count))
+    food = np.broadcast_to(world.food_present[:, None], (arenas, n, world.food_present.shape[1]))
     half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2)
     creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start)
     hits = np.stack([

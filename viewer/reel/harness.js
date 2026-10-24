@@ -100,7 +100,13 @@ async function setup(size, demo) {
   return { gl, label, step };
 }
 
-// shots: [{from, to, speed}] and labels: [{from, to, lines}] in replay seconds; keys: [{at, key}];
+function press(canvas, { key, zoom }) {
+  if (zoom) canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: zoom, clientX: canvas.width / 2, clientY: canvas.height / 2, bubbles: true, cancelable: true }));
+  else dispatchEvent(new KeyboardEvent('keydown', { key }));
+}
+
+// shots: [{from, to, speed}] and labels: [{from, to, lines}] in replay seconds; keys: [{at, key}] or [{at, zoom}]
+// (a mouse wheel turn on the canvas, + out, - in: portrait needs the overview pulled back to fit the arena);
 // hold: seconds to keep the last frame, showing end on the clock (the replay clock rounds down);
 // tag: a small label in a grid cell; demo: the scripted demo rather than a replay
 export async function clip({ name, shots, labels = [], keys = [], hold = 0, end, clock = false, size = [1080, 1920], tag, demo = false }) {
@@ -119,7 +125,7 @@ export async function clip({ name, shots, labels = [], keys = [], hold = 0, end,
       step(ms);
       left -= ms;
       t += ms / 1000;
-      while (pending.length && pending[0].at <= t) dispatchEvent(new KeyboardEvent('keydown', { key: pending.shift().key }));
+      while (pending.length && pending[0].at <= t) press(gl, pending.shift());
     }
   };
   const out = Object.assign(document.createElement('canvas'), { width: W, height: H });

@@ -31,7 +31,8 @@ type Row = Record<string, number | number[] | undefined>;
 interface Score { mean: number; stderr: number }
 interface RunDetail {
   run: { id: string; started: string; finished?: string; scratch: boolean; device?: string; gpu?: string | null;
-    workers?: number; parent: { id: string } | null; world: { file: string }; train: { config: { ppo: { samples: number } } } };
+    workers?: number; parent: { id: string } | null; world: { file: string }; train: { config: { ppo: { samples: number } } };
+    schema?: { actions: string[] } };
   state: State;
   metrics: Row[];
   checkpoints: { file: string; samples: number }[];
@@ -113,12 +114,13 @@ function charts(d: RunDetail) {
   const rows = d.metrics;
   const xs = rows.map((r) => r.samples as number);
   const pick = (key: string) => rows.map((r) => (typeof r[key] === 'number' ? (r[key] as number) : null));
-  const spread = (k: number) => rows.map((r) => (Array.isArray(r.std) ? r.std[k] : null));
+  const spread = (k: number) => rows.map((r) => (Array.isArray(r.std) ? (r.std[k] ?? null) : null));
+  const actions = d.run.schema?.actions ?? ['thrust', 'turn'];
   const specs: [string, Series[]][] = [
-    ['Food per episode (−1 if it died)', [{ name: 'return', values: pick('episode_return') }]],
-    ['Seconds alive per episode', [{ name: 'seconds', values: pick('episode_seconds') }]],
+    ['Reward per life', [{ name: 'return', values: pick('episode_return') }]],
+    ['Seconds alive per life', [{ name: 'seconds', values: pick('episode_seconds') }]],
     ['Samples a second', [{ name: 'samples/s', values: pick('samples_per_second') }]],
-    ['Action spread (std)', [{ name: 'thrust', values: spread(0) }, { name: 'turn', values: spread(1) }]],
+    ['Action spread (std)', actions.map((name, k) => ({ name, values: spread(k) }))],
     ['KL per update', [{ name: 'kl', values: pick('kl') }]],
     ['Explained variance', [{ name: 'explained', values: pick('explained_variance') }]],
   ];

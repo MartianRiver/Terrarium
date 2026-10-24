@@ -51,6 +51,21 @@ class Food:
     regrow_min: float
     regrow_max: float
     clearance: float
+    patches: int
+    patch_radius: float
+
+
+@dataclass(frozen=True)
+class Crop:
+    capacity: int
+    slow: float
+    start: int
+
+
+@dataclass(frozen=True)
+class Jelly:
+    energy: float
+    hunger: float
 
 
 @dataclass(frozen=True)
@@ -91,6 +106,8 @@ class Config:
     energy: Energy
     colonies: Colonies
     food: Food
+    crop: Crop
+    jelly: Jelly
     ground: Ground
     vision: Vision
     episode: Episode
@@ -109,6 +126,10 @@ class Reward:
     food: float
     death: float
     alive: float
+    stored: float
+    jelly: float
+    colony: float
+    home: float
 
 
 @dataclass(frozen=True)

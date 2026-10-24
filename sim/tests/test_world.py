@@ -80,6 +80,7 @@ def test_things_stay_inside_and_apart():
 def test_eating_gives_energy_and_food_regrows_elsewhere():
     world = World(CFG, seed=3)
     world.food_pos[0, 0] = world.pos[0, 0]
+    world.energy[0, 0] = 0.5
     old_id, before = world.food_id[0, 0], world.energy[0, 0]
     world.step(np.zeros((1, len(world.colony), 2)))
     assert not world.food_present[0, 0]
@@ -96,6 +97,127 @@ def test_eating_gives_energy_and_food_regrows_elsewhere():
     assert world.food_id[0, 0] > old_id and world.food_id[0, 0] not in world.food_id[0, 1:]
     nest_gap = CFG.colonies.nest_radius + CFG.food.clearance
     assert (np.hypot(*(world.nests - world.food_pos[0, 0]).T) >= nest_gap).all()
+
+
+STILL = np.zeros((1, 1, 2))
+
+
+def test_too_full_to_eat_carries_it_slower():
+    world = alone()
+    world.food_pos[0, 0] = world.pos[0, 0]
+    world.step(STILL)
+    assert world.crop[0, 0] == 1 and world.meals[0, 0] == 1 and world.energy[0, 0] < CFG.energy.start
+    for _ in range(40):
+        world.step(np.array([[[1.0, 0.0]]]))
+    speed = np.hypot(*world.vel[0, 0])
+    assert speed == pytest.approx(CFG.creature.max_speed * (1 - CFG.crop.slow), rel=0.02)
+
+
+def test_a_full_crop_walks_over_food():
+    world = alone()
+    world.crop[:] = CFG.crop.capacity
+    world.food_pos[0, 0] = world.pos[0, 0]
+    world.step(STILL)
+    assert world.food_present[0, 0] and world.meals[0, 0] == 0
+
+
+UNLOAD = np.array([[[0.0, 0.0, 1.0, -1.0]]])
+EAT = np.array([[[0.0, 0.0, -1.0, 1.0]]])
+
+
+def test_unloading_in_the_nest_fills_its_store():
+    world = alone()
+    place(world, 0, *world.nests[0])
+    world.crop[:] = 2
+    world.step(STILL)
+    assert world.crop[0, 0] == 2, 'nothing is unloaded unless it chooses to'
+    world.step(UNLOAD)
+    assert world.crop[0, 0] == 0 and world.store[0, 0] == 2 and world.stored[0, 0] == 2
+
+
+def test_unloading_outside_a_nest_leaves_jelly_anyone_can_eat():
+    world = alone()
+    world.food_regrow[:, :world.wild] = 10_000
+    world.crop[:] = 2
+    world.step(UNLOAD)
+    dropped = np.flatnonzero(world.food_present[0])
+    assert world.crop[0, 0] == 0 and len(dropped) == 2 and (dropped >= world.wild).all()
+    assert world.store[0, 0] == 0 and world.stored[0, 0] == 0
+    # full, it walks over jelly rather than eating it or taking it back into its crop
+    world.food_pos[0, dropped[0]] = world.pos[0, 0]
+    world.energy[:] = 0.9
+    world.step(STILL)
+    assert world.food_present[0, dropped[0]] and world.crop[0, 0] == 0
+    world.energy[:] = 0.5
+    world.step(STILL)
+    assert not world.food_present[0, dropped[0]] and world.food_regrow[0, dropped[0]] == -1
+    assert world.energy[0, 0] == pytest.approx(0.5 + CFG.jelly.energy - CFG.energy.drain * CFG.dt)
+    assert world.meals[0, 0] == 0, 'jelly is not a meal found'
+
+
+def test_unloading_in_a_rivals_nest_feeds_theirs():
+    cfg = replace(CFG, colonies=replace(CFG.colonies, count=2, size=1), block=())
+    world = World(cfg)
+    place(world, 0, *world.nests[1])
+    world.crop[:] = 1
+    world.step(np.array([[[0.0, 0.0, 1.0, -1.0], [0.0, 0.0, -1.0, -1.0]]]))
+    assert list(world.store[0]) == [0, 1] and world.stored[0, 0] == 0
+
+
+def test_eating_from_its_crop():
+    world = alone()
+    world.crop[:] = 1
+    world.energy[:] = 0.5
+    world.step(EAT)
+    assert world.crop[0, 0] == 0 and world.energy[0, 0] == pytest.approx(0.9 - CFG.energy.drain * CFG.dt)
+
+
+def test_a_full_one_cant_eat_its_crop():
+    world = alone()
+    world.crop[:] = 1
+    world.energy[:] = 0.9
+    world.step(EAT)
+    assert world.crop[0, 0] == 1 and world.fed[0, 0] == 0
+
+
+def test_only_the_hungry_eat_from_the_store_and_only_at_home():
+    world = alone()
+    world.store[:] = 2
+    world.energy[:] = CFG.jelly.hunger - 0.01
+    world.step(EAT)
+    assert world.store[0, 0] == 2, 'away from the nest'
+    place(world, 0, *world.nests[0])
+    world.energy[:] = 0.5
+    world.step(EAT)
+    assert world.store[0, 0] == 2, 'not hungry'
+    world.energy[:] = CFG.jelly.hunger - 0.01
+    world.step(EAT)
+    assert world.store[0, 0] == 1 and world.jelly[0, 0] == 1
+    assert world.energy[0, 0] == pytest.approx(CFG.jelly.hunger - 0.01 + CFG.jelly.energy - CFG.energy.drain * CFG.dt)
+
+
+def test_the_store_runs_out_lowest_index_first():
+    cfg = replace(CFG, colonies=replace(CFG.colonies, count=1, size=3), block=())
+    world = World(cfg)
+    for i in range(3):
+        place(world, i, *(world.nests[0] + (0.9 * (i - 1), 0)))
+    world.store[:] = 2
+    world.energy[:] = 0.1
+    world.step(np.repeat(EAT, 3, 1))
+    assert list(world.jelly[0]) == [1, 1, 0] and world.store[0, 0] == 0
+
+
+def test_food_grows_in_patches_that_move_each_episode():
+    world = World(CFG, 2, seed=4)
+    grown = world.food_pos[:, :world.wild]
+    near = np.hypot(*(grown[:, :, None] - world.patch_pos[:, None]).transpose(3, 0, 1, 2)).min(-1)
+    assert (near <= CFG.food.patch_radius + 1e-9).all()
+    before = world.patch_pos.copy()
+    world.crop[:] = 1
+    world.store[:] = 3
+    world.reset(np.array([True, False]))
+    assert not np.allclose(world.patch_pos[0], before[0]) and np.allclose(world.patch_pos[1], before[1])
+    assert (world.crop[0] == 0).all() and (world.store[0] == 0).all() and (world.store[1] == 3).all()
 
 
 def test_energy_drains_with_effort():
@@ -185,7 +307,9 @@ def test_reset_starts_only_those_arenas_over():
 
     assert world.age[1] == 0 and world.age[0] == world.age[2] == 200
     assert world.alive[1].all() and (world.energy[1] == CFG.energy.start).all()
-    assert world.food_present[1].all() and world.food_id[1].min() > before[1][1].max()
+    wild = world.wild
+    assert world.food_present[1, :wild].all() and not world.food_present[1, wild:].any()
+    assert world.food_id[1, :wild].min() > before[1][1].max()
     assert (world.meals[1] == 0).all()
     assert np.array_equal(world.block_pos[1], [(b.x, b.y) for b in CFG.block])
     assert (world.vel[1] == 0).all() and worst_overlap(world) < 0.15
@@ -204,3 +328,19 @@ def test_reset_is_deterministic():
         w.reset(np.array([True, False]))
         run(w, 100)
     assert np.array_equal(worlds[0].pos, worlds[1].pos) and np.array_equal(worlds[0].food_pos, worlds[1].food_pos)
+
+
+def test_a_training_world_can_start_with_full_crops():
+    cfg = replace(CFG, crop=replace(CFG.crop, start=CFG.crop.capacity))
+    world = World(cfg, 2, seed=3)
+    assert (world.crop == CFG.crop.capacity).all()
+    world.crop[:] = 0
+    world.reset(np.array([True, False]))
+    assert (world.crop[0] == CFG.crop.capacity).all() and (world.crop[1] == 0).all()
+    with pytest.raises(ConfigError, match='more than a crop holds'):
+        World(replace(CFG, crop=replace(CFG.crop, start=CFG.crop.capacity + 1)))
+
+
+def test_a_spawn_ring_past_the_walls_is_refused():
+    with pytest.raises(ConfigError, match='past the walls'):
+        World(replace(CFG, block=(), colonies=replace(CFG.colonies, spawn_ring=4.0)))

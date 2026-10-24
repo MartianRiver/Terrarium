@@ -10,14 +10,14 @@ import numpy as np
 import torch
 
 from .brain import Brain, tensors
-from .config import Config, Reward
+from .config import Config, Train
 from .forage import Forage
 from .ppo import Episodes, Rollout, collect
 
 
 class Share:
-    def __init__(self, cfg: Config, reward: Reward, arenas: int, seed: int, actor: Brain):
-        self.env = Forage(cfg, reward, arenas, seed)
+    def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain):
+        self.env = Forage(cfg, train, arenas, seed)
         self.actor = actor
         self.episodes = Episodes(self.env.samples, cfg.dt)
         self.obs = self.env.observe()
@@ -32,11 +32,11 @@ class Share:
         return roll, last_value, finished
 
 
-def serve(conn, cfg: Config, reward: Reward, arenas: int, seed: int, actor: Brain):
+def serve(conn, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain):
     # the workers between them use the cores; threads inside each would only fight
     torch.set_num_threads(1)
     torch.manual_seed(seed)
-    share = Share(cfg, reward, arenas, seed, actor)
+    share = Share(cfg, train, arenas, seed, actor)
     while (job := conn.recv()) is not None:
         try:
             conn.send(share.play(*job))
@@ -46,19 +46,19 @@ def serve(conn, cfg: Config, reward: Reward, arenas: int, seed: int, actor: Brai
 
 
 class Collector:
-    def __init__(self, cfg: Config, reward: Reward, arenas: int, seed: int, actor: Brain, workers: int = 1):
+    def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain, workers: int = 1):
         self.samples = arenas * cfg.colonies.count * cfg.colonies.size
         self.episodes = Episodes(self.samples, cfg.dt)
         self.local, self.pipes, self.procs = None, [], []
         if workers == 1:
-            self.local = Share(cfg, reward, arenas, seed, actor)
+            self.local = Share(cfg, train, arenas, seed, actor)
             return
         # spawn, not fork: a forked child of a process holding CUDA or MPS can hang
         ctx = mp.get_context('spawn')
         for i, n in enumerate(len(a) for a in np.array_split(np.arange(arenas), workers)):
             mine, theirs = ctx.Pipe()
             own = int(np.random.SeedSequence([seed, i]).generate_state(1)[0])
-            proc = ctx.Process(target=serve, args=(theirs, cfg, reward, n, own, actor), daemon=True)
+            proc = ctx.Process(target=serve, args=(theirs, cfg, train, n, own, actor), daemon=True)
             proc.start()
             self.pipes.append(mine)
             self.procs.append(proc)

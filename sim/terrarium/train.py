@@ -67,7 +67,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
 
     learner.to(device)
     optimizer = torch.optim.Adam(learner.parameters(), lr=ppo.lr, eps=1e-5)
-    rollouts = Collector(world_cfg, cfg.reward, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers)
+    rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers)
     per_update = rollouts.samples * ppo.steps
     updates = max(1, ppo.samples // per_update)
     meta = {'run': run.id, 'commit': run.record['commit'], 'scratch': scratch,

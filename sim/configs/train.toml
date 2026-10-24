@@ -1,12 +1,21 @@
 # Training: what's rewarded. The world it trains in is a separate file (solo.toml for 0.2).
 
 [reward]
-# per food eaten
+# per food's worth of energy got from eating food (so eating while full earns little, and picking up earns nothing)
 food = 1.0
 # once, on the tick a creature dies
 death = -1.0
 # per second alive; off, since paying for time alone teaches standing still
 alive = 0.0
+# per food unloaded into its own nest's store: twice what eating it pays, or keeping it in the crop is as good (until hatchlings give the store a use)
+stored = 2.0
+# per jelly eaten from the store: foraging should always pay better
+jelly = -0.5
+# share of each creature's reward that's its colony's average instead of its own (0 = all its own)
+colony = 0.5
+# per food in its crop at its own nest, paid as it carries it home (nothing an arena's width away) and
+# taken back as it walks off, eats it or unloads it; only moves reward earlier, so it can't change what pays best
+home = 0.5
 
 [ppo]
 # samples to train on in all: one creature for one tick is one sample

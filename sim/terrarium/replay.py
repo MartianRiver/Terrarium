@@ -38,15 +38,17 @@ def frame(world: World, a: int) -> dict:
     size = _r(cfg.creature.radius / BLOB_RADIUS)
     speed = np.hypot(world.vel[a, :, 0], world.vel[a, :, 1])
     creatures = [{'id': int(i), 'colony': int(c), 'x': _r(x), 'y': _r(y), 'heading': _r(h), 'speed': _r(s),
-                  'size': size, 'energy': _r(e), 'signal': -1}
-                 for i, c, (x, y), h, s, e in zip(world.creature_id, world.colony, world.pos[a], world.heading[a],
-                                                  speed, world.energy[a])]
+                  'size': size, 'energy': _r(e), 'signal': -1, 'carrying': int(k)}
+                 for i, c, (x, y), h, s, e, k in zip(world.creature_id, world.colony, world.pos[a], world.heading[a],
+                                                     speed, world.energy[a], world.crop[a])]
     here = world.food_present[a]
-    food = [{'id': int(i), 'kind': 'common', 'x': _r(x), 'y': _r(y)}
-            for i, (x, y) in zip(world.food_id[a][here], world.food_pos[a][here])]
+    kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
+    food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
+            for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
     blocks = [{'id': int(i), 'x': _r(x), 'y': _r(y), 'angle': _r(t), 'w': b.w, 'h': b.h}
               for i, b, (x, y), t in zip(world.block_id, cfg.block, world.block_pos[a], world.block_angle[a])]
-    return {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks}
+    stores = [{'colony': c, 'jelly': int(j)} for c, j in enumerate(world.store[a])]
+    return {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
 
 
 class Writer:

@@ -45,6 +45,23 @@ regrow_min = 6.0
 regrow_max = 12.0
 # food never grows closer than this to a nest's edge or a wall
 clearance = 1.5
+# food grows back in this many patches, placed anew each episode, within patch_radius of their centres
+patches = 4
+patch_radius = 2.5
+
+[crop]
+# food picked up while too full to eat it is carried instead, up to this many, and unloaded in the nest
+capacity = 2
+# share of top speed lost per food carried
+slow = 0.15
+# food in each crop at the start (a training world can start them full)
+start = 0
+
+[jelly]
+# what one food in the store gives back when eaten, against [energy] food fresh
+energy = 0.25
+# only a creature below this energy eats from the store, or from its own crop
+hunger = 0.3
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)

@@ -1,7 +1,10 @@
 # Evals v1: a policy plays a fixed set of episodes on fixed seeds, one per
 # arena, and gets two numbers: food per minute and time alive. Random actions
 # are the baseline every brain has to beat; greedy is a scripted forager that
-# heads for the nearest food it can see, there to show what the senses allow.
+# heads for the nearest food it can see, there to show what the senses allow,
+# eating what it carries once it can without waste. Carrier is greedy that takes
+# its crop home and unloads it once it's full, and goes home to eat when it's
+# hungry and there's jelly in the store.
 #
 #   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt]
 
@@ -48,11 +51,30 @@ def greedy_policy(world: World) -> Policy:
         # nothing to eat in view: go straight, and turn hard when something's close ahead
         blocked = (np.where(ahead & (kind != NOTHING), dist, np.inf).min(-1) < 1.5)
         turn = np.where(sees, np.clip(angles[nearest] * 3, -1, 1), np.where(blocked, 1.0, 0.0))
-        return np.stack([np.ones_like(turn), turn], -1)
+        eat = np.where(w.energy <= 1 - w.cfg.energy.food, 1.0, -1.0)
+        return np.stack([np.ones_like(turn), turn, -np.ones_like(turn), eat], -1)
     return act
 
 
-POLICIES = {'random': random_policy, 'greedy': greedy_policy}
+def carrier_policy(world: World) -> Policy:
+    greedy = greedy_policy(world)
+
+    def act(w: World) -> np.ndarray:
+        action = greedy(w)
+        home = w.nests[w.colony] - w.pos
+        bearing = np.arctan2(home[..., 1], home[..., 0]) - w.heading
+        bearing = (bearing + np.pi) % (2 * np.pi) - np.pi
+        stocked = np.take_along_axis(w.store, np.broadcast_to(w.colony, w.crop.shape), 1) > 0
+        home_now = (w.crop >= w.cfg.crop.capacity) | ((w.energy < w.cfg.jelly.hunger) & stocked)
+        action[..., 1] = np.where(home_now, np.clip(bearing * 3, -1, 1), action[..., 1])
+        action[..., 2] = np.where((w.nest_at() == w.colony) & (w.crop > 0), 1.0, -1.0)
+        hungry = w.energy < w.cfg.jelly.hunger
+        action[..., 3] = np.where(hungry | (action[..., 3] > 0), 1.0, -1.0)
+        return action
+    return act
+
+
+POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'carrier': carrier_policy}
 
 
 def brain_policy(path: Path | str) -> Callable[[World], Policy]:
@@ -65,8 +87,9 @@ def brain_policy(path: Path | str) -> Callable[[World], Policy]:
 
         def act(w: World) -> np.ndarray:
             nonlocal last
-            last = np.clip(brain.act(observe(w, last), sample=False), -1, 1).reshape(last.shape)
-            return last
+            action = np.clip(brain.act(observe(w, last), sample=False), -1, 1).reshape(*last.shape[:2], -1)
+            last = action[..., :2]
+            return action
         return act
     return make
 
@@ -77,6 +100,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES) 
     policy = make(world)
     lived = np.zeros(world.alive.shape, int)
     meals = np.zeros(world.alive.shape, int)
+    stored = np.zeros(world.alive.shape, int)
     done = np.zeros(episodes, bool)
     while not done.all():
         before = world.alive & ~done[:, None]
@@ -85,13 +109,14 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES) 
         # an arena that has ended stops counting; the others carry on
         finished = world.ended & ~done
         meals[finished] = world.meals[finished]
+        stored[finished] = world.stored[finished]
         done |= finished
     alive = lived / cfg.tick_hz
     per_minute = meals / (alive / 60)
     return {
         'episodes': episodes, 'seed': SEED,
         'food_per_minute': summary(per_minute), 'seconds_alive': summary(alive),
-        'food': summary(meals),
+        'food': summary(meals), 'stored': summary(stored),
     }
 
 
@@ -128,12 +153,13 @@ def main():
     results = {}
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {SEED}')
     width = max([8, *(len(Path(b).name) for b in args.brain)])
-    print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}')
+    print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}  {"stored":>12}')
     makers = {name: POLICIES[name] for name in args.policy} | {Path(b).name: brain_policy(b) for b in args.brain}
     for name, make in makers.items():
         r = results[name] = run(cfg, make, args.episodes)
-        f, s = r['food_per_minute'], r['seconds_alive']
-        print(f'{name:<{width}}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}')
+        f, s, st = r['food_per_minute'], r['seconds_alive'], r['stored']
+        print(f'{name:<{width}}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}'
+              f'  {st["mean"]:5.1f} ± {st["stderr"]:4.1f}')
         log.info('eval done', policy=name, food_per_minute=round(f['mean'], 3), seconds_alive=round(s['mean'], 1))
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')

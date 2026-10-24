@@ -160,17 +160,19 @@ function addHedge(scene: THREE.Object3D, info: WorldInfo, rng: () => number) {
   scene.add(hedge);
 }
 
+// a nest is a flat pad of soil: Terrikins walk across it in the sim, so anything taller swallows their feet
+export const NEST_TOP = 0.04;
+
 function addNest(scene: THREE.Object3D, nest: NestInfo) {
   const tint = COLONY_COLOURS[nest.colony % COLONY_COLOURS.length];
-  const mound = new THREE.Mesh(
-    new THREE.SphereGeometry(nest.radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.32, 1),
+  const pad = new THREE.Mesh(
+    new THREE.CylinderGeometry(nest.radius, nest.radius * 1.04, NEST_TOP, 48),
     new THREE.MeshStandardMaterial({ color: GARDEN.soil, roughness: 1 }),
   );
-  mound.position.set(nest.x, 0, nest.y);
-  mound.castShadow = true;
-  mound.receiveShadow = true;
+  pad.position.set(nest.x, NEST_TOP / 2, nest.y);
+  pad.receiveShadow = true;
   const hole = new THREE.Mesh(new THREE.CircleGeometry(nest.radius * 0.28, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: GARDEN.hole }));
-  hole.position.set(nest.x, nest.radius * 0.32 + 0.01, nest.y);
+  hole.position.set(nest.x, NEST_TOP + 0.003, nest.y);
   // a ring of stones in the colony's colour
   const stones = Math.round(nest.radius * 15);
   const rng = seeded(nest.colony + 3);
@@ -181,7 +183,7 @@ function addNest(scene: THREE.Object3D, nest: NestInfo) {
     d.scale.set(s, s * 0.6, s);
   });
   ring.castShadow = ring.receiveShadow = true;
-  scene.add(mound, hole, ring);
+  scene.add(pad, hole, ring);
 }
 
 // curved blades that sway; the sway is a uniform the frame loop advances

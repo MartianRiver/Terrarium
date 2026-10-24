@@ -14,6 +14,8 @@ uv run python -m terrarium.evals --policy random greedy --config configs/solo.to
 
 `random` is the stand-in brain from 0.1, and the baseline every trained brain has to beat. `greedy` is scripted: it heads for the nearest food any ray sees, and otherwise goes straight and turns away from anything close ahead. It's not a brain and never trains anything. It shows what the senses make possible, so if a trained brain can't get near it, the brain is the problem, not the rays.
 
+From 0.3 greedy also eats what it carries once it can without waste, and `carrier` is greedy that takes its crop home and unloads it once it's full, and goes home to eat when it's hungry and the store has jelly. Results also have **stored**, food unloaded into the creature's own store. Food per minute counts food picked up where it grew, eaten or carried. Since a full Terrikin with a full crop can't take any more, 0.3's numbers can't be compared with 0.2's: the 0.2 brain scores 5.23 solo in the 0.3 world against 18.40 in its own. The numbers and how they changed are in [notes/0.3.md](notes/0.3.md).
+
 ## v1, solo forager (0.2)
 
 `configs/solo.toml`, 64 episodes of up to 180 s:

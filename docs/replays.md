@@ -16,6 +16,8 @@ Line 1 is the header:
 
 Every line after it is one `Frame`, one per tick, starting from the tick before the first step. `info` and `Frame` are the types in [viewer/src/world.ts](../viewer/src/world.ts). `source` says where the run came from (commit, with `-dirty` if the working tree had changes; seed; brain; the full config). The viewer logs it and never depends on it.
 
+From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty.
+
 Positions are in metres and angles in radians, rounded to 3 decimals. A creature's `size` is its radius over 0.45 m, the radius the blob model is drawn at. Food gets a new id every time it regrows, because the viewer pops things in and out by id.
 
 ## Changing it

@@ -5,7 +5,8 @@
 export const SIGNAL_COUNT = 5;
 export const SIGNAL_OFF = -1;
 
-export type FoodKind = 'common' | 'rich';
+// jelly is what a Terrikin leaves when it unloads its crop outside a nest (0.3 on)
+export type FoodKind = 'common' | 'rich' | 'jelly';
 
 export interface CreatureState {
   id: number;
@@ -17,6 +18,7 @@ export interface CreatureState {
   size: number;
   energy: number; // 0..1
   signal: number; // SIGNAL_OFF or 0..SIGNAL_COUNT-1
+  carrying: number; // food eaten past full, held in its crop to make jelly; 0 in replays from before 0.3
 }
 
 export interface FoodState {
@@ -51,9 +53,16 @@ export interface WorldInfo {
   nests: NestInfo[];
 }
 
+// jelly in a colony's store, in food unloaded
+export interface StoreState {
+  colony: number;
+  jelly: number;
+}
+
 export interface Frame {
   tick: number;
   creatures: CreatureState[];
   food: FoodState[];
   blocks: BlockState[];
+  stores: StoreState[]; // empty in replays from before 0.3
 }
