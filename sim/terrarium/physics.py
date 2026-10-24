@@ -10,6 +10,9 @@ from pymunk.constraints import GearJoint, PivotJoint
 from .config import Config
 
 CREATURE, BLOCK, WALL = 1, 2, 4
+SOLID = pymunk.ShapeFilter(categories=CREATURE)
+# a dead creature's body touches nothing, so nothing bumps into what's drawn as a tombstone
+GONE = pymunk.ShapeFilter(categories=CREATURE, mask=0)
 # walls are thick and sit outside the arena, so nothing squeezed against one can pop through it
 WALL_THICKNESS = 0.5
 # per body: position x, y, angle, velocity x, y, angular velocity
@@ -49,7 +52,7 @@ class Physics:
             body.position = (float(x), float(y))
             shape = pymunk.Circle(body, cfg.creature.radius)
             shape.friction = cfg.creature.friction
-            shape.filter = pymunk.ShapeFilter(categories=CREATURE)
+            shape.filter = SOLID
             space.add(body, shape)
             bodies.append(body)
         for b in cfg.block:
@@ -98,11 +101,22 @@ class Physics:
             for body, (x, y) in zip(bodies, pos):
                 body.position = (float(x), float(y))
                 body.velocity = (0, 0)
+                for shape in body.shapes:
+                    shape.filter = SOLID
             for body, b in zip(bodies[self.creatures:], self.cfg.block):
                 body.position = (b.x, b.y)
                 body.angle = b.angle
                 body.velocity = (0, 0)
                 body.angular_velocity = 0
+        self.read()
+
+    def remove(self, creatures: np.ndarray):
+        """Take these (arenas, creatures) out of the world where they stand, until their arena is placed again."""
+        for a, c in zip(*np.nonzero(creatures)):
+            body = self.bodies[a][c]
+            body.velocity = (0, 0)
+            for shape in body.shapes:
+                shape.filter = GONE
         self.read()
 
     def step(self, force: np.ndarray):

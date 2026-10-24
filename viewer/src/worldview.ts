@@ -8,6 +8,7 @@ import { Droppings } from './droppings';
 import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
 import { BlockView, FoodView } from './props';
+import { Tombstones } from './tombstones';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
 const log = createLogger('worldview');
@@ -38,9 +39,11 @@ export class WorldView {
   private droppings: Droppings | null;
   private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0 };
   private piles = new Map<number, JellyPile>();
+  private tombstones: Tombstones;
 
   constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
     this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
+    this.tombstones = new Tombstones(scene, info.tickHz);
     for (const nest of info.nests) {
       const pile = new JellyPile(nest);
       this.piles.set(nest.colony, pile);
@@ -59,6 +62,7 @@ export class WorldView {
     this.syncFood(frame);
     this.syncBlocks(frame);
     this.droppings?.push(frame);
+    this.tombstones.push(frame);
     for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
@@ -75,13 +79,17 @@ export class WorldView {
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
       if (c === this.frame.creatures[0]) this.focus = { x: s.x, y: s.y };
-      this.blobs.get(c.id)!.update(s, this.info.maxSpeed, dt, time);
+      const blob = this.blobs.get(c.id)!;
+      // the dead are a tombstone now
+      blob.root.visible = !this.tombstones.isDead(c.id);
+      if (blob.root.visible) blob.update(s, this.info.maxSpeed, dt, time);
     }
     for (const b of this.frame.blocks) {
       const p = this.prevBlocks.get(b.id) ?? b;
       this.blocks.get(b.id)!.update({ ...b, x: lerp(p.x, b.x, alpha), y: lerp(p.y, b.y, alpha), angle: lerpAngle(p.angle, b.angle, alpha) });
     }
     this.droppings?.render(this.frame.tick, alpha);
+    this.tombstones.render(this.frame.tick, alpha);
     for (const f of this.food.values()) f.update(dt, time);
     this.dyingFood = this.dyingFood.filter((f) => {
       const alive = f.update(dt, time);
@@ -98,6 +106,7 @@ export class WorldView {
     }
     for (const f of [...this.food.values(), ...this.dyingFood]) this.scene.remove(f.root);
     this.droppings?.clear();
+    this.tombstones.clear();
     for (const block of this.blocks.values()) {
       this.scene.remove(block.root);
       block.dispose();

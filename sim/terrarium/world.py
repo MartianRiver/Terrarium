@@ -1,7 +1,8 @@
 # The world: colonies of creatures around their nests, food that's eaten and
 # regrows, pushable blocks, walls. Runs many independent arenas at once; every
 # array is (arenas, ...) and an action is (thrust, turn) per creature in [-1, 1].
-# A creature dies when its energy runs out; an arena has ended once everyone in
+# A creature dies when its energy runs out, and its body leaves the world where
+# it fell: nothing bumps into it or sees it. An arena has ended once everyone in
 # it is dead or its episode is up, and the caller starts it over with reset().
 #
 # Food a creature eats past full goes into its crop, like an ant's social
@@ -153,7 +154,7 @@ class World:
     def step(self, actions: np.ndarray):
         """actions (arenas, creatures, k): thrust and turn, then unload and eat (yes when above 0) if k is 4."""
         cfg, c = self.cfg, self.cfg.creature
-        # the dead don't move, though their bodies still get pushed around
+        # the dead don't move
         actions = np.clip(actions, -1, 1) * self.alive[..., None]
         thrust, turn = actions[..., 0], actions[..., 1]
         unload, eat = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k else np.zeros_like(self.alive)
@@ -177,6 +178,7 @@ class World:
         dying = self.alive & (self.energy <= 0)
         if dying.any():
             self.alive &= ~dying
+            self.physics.remove(dying)
             log.debug('creatures died', tick=self.tick, count=int(dying.sum()))
         self.age += 1
         self.tick += 1

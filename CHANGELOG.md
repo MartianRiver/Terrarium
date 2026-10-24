@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: 0.3 Daisy, colony basics
+
+Kept as we go: each branch adds what it changed before it's merged, and the release turns this into the 0.3.0 entry.
+
+Terrikins now live in a garden under a glass dome on Mars: a clay body with feet and a waddle, a face, a colony-coloured tail, droppings (drawn only), a follow camera (F) and a flyby into the dome (`&intro`). The public site at terrarium.martianriver.com plays the latest brain (`npm run site`). The tools that made the first Instagram reel are in `viewer/reel/`.
+
+Training got faster and accounted for. torch has CPU and CUDA extras on Linux, `--device` and `--workers` split episodes over processes, and `terrarium.remote` trains on a rented GPU from a committed checkout. `terrarium.compute` adds up the hours of every run and the dollars of every rented machine (`sim/compute.toml`), and a promoted brain records what it took. The runs page (`runs.html`, with `terrarium.serve`) lists every run with its curves, live while it trains, and each checkpoint as a generation to watch.
+
+The brain sees more (schema v2): the distance and direction to its own nest, whether a creature it sees is a nestmate, and how far its own and other nests are along each ray. The 0.2 brain loads and acts the same.
+
+Colonies carry food home (schema v3). Food eaten past full goes into a crop, like an ant's social stomach, and slows the carrier down. Two new actions: unload, which puts the crop into the nest's store, or onto the ground as jelly anyone can eat, and eat, from the crop or (when hungry, at home) from the store. Two new inputs say how full the crop is and whether it's home. Food grows in patches that move each episode. The reward pays for storing, can be partly shared with the colony, and pays a little for carrying food closer to home (and takes it back for walking off), which only moves reward earlier. `carrier` is the new scripted baseline: greedy that takes a full crop home. A new yes/no action now starts out mostly no, so it's tried now and then; zero-padding it made it fire half the time in training, which is why nothing stored for the first eight runs (`docs/notes/0.3.md` has the whole story).
+
+A dead Terrikin's body now leaves the world: nothing bumps into it or sees it. The viewer puts a small tombstone where it fell, which fades after 20 s. The replay clock runs on into hours and days.
+
+Notes on what was tried in each stage, dead ends included, are in `docs/notes/`.
+
 ## 0.2.0: Solo forager
 
 The first trained brain. One creature alone in the arena with 8 berries learns to keep itself fed. On the evals it eats 18.4 berries a minute and lives out every 3-minute episode. Random actions manage 0.26 and starve in under a minute. A scripted forager that beelines for the nearest berry it sees gets 13.8, so the brain beats that too.

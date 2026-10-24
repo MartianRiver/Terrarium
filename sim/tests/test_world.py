@@ -31,9 +31,11 @@ def place(world, creature, x, y):
 
 
 def worst_overlap(world):
+    """Between the living: the dead have left, and others walk through where they lie."""
     d = world.pos[:, :, None] - world.pos[:, None]
     dist = np.sqrt((d * d).sum(-1)) + np.eye(len(world.colony)) * 1e9
-    return np.maximum(2 * CFG.creature.radius - dist, 0).max()
+    both = world.alive[:, :, None] & world.alive[:, None]
+    return np.where(both, np.maximum(2 * CFG.creature.radius - dist, 0), 0).max()
 
 
 def test_same_seed_same_world():
@@ -272,12 +274,35 @@ def test_running_out_of_energy_kills_and_ends_the_arena():
         ticks += 1
     assert ticks == int(np.ceil(0.01 / ((CFG.energy.drain + CFG.energy.move) * CFG.dt)))
     assert world.ended[0]
-    # dead bodies coast to a stop and don't eat
+    # dead bodies stop where they fall and don't eat
+    fell = world.pos[0, 0].copy()
     world.food_regrow[0, 0] = 0
     world.food_pos[0, 0] = world.pos[0, 0]
     for _ in range(40):
         world.step(np.array([[[1.0, 1.0]]]))
-    assert np.hypot(*world.vel[0, 0]) < 0.01 and world.food_present[0, 0] and world.energy[0, 0] == 0
+    assert (world.pos[0, 0] == fell).all() and world.food_present[0, 0] and world.energy[0, 0] == 0
+
+
+def test_the_dead_leave_the_world_until_it_starts_over():
+    cfg = replace(CFG, colonies=replace(CFG.colonies, count=1, size=2), block=())
+    world = World(cfg)
+    place(world, 0, 0.0, 0.0)
+    place(world, 1, 2.0, 0.0)
+    world.heading[:] = 0
+    world.energy[0, 1] = 0.0001
+    world.food_regrow[:] = 1
+    world.step(np.zeros((1, 2, 2)))
+    assert not world.alive[0, 1]
+    # the living one walks straight through where the body lies
+    for _ in range(40):
+        world.step(np.array([[[1.0, 0.0], [0.0, 0.0]]]))
+    assert world.pos[0, 0, 0] > 3.0 and abs(world.pos[0, 0, 1]) < 0.01 and (world.pos[0, 1] == (2.0, 0.0)).all()
+    world.reset(np.array([True]))
+    place(world, 0, 0.0, 0.0)
+    place(world, 1, 2.0, 0.0)
+    for _ in range(40):
+        world.step(np.array([[[1.0, 0.0], [0.0, 0.0]]]))
+    assert world.pos[0, 1, 0] > 2.05, 'solid again, so it gets pushed'
 
 
 def test_eating_on_the_last_tick_saves_it():

@@ -1,3 +1,4 @@
+import { clock } from './clock';
 import { createDemo } from './demo';
 import { createLogger } from './lib/logger';
 import { readReplay, ReplayError, type Replay } from './replay';
@@ -38,7 +39,6 @@ function webglAvailable() {
 const SITE = import.meta.env.MODE === 'site';
 const SITE_REPLAY = '/replays/latest.jsonl.gz';
 
-const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 function demoSource(): Source {
   return { ...createDemo(), label: () => 'scripted demo' };

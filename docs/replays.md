@@ -18,6 +18,8 @@ Every line after it is one `Frame`, one per tick, starting from the tick before 
 
 From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty.
 
+A dead creature stays in the frames with `energy` 0 where it fell, and the viewer draws a tombstone there that fades after 20 s. From 0.3 the sim takes a dead body out of the world (nothing bumps into it or sees it); in older replays it could still be pushed, and its stone stays where it died.
+
 Positions are in metres and angles in radians, rounded to 3 decimals. A creature's `size` is its radius over 0.45 m, the radius the blob model is drawn at. Food gets a new id every time it regrows, because the viewer pops things in and out by id.
 
 ## Changing it
