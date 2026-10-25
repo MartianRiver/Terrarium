@@ -1,5 +1,6 @@
 # A vault (an experiment, 0.3): night.toml with half the food growing in the middle, walled in by blocks too heavy
-# to move, behind two doors that can only be pulled out. Creatures can grab a block and drag it.
+# to move, behind two doors that can only be pulled out. Creatures can grab a block and drag it, and smell the
+# food through the doors.
 # Metres, seconds, kilograms, radians.
 
 tick_hz = 20
@@ -99,6 +100,15 @@ reach = 0.15
 grip = 30.0
 seconds = 2.0
 energy = 0.01
+
+[smell]
+# food gives off a smell that spreads over a grid of `cell`-metre squares: each tick a share `spread` of the difference
+# flows to each neighbouring cell, then it all fades by `fade`. Blocks stop it, but one a creature can drag (a door)
+# lets `leak` of it through. A creature senses how strong it is and which way it gets stronger; spread 0 turns it off
+cell = 0.25
+spread = 0.2
+fade = 0.01
+leak = 0.1
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)

@@ -16,7 +16,7 @@ Each release is a tag (`v0.2.0`) with an entry in [CHANGELOG.md](../CHANGELOG.md
 - A release merges `next` into `main` with a merge commit, so `main`'s history reads one stage at a time, then tags it.
 - An urgent fix goes on a branch off `main`, is released as 0.N.y, and `main` is merged back into `next`.
 
-Nothing is pushed straight to `main` or `next`. GitHub doesn't enforce that on a private repo, so a pre-push hook does.
+Nothing is pushed straight to `main` or `next`. A GitHub ruleset enforces that, and a pre-push hook catches it before it gets that far.
 
 ## What's kept across versions
 

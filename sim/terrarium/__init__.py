@@ -1,5 +1,11 @@
 # Lazy, so the coordinator runs on a bare python without numpy or torch
+from typing import TYPE_CHECKING
+
 __all__ = ['Config', 'ConfigError', 'World', 'load']
+
+if TYPE_CHECKING:
+    from .config import Config, ConfigError, load
+    from .world import World
 
 
 def __getattr__(name):

@@ -77,7 +77,8 @@ class Physics:
             spin.max_force = friction_torque(cfg, b.w, b.h, b.mass)
             space.add(slide, spin)
             if b.hinge:
-                space.add(PivotJoint(space.static_body, body, body.local_to_world(b.hinge), b.hinge))
+                pin = (b.hinge[0], b.hinge[1])
+                space.add(PivotJoint(space.static_body, body, body.local_to_world(pin), pin))
         r = WALL_THICKNESS / 2
         out = cfg.arena.size / 2 + r
         corners = [(-out, -out), (out, -out), (out, out), (-out, out)]

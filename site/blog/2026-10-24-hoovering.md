@@ -9,7 +9,7 @@ drafted: Claude Opus 5.5
 edited: River James
 ---
 
-After [Clover](/notes/clover/) could feed itself, the next stage was a colony: three nests of six Terrikins each, and one job. Carry food home.
+After [Clover](/blog/clover/) could feed itself, the next stage was a colony: three nests of six Terrikins each, and one job. Carry food home.
 
 ## Carrying food home
 

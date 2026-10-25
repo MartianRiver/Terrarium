@@ -92,7 +92,7 @@ def advantages(rewards, values, dones, last_value, gamma: float, lam: float) -> 
 
 
 def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray, returns: np.ndarray,
-           cfg: PPO) -> dict:
+           cfg: PPO, bf16: bool = False) -> dict:
     device = next(learner.parameters()).device
 
     # only what living creatures did; the dead's samples are placeholders
@@ -111,7 +111,10 @@ def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv:
         order = torch.randperm(n, device=device)
         for start in range(0, size * cfg.minibatches, size):
             mb = order[start:start + size]
-            mean, value = learner(me[mb], kinds[mb], rays[mb])
+            # bf16 for the brain's own maths only; the losses stay float32
+            with torch.autocast(device.type, torch.bfloat16, enabled=bf16):
+                mean, value = learner(me[mb], kinds[mb], rays[mb])
+            mean, value = mean.float(), value.float()
             dist = learner.dist(mean)
             log_ratio = dist.log_prob(actions[mb]).sum(-1) - old_logp[mb]
             ratio = log_ratio.exp()

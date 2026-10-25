@@ -5,9 +5,10 @@
 #
 # writes OUT/index.json and OUT/<run>-<checkpoint>.jsonl.gz. --line picks the runs of the line being trained
 # now (fnmatch on the name after the run's date and time): the best of them that has finished and been scored is
-# where the lineage is traced back from, and any of them still training show up as live. A run's parent is the
-# run its parent checkpoint's meta names, or the run with a checkpoint of the same sha256 (a copy, made before
-# checkpoints carried their run), or a bridge from gallery.toml for a brain made without training.
+# where the lineage is traced back from, and any of them still training show up as live. [[working]] in gallery.toml
+# names something being worked on beside the line: its best few finished runs by one of their evals' numbers. A
+# run's parent is the run its parent checkpoint's meta names, or the run with a checkpoint of the same sha256 (a
+# copy, made before checkpoints carried their run), or a bridge from gallery.toml for a brain made without training.
 import argparse
 import fnmatch
 import hashlib
@@ -97,6 +98,10 @@ def numbers(s: dict | None) -> dict:
         out['stored'] = round(s['stored']['mean'], 1)
     if 'through_first_night' in s and s.get('deaths', {}).get('colonies'):
         out['through_first_night'] = [s['through_first_night'], s['deaths']['colonies']]
+    # worlds with grab: what the vault's doors are for
+    if s.get('actions', {}).get('grab_block', {}).get('ticks'):
+        out['from_middle'] = round(s['from_middle']['mean'], 2)
+        out['blocks_moved'] = round(s['blocks_moved']['mean'], 2)
     return out
 
 
@@ -147,6 +152,20 @@ class Gallery:
             steps[-1]['brains'].append(self.entry(run, checkpoint, (step or {}).get('replay')))
         return steps
 
+    def working(self, w: dict) -> dict:
+        """The best few finished runs of something being worked on, by the number that says how close it is."""
+        found = []
+        for p in self.lineage.runs.values():
+            note = next((t for pat, t in w['notes'].items() if fnmatch.fnmatch(name(p), pat)), None)
+            if note is None or not compute.read_run(p).get('finished'):
+                continue
+            if s := scores(p, checkpoint_of(p, None)):
+                found.append((s[w['score']]['mean'], p.name, note))
+        best = sorted(found, reverse=True)[:w['show']]
+        return {'title': w['title'], 'text': w['text'],
+                'brains': [{**self.entry(run, checkpoint_of(self.lineage.runs[run], None)), 'note': note}
+                           for _, run, note in best]}
+
     def build(self, line: str) -> dict:
         self.out.mkdir(parents=True, exist_ok=True)
         mine = [p for _, p in sorted(self.lineage.runs.items()) if fnmatch.fnmatch(name(p), line)]
@@ -170,9 +189,11 @@ class Gallery:
                        for p in latest],
             'asides': [{'title': a['title'], 'text': a['text'], **self.entry(a['run'], a['checkpoint'], a.get('replay'))}
                        for a in self.steps.get('aside', [])],
+            'working': [self.working(w) for w in self.steps.get('working', [])],
         }
         wanted = {'index.json'} | {b['replay'] for s in index['steps'] for b in s['brains']} \
-            | {b['replay'] for b in index['training'] + index['latest'] + index['asides']}
+            | {b['replay'] for b in index['training'] + index['latest'] + index['asides']} \
+            | {b['replay'] for w in index['working'] for b in w['brains']}
         # a live run's older checkpoints drop off as newer ones come
         for f in self.out.iterdir():
             if f.name not in wanted:
@@ -193,7 +214,8 @@ def main():
     index = Gallery(args.root, args.out, tomllib.loads(args.steps.read_text())).build(args.line)
     brains = sum(len(s['brains']) for s in index['steps'])
     print(f"{args.out}: {len(index['steps'])} steps, {brains} brains, {len(index['training'])} training now, "
-          f"{len(index['latest'])} newest, {len(index['asides'])} asides")
+          f"{len(index['latest'])} newest, {len(index['asides'])} asides, "
+          f"{sum(len(w['brains']) for w in index['working'])} being worked on")
 
 
 if __name__ == '__main__':

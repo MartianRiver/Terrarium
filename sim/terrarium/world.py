@@ -28,6 +28,7 @@
 import numpy as np
 
 from . import night
+from .smell import Field
 from .config import Config, ConfigError
 from .log import Logger
 from .physics import Physics
@@ -121,6 +122,7 @@ class World:
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
         self.door_out = np.zeros((arenas, len(self.doors)))
         self.pulled = np.zeros((arenas, n))
+        self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors) if cfg.smell.on else None
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -195,6 +197,8 @@ class World:
         self.gripping[idx] = 0
         self.pulled[idx] = 0
         self.door_out[idx] = 0
+        if self.smell:
+            self.smell.reset(idx)
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -247,6 +251,8 @@ class World:
         self._eat()
         self._unload(unload)
         self._feed(eat)
+        if self.smell:
+            self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
         dying = self.alive & (self.energy <= 0)
         if dying.any():
             self.alive &= ~dying
@@ -344,6 +350,13 @@ class World:
             self.energy[gets] += cfg.jelly.energy
             self.jelly[gets] += 1
         np.clip(self.energy, 0, 1, out=self.energy)
+
+    def smelled(self) -> tuple[np.ndarray, ...]:
+        """How strong the smell of food is where each creature stands (0 to 1), and which way off its heading it
+        gets stronger (sin, cos); all 0 with smell off."""
+        if not self.smell:
+            return tuple(np.zeros_like(self.energy) for _ in range(3))
+        return self.smell.sense(self.pos, self.heading)
 
     def light(self) -> np.ndarray:
         """How light it is in each arena, 1 by day and 0 at night, (arenas,)."""

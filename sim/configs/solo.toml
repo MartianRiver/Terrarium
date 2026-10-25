@@ -101,6 +101,15 @@ grip = 0.0
 seconds = 0.0
 energy = 0.0
 
+[smell]
+# food gives off a smell that spreads over a grid of `cell`-metre squares: each tick a share `spread` of the difference
+# flows to each neighbouring cell, then it all fades by `fade`. Blocks stop it, but one a creature can drag (a door)
+# lets `leak` of it through. A creature senses how strong it is and which way it gets stronger; spread 0 turns it off
+cell = 0.25
+spread = 0.0
+fade = 0.01
+leak = 0.1
+
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
 friction = 1.2

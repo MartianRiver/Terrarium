@@ -74,7 +74,7 @@ ${marks ? '<p class="review">Review build: drafts are shown and marked. Not the 
   <nav aria-label="Site">
     <a href="/watch/">Watch</a>
     <a href="/brains/">Brains</a>
-    <a href="/notes/">Notes</a>
+    <a href="/blog/">Blog</a>
     <a href="${REPO}">Code</a>
   </nav>
 </header>
@@ -140,13 +140,13 @@ function posts(dir, draft) {
   });
 }
 
-const notes = [...posts(join(SITE, 'notes'), false), ...(review ? posts(process.env.SITE_DRAFTS ?? join(SITE, 'drafts'), true) : [])]
+const notes = [...posts(join(SITE, 'blog'), false), ...(review ? posts(process.env.SITE_DRAFTS ?? join(SITE, 'drafts'), true) : [])]
   .sort((a, b) => when(b.date) - when(a.date));
 const tag = (n) => (n.draft && marks ? ' <span class="draft">DRAFT</span>' : '');
 
 const list = (items) =>
   `<ul class="notes">\n${items
-    .map((n) => `<li><a href="/notes/${n.slug}/">${escape(n.title)}</a>${tag(n)}
+    .map((n) => `<li><a href="/blog/${n.slug}/">${escape(n.title)}</a>${tag(n)}
   <span class="when">${date(n.date)}</span><p>${escape(n.summary)}</p></li>`)
     .join('\n')}\n</ul>`;
 
@@ -168,13 +168,13 @@ const hero = `<section class="hero">
   </div>
 </section>
 <script>if (location.search) location.replace('/watch/' + location.search)</script>`;
-const latest = notes.length ? `${list(notes.slice(0, 3))}\n<p><a href="/notes/">All the notes</a></p>` : '<p>Nothing written up yet.</p>';
+const latest = notes.length ? `${list(notes.slice(0, 3))}\n<p><a href="/blog/">All the posts</a></p>` : '<p>Nothing written up yet.</p>';
 write('', page({
   title: 'Terrarium',
   description: home.meta.description,
   path: '/',
   wide: true,
-  body: `${hero}\n<div class="text">\n${marked(home.body).replace('<!-- notes -->', latest)}</div>`,
+  body: `${hero}\n<div class="text">\n${marked(home.body).replace('<!-- posts -->', latest)}</div>`,
 }));
 
 write('how', page({
@@ -184,11 +184,11 @@ write('how', page({
   body: `<article>\n<h1>${escape(how.meta.title)}</h1>\n${marked(how.body)}</article>`,
 }));
 
-write('notes', page({
-  title: 'Notes',
+write('blog', page({
+  title: 'Blog',
   description: 'Write-ups of what I tried, what worked and what didn’t.',
-  path: '/notes/',
-  body: `<h1>Notes</h1>\n<p>What I tried, what worked, what didn’t and what I tried next. The full lab record, every run and dead end, is in the repo’s <a href="${REPO}/tree/HEAD/docs/notes">docs/notes</a>.</p>\n${list(notes)}`,
+  path: '/blog/',
+  body: `<h1>Blog</h1>\n<p>What I tried, what worked, what didn’t and what I tried next. The full lab record, every run and dead end, is in the repo’s <a href="${REPO}/tree/HEAD/docs/notes">docs/notes</a>.</p>\n${list(notes)}`,
 }));
 
 // the gallery itself (/replays/gallery/index.json and its replays) is published apart from the site, every 15 min
@@ -203,6 +203,7 @@ function brain(b, i, extra = '') {
   if (n.food_per_minute !== undefined) bits.push(n.food_per_minute + ' food a minute');
   if (n.stored !== undefined) bits.push(n.stored + ' stored');
   if (n.through_first_night) bits.push(n.through_first_night[0] + ' of ' + n.through_first_night[1] + ' colonies through night 1');
+  if (n.from_middle !== undefined) bits.push(n.from_middle + ' food from the room, ' + n.blocks_moved + ' doors moved, per episode');
   const tested = n.episodes ? ' <span class="when">tested over ' + n.episodes + ' episodes</span>' : '';
   return '<li><a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(b.replay) + '&follow&gallery=' + i + '">Watch</a> <b>' + esc(b.name) + '</b>'
     + ' <span class="when">' + esc(b.world) + ' · ' + (b.samples / 1e6).toFixed(1) + 'M samples, ' + Math.round(b.total / 1e6) + 'M in all' + extra + '</span>'
@@ -228,6 +229,14 @@ fetch('/replays/gallery/index.json', { cache: 'no-cache' }).then((r) => {
     html += '<h2>On the side</h2><ol class="brains">' + g.asides.map((b) => brain(b, i++).replace('</b>', '</b> <span class="aside">' + esc(b.title) + '</span>')
       .replace('</li>', '<p>' + esc(b.text) + '</p></li>')).join('') + '</ol>';
   }
+  // what's being worked on goes first on the page, numbered last so older links still land on the same brain
+  let working = '';
+  for (const w of g.working || []) {
+    if (!w.brains.length) continue;
+    working += '<h2>Working on now: ' + esc(w.title) + '</h2><p>' + esc(w.text) + '</p><ol class="brains">'
+      + w.brains.map((b) => brain(b, i++).replace('</li>', '<p>' + esc(b.note) + '</p></li>')).join('') + '</ol>';
+  }
+  html = working + html;
   box.innerHTML = html + '<p class="when">Updated ' + ago(g.updated) + '.</p>';
 }).catch(() => {
   box.innerHTML = '<p>The gallery isn’t up right now. The <a href="/watch/">latest brain</a> still plays.</p>';
@@ -256,13 +265,25 @@ for (const n of notes) {
   }
   mine.forEach((c) => used.add(c));
   const banner = n.draft && marks ? '<p class="draft-banner">DRAFT: not published. Only the review build shows this.</p>\n' : '';
-  write(`notes/${n.slug}`, page({
+  write(`blog/${n.slug}`, page({
     title: n.title,
     description: n.summary,
-    path: `/notes/${n.slug}/`,
-    body: `<article>\n${banner}<h1>${escape(n.title)}${tag(n)}</h1>\n<p class="when">${date(n.date)}${n.stage ? ` · ${escape(n.stage)}` : ''}<br><a href="/how/">Drafted by ${escape(n.drafted)}</a> · edited by ${escape(n.edited)}${date(n.written) !== date(n.date) ? ` · written up ${date(n.written)}` : ''}</p>\n${html}</article>\n<p><a href="/notes/">All the notes</a></p>${html.includes('class="youtube"') ? `\n${YOUTUBE}` : ''}`,
+    path: `/blog/${n.slug}/`,
+    body: `<article>\n${banner}<h1>${escape(n.title)}${tag(n)}</h1>\n<p class="when">${date(n.date)}${n.stage ? ` · ${escape(n.stage)}` : ''}<br><a href="/how/">Drafted by ${escape(n.drafted)}</a> · edited by ${escape(n.edited)}${date(n.written) !== date(n.date) ? ` · written up ${date(n.written)}` : ''}</p>\n${html}</article>\n<p><a href="/blog/">All the posts</a></p>${html.includes('class="youtube"') ? `\n${YOUTUBE}` : ''}`,
   }));
 }
+
+// the blog was called notes at first, and links to those addresses are out there
+const forward = (to) => `<!doctype html>
+<meta charset="utf-8">
+<title>Moved · Terrarium</title>
+<link rel="canonical" href="${ORIGIN}${to}">
+<meta http-equiv="refresh" content="0; url=${to}">
+<script>location.replace('${to}' + location.hash)</script>
+<p>This is at <a href="${to}">${to}</a> now.</p>
+`;
+write('notes', forward('/blog/'));
+for (const n of notes) write(`notes/${n.slug}`, forward(`/blog/${n.slug}/`));
 
 writeFileSync(join(out, '404.html'), page({
   title: 'Not here',
@@ -295,4 +316,4 @@ for (const name of used) {
   cpSync(`${cached}.jpg`, join(out, 'media', `${name}.jpg`));
 }
 
-console.log(`site: ${notes.length} notes${review ? ` (${notes.filter((n) => n.draft).length} drafts)` : ''}, ${used.size} clips → ${out}`);
+console.log(`site: ${notes.length} posts${review ? ` (${notes.filter((n) => n.draft).length} drafts)` : ''}, ${used.size} clips → ${out}`);

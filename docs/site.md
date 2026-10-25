@@ -1,16 +1,16 @@
 # The site
 
-terrarium.martianriver.com is a front page, the notes, a gallery of brains at `/brains/`, and the viewer at `/watch/`. Everything is static: no framework, no analytics, no cookies.
+terrarium.martianriver.com is a front page, a blog, a gallery of brains at `/brains/`, and the viewer at `/watch/`. Everything is static: no framework, no analytics, no cookies.
 
 | | |
 |---|---|
-| `site/index.md` | the front page's text: what it is, where it's at, what's next; the latest notes go where `<!-- notes -->` is |
+| `site/index.md` | the front page's text: what it is, where it's at, what's next; the latest posts go where `<!-- posts -->` is |
 | `site/how.md` | /how/, who does what: what I decide and what the model I build with does |
-| `site/notes/` | published posts, `YYYY-MM-DD-slug.md`, served at `/notes/slug/` |
+| `site/blog/` | published posts, `YYYY-MM-DD-slug.md`, served at `/blog/slug/` (the blog was called notes at first, so `/notes/…` forwards there) |
 | `site/clips.json` | every clip a post can show, and where it's cut from |
 | `site/site.css`, `hero.jpg`, `card.jpg` | the look, the front page's still, the link preview image |
 | `site/fonts/` | Nunito, served from the site itself, with its licence (SIL OFL) |
-| `site/gallery.toml` | the gallery's steps, their captions, and side experiments |
+| `site/gallery.toml` | the gallery's steps, their captions, what's being worked on beside the line, and side experiments |
 | `viewer/site.mjs` | turns those into pages |
 
 ```
@@ -29,7 +29,7 @@ A post starts with a few lines of front matter:
 title: Clover: one Terrikin learns to eat
 date: 2026-10-23T17:00+11:00
 written: 2026-10-25
-summary: One line for the list of notes and link previews.
+summary: One line for the list of posts and link previews.
 stage: 0.2 Clover
 clips: clover-gen0, clover-final
 drafted: the exact model that drafted it
@@ -37,7 +37,7 @@ edited: River James
 ---
 ```
 
-`date` is when it happened, or when it went up on Instagram, and orders the notes: a day, or a time with its offset (one a day at 5 PM Sydney time, like the Instagram posts); pages show the day in Sydney time. `written` is when the post was written, and shows in the byline when it's a different day. `drafted` and `edited` are required too, and show under the date as a byline linking to /how/. Posts are in my voice: the "I" is me.
+`date` is when it happened, or when it went up on Instagram, and orders the posts: a day, or a time with its offset (one a day at 5 PM Sydney time, like the Instagram posts); pages show the day in Sydney time. `written` is when the post was written, and shows in the byline when it's a different day. `drafted` and `edited` are required too, and show under the date as a byline linking to /how/. Posts are in my voice: the "I" is me.
 
 Then Markdown. The deeper stuff goes in folds, which also read fine on GitHub:
 
@@ -52,7 +52,7 @@ Then Markdown. The deeper stuff goes in folds, which also read fine on GitHub:
 
 ## Drafts and review
 
-Drafts never go in git. They live in a folder outside the repo (mine is my backups folder's `terrarium/site/drafts`), named by `SITE_DRAFTS`, or `site/drafts/`, which is ignored. Publishing a post means moving it into `site/notes/`. `npm run site` never reads drafts.
+Drafts never go in git. They live in a folder outside the repo (mine is my backups folder's `terrarium/site/drafts`), named by `SITE_DRAFTS`, or `site/drafts/`, which is ignored. Publishing a post means moving it into `site/blog/`. `npm run site` never reads drafts.
 
 ```
 SITE_DRAFTS=... SITE_CLIPS=... npm run review     # dist-review/: the site with the drafts in
@@ -69,7 +69,7 @@ Longer videos go on YouTube, unlisted: `{{youtube VIDEO_ID Title}}` shows a butt
 
 ## The gallery of brains
 
-`/brains/` lists every brain the one training now came from, back to the first, grouped into the steps `site/gallery.toml` names, then the newest brains of the training going on now, then a few side experiments. Each has a Watch link, and a replay opened from there gets a bar to step to the brain before or after it. The numbers are each run's own evals, in the world it trained in.
+`/brains/` starts with what's being worked on beside the main line (each `[[working]]` in `site/gallery.toml`: what it's for, then its best few finished runs by the number that says how close it is, `score`, each with a note on what it tried, matched by run name), then lists every brain the one training now came from, back to the first, grouped into the steps `site/gallery.toml` names, then the newest brains of the training going on now, then a few side experiments. Each has a Watch link, and a replay opened from there gets a bar to step to the brain before or after it. The numbers are each run's own evals, in the world it trained in.
 
 The page is static and reads `/replays/gallery/index.json` when it opens. That and the replays come from
 

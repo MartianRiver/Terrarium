@@ -206,6 +206,13 @@ function boot() {
     runsLink.href = '/';
     runsLink.textContent = 'About';
   }
+  // on the site, other replays are picked from the gallery; a file picker means nothing on a phone (dropping one still works)
+  if (SITE) {
+    const brains = document.createElement('a');
+    brains.href = '/brains/';
+    brains.textContent = 'Brains';
+    openButton.replaceWith(brains);
+  }
   const wanted = params.get('replay') ?? (SITE ? SITE_REPLAY : null);
   if (wanted) {
     const url = new URL(wanted, location.href);
