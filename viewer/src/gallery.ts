@@ -7,7 +7,10 @@ const log = createLogger('gallery');
 const INDEX = '/replays/gallery/index.json';
 
 interface Brain { name: string; replay: string; world: string; samples: number; total: number }
-interface Index { steps: { title: string; brains: Brain[] }[]; training: Brain[]; latest: Brain[]; asides: (Brain & { title: string })[] }
+interface Index {
+  steps: { title: string; brains: Brain[] }[]; training: Brain[]; latest: Brain[]; asides: (Brain & { title: string })[];
+  working?: { title: string; brains: Brain[] }[];
+}
 
 // the same order the brains page numbers them in
 export function flatten(g: Index): { brain: Brain; group: string }[] {
@@ -15,6 +18,7 @@ export function flatten(g: Index): { brain: Brain; group: string }[] {
     ...g.steps.flatMap((s) => s.brains.map((brain) => ({ brain, group: s.title }))),
     ...[...g.training, ...g.latest].map((brain) => ({ brain, group: 'Training now' })),
     ...g.asides.map((brain) => ({ brain, group: brain.title })),
+    ...(g.working ?? []).flatMap((w) => w.brains.map((brain) => ({ brain, group: w.title }))),
   ];
 }
 

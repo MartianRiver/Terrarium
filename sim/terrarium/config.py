@@ -110,6 +110,18 @@ class Grab:
 
 
 @dataclass(frozen=True)
+class Smell:
+    cell: float
+    spread: float
+    fade: float
+    leak: float
+
+    @property
+    def on(self) -> bool:
+        return self.spread > 0
+
+
+@dataclass(frozen=True)
 class Ground:
     friction: float
 
@@ -154,6 +166,7 @@ class Config:
     night: Night
     sprint: Sprint
     grab: Grab
+    smell: Smell
     ground: Ground
     vision: Vision
     episode: Episode
@@ -180,6 +193,8 @@ class Reward:
     warm: float
     effort: float
     door: float
+    novelty: float
+    variety: float
 
 
 @dataclass(frozen=True)
@@ -261,7 +276,8 @@ SINCE = {'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest'
          'energy': {'turn': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
          'food': {'middle': 0},
-         'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0}}
+         'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0},
+         'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0}}
 
 
 def upgrade(data: dict) -> dict:

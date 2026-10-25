@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import night
+from .fun import Fun
 from .config import Config, Reward, Train
 from .vision import directions, look
 from .world import World
@@ -54,7 +55,8 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    np.hypot(home[..., 0], home[..., 1]) / v.range, np.sin(bearing), np.cos(bearing),
                    world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony, store,
                    np.broadcast_to(world.light()[:, None], store.shape), sprinting, rested,
-                   world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1)], -1)
+                   world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1),
+                   *world.smelled()], -1)
 
     angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
     shape = sight.dist.shape
@@ -74,6 +76,8 @@ class Forage:
         self.opening = train.start.opening
         self._open(np.ones(arenas, bool))
         self.reward = train.reward
+        r = self.reward
+        self.fun = Fun(self.world, r.novelty, r.variety) if r.novelty or r.variety else None
         self.repeat = train.ppo.repeat
         if self.world.episode_ticks % self.repeat:
             raise ValueError(f'{self.world.episode_ticks} ticks an episode is not a whole number of {self.repeat}-tick choices')
@@ -107,17 +111,20 @@ class Forage:
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
         # tick, and an arena where everyone has died only ticks on with nobody in it
-        lived, snug = np.zeros(alive.shape), np.zeros(alive.shape)
+        lived, snug, fun = np.zeros(alive.shape), np.zeros(alive.shape), np.zeros(alive.shape)
         for _ in range(self.repeat):
             w.step(actions)
             lived += w.alive
+            if self.fun:
+                fun += self.fun.step(actions)
             if r.snug or r.warm:
                 warm = night.warmth(w.pos, w.alive, w.colony, w.nest_at() == w.colony, w.cfg.night)
                 snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
         self.last = actions[..., :2].copy()
         own = ((r.food * (w.fed - before['fed']) - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
-               + r.door * (w.pulled - before['pulled']) + r.death * (alive & ~w.alive) + w.cfg.dt * (r.alive * lived + snug))
+               + r.door * (w.pulled - before['pulled']) + r.death * (alive & ~w.alive) + w.cfg.dt * (r.alive * lived + snug)
+               + fun)
         ended = w.ended.copy()
         died = alive & ~w.alive
         done = died | ended[:, None]
@@ -129,6 +136,8 @@ class Forage:
         w.reset(ended)
         self._stagger(ended)
         self._open(ended)
+        if self.fun:
+            self.fun.reset(ended)
         self.last[ended] = 0
         return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
 

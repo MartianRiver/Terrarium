@@ -271,3 +271,73 @@ started = "2026-10-25T13:19:02+11:00"
 ended = "2026-10-25T14:05:41+11:00"
 dollars = 0.070
 note = "meant for the vault runs; hung in uv sync for 40 minutes and never trained"
+
+[[session]]
+provider = "vast"
+instance = 57610825
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T15:33:46+11:00"
+ended = "2026-10-25T16:25:34+11:00"
+dollars = 0.163
+note = "vault grid: door1-shut and door1-ajar (door reward 1.0)"
+
+[[session]]
+provider = "vast"
+instance = 57611391
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T15:39:21+11:00"
+ended = "2026-10-25T16:25:08+11:00"
+dollars = 0.144
+note = "vault grid: hinged doors, swing-ajar and swing-door"
+
+[[session]]
+provider = "vast"
+instance = 57611548
+gpu = "RTX 3080"
+cpu = "Xeon E5-2696 v3, 16 cores"
+started = "2026-10-25T15:41:06+11:00"
+ended = "2026-10-25T16:30:26+11:00"
+dollars = 0.195
+note = "vault grid: curriculum chains cur-1..4 and curd-1..4 (doors from 0.7 open to shut)"
+
+[[session]]
+provider = "vast"
+instance = 57618336
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T16:37:39+11:00"
+ended = "2026-10-25T16:43:16+11:00"
+dollars = 0.018
+note = "meant for the bf16 check; its configs predated hinge, ajar and door, every job failed in seconds"
+
+[[session]]
+provider = "vast"
+instance = 57619074
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T16:44:03+11:00"
+ended = "2026-10-25T17:52:44+11:00"
+dollars = 0.216
+note = "bf16 check: update timed at widths 64, 128 and 256, plain and --fast; 4 x 4M from pbt-t5-4, plain and --fast, seeds 0 and 1"
+
+[[session]]
+provider = "vast"
+instance = 57619794
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-25T16:50:19+11:00"
+ended = "2026-10-25T18:15:34+11:00"
+dollars = 0.117
+note = "vault with smell: doors shut, and ajar in half the arenas; then pbt-t5-4 widened to 128 scored against itself"
+
+[[session]]
+provider = "vast"
+instance = 57619769
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T16:50:05+11:00"
+ended = "2026-10-25T18:52:32+11:00"
+dollars = 0.386
+note = "vault with smell: ajar in half the arenas with the door reward, and with the brain widened to 256"

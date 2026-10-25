@@ -6,7 +6,7 @@ Every creature runs its own copy of the same brain, acting on what it alone sens
 
 Each creature is one sample, made of tokens:
 
-- **A self token:** energy, forward speed and side speed (as shares of top speed), its last thrust and turn, how full its crop is (as a share of what it holds), whether it's in its own nest, how much jelly its colony has (near 1 at a jelly a member, the way an ant knows how hungry its nest is), how light it is (1 by day, 0 at night, fading at dusk; always 1 without nights), its sprint (the share of a burst left, and how far through the rest after one it is: 1 when it can sprint again, 0 with sprint off), its grip (the share of it left while it holds a block, 0 when it holds none), and the way home: the distance to its own nest's centre (in vision ranges) and the sin and cos of its direction off the heading. It may get fuzzier later, so remembering and scent trails have something to do.
+- **A self token:** energy, forward speed and side speed (as shares of top speed), its last thrust and turn, how full its crop is (as a share of what it holds), whether it's in its own nest, how much jelly its colony has (near 1 at a jelly a member, the way an ant knows how hungry its nest is), how light it is (1 by day, 0 at night, fading at dusk; always 1 without nights), its sprint (the share of a burst left, and how far through the rest after one it is: 1 when it can sprint again, 0 with sprint off), its grip (the share of it left while it holds a block, 0 when it holds none), the smell of food where it stands (0 for faint or none to 1, on a scale of powers of ten) and the sin and cos of the way it gets stronger off the heading (all 0 in worlds without smell), and the way home: the distance to its own nest's centre (in vision ranges) and the sin and cos of its direction off the heading. It may get fuzzier later, so remembering and scent trails have something to do.
 - **A token per ray:** what the ray hit (nothing, wall, creature, food, block), how far it got as a share of the range, the sin and cos of its angle off the heading, whether a creature it hit is a nestmate, and how far it got before reaching its own nest and any other colony's.
 
 Rays come from `terrarium.vision`, as many as `[vision] rays` says. Since each ray is its own token, changing the count needs no retraining of the shape, though a brain will see differently with a different fan.
@@ -27,7 +27,7 @@ Nests are flat ground, so they don't stop a ray. A ray reports reaching one only
 1. Each ray token is an embedding for its kind plus a linear map of its features; the self token has its own linear map.
 2. A 2-layer transformer encoder (width 64, 4 heads, pre-norm) attends over all the tokens.
 3. The self token's output gives the mean action and the value estimate.
-4. 69,325 weights (68,229 in the 0.2 brain, before the crop, the home sense, knowing it's home, the store, the light, the sprint senses, the grip, nests, nestmates, unload, eat, sprint and grab), roughly 300 kB on disk.
+4. 69,517 weights (68,229 in the 0.2 brain, before the crop, the home sense, knowing it's home, the store, the light, the sprint senses, the grip, smell, nests, nestmates, unload, eat, sprint and grab), roughly 300 kB on disk.
 
 ## Sort of on the level of
 

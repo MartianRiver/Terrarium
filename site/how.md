@@ -13,6 +13,6 @@ I've wanted a digital ant farm for a long time: something I could host online fo
 
 A pet project like this only fits in the time I have because of agentic coding. The grunt work, all the scripting, and setting up and minding rented GPUs would otherwise take more hours than I've got.
 
-## The notes
+## The blog
 
-The notes are drafted by Claude from the run records and edited by me. Each one says which model drafted it. Every number in them comes from a run record, and I read every post and clip before it goes up. They're in my voice, so when a note says "I", that's me.
+The posts are drafted by Claude from the run records and edited by me. Each one says which model drafted it. Every number in them comes from a run record, and I read every post and clip before it goes up. They're in my voice, so when a post says "I", that's me.

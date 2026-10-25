@@ -60,8 +60,11 @@ Done when creatures carry food home and store it, colonies get through the night
 
 *Mac and rented GPUs.* A colony that grows and shrinks with what it gathers, and a brain that remembers.
 
-- **Hatchlings.** Above a threshold the store hatches a new Terrikin, up to a cap: small and slow, it feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size.
+- **Hatchlings.** Above a threshold the store hatches a new Terrikin, up to a cap: small and slow, it feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size. Once that works, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job.
 - Memory: a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight, and getting back to a patch it found needs more than that.
+- **Smelling the way home.** The exact sense of where the nest is goes, faded out over training once memory is in. Each nest gives off its colony's scent instead, so close by they can smell home, and further out they have to remember the way.
+- Seeing which nestmates are carrying food, the way harvester ants judge how much is out there by who comes home loaded.
+- **A brain for each colony.** Each colony's Terrikins learn from their own colony only, with its own reward blend and dials, and the colonies that do best get copied more. Until now every colony has run the same brain, so they couldn't settle on different ways of living.
 - The first danger: a dust devil drifts across the arena, knocking creatures over (they lie still for a moment) and making them drop what they carry. It's weather, not a creature: nothing about it learns.
 - Evals: how big each colony gets.
 
@@ -70,6 +73,9 @@ Done when the colony grows from its store and shrinks in lean times, foragers go
 ## 0.5 Foxglove: Working together, moving things
 
 *Mac, then rented GPUs.* Signal patch (free at first), scent marks (cost energy), rich food that needs two carriers, and blocks of varying weight, some needing two creatures.
+
+- Two scent marks, one that draws others and a "no entry" one, as Pharaoh's ants use, laid on the same smell the food has. Both learned: no scripted trail-layers to get them started, even though that makes the first trails harder to find.
+- Shivering: spending energy to warm nestmates close by, so huddling can split into heaters and passengers, as it does in honeybees.
 
 - With dust devils about, a signal has more to mean than "help me carry this".
 - Heavier blocks than one creature can drag, building on 0.3's grab.
@@ -125,9 +131,19 @@ Done when it's running and worth checking in on.
 - The queen as a thinking agent
 - Genetics, inheritance, pairing
 - Bee-style dances
+- Learning from each other within a life: a trick one Terrikin finds spreading through its colony, as string pulling spread through bumblebees. Needs memory first, and probably more than reward alone.
 - True height: ramps and ledges
 - Dealing with nestmates that don't pull their weight over time, not just when caught in the act. Needs telling individuals apart, and longer memory.
 
 ## Walking
 
-A separate track, after the colony stages. In the sim a creature slides on a plane, and the waddle is only the viewer's. Here it gets a real body with legs in 3D physics, and a small body brain learns to walk, taking the colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.4) becomes something it has to get up from. It's the step towards a real robot.
+A separate track, after the colony stages. In the sim a creature slides on a plane, and the waddle is only the viewer's. Here it gets a real body with legs in 3D physics, and a small body brain learns to walk, taking the colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.4) becomes something it has to get up from. It's the step towards a real robot. It learns to walk from rewards and costs alone, never from recordings of how real animals move.
+
+## Lab
+
+A long-running track beside the stages: arenas copied from the classic bee and ant experiments, used to measure how close the Terrikins get to the real thing. Each one is set up from the original paper, and scored the same way the researchers scored the insects.
+
+- **Bees:** counting, putting zero below one, telling same from different, visiting several flowers in a good order, finding the way home by the sun, and dances that say where food is.
+- **Ants:** the double bridge (do they settle on the shorter way?), bridging a gap with their own bodies, choosing between two nest sites, and leading a nestmate to food.
+
+Some of these the Terrikins may never do, and that's part of what it measures. The long-term goals behind it are real navigation, colonies with their own traditions that outlast the Terrikins who started them, and a colony that solves problems none of its members could alone, the way an ant colony works as one "liquid brain".

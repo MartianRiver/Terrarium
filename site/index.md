@@ -25,9 +25,9 @@ The world grows a stage at a time, and every stage's brain starts from the last 
 
 Every stage, and what has to be true before it counts as done, is in the [roadmap](https://github.com/MartianRiver/Terrarium/blob/HEAD/ROADMAP.md).
 
-## Notes
+## Blog
 
-<!-- notes -->
+<!-- posts -->
 
 ## Follow along
 

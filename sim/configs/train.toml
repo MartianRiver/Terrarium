@@ -27,6 +27,10 @@ effort = 0.0
 # per metre a block one creature can drag (a door) gets from where it started, up to a metre, paid to whoever holds
 # it as it goes (and taken back if they push it home again)
 door = 0.0
+# fun, as boredom lets it be (fun.py): per metre a block moves while it's touching or holding it, and per tick of
+# yes to unload, eat, sprint or grab; each wears off the more that creature has done it lately, and comes back
+novelty = 0.0
+variety = 0.0
 
 [ppo]
 # samples to train on in all: one creature making one choice is one sample
