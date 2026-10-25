@@ -1,0 +1,72 @@
+{
+  "hoovering": {
+    "from": "0.3/moments/2026-10-23-reward-hack-hoovering/landscape-raw.mp4",
+    "start": 1,
+    "seconds": 12,
+    "width": 960,
+    "alt": "Close up, a peach Terrikin picks up a berry, drops it straight behind itself and goes for the next, over and over."
+  },
+  "clover-gen0": {
+    "from": "0.2/reels/2026-10-23-first/clips/04-gen0.mp4",
+    "start": 0,
+    "seconds": 8.4,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 0, no practice: a peach Terrikin moves at random, turns grey and stops. It starved after 1 minute 11."
+  },
+  "clover-gen1": {
+    "from": "0.2/reels/2026-10-23-first/clips/05-gen1.mp4",
+    "start": 0,
+    "seconds": 15,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 1, 23 hours of practice: the Terrikin finds berries, then wanders off along the hedge and loses track of them."
+  },
+  "clover-gen2": {
+    "from": "0.2/reels/2026-10-23-first/clips/06-gen2.mp4",
+    "start": 0,
+    "seconds": 8.4,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 2, 46 hours of practice: sped up, the Terrikin goes berry to berry and survives all 3 minutes, 49 berries."
+  },
+  "clover-final": {
+    "from": "0.2/reels/2026-10-23-first/clips/07-final.mp4",
+    "start": 0,
+    "seconds": 10,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 13, the 0.2 brain after 11.6 days of practice: the Terrikin heads for each berry it sees. It never starved in 64 tests."
+  },
+  "hoovering-overview": {
+    "from": "0.3/moments/2026-10-23-reward-hack-hoovering/landscape-raw.mp4",
+    "start": 14,
+    "seconds": 14,
+    "width": 960,
+    "alt": "The whole garden at four times speed: three colonies sweep the lawn, leaving dropped berries everywhere and nothing at their nests."
+  },
+  "nights-piles": {
+    "from": "0.3/reels/2026-10-25-nights/clips/03d-piles.mp4",
+    "start": 0,
+    "seconds": 8,
+    "width": 480,
+    "crop": "1080:1080:0:280",
+    "alt": "Sped up: three colonies with jelly piling up in their nests, while Terrikins starve right beside it."
+  },
+  "nights-first": {
+    "from": "0.3/reels/2026-10-25-nights/clips/04-first-night.mp4",
+    "start": 0,
+    "seconds": 18.2,
+    "width": 480,
+    "crop": "1080:1080:0:280",
+    "alt": "Night falls on the first night brain. The Terrikins stay out in the dark and all 18 of them freeze."
+  },
+  "nights-now": {
+    "from": "0.3/reels/2026-10-25-nights/clips/06-now.mp4",
+    "start": 0,
+    "seconds": 35,
+    "width": 480,
+    "crop": "1080:1080:0:280",
+    "alt": "The RL-only brain after the automated forks: at dusk every Terrikin heads home, they huddle on the nest and spin all night, and at first light they head out again."
+  }
+}

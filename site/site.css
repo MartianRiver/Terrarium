@@ -1,0 +1,324 @@
+/* Nunito (SIL OFL, fonts/OFL.txt), the variable latin file: one 39 KB file covers every weight used here */
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/nunito.woff2') format('woff2');
+  font-weight: 200 1000;
+  font-display: swap;
+}
+
+/* colours from the garden (viewer/src/palette.ts): lawn, Mars plain, Terrikin tints; night for dark mode */
+:root {
+  --bg: #fbf6ee;
+  --card: #fffdf8;
+  --text: #2c3a33;
+  --muted: #6b7a70;
+  --line: #e6dccb;
+  --link: #a9552f;
+  --accent: #c46d40;
+  --accent-text: #fff;
+  --lawn: #bddb93;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1f36;
+    --card: #232845;
+    --text: #e9e6f2;
+    --muted: #a3a9c6;
+    --line: #353b60;
+    --link: #f0a37a;
+    --accent: #e3a372;
+    --accent-text: #1b1f36;
+    --lawn: #3f5a3a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 18px/1.6 'Nunito', system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.top .name,
+.watch {
+  line-height: 1.2;
+}
+
+h2 {
+  margin-top: 2.2em;
+}
+
+a {
+  color: var(--link);
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.top .name {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.top nav a {
+  margin-left: 18px;
+  color: var(--text);
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+main.wide {
+  max-width: 60rem;
+}
+
+main.wide .text {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.hero {
+  position: relative;
+  margin: 8px 0 32px;
+}
+
+.hero img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+}
+
+.pitch {
+  max-width: 40rem;
+  margin: 20px auto 0;
+}
+
+.pitch h1 {
+  margin: 0;
+  font-size: 2.6rem;
+}
+
+.pitch p {
+  margin: 6px 0 20px;
+  font-size: 1.25rem;
+  color: var(--muted);
+}
+
+.watch {
+  display: inline-block;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+  font-size: 1.15rem;
+  text-decoration: none;
+}
+
+.watch:hover,
+.watch:focus-visible {
+  filter: brightness(1.08);
+}
+
+.notes {
+  padding: 0;
+  list-style: none;
+}
+
+.notes li {
+  margin: 0 0 20px;
+}
+
+.notes li > a {
+  font-weight: 600;
+}
+
+.notes p {
+  margin: 2px 0 0;
+}
+
+.when {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+article h1 {
+  margin-bottom: 4px;
+}
+
+details {
+  margin: 1.2em 0;
+  padding: 4px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--lawn);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+details[open] {
+  padding-bottom: 12px;
+}
+
+summary {
+  cursor: pointer;
+  padding: 6px 0;
+  font-weight: 600;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 0.8em;
+}
+
+code {
+  font-size: 0.9em;
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+footer {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+footer a {
+  color: inherit;
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 17px;
+  }
+  .top nav a {
+    margin-left: 12px;
+  }
+  .pitch h1 {
+    font-size: 2.1rem;
+  }
+}
+
+/* review build only */
+.review {
+  margin: 0;
+  padding: 8px 16px;
+  background: #ffd166;
+  color: #2c3a33;
+  font-weight: 600;
+  text-align: center;
+}
+
+.draft {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: #ffd166;
+  color: #2c3a33;
+  font-size: 0.7em;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.draft-banner {
+  padding: 10px 14px;
+  border: 2px dashed #e0a800;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.source {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75em;
+  color: var(--muted);
+}
+
+/* clips: short loops on the site, longer ones on YouTube */
+figure {
+  margin: 1.5em 0;
+}
+
+.youtube button {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.youtube button span {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.youtube iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 12px;
+}
+
+.clips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 1.5em 0;
+}
+
+.clips figure {
+  margin: 0;
+}
