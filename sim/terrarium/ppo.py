@@ -23,6 +23,7 @@ class Rollout:
     values: np.ndarray
     rewards: np.ndarray
     dones: np.ndarray     # this step ended the episode; the next observation is a fresh start
+    active: np.ndarray    # the creature was alive to act; the dead wait for their arena to start over
 
 
 class Episodes:
@@ -34,9 +35,11 @@ class Episodes:
         self.ticks = np.zeros(samples, int)
         self.finished: list[tuple[float, float]] = []
 
-    def add(self, reward: np.ndarray, done: np.ndarray):
-        self.ret += reward
-        self.ticks += 1
+    def add(self, reward: np.ndarray, done: np.ndarray, active: np.ndarray):
+        """An episode is one creature's life: the dead count nothing until their arena starts over."""
+        self.ret += reward * active
+        self.ticks += active
+        done = done & active
         for i in np.flatnonzero(done):
             self.finished.append((float(self.ret[i]), float(self.ticks[i] * self.dt)))
         self.ret[done] = 0
@@ -62,10 +65,16 @@ def collect(env: Forage, actor: Brain, steps: int, obs: Observation, episodes: E
             keep['actions'].append(action.numpy())
             keep['logprobs'].append(dist.log_prob(action).sum(-1).numpy())
             keep['values'].append(value.numpy())
+            active = env.active
+            keep['active'].append(active)
             obs, reward, done, _ = env.step(action.numpy())
+            episodes.add(reward, done, active)
+            if env.final is not None:
+                # cut off by the time limit, not ended: what's left is worth what the value says it is
+                _, after = actor(*tensors(env.final, 'cpu'))
+                reward = reward + env.gamma * after.numpy() * env.cut
             keep['rewards'].append(reward)
             keep['dones'].append(done)
-            episodes.add(reward, done)
     return Rollout(**{k: np.stack(v) for k, v in keep.items()}), obs
 
 
@@ -86,8 +95,11 @@ def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv:
            cfg: PPO) -> dict:
     device = next(learner.parameters()).device
 
+    # only what living creatures did; the dead's samples are placeholders
+    active = roll.active.reshape(-1)
+
     def flat(x: np.ndarray) -> torch.Tensor:
-        return torch.from_numpy(np.ascontiguousarray(x.reshape(-1, *x.shape[2:]))).to(device)
+        return torch.from_numpy(np.ascontiguousarray(x.reshape(-1, *x.shape[2:])[active])).to(device)
 
     me, kinds, rays = flat(roll.me), flat(roll.kinds), flat(roll.rays)
     actions, old_logp = flat(roll.actions), flat(roll.logprobs)
@@ -120,7 +132,8 @@ def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv:
                 seen['kl'].append(((ratio - 1) - log_ratio).mean().item())
                 seen['clipped'].append(((ratio - 1).abs() > cfg.clip).float().mean().item())
     stats: dict[str, float | list[float]] = {k: float(np.mean(v)) for k, v in seen.items()}
+    returns, values = returns[roll.active], roll.values[roll.active]
     var = returns.var()
-    stats['explained_variance'] = float(1 - (returns - roll.values).var() / var) if var > 0 else 0.0
+    stats['explained_variance'] = float(1 - (returns - values).var() / var) if var > 0 else 0.0
     stats['std'] = learner.log_std.exp().tolist()
     return stats

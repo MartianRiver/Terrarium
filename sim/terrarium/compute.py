@@ -8,6 +8,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 import tomllib
@@ -53,11 +54,22 @@ def sessions(path: Path = SESSIONS) -> list[dict]:
     return tomllib.loads(path.read_text()).get('session', []) if path.exists() else []
 
 
+def machines(path: Path = SESSIONS) -> list[dict]:
+    """My own machines, by the cpu and memory a run records, with the name to show them by."""
+    return tomllib.loads(path.read_text()).get('machine', []) if path.exists() else []
+
+
+def rented_hours(session: dict) -> float:
+    # the whole rental, setup and idle included, not just the training on it
+    return (when(session['ended']) - when(session['started'])).total_seconds() / 3600
+
+
 def spent(root: Path, since: datetime, until: datetime, path: Path = SESSIONS) -> dict:
     """Runs started and rentals ended in (since, until]."""
     runs = [r for r in root.iterdir() if (r / 'run.json').exists() and since < when(read_run(r)['started']) <= until]
     rented = [s for s in sessions(path) if since < when(s['ended']) <= until]
     return {'runs': len(runs), 'hours': round(sum(map(seconds, runs)) / 3600, 2),
+            'rented_hours': round(sum(map(rented_hours, rented)), 2),
             'dollars': round(sum(float(s['dollars']) for s in rented), 2)}
 
 
@@ -115,67 +127,94 @@ def rented_on(record: dict, session: dict) -> bool:
         return session.get('instance') == instance
     if record.get('device') != 'cuda' or not when(session['started']) <= when(record['started']) <= when(session['ended']):
         return False
-    return not record.get('gpu') or session['gpu'] in record['gpu']
+    if record.get('gpu') and session['gpu'] not in record['gpu']:
+        return False
+    # "Xeon Gold 6138, 40 cores" matches "Intel(R) Xeon(R) Gold 6138 CPU @ 2.00GHz"
+    cpu = record.get('machine', {}).get('cpu')
+    return not (cpu and 'cpu' in session) or all(w in cpu for w in session['cpu'].split(',')[0].split())
 
 
-def hardware(record: dict, rentals: list[dict]) -> str:
-    if record.get('device') == 'cuda':
-        gpu = record.get('gpu') or next((s['gpu'] for s in rentals if rented_on(record, s)), 'a GPU')
-        return gpu.removeprefix('NVIDIA ').removeprefix('GeForce ')
+def cpu_name(cpu: str) -> str:
+    """"Intel(R) Xeon(R) Gold 6154 CPU @ 3.00GHz" -> "Xeon Gold 6154", "AMD EPYC 7662 64-Core Processor" -> "EPYC 7662"."""
+    cpu = re.sub(r'\((R|TM)\)|@.*$|\bCPU\b|\bProcessor\b|\b\d+-Core\b|^(Intel|AMD)\b', '', cpu)
+    return ' '.join(cpu.split())
+
+
+def hardware(record: dict, rentals: list[dict], mine: list[dict] | None = None) -> str:
     m = record.get('machine', {})
+    if record.get('device') == 'cuda':
+        rental = next((s for s in rentals if rented_on(record, s)), {})
+        gpu = (record.get('gpu') or rental.get('gpu') or 'a GPU').removeprefix('NVIDIA ').removeprefix('GeForce ')
+        # the rental knows the cores it came with; older runs at least recorded the CPU's model
+        cpu = rental.get('cpu') or (cpu_name(m['cpu']) if 'cpu' in m else None)
+        return f'{gpu}, {cpu}' if cpu else gpu
     if 'cpu' in m:
-        return f'{m["cpu"]}, {m["memory_gb"]} GB'
+        named = next((k['name'] for k in mine or [] if k.get('cpu') == m['cpu'] and k.get('memory_gb') == m['memory_gb']), None)
+        return named or f'{m["cpu"]}, {m["memory_gb"]} GB'
+    # runs from before cpu and memory were recorded: a machine of mine can be named by its platform
+    named = next((k['name'] for k in mine or [] if 'platform' in k and m.get('platform', '').startswith(k['platform'])), None)
+    if named:
+        return named
     return f'{m["platform"].split("-")[0]} {m["processor"]}' if m else 'not recorded'
 
 
-def shares(root: Path, rentals: list[dict]) -> dict[str, float]:
-    """Each rental's dollars split across the runs it hosted by their hours, idle time and all. Rentals that
-    overlap with the same GPU can't be told apart, so their runs share both."""
+def shares(root: Path, rentals: list[dict]) -> dict[str, tuple[float, float]]:
+    """Each rental's dollars and hours split across the runs it hosted by their hours, idle time and all. Rentals
+    that overlap with the same GPU can't be told apart, so their runs share both."""
     runs = [read_run(r) | {'seconds': seconds(r)} for r in root.iterdir() if (r / 'run.json').exists()]
-    out = defaultdict(float)
+    out = defaultdict(lambda: (0.0, 0.0))
     for s in rentals:
         hosted = [r for r in runs if rented_on(r, s)]
         total = sum(r['seconds'] for r in hosted)
         for r in hosted:
-            out[r['id']] += float(s['dollars']) * r['seconds'] / total if total else 0
+            share = r['seconds'] / total if total else 0
+            dollars, hours = out[r['id']]
+            out[r['id']] = (dollars + float(s['dollars']) * share, hours + rented_hours(s) * share)
     return dict(out)
 
 
 def by_hardware(rows: list[dict]) -> list[dict]:
-    groups = defaultdict(lambda: {'runs': 0, 'hours': 0.0, 'dollars': 0.0})
+    groups = defaultdict(lambda: {'runs': 0, 'hours': 0.0, 'rented_hours': 0.0, 'dollars': 0.0})
     for r in rows:
         g = groups[r['hardware']]
         g['runs'] += 1
-        g['hours'] += r['hours']
-        g['dollars'] += r['dollars']
+        for k in ('hours', 'rented_hours', 'dollars'):
+            g[k] += r[k]
     return sorted(({'hardware': k, **v} for k, v in groups.items()), key=lambda g: -g['hours'])
 
 
 def behind(root: Path, run: Path, path: Path = SESSIONS) -> dict:
-    """What went into the brain this run ends with: its runs, per machine, in hours and dollars."""
-    rentals = sessions(path)
+    """What went into the brain this run ends with: its runs, per machine, in hours (training, and rented with idle
+    time) and dollars."""
+    rentals, mine = sessions(path), machines(path)
     cost = shares(root, rentals)
     runs, missing = line(root, run)
     rows = []
     for r, secs in runs:
         rec, whole = read_run(r), seconds(r)
-        rows.append({'id': rec['id'], 'hardware': hardware(rec, rentals), 'hours': secs / 3600,
-                     'dollars': cost.get(rec['id'], 0.0) * (secs / whole if whole else 1)})
+        part = secs / whole if whole else 1
+        dollars, rented = cost.get(rec['id'], (0.0, 0.0))
+        rows.append({'id': rec['id'], 'hardware': hardware(rec, rentals, mine), 'hours': secs / 3600,
+                     'rented_hours': rented * part, 'dollars': dollars * part})
     return {'runs': rows, 'hardware': by_hardware(rows), 'hours': sum(r['hours'] for r in rows),
-            'dollars': sum(r['dollars'] for r in rows), 'missing': missing}
+            'rented_hours': sum(r['rented_hours'] for r in rows), 'dollars': sum(r['dollars'] for r in rows),
+            'missing': missing}
 
 
 def everything(root: Path, path: Path = SESSIONS) -> dict:
-    """Every run and rental so far, dead ends and pods that never ran anything included."""
-    rentals = sessions(path)
+    """Every run and rental so far, dead ends included, and rentals with no training run on them (evals, probes,
+    failed starts)."""
+    rentals, mine = sessions(path), machines(path)
     cost = shares(root, rentals)
     records = [read_run(r) | {'seconds': seconds(r)} for r in root.iterdir() if (r / 'run.json').exists()]
-    rows = [{'hardware': hardware(r, rentals), 'hours': r['seconds'] / 3600, 'dollars': cost.get(r['id'], 0.0)}
+    rows = [{'hardware': hardware(r, rentals, mine), 'hours': r['seconds'] / 3600,
+             'dollars': cost.get(r['id'], (0.0, 0.0))[0], 'rented_hours': cost.get(r['id'], (0.0, 0.0))[1]}
             for r in records]
     unused = [s for s in rentals if not any(rented_on(r, s) for r in records)]
     return {'hardware': by_hardware(rows), 'hours': sum(r['hours'] for r in rows),
-            'unused': {'rentals': len(unused), 'dollars': sum(float(s['dollars']) for s in unused)},
-            'dollars': sum(float(s['dollars']) for s in rentals)}
+            'unused': {'rentals': len(unused), 'rented_hours': sum(map(rented_hours, unused)),
+                       'dollars': sum(float(s['dollars']) for s in unused)},
+            'rented_hours': sum(map(rented_hours, rentals)), 'dollars': sum(float(s['dollars']) for s in rentals)}
 
 
 def totals(root: Path, record: dict, brains: list[dict], until: datetime, path: Path = SESSIONS) -> dict:
@@ -191,11 +230,12 @@ def report(brains: list[dict], root: Path = ROOT, path: Path = SESSIONS):
     for b in brains:
         c = b['compute']
         print(f'{b["stage"]}  {b["file"]}: {c["lineage_hours"]} h of training behind it; the stage took {c["runs"]} '
-              f'runs, {c["hours"]} h, ${c["dollars"]:.2f}; {c["total_hours"]} h, ${c["total_dollars"]:.2f} so far'
+              f'runs, {c["hours"]} h of training, {c.get("rented_hours", 0)} h rented, ${c["dollars"]:.2f}; {c["total_hours"]} h, ${c["total_dollars"]:.2f} so far'
               + (f'; like {b["like"]}' if b.get('like') else ''))
     since = when(brains[-1]['compute']['until']) if brains else BEGINNING
     now = spent(root, since, datetime.now().astimezone(), path)
-    print(f'since then: {now["runs"]} runs, {now["hours"]} h, ${now["dollars"]:.2f}')
+    print(f'since then: {now["runs"]} runs, {now["hours"]} h of training, {now["rented_hours"]} h rented, '
+          f'${now["dollars"]:.2f}')
 
 
 def vast_key() -> str:

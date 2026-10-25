@@ -1,3 +1,4 @@
+import { clock } from './clock';
 import { createDemo } from './demo';
 import { createLogger } from './lib/logger';
 import { readReplay, ReplayError, type Replay } from './replay';
@@ -38,7 +39,6 @@ function webglAvailable() {
 const SITE = import.meta.env.MODE === 'site';
 const SITE_REPLAY = '/replays/latest.jsonl.gz';
 
-const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 function demoSource(): Source {
   return { ...createDemo(), label: () => 'scripted demo' };
@@ -68,8 +68,10 @@ function boot() {
     return;
   }
 
+  const params = new URLSearchParams(location.search);
+  const lite = params.has('lite');
   const container = document.getElementById('world')!;
-  const stage = createStage(container);
+  const stage = createStage(container, lite);
   let make = demoSource;
   let source!: Source;
   let view: WorldView | undefined;
@@ -87,15 +89,15 @@ function boot() {
     setStatus('error', 'Lost the graphics context. Reload to try again.');
   });
 
-  const params = new URLSearchParams(location.search);
-
   // from the top: a replay that has run out loops, and R does the same by hand
   function restart(newWorld = false) {
     view?.dispose();
     source = make();
     if (newWorld) stage.setWorld(source.info);
     view = new WorldView(stage.scene, source.info, !params.has('nodroppings'));
-    view.push(source.step()!);
+    const first = source.step()!;
+    view.push(first);
+    stage.light(first.light);
     acc = 0;
     snap = true;
   }
@@ -134,6 +136,36 @@ function boot() {
       throw new ReplayError(body?.error ?? `the server said ${res.status}`);
     }
     return res.arrayBuffer();
+  }
+
+  // ?latest[=text]: the newest checkpoint of the newest run whose id has text in it, or with no text, of each
+  // live run in turn; looked for again each time the replay runs out, and the old one loops while the next records
+  let latest = '';
+  let looking = false;
+  async function openLatest() {
+    if (looking) return;
+    looking = true;
+    try {
+      const want = params.get('latest') ?? '';
+      const runs: { id: string; state: string }[] = await (await fetch('/api/runs', { cache: 'no-cache' })).json();
+      const live = runs.filter((r) => r.state === 'live');
+      const pool = want ? runs.filter((r) => r.id.includes(want)).slice(0, 1) : live.length ? live : runs.slice(0, 1);
+      const run = pool[(pool.findIndex((r) => latest.startsWith(`${r.id}/`)) + 1) % pool.length];
+      if (!run) throw new ReplayError(`no run matching “${want}”`);
+      const detail: { checkpoints: { file: string; samples: number }[] } = await (await fetch(`/api/runs/${run.id}`, { cache: 'no-cache' })).json();
+      const newest = detail.checkpoints.at(-1);
+      if (!newest || `${run.id}/${newest.file}` === latest) return;
+      const bytes = await fetchReplay(new URL(`/api/runs/${run.id}/replay/${newest.file}?seed=0`, location.href));
+      latest = `${run.id}/${newest.file}`;
+      log.info('newer checkpoint', { run: run.id, samples: newest.samples });
+      await open(`${run.id.replace(/^\d{8}-\d{6}-/, '')} · ${(newest.samples / 1e6).toFixed(1)}M`, async () => bytes);
+    } catch (err) {
+      log.warn('latest checkpoint not opened', { err: String(err) });
+    } finally {
+      looking = false;
+      // nothing to loop yet (the demo never runs out), so keep looking
+      if (!latest) setTimeout(openLatest, 30_000);
+    }
   }
 
   openButton.addEventListener('click', () => fileInput.click());
@@ -175,8 +207,16 @@ function boot() {
     if (url.origin === location.origin) void open(name, () => fetchReplay(url));
     else setStatus('error', `Won’t fetch a replay from another site (${url.origin}). Click or press Esc to close this.`);
   }
+  const watching = !SITE && params.has('latest');
+  if (watching) void openLatest();
 
+  // lite draws 30 frames a second at most
+  const gap = lite ? 1000 / 30 - 2 : 0;
   function frame(now: number) {
+    if (now - last < gap) {
+      requestAnimationFrame(frame);
+      return;
+    }
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     const tickSeconds = 1 / source.info.tickHz;
@@ -186,9 +226,11 @@ function boot() {
         const next = source.step();
         if (!next) {
           restart();
+          if (watching) void openLatest();
           break;
         }
         view!.push(next);
+        stage.light(next.light);
         acc -= tickSeconds;
       }
     }

@@ -38,43 +38,49 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 
 ## 0.3 Daisy: Colony basics
 
-*Mac.* 6–12 creatures, one nest, one shared brain. Carry food home as jelly. The reward shifts partly toward the colony's store.
+*Mac and rented GPUs.* Three colonies of six, a nest each, every Terrikin with its own copy of the same brain. Carry food home as jelly, get through the night on it, and race the other colonies for food there isn't enough of.
 
-- New inputs, added so the 0.2 brain still loads: body traits (size, speed), and whether a creature a ray hits is from the same colony. A flag rather than a colony number, so one brain works for every colony.
+- New inputs, added so the 0.2 brain still loads: whether a creature a ray hits is from the same colony. A flag rather than a colony number, so one brain works for every colony.
 - Nests are something rays can see, own and other. Each creature also knows the distance and direction to its own nest, the way an ant keeps track of the way home. This may get fuzzier in later stages, so remembering and scent trails have something to do.
 - The reward blend as a config dial.
 - A crop, like an ant's social stomach: food eaten when already full is carried instead, slows the creature down, and is unloaded at the nest as jelly. Being full starts to mean something.
-- **The jelly store.** One number per nest in the sim, drawn as a pile that grows. Above a threshold it hatches a new Terrikin, up to a cap: a hatchling is small and slow, feeds itself from the store while it's at the nest, and grows into an adult. Below the threshold the store feeds the colony, but eating jelly gives back less than the food was worth and takes from the colony's share of the reward, and at first only a hungry creature can eat from it at all. Foraging should always pay better.
-- Memory: a few numbers the brain carries from one tick to the next. The 0.2 brain forgets food the moment it's out of sight, and getting back to a patch it found needs more than that.
-- Food grows in patches rather than evenly, since streams only form when food is clumped.
-- Trained on a mix of colony arenas and solo ones, so the 0.2 skill isn't lost.
-- **Evals v2:** a scripted forager that carries food home as the baseline, like greedy was for 0.2. Trips home, how much food is stored rather than eaten, and how big the colony gets.
+- **The jelly store.** One number per nest in the sim, drawn as a pile that grows. It feeds the colony, but eating jelly gives back less than the food was worth, and only a hungry creature can eat from it. Foraging should always pay better.
+- Food grows in patches rather than evenly, since streams only form when food is clumped. Half of it grows in the middle, between the nests, so colonies meet over it, in a room walled in by blocks, behind doors that can only be pulled out.
+- Grab: hold a block and drag it, for a little energy while holding on. The first use is getting the vault's doors out of the way.
+- **Day and night.** Food stops growing at night and what's left standing goes, so the store is what gets a colony through to morning. Nights are cold: energy drains faster, less so in the nest or close to nestmates, so huddling can pay. They can sense the light, and dusk dims slowly, so night can be seen coming. Nights have to be longer than a Terrikin can last on what's in its body, or there's no point keeping a store.
+- Sprint: faster, costs energy, has a cooldown. For getting to food before another colony does, and later for getting out of the way. Turning costs energy too, by how hard, so steering is cheap and spinning on the spot isn't.
+- **Scarcity.** Only enough food for about two colonies' worth of Terrikins to live through all three nights of an episode, so colonies race each other for it. With every colony running the same brain, which one makes it is down to place and luck; telling better brains apart comes with rivals in 0.6.
+- Foraging is checked in the colony world, not alone. Isolated ant workers die young even with food to hand (Koto et al. 2015), and a colony brain alone turned out the same way, so a lone Terrikin is scored as a number to watch, not held to what the 0.2 brain did.
+- **Evals v2:** scripted foragers that carry food home (and one that also goes home at dusk) as the baselines, like greedy was for 0.2. Food stored and eaten, deaths and where they happen (away from the nest by day: a forager that couldn't feed itself), colonies through the night, how often another colony is close when food is eaten, and seeds held back for the release.
+- The brain is learned, never copied: forks that train side by side and copy whichever is doing best (population-based training) are how it gets there.
 
-Done when creatures stream between food and nest, the colony grows from its store, and a lone creature still forages as well as the 0.2 brain did.
+Done when creatures carry food home and store it, colonies get through the night on the store and by huddling, they pull the doors open to get at the food in the middle, about two colonies in three live through all three nights on food for two, foragers away from the nest keep themselves fed, and the brain beats the one it started from.
 
-## 0.4 Elderflower: Signals, scent and cooperation
+## 0.4 Elderflower: Growth and memory
 
-*Mac, maybe RunPod.* Signal patch (free at first), scent marks (cost energy), and rich food that needs two carriers. And the first danger: dust devils.
+*Mac and rented GPUs.* A colony that grows and shrinks with what it gathers, and a brain that remembers.
 
-- A dust devil drifts across the arena, knocking creatures over (they lie still for a moment) and making them drop what they carry. It's weather, not a creature: nothing about it learns.
-- Sprint: faster, costs energy, has a cooldown. For getting out of the way.
-- With something to warn about, a signal has more to mean than "help me carry this".
+- **Hatchlings.** Above a threshold the store hatches a new Terrikin, up to a cap: small and slow, it feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size.
+- Memory: a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight, and getting back to a patch it found needs more than that.
+- The first danger: a dust devil drifts across the arena, knocking creatures over (they lie still for a moment) and making them drop what they carry. It's weather, not a creature: nothing about it learns.
+- Evals: how big each colony gets.
 
-Done when pairs team up on heavy food, and creatures keep clear of dust devils. Watch for signals or trails starting to mean something, warnings especially.
+Done when the colony grows from its store and shrinks in lean times, foragers go back to a patch they remember, and creatures keep clear of dust devils.
 
-## 0.5 Foxglove: Movable objects
+## 0.5 Foxglove: Working together, moving things
 
-*Mac, then RunPod.* Blocks of varying weight, some needing two creatures.
+*Mac, then rented GPUs.* Signal patch (free at first), scent marks (cost energy), rich food that needs two carriers, and blocks of varying weight, some needing two creatures.
 
+- With dust devils about, a signal has more to mean than "help me carry this".
+- Heavier blocks than one creature can drag, building on 0.3's grab.
 - Shove: knocks the target back and makes it drop what it's carrying, no damage. Costs energy, has a cooldown. For clearing paths and moving things, and the same knock and drop as the dust devil's.
 - The store's hunger limit loosened, so a creature can eat jelly it doesn't need. Nestmates can shove it off: caught in the act, not by reputation. Learning to shove nestmates first means it's already a skill when rivals arrive.
-- Training on RunPod: run records note the machine, and weights come back to the Mac with their lineage entry.
 
-Done when creatures move things for a purpose. Maybe the first barriers, and freeloaders pushed off the store.
+Done when pairs team up on heavy food and heavy blocks, and creatures move things for a purpose. Maybe the first barriers, and freeloaders pushed off the store. Watch for signals or trails starting to mean something, warnings especially.
 
 ## 0.6 Gorse: Rivals and conflict
 
-*RunPod.* Two colonies, then three or four. Shoving rivals and stealing first, then attack, health and death. Friendly fire ramped in.
+*Rented GPUs.* Two colonies, then three or four. Shoving rivals and stealing first, then attack, health and death. Friendly fire ramped in.
 
 - Rivals can take jelly from a nest's store and carry it home; the colony can push or fight them off.
 
@@ -84,25 +90,25 @@ Done when there's stealing, guarding of food patches, fights and retreats. Possi
 
 ## 0.7 Honeysuckle: Queen and brood
 
-*RunPod.* A scripted queen, eggs, feeding, hatchlings growing up. Raiding rival brood becomes possible.
+*Rented GPUs.* A scripted queen, eggs, feeding, hatchlings growing up. Raiding rival brood becomes possible.
 
 Done when there are guards staying home, nurses near the brood, and raids on rival nests.
 
 ## 0.8 Ivy: Farming and seasons
 
-*RunPod.* Seeds, fertile soil, lean seasons.
+*Rented GPUs.* Seeds, fertile soil, lean seasons.
 
 Done when colonies plant and defend farms, and different colonies settle on different strategies. The big one.
 
 ## 0.9 Juniper: Requeening
 
-*RunPod.* The queen can die, and a colony can raise a new one with food and time.
+*Rented GPUs.* The queen can die, and a colony can raise a new one with food and time.
 
 Done when there are colony crises and comebacks.
 
 ## 1.0 Kingcup: The main world
 
-*RunPod or a small always-on server.* One continuous real-time world.
+*Rented GPUs or a small always-on server.* One continuous real-time world.
 
 - **World state saved apart from the brains,** versioned, and moved forward to new versions instead of reset.
 - Swapping in a new brain without wiping the world.
@@ -112,7 +118,7 @@ Done when it's running and worth checking in on.
 
 ## Later
 
-- Day/night cycle
+- More to night: shorter sight in the dark, glowing signals easier to spot, night raids
 - Castes (different body traits at spawn; the colony chooses what to spawn)
 - A small energy cost for colour signalling (more honest signals)
 - Disguise and impersonation as a deliberate unlock

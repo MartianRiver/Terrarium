@@ -18,6 +18,10 @@ export const GARDEN = {
   skyLight: 0xfff0dc,
   groundLight: 0x9a6a4e,
   sun: 0xffdcb4,
+  // the same at full night: a deep dusty blue, moonlit
+  nightSky: 0x1e2340,
+  nightSkyLight: 0x8fa2d8,
+  nightGroundLight: 0x2a2236,
   // the plain outside the dome
   regolith: '#c46d40',
   regolithFlecks: ['#a9552f', '#d88a58', '#8e4628', '#e3a372'],

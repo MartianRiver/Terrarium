@@ -64,7 +64,7 @@ export function createDemo(seed = 7) {
         id: nextId++, colony: nest.colony,
         x: nest.x + Math.cos(a) * 2.5, y: nest.y + Math.sin(a) * 2.5,
         heading: rng() * Math.PI * 2, speed: 0, size: 1,
-        energy: 0.5 + rng() * 0.5, signal: SIGNAL_OFF,
+        energy: 0.5 + rng() * 0.5, signal: SIGNAL_OFF, carrying: 0, holding: 0,
         goal: 'wander', goalTicks: Math.floor(rng() * 60), drift: 0, targetBlock: 0, signalTicks: 0,
       });
     }
@@ -217,10 +217,12 @@ export function createDemo(seed = 7) {
 
     return {
       tick,
-      creatures: agents.map(({ id, colony, x, y, heading, speed, size, energy, signal }) =>
-        ({ id, colony, x, y, heading, speed, size, energy, signal })),
+      creatures: agents.map(({ id, colony, x, y, heading, speed, size, energy, signal, carrying, holding }) =>
+        ({ id, colony, x, y, heading, speed, size, energy, signal, carrying, holding })),
       food: food.map((f) => ({ ...f })),
       blocks: blocks.map((b) => ({ ...b })),
+      stores: [],
+      light: 1,
     };
   }
 

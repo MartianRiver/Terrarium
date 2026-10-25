@@ -32,6 +32,7 @@ class Energy:
     start: float
     drain: float
     move: float
+    turn: float
     food: float
 
 
@@ -51,6 +52,61 @@ class Food:
     regrow_min: float
     regrow_max: float
     clearance: float
+    patches: int
+    patch_radius: float
+    middle: int
+
+
+@dataclass(frozen=True)
+class Crop:
+    capacity: int
+    slow: float
+    start: int
+
+
+@dataclass(frozen=True)
+class Jelly:
+    energy: float
+    hunger: float
+
+
+@dataclass(frozen=True)
+class Night:
+    cycle: float
+    length: float
+    dusk: float
+    cold: float
+    nest: float
+    huddle: float
+    reach: float
+
+    @property
+    def on(self) -> bool:
+        return self.cycle > 0 and self.length > 0
+
+
+@dataclass(frozen=True)
+class Sprint:
+    speed: float
+    seconds: float
+    cooldown: float
+    energy: float
+
+    @property
+    def on(self) -> bool:
+        return self.seconds > 0 and self.speed > 1
+
+
+@dataclass(frozen=True)
+class Grab:
+    reach: float
+    grip: float
+    seconds: float
+    energy: float
+
+    @property
+    def on(self) -> bool:
+        return self.grip > 0
 
 
 @dataclass(frozen=True)
@@ -91,6 +147,11 @@ class Config:
     energy: Energy
     colonies: Colonies
     food: Food
+    crop: Crop
+    jelly: Jelly
+    night: Night
+    sprint: Sprint
+    grab: Grab
     ground: Ground
     vision: Vision
     episode: Episode
@@ -109,17 +170,27 @@ class Reward:
     food: float
     death: float
     alive: float
+    stored: float
+    jelly: float
+    colony: float
+    home: float
+    snug: float
+    warm: float
+    effort: float
 
 
 @dataclass(frozen=True)
 class PPO:
     samples: int
+    repeat: int
     arenas: int
     steps: int
     epochs: int
     minibatches: int
     lr: float
+    anneal: bool
     gamma: float
+    bootstrap: bool
     lam: float
     clip: float
     entropy: float
@@ -129,9 +200,17 @@ class PPO:
 
 
 @dataclass(frozen=True)
+class Start:
+    fresh: tuple[str, ...]
+    staggered: bool
+    ajar: float
+
+
+@dataclass(frozen=True)
 class Train:
     reward: Reward
     ppo: PPO
+    start: Start
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -162,10 +241,28 @@ def convert(kind, value, where):
         if not isinstance(value, (list, tuple)):
             raise ConfigError(f'{where}: expected a list of tables')
         return tuple(convert(item, v, f'{where}[{i}]') for i, v in enumerate(value))
+    if kind is bool:
+        if not isinstance(value, bool):
+            raise ConfigError(f'{where}: expected true or false, got {value!r}')
+        return value
     # TOML ints are fine where a float is wanted, but not the other way round, and never bools
     if isinstance(value, bool) or not (isinstance(value, kind) or (kind is float and isinstance(value, int))):
         raise ConfigError(f'{where}: expected {kind.__name__}, got {value!r}')
     return kind(value)
+
+
+# keys added after worlds were first recorded, as they were before: off. Only for reading old run
+# records (serve.py), never for configs on disk, which have every key
+SINCE = {'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
+         'energy': {'turn': 0.0},
+         'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
+         'food': {'middle': 0},
+         'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0}}
+
+
+def upgrade(data: dict) -> dict:
+    """A recorded world config with the keys it predates filled in, so the world it describes is unchanged."""
+    return {**data, **{k: {**old, **data.get(k, {})} for k, old in SINCE.items()}}
 
 
 def load(path: Path | str = DEFAULT) -> Config:

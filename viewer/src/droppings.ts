@@ -10,7 +10,8 @@ const DIGEST = 5; // seconds after the meal that fills the gut
 const LIFE = 40; // seconds before it sinks into the lawn
 const POP = 0.3;
 const SINK = 2;
-const BEHIND = 0.65; // the whole cluster clears the 0.45 m body
+const BEHIND = 0.6; // the whole cluster clears the 0.45 m body
+const SIZE = 0.6;
 
 const pelletGeo = new THREE.SphereGeometry(1, 12, 8);
 const pelletMat = new THREE.MeshPhysicalMaterial({ color: 0x5e4130, roughness: 0.75, sheen: 0.4, sheenColor: new THREE.Color(0x9c7458) });
@@ -59,8 +60,8 @@ export class Droppings {
       const age = (tick + alpha - d.born) / this.tickHz;
       const grow = age < POP ? easeOutBack(Math.max(0, age) / POP) : 1;
       const sink = Math.min(1, Math.max(0, (age - LIFE) / SINK));
-      d.root.scale.setScalar(Math.max(0.001, grow * (1 - sink * 0.6)));
-      d.root.position.y = -sink * 0.08;
+      d.root.scale.setScalar(Math.max(0.001, SIZE * grow * (1 - sink * 0.6)));
+      d.root.position.y = -sink * 0.08 * SIZE;
     }
   }
 

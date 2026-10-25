@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import compute
-from .config import Config, build
+from .config import Config, build, upgrade
 from .log import Logger
 from .record import record
 from .runs import ROOT
@@ -92,7 +92,7 @@ class Runs:
         out = run / 'replays' / f'{Path(checkpoint).stem}-{seed}.jsonl.gz'
         with self.recording:
             if not out.exists():
-                cfg = build(Config, compute.read_run(run)['world']['config'])
+                cfg = build(Config, upgrade(compute.read_run(run)['world']['config']))
                 out.parent.mkdir(exist_ok=True)
                 partial = out.with_name(out.name + '.part')
                 brain = None if checkpoint == 'random' else run / 'checkpoints' / checkpoint

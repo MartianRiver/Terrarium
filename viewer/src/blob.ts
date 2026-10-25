@@ -64,6 +64,8 @@ const BULB_GLOW = 0.8;
 // energy where starving starts to show, and where full does
 const HUNGRY_BELOW = 0.3;
 const FULL_ABOVE = 0.85;
+// a full crop shows as a glowing jelly belly, like a honeypot ant's; this many fills it
+const CROP_FULL = 2;
 
 function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number, number, number], scale: [number, number, number] | number, shadow = true) {
   const m = new THREE.Mesh(geo, mat);
@@ -88,6 +90,11 @@ export class BlobView {
   private feet: THREE.Mesh[] = [];
   private stalk = new THREE.Group();
   private tail = new THREE.Group();
+  private belly: THREE.Mesh;
+  private bellyMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffb03a, emissive: 0xff8a1f, emissiveIntensity: 0.35, roughness: 0.15, clearcoat: 1, transparent: true, opacity: 0.85,
+  });
+  private crop = 0;
 
   private seed = Math.random() * 100;
   private phase = 0;
@@ -145,6 +152,10 @@ export class BlobView {
     this.tail.add(mesh(tailGeo, new THREE.MeshStandardMaterial({ color: this.tint.clone().offsetHSL(0, 0.18, -0.14), roughness: 0.6 }), [0, 0, 0], [0.065, 0.15, 0.065]));
     this.body.add(this.tail);
 
+    this.belly = seat(mesh(ball, this.bellyMat, [0, 0, 0], [0.2, 0.15, 0.06], false), 0, 0.2, -0.02);
+    this.belly.visible = false;
+    this.body.add(this.belly);
+
     this.stalk.position.set(0, 0.79, -0.03);
     this.stalk.add(mesh(stalkGeo, this.limbs, [0, 0, 0], 1), mesh(ball, this.bulbMat, [0, 0.23, 0], 0.105));
     this.body.add(this.stalk);
@@ -169,6 +180,7 @@ export class BlobView {
     this.animateWalk(s.speed / maxSpeed, dt, time);
     this.animateEyes(dt, time);
     this.applySignal(s.signal, dt);
+    this.applyCrop(s.carrying, dt);
   }
 
   private animateWalk(moving: number, dt: number, time: number) {
@@ -251,6 +263,12 @@ export class BlobView {
     // duller as energy falls, grey when starving
     this.skin.color.copy(this.tint).lerp(grey, (1 - e) * 0.3 + this.hunger * 0.45);
     this.limbs.color.copy(this.skin.color);
+  }
+
+  private applyCrop(carrying: number, dt: number) {
+    this.crop += (Math.min(1, carrying / CROP_FULL) - this.crop) * Math.min(1, dt * 6);
+    this.belly.visible = this.crop > 0.02;
+    this.belly.scale.set(0.2 * this.crop, 0.15 * this.crop, 0.06);
   }
 
   private applySignal(signal: number, dt: number) {
