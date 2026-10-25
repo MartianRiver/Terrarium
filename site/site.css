@@ -1,3 +1,11 @@
+/* Nunito (SIL OFL, fonts/OFL.txt), the variable latin file: one 39 KB file covers every weight used here */
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/nunito.woff2') format('woff2');
+  font-weight: 200 1000;
+  font-display: swap;
+}
+
 /* colours from the garden (viewer/src/palette.ts): lawn, Mars plain, Terrikin tints; night for dark mode */
 :root {
   --bg: #fbf6ee;
@@ -34,7 +42,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 18px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font: 18px/1.6 'Nunito', system-ui, sans-serif;
 }
 
 h1,
@@ -42,7 +50,6 @@ h2,
 h3,
 .top .name,
 .watch {
-  font-family: ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
   line-height: 1.2;
 }
 
@@ -284,7 +291,9 @@ figure {
   border-radius: 12px;
   background: var(--card);
   color: var(--text);
-  font: 600 1.1rem ui-rounded, system-ui, sans-serif;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
 }
 

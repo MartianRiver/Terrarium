@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
-    "site": "npm run typecheck && rm -rf dist-site && vite build --mode site --base /watch/ --outDir dist-site/watch && mkdir -p dist-site/replays && cp ../samples/0.2-forager.jsonl.gz dist-site/replays/latest.jsonl.gz && node site.mjs dist-site",
-    "review": "npm run site && rm -rf dist-review && cp -R dist-site dist-review && node site.mjs dist-review --review",
+    "site": "npm run site:watch && node site.mjs dist-site",
+    "site:watch": "npm run typecheck && rm -rf dist-site && vite build --mode site --base /watch/ --outDir dist-site/watch && mkdir -p dist-site/replays && cp ../samples/0.2-forager.jsonl.gz dist-site/replays/latest.jsonl.gz",
+    "review": "npm run site:watch && rm -rf dist-review && mv dist-site dist-review && node site.mjs dist-review --review",
     "review:serve": "vite preview --outDir dist-review --host 0.0.0.0 --port 5198 --strictPort",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",

@@ -4,7 +4,7 @@
 // exactly as they will when published, unless --marked adds a review bar, DRAFT tags and where each clip came from.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
@@ -22,6 +22,12 @@ if (!out) throw new Error('usage: node site.mjs OUT [--review [--marked]]');
 const review = args.includes('--review');
 const marks = review && args.includes('--marked');
 const media = process.env.SITE_CLIPS;
+// a half-built public site must never be deployed: rsync --delete would leave the server with only the viewer
+process.on('uncaughtException', (e) => {
+  if (!review) rmSync(out, { recursive: true, force: true });
+  console.error(`site: ${e.message}`);
+  process.exit(1);
+});
 const clips = JSON.parse(readFileSync(join(SITE, 'clips.json'), 'utf8'));
 
 function read(path) {
@@ -37,8 +43,11 @@ function read(path) {
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// a plain day or a full ISO time with its offset (2026-10-24T17:00+11:00); pages show the day in Sydney
+const when = (iso) => new Date(iso.includes('T') ? iso : `${iso}T12:00:00+11:00`);
+
 function date(iso) {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return when(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
 }
 
 function page({ title, description, path, body, wide = false }) {
@@ -72,7 +81,7 @@ ${marks ? '<p class="review">Review build: drafts are shown and marked. Not the 
 ${body}
 </main>
 <footer>
-  <p>Made by River James (Martian River). <a href="${INSTAGRAM}">Instagram</a> · <a href="${REPO}">GitHub</a> · MIT licence. No cookies, no tracking.</p>
+  <p>Made by River James (Martian River). <a href="${INSTAGRAM}">Instagram</a> · <a href="${REPO}">GitHub</a> · <a href="/how/">How this is made</a> · MIT licence. No cookies, no tracking.</p>
 </footer>
 </body>
 </html>
@@ -118,15 +127,20 @@ function posts(dir, draft) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => {
     const { meta, body } = read(join(dir, f));
-    for (const key of ['title', 'date', 'summary']) {
+    // every post says which model drafted it and who edited it (/how/)
+    // date is when it happened or went up on Instagram; written is when the post was, shown when they differ
+    for (const key of ['title', 'date', 'written', 'summary', 'drafted', 'edited']) {
       if (!meta[key]) throw new Error(`${f} has no ${key}`);
+    }
+    for (const key of ['date', 'written']) {
+      if (Number.isNaN(when(meta[key]).getTime())) throw new Error(`${f}: ${key} isn't a date: ${meta[key]}`);
     }
     return { ...meta, file: f, slug: f.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.md$/, ''), body, draft };
   });
 }
 
 const notes = [...posts(join(SITE, 'notes'), false), ...(review ? posts(process.env.SITE_DRAFTS ?? join(SITE, 'drafts'), true) : [])]
-  .sort((a, b) => b.date.localeCompare(a.date));
+  .sort((a, b) => when(b.date) - when(a.date));
 const tag = (n) => (n.draft && marks ? ' <span class="draft">DRAFT</span>' : '');
 
 const list = (items) =>
@@ -136,6 +150,14 @@ const list = (items) =>
     .join('\n')}\n</ul>`;
 
 const home = read(join(SITE, 'index.md'));
+const how = read(join(SITE, 'how.md'));
+// nothing unfinished goes public: the same list as check.py's UNFINISHED. A review build still shows it
+const UNFINISHED = [/^\W*DRAFT\b/m, /\bTBD\b/, /\bRiver (needs|has|is|still) to\b/i, /\bRiver to (write|add|check|fill|decide|review|edit|confirm)\b/i,
+  /\b(River|me) to fill in\b/i, /\blorem\s+ipsum\b/i, /\[(fill|insert|add) [^\]]*\]/i, /\bplaceholder (text|paragraph|for River)\b/i];
+for (const [name, text] of [['index.md', home.body], ['how.md', how.body], ...notes.filter((n) => !n.draft).map((n) => [n.file, n.body])]) {
+  const hit = UNFINISHED.map((p) => text.match(p)?.[0]).find(Boolean);
+  if (!review && hit) throw new Error(`site/${name} has something unfinished ("${hit}"), so it can't be published`);
+}
 const hero = `<section class="hero">
   <img src="/hero.jpg" width="1600" height="900" alt="A garden under a glass dome on a red plain. On the lawn inside, little round Terrikins in three colours gather berries around their nests.">
   <div class="pitch">
@@ -152,6 +174,13 @@ write('', page({
   path: '/',
   wide: true,
   body: `${hero}\n<div class="text">\n${marked(home.body).replace('<!-- notes -->', latest)}</div>`,
+}));
+
+write('how', page({
+  title: how.meta.title,
+  description: how.meta.description,
+  path: '/how/',
+  body: `<article>\n<h1>${escape(how.meta.title)}</h1>\n${marked(how.body)}</article>`,
 }));
 
 write('notes', page({
@@ -176,7 +205,7 @@ for (const n of notes) {
     title: n.title,
     description: n.summary,
     path: `/notes/${n.slug}/`,
-    body: `<article>\n${banner}<h1>${escape(n.title)}${tag(n)}</h1>\n<p class="when">${date(n.date)}${n.stage ? ` · ${escape(n.stage)}` : ''}</p>\n${html}</article>\n<p><a href="/notes/">All the notes</a></p>${html.includes('class="youtube"') ? `\n${YOUTUBE}` : ''}`,
+    body: `<article>\n${banner}<h1>${escape(n.title)}${tag(n)}</h1>\n<p class="when">${date(n.date)}${n.stage ? ` · ${escape(n.stage)}` : ''}<br><a href="/how/">Drafted by ${escape(n.drafted)}</a> · edited by ${escape(n.edited)}${date(n.written) !== date(n.date) ? ` · written up ${date(n.written)}` : ''}</p>\n${html}</article>\n<p><a href="/notes/">All the notes</a></p>${html.includes('class="youtube"') ? `\n${YOUTUBE}` : ''}`,
   }));
 }
 
@@ -188,7 +217,7 @@ writeFileSync(join(out, '404.html'), page({
 }));
 if (review) writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 
-for (const f of ['site.css', 'hero.jpg', 'card.jpg']) cpSync(join(SITE, f), join(out, f));
+for (const f of ['site.css', 'hero.jpg', 'card.jpg', 'fonts']) cpSync(join(SITE, f), join(out, f), { recursive: true });
 
 // clip masters never go in git: each one is cut from the backups folder (SITE_CLIPS) and cached by its settings
 if (used.size && !media) throw new Error(`posts show clips (${[...used].join(', ')}): set SITE_CLIPS to the clips folder`);
