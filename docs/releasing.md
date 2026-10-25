@@ -37,6 +37,7 @@ When everything listed for the stage in the roadmap is on `next`, or has been mo
 4. Every sample replay, from every earlier version, plays in the viewer.
 5. There's a clip of what the stage was for.
 6. The roadmap, VISION.md and the changelog match what was built; the version is bumped in `viewer/package.json` (and the sim's `pyproject.toml` from 0.1).
+7. The site matches the release: "Where it's at" in `site/index.md`, the hero still if the stage has a better one, and the replay it plays. Then it's rebuilt and deployed ([site.md](site.md)).
 
 Then merge `next` into `main` by pull request, as a merge commit, and tag it.
 

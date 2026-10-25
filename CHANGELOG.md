@@ -8,6 +8,8 @@ The runs page shows the compute behind each brain: hours and dollars per machine
 
 Training runs can go through a job queue (`docs/compute.md`): I sign each job, a coordinator hands jobs out, and workers on my machines, rented GPUs and later lent ones check the signature and every input, train, and send the run back. Donated machines only run code that's public on `main` or `next`. Rented machines have their own kind of token, and a batch can say `on = "rented"` to keep its jobs off my own machines (or `"trusted"` to keep them on).
 
+terrarium.martianriver.com has a front page: what the Terrikins are, where they're at, what's next, and notes, write-ups of what I tried in plain words with the details folded away. The viewer moved to `/watch/`; old links with a replay in them still get there. Posts are Markdown in `site/`, built by `npm run site`; drafts never go in git, and `npm run review` builds a copy with them in, looking just as they will when published, for reading on a phone before anything goes up. Short clips are cut from my backups at build time, so videos stay out of the repo too (`docs/site.md`).
+
 The repo has a README, the MIT licence, and issue templates for bugs and ideas (issues are welcome; pull requests aren't taken).
 
 ## 0.2.0: Solo forager

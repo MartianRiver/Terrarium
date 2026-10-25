@@ -1,0 +1,41 @@
+{
+  "hoovering": {
+    "from": "0.3/moments/2026-10-23-reward-hack-hoovering/landscape-raw.mp4",
+    "start": 1,
+    "seconds": 12,
+    "width": 960,
+    "alt": "A peach-coloured Terrikin grabs a berry, drops it straight behind itself and grabs the next, over and over."
+  },
+  "clover-gen0": {
+    "from": "0.2/reels/2026-10-23-first/clips/04-gen0.mp4",
+    "start": 0,
+    "seconds": 8.4,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 0, no practice: a peach Terrikin moves at random, turns grey and stops. It starved after 1 minute 11."
+  },
+  "clover-gen1": {
+    "from": "0.2/reels/2026-10-23-first/clips/05-gen1.mp4",
+    "start": 0,
+    "seconds": 15,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 1, 23 hours of practice: the Terrikin finds berries, then wanders off along the hedge and loses track of them."
+  },
+  "clover-gen2": {
+    "from": "0.2/reels/2026-10-23-first/clips/06-gen2.mp4",
+    "start": 0,
+    "seconds": 8.4,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 2, 46 hours of practice: sped up, the Terrikin goes berry to berry and survives all 3 minutes, 49 berries."
+  },
+  "clover-final": {
+    "from": "0.2/reels/2026-10-23-first/clips/07-final.mp4",
+    "start": 0,
+    "seconds": 10,
+    "width": 480,
+    "crop": "1080:1080:0:260",
+    "alt": "Generation 13, the 0.2 brain after 11.6 days of practice: the Terrikin heads for each berry it sees. It never starved in 64 tests."
+  }
+}

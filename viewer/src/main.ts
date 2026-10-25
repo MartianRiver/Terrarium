@@ -167,7 +167,12 @@ function boot() {
   restart(true);
   if (params.has('intro')) stage.intro();
   if (params.has('follow')) follow(true);
-  if (SITE) document.querySelector('a[href="/runs.html"]')?.remove();
+  // the public site has no runs page; the link goes back to the front page instead
+  const runsLink = document.querySelector<HTMLAnchorElement>('a[href="/runs.html"]');
+  if (SITE && runsLink) {
+    runsLink.href = '/';
+    runsLink.textContent = 'About';
+  }
   const wanted = params.get('replay') ?? (SITE ? SITE_REPLAY : null);
   if (wanted) {
     const url = new URL(wanted, location.href);

@@ -2,6 +2,7 @@
 node_modules/
 dist/
 dist-site/
+dist-review/
 .venv/
 __pycache__/
 .pytest_cache/
