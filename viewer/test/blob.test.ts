@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 import { BlobView } from '../src/blob';
 
 const RADIUS = 0.45; // sim/configs/world.toml [creature] radius
-const walking = { id: 1, colony: 0, x: 0, y: 0, heading: 0, speed: 2.4, size: 1, energy: 0.9, signal: -1 };
+const walking = { id: 1, colony: 0, x: 0, y: 0, heading: 0, speed: 2.4, size: 1, energy: 0.9, signal: -1, carrying: 0, holding: 0 };
 
 // furthest any vertex is drawn from the blob's centre, across the ground
 function reach(blob: BlobView) {
@@ -34,12 +34,12 @@ test('a blob stays in shape at 10 fps', () => {
   expect(body.x).toBeLessThan(1.3);
 });
 
-test('a blob is drawn inside its body, walking, turning, full or starving', () => {
-  for (const energy of [1, 0.6, 0.02]) {
+test('a blob is drawn inside its body, walking, turning, full or starving, carrying or not', () => {
+  for (const [energy, carrying] of [[1, 0], [0.6, 3], [0.02, 0]]) {
     const blob = new BlobView(0);
     let far = 0;
     for (let i = 0; i < 300; i++) {
-      blob.update({ ...walking, energy, heading: Math.sin(i * 0.1) * 2 }, 2.4, 1 / 30, i / 30);
+      blob.update({ ...walking, energy, carrying, heading: Math.sin(i * 0.1) * 2 }, 2.4, 1 / 30, i / 30);
       far = Math.max(far, reach(blob));
     }
     expect(far, `energy ${energy}`).toBeLessThanOrEqual(RADIUS + 0.02);

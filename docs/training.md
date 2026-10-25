@@ -5,7 +5,7 @@ cd sim
 uv run python -m terrarium.train solo-first --world configs/solo.toml
 ```
 
-PPO trains one brain for every creature, CleanRL-style:
+PPO trains one brain, and every creature runs its own copy of it, CleanRL-style:
 
 1. **Rollouts on the CPU.** `[ppo] arenas` run side by side, each for `steps` ticks per rollout. `--workers N` splits the arenas between N processes.
 2. **Advantages** from GAE.
@@ -17,7 +17,11 @@ The 0.2 brain took the default 20M samples, 52 minutes on the M3. Food per episo
 
 Where it runs and how many workers are facts about the machine, not the training, so they're flags rather than config, and a run on a rented machine doesn't dirty the tree. With one worker the rollouts happen in the training process, seeded as they always were: the same seed gives the same brain. With more, worker i's arenas and sampling are seeded from (seed, i), so a run repeats for the same worker count but not across counts.
 
-Arenas that end start over at once, and running out of time counts as an end like dying does. Not bootstrapping that cut-off costs nothing here: episodes last minutes, and `gamma` looks a few seconds ahead.
+Arenas that end start over at once. With colonies an arena carries on when one creature dies: the dead one's samples are marked inactive and left out of the update until its arena starts over, and each life counts as an episode in the metrics. Dying is an end. Running out of time isn't, since the limit is only there to give training fresh starts and a creature has no clock to see it coming: with `[ppo] bootstrap` on, a creature cut off alive is paid what its value says the rest is worth (Pardo et al., "Time Limits in Reinforcement Learning", 2018). Until 0.3 the cut counted as an end, which cost little while `gamma` looked 5 s ahead, and more once it looked 17 s ahead and things like storing food for the night pay later than that.
+
+A parent brain's actions can be started over with `[start] fresh` in the train config, as new actions start: for one the parent has learned never to take, like `eat` in 0.3. With nights on, `[start] staggered` starts each training arena at a random time of day (and again each time it starts over). Without it every arena starts at dawn together, and since they tend to die out in the same night they stay in step: a rollout is a few seconds of world time, so each update would learn only from day, or only from night. Evals always start at dawn.
+
+`[ppo] repeat` holds each choice for that many ticks and sums the rewards over them, so one sample is one creature making one choice, and `gamma` and `lam` count choices. At 20 Hz with `lam` 0.95, credit reaches about a second ahead; holding choices 4 ticks makes it four times that, and `gamma` 0.999 then looks about 200 s ahead instead of 50. Episode ticks must divide by it. The brain records it and acts the same way in evals and replays. `anneal = false` keeps the learning rate constant instead of falling to 0, for training in chunks that carry on from each other, and `--no-evals` skips the evals at the end when something else scores the run.
 
 ## Run records
 
@@ -66,7 +70,7 @@ uv run python -m terrarium.compute vast    # Vast's charges per instance, checke
 
 The hours come from every run in `runs/`: start to finish, or up to its last update for one that was stopped. Scratch runs and abandoned ones count, since they're part of what it took. A run on a rented machine counts once it's fetched.
 
-The dollars come from [`sim/compute.toml`](../sim/compute.toml), one `[[session]]` per rented machine, written when it's destroyed. The bill includes setup, downloads and idle time, so it's more than the training hours at the list price. `compute vast` reads the charges with `VAST_API_KEY` from the environment or `.env`, and says which instances are missing or differ.
+The dollars come from [`sim/compute.toml`](../sim/compute.toml), one `[[session]]` per rented machine, written when it's destroyed. The bill includes setup, downloads and idle time, so it's more than the training hours at the list price, and the ledger shows each machine's rented hours (start to destroyed) next to its training hours. A session also names the `cpu` and cores it came with, which tells apart pods with the same GPU at the same time. `[[machine]]` entries name my own machines, matched by the CPU and memory their runs record. `compute vast` reads the charges with `VAST_API_KEY` from the environment or `.env`, and says which instances are missing or differ.
 
 Running the Mac isn't counted in dollars.
 
@@ -77,9 +81,9 @@ uv run python -m terrarium.serve    # in sim/
 npm run dev                         # in viewer/, then open /runs.html
 ```
 
-The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (food per episode, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent. Watch opens one in the viewer.
+The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (reward per life, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent. Watch opens one in the viewer.
 
-Each run's page also says what went into the brain it ends with, per machine: hours and dollars for the run and every run behind its parent, back to the first. A parent that was a checkpoint partway through a run counts up to that checkpoint, and a brain made from another without training (new actions set up, say) is followed through to the one it came from, if its checkpoint's meta names it as `parent`. A rented machine's bill is shared across the runs it hosted by their hours, idle time included; rentals with the same GPU at the same time can't be told apart, so they share their runs. The list ends with everything so far per machine, including rentals that never ran anything.
+Each run's page also says what went into the brain it ends with, per machine: hours and dollars for the run and every run behind its parent, back to the first. A parent that was a checkpoint partway through a run counts up to that checkpoint, and a brain made from another without training (new actions set up, say) is followed through to the one it came from, if its checkpoint's meta names it as `parent`. A rented machine's bill is shared across the runs it hosted by their hours, idle time included; rentals with the same GPU at the same time can only be told apart by their `cpu`, and without one they share their runs. Training hours add up every run, so a pod running three at once shows more training than rented time. The list ends with everything so far per machine, including rentals with no training run on them (evals, probes, failed starts).
 
 The replay is recorded the first time it's asked for, in the run's own world from `run.json` rather than today's config, and kept in the run's `replays/` folder. One takes a second or two. The replay seed picks the arena: the same seed gives every generation the same layout, which is the fair way to compare them. A run on another machine shows up once it's fetched.
 

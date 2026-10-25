@@ -97,6 +97,10 @@ def test_creatures_see_each_other_but_not_themselves():
     assert (kind[0, :, 0] == CREATURE).all()
     assert dist[0, :, 0] == pytest.approx(2.0 - R)
     assert look(world).nestmate.all()
+    # the dead aren't there to see
+    world.alive[0, 1] = False
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == NOTHING
 
 
 def test_own_nest_and_others():

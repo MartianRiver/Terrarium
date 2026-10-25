@@ -1,11 +1,11 @@
 # The brain: attention over a self token and one token per ray, each ray
 # token being what it hit (an embedding per kind) plus where (a linear map of
 # its features). The self token's output drives the policy (a Gaussian over the
-# actions) and the value estimate. One brain acts for every creature.
+# actions) and the value estimate. Every creature runs a copy of the same brain.
 #
 # Checkpoints carry their schema and are refused when it doesn't fit (schema.py).
 # A brain from shorter lists loads with every new weight zero, which is what
-# makes the lists safe to grow.
+# makes the lists safe to grow; new actions start as a fresh brain's do.
 
 import hashlib
 from pathlib import Path
@@ -31,6 +31,9 @@ class Shape(TypedDict):
 
 
 SHAPE: Shape = {'width': 64, 'layers': 2, 'heads': 4}
+# a new action's spread, and where a yes/no one's mean starts: with that spread it's yes on about 5% of samples
+LOG_STD = -0.5
+NO = -1.0
 
 
 class Brain(nn.Module):
@@ -46,11 +49,31 @@ class Brain(nn.Module):
         self.encoder = nn.TransformerEncoder(layer, layers, enable_nested_tensor=False)
         self.norm = nn.LayerNorm(width)
         self.policy = nn.Linear(width, len(s['actions']))
-        self.log_std = nn.Parameter(torch.full((len(s['actions']),), -0.5))
+        self.log_std = nn.Parameter(torch.full((len(s['actions']),), LOG_STD))
         self.value = nn.Linear(width, 1)
         # small first actions, so training starts from gentle wandering rather than saturated turns
         nn.init.normal_(self.policy.weight, std=0.01)
         nn.init.zeros_(self.policy.bias)
+        self.start_actions(0)
+
+    def start_actions(self, first: int):
+        """Set actions from index first on as a fresh brain has them."""
+        with torch.no_grad():
+            for i, name in enumerate(self.schema['actions'][first:], first):
+                self.log_std[i] = LOG_STD
+                self.policy.bias[i] = NO if name in schema.YES_NO else 0.0
+
+    def restart(self, names: tuple[str, ...]):
+        """Start these actions over as new ones start: nothing it sees moves them yet."""
+        actions = self.schema['actions']
+        if unknown := sorted(set(names) - set(actions)):
+            raise ValueError(f'no such action: {", ".join(unknown)}')
+        with torch.no_grad():
+            for name in names:
+                i = actions.index(name)
+                self.policy.weight[i] = 0
+                self.log_std[i] = LOG_STD
+                self.policy.bias[i] = NO if name in schema.YES_NO else 0.0
 
     def forward(self, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Mean action and value per sample."""
@@ -94,6 +117,7 @@ def load(path: Path | str) -> tuple[Brain, dict]:
         grown[tuple(slice(0, n) for n in old.shape)] = old
         state[name] = grown
     brain.load_state_dict(state)
+    brain.start_actions(len(data['schema']['actions']))
     log.info('brain loaded', path=str(path), id=brain_id(path)[:12], schema=data['schema']['version'])
     return brain, data['meta']
 

@@ -42,4 +42,4 @@ Then merge `next` into `main` by pull request, as a merge commit, and tag it.
 
 ## Changelog
 
-Written at release time from the commits on `next` since the last release (`git log --first-parent main..next`), in plain words: what changed, what to watch for in it, and anything a saved brain or replay needs.
+Kept as we go: the top section, **Unreleased**, gets a few plain sentences from each branch before it's merged (what changed, what to watch for, anything a saved brain or replay needs). At release time it becomes the version's entry, checked against the commits on `next` since the last release (`git log --first-parent main..next`).

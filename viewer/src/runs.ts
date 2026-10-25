@@ -30,14 +30,16 @@ interface RunSummary {
 
 type Row = Record<string, number | number[] | undefined>;
 interface Score { mean: number; stderr: number }
-interface Machine { hardware: string; runs: number; hours: number; dollars: number }
+interface Machine { hardware: string; runs: number; hours: number; rented_hours: number; dollars: number }
 interface Behind { runs: { id: string; hardware: string; hours: number; dollars: number }[]; hardware: Machine[];
-  hours: number; dollars: number; missing: string | null }
-interface Everything { hardware: Machine[]; hours: number; dollars: number; unused: { rentals: number; dollars: number } }
+  hours: number; rented_hours: number; dollars: number; missing: string | null }
+interface Everything { hardware: Machine[]; hours: number; rented_hours: number; dollars: number;
+  unused: { rentals: number; rented_hours: number; dollars: number } }
 
 interface RunDetail {
   run: { id: string; started: string; finished?: string; scratch: boolean; device?: string; gpu?: string | null;
-    workers?: number; parent: { id: string } | null; world: { file: string }; train: { config: { ppo: { samples: number } } } };
+    workers?: number; parent: { id: string } | null; world: { file: string }; train: { config: { ppo: { samples: number } } };
+    schema?: { actions: string[] } };
   state: State;
   metrics: Row[];
   checkpoints: { file: string; samples: number }[];
@@ -92,15 +94,19 @@ function badge(state: State, scratch: boolean) {
   return out;
 }
 
+// rented time is the whole rental, setup and idle included; my own machines have none
+const rented = (h: number) => (h ? hours(h) : '–');
+
 // per machine, then the total; extra rows (rentals that never ran anything) go before the total
-function machines(rows: Machine[], total: { hours: number; dollars: number }, extra: HTMLElement[] = []) {
-  const head = el('tr', {}, ...['on', 'runs', 'time', 'cost'].map((h) => el('th', { textContent: h, scope: 'col' })));
-  const row = (on: string, runs: string, h: string, d: string, className = '') =>
-    el('tr', { className }, el('td', { textContent: on }), ...[runs, h, d].map((t) => el('td', { className: 'num', textContent: t })));
+function machines(rows: Machine[], total: { hours: number; rented_hours: number; dollars: number }, extra: HTMLElement[] = []) {
+  const head = el('tr', {}, ...['on', 'runs', 'training', 'rented', 'cost'].map((h) => el('th', { textContent: h, scope: 'col' })));
+  const row = (on: string, cells: string[], className = '') =>
+    el('tr', { className }, el('td', { textContent: on }), ...cells.map((t) => el('td', { className: 'num', textContent: t })));
   return el('table', { className: 'compute' }, el('thead', {}, head), el('tbody', {},
-    ...rows.map((m) => row(m.hardware, String(m.runs), hours(m.hours), dollars(m.dollars))),
+    ...rows.map((m) => row(m.hardware, [String(m.runs), hours(m.hours), rented(m.rented_hours), dollars(m.dollars)])),
     ...extra,
-    row('in all', String(rows.reduce((n, m) => n + m.runs, 0)), hours(total.hours), dollars(total.dollars), 'total')));
+    row('in all', [String(rows.reduce((n, m) => n + m.runs, 0)), hours(total.hours), rented(total.rented_hours),
+      dollars(total.dollars)], 'total')));
 }
 
 function behind(c: Behind) {
@@ -115,8 +121,8 @@ function behind(c: Behind) {
 
 function everything(c: Everything) {
   const unused = c.unused.rentals
-    ? [el('tr', {}, el('td', { textContent: `${c.unused.rentals} rented that never ran anything` }),
-      ...['–', '–', dollars(c.unused.dollars)].map((t) => el('td', { className: 'num', textContent: t })))]
+    ? [el('tr', {}, el('td', { textContent: `${c.unused.rentals} rented with no training on them (evals, probes, failed starts)` }),
+      ...['–', '–', rented(c.unused.rented_hours), dollars(c.unused.dollars)].map((t) => el('td', { className: 'num', textContent: t })))]
     : [];
   return [el('h2', { textContent: 'All training so far' }), machines(c.hardware, c, unused),
     el('p', { className: 'none', textContent: 'Every run here, dead ends included, and every rented machine in sim/compute.toml.' })];
@@ -152,12 +158,13 @@ function charts(d: RunDetail) {
   const rows = d.metrics;
   const xs = rows.map((r) => r.samples as number);
   const pick = (key: string) => rows.map((r) => (typeof r[key] === 'number' ? (r[key] as number) : null));
-  const spread = (k: number) => rows.map((r) => (Array.isArray(r.std) ? r.std[k] : null));
+  const spread = (k: number) => rows.map((r) => (Array.isArray(r.std) ? (r.std[k] ?? null) : null));
+  const actions = d.run.schema?.actions ?? ['thrust', 'turn'];
   const specs: [string, Series[]][] = [
-    ['Food per episode (−1 if it died)', [{ name: 'return', values: pick('episode_return') }]],
-    ['Seconds alive per episode', [{ name: 'seconds', values: pick('episode_seconds') }]],
+    ['Reward per life', [{ name: 'return', values: pick('episode_return') }]],
+    ['Seconds alive per life', [{ name: 'seconds', values: pick('episode_seconds') }]],
     ['Samples a second', [{ name: 'samples/s', values: pick('samples_per_second') }]],
-    ['Action spread (std)', [{ name: 'thrust', values: spread(0) }, { name: 'turn', values: spread(1) }]],
+    ['Action spread (std)', actions.map((name, k) => ({ name, values: spread(k) }))],
     ['KL per update', [{ name: 'kl', values: pick('kl') }]],
     ['Explained variance', [{ name: 'explained', values: pick('explained_variance') }]],
   ];

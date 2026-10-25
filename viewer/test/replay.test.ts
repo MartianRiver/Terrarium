@@ -35,20 +35,40 @@ describe('sample replays', () => {
 });
 
 describe('reading', () => {
+  const refuses = (text: string, message: RegExp) => expect(() => parseReplay(text)).toThrow(message);
+
   test('gzipped and plain text read the same', async () => {
     const text = lines(header, frame, { ...frame, tick: 1 });
     const plain = await readReplay(new TextEncoder().encode(text));
     const zipped = await readReplay(bytes(gzipSync(text)));
     expect(zipped).toEqual(plain);
-    expect(plain.frames[1].creatures[0]).toEqual(frame.creatures[0]);
+    expect(plain.frames[1].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0 });
+  });
+
+  test('carrying and stores are read when there, and empty in replays from before them', () => {
+    const later = { ...frame, creatures: [{ ...frame.creatures[0], carrying: 2 }], stores: [{ colony: 0, jelly: 5 }] };
+    const replay = parseReplay(lines(header, frame, later));
+    expect(replay.frames[0].stores).toEqual([]);
+    expect(replay.frames[1].creatures[0].carrying).toBe(2);
+    expect(replay.frames[1].stores).toEqual([{ colony: 0, jelly: 5 }]);
+    refuses(lines(header, { ...later, stores: [{ colony: 0, jelly: 0.5 }] }), /jelly: expected a whole number/);
+  });
+
+  test('a grip is read when there, and none in worlds without grab', () => {
+    const replay = parseReplay(lines(header, frame, { ...frame, creatures: [{ ...frame.creatures[0], holding: 1 }] }));
+    expect(replay.frames.map((f) => f.creatures[0].holding)).toEqual([0, 1]);
+  });
+
+  test('the light is read when there, and full day in worlds without nights', () => {
+    const replay = parseReplay(lines(header, frame, { ...frame, light: 0.25 }));
+    expect(replay.frames.map((f) => f.light)).toEqual([1, 0.25]);
+    refuses(lines(header, { ...frame, light: 'dusk' }), /light/);
   });
 
   test('fields it doesn\'t know are ignored', () => {
     const replay = parseReplay(lines({ ...header, later: 1 }, { ...frame, weather: 'rain', creatures: [{ ...frame.creatures[0], mood: 2 }] }));
-    expect(replay.frames[0].creatures[0]).toEqual(frame.creatures[0]);
+    expect(replay.frames[0].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0 });
   });
-
-  const refuses = (text: string, message: RegExp) => expect(() => parseReplay(text)).toThrow(message);
 
   test('refuses a newer format, saying so', () => {
     refuses(lines({ ...header, version: REPLAY_VERSION + 1 }, frame), /newer sim/);

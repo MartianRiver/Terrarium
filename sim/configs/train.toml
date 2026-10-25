@@ -1,26 +1,51 @@
 # Training: what's rewarded. The world it trains in is a separate file (solo.toml for 0.2).
 
 [reward]
-# per food eaten
+# per food's worth of energy got from eating food (so eating while full earns little, and picking up earns nothing)
 food = 1.0
 # once, on the tick a creature dies
 death = -1.0
 # per second alive; off, since paying for time alone teaches standing still
 alive = 0.0
+# per food unloaded into its own nest's store: twice what eating it pays, or keeping it in the crop is as good (until hatchlings give the store a use)
+stored = 2.0
+# per jelly eaten from the store: foraging should always pay better
+jelly = -0.5
+# share of each creature's reward that's its colony's average instead of its own (0 = all its own)
+colony = 0.5
+# per food in its crop at its own nest, paid as it carries it home (nothing an arena's width away) and
+# taken back as it walks off, eats it or unloads it; only moves reward earlier, so it can't change what pays best
+home = 0.5
+# per second, times how warm it is (1 in its own nest, a share for each nestmate close by, as [night] counts it):
+# snug at any time of day, warm only as much as it's dark. Small next to food, so by day it's a nudge
+# towards company; at night, with no food about, it's the thing to do
+snug = 0.0
+warm = 0.0
+# per food's worth of energy spent moving (thrust, turn, sprint), charged as it's spent: the reward feels what the
+# body pays straight away, not only once it's hungry later. 1 makes food and effort one energy budget
+effort = 0.0
 
 [ppo]
-# samples to train on in all: one creature for one tick is one sample
+# samples to train on in all: one creature making one choice is one sample
 samples = 20_000_000
-# arenas run side by side, and ticks each one runs per rollout
+# ticks each choice is held for: 1 picks a new action every tick; more, and the discount reaches further in world
+# time for the same gamma (the episode's length in ticks must divide by it)
+repeat = 1
+# arenas run side by side, and choices each one makes per rollout
 arenas = 256
 steps = 128
 # passes over each rollout, and how many pieces each pass is cut into
 epochs = 4
 minibatches = 8
-# learning rate, falling linearly to 0 over the run
+# learning rate, falling linearly to 0 over the run unless anneal is off (for runs that are one piece of a longer
+# lineage, where each piece falling to 0 would make the lineage a chain of warm restarts)
 lr = 3e-4
-# discount per tick (0.99 looks about 5 s ahead at 20 Hz) and the GAE trade-off
+anneal = true
+# discount per choice (0.99 looks about 5 s ahead at 20 Hz, held 1 tick) and the GAE trade-off
 gamma = 0.99
+# at the episode's time limit, carry on the value of where it got to rather than count it as an end:
+# the limit is only there to give training fresh starts, and the creature has no clock to see it coming
+bootstrap = true
 lam = 0.95
 clip = 0.2
 # loss weights: entropy bonus and value error
@@ -29,3 +54,14 @@ value = 0.5
 max_grad_norm = 0.5
 # save a checkpoint every this many updates, and always at the end
 checkpoint_every = 50
+
+[start]
+# the parent brain's actions to start over, as a new action starts: a yes/no one leans no and is tried
+# now and then. For one the parent has learned never to take
+fresh = []
+# with nights on, each arena starts at a random time of day instead of dawn, so a batch isn't all
+# day or all night (arenas started together stay in step); evals always start at dawn
+staggered = false
+# with grab on, this share of arenas start with the blocks one creature can drag (the vault's doors) pulled a metre
+# out, so what's behind them can be found before pulling them is learned; evals always start them shut
+ajar = 0.0
