@@ -103,3 +103,54 @@ def test_ajar_arenas_start_with_the_doors_pulled_out():
     assert np.allclose(env.world.block_pos[:, 0], (0, 2.85))
     shut = Forage(VAULT, train, 2, 0)
     assert np.allclose(np.abs(shut.world.block_pos[:, EAST_DOOR, 0]), 2.85)
+
+
+SWING = load(DEFAULT.parent / 'vault-swing.toml')
+
+
+def test_a_hinged_door_swings_out_about_its_hinge():
+    world = at_door(0.0, SWING)
+    # outside the door's far end, away from the hinge
+    world.physics.place([0], np.array([[(OUTSIDE[0], 0.4)]]))
+    walk(world, 1.0, 1, 3)
+    assert world.holding[0, 0]
+    assert abs(world.physics.block_angle[0, EAST_DOOR]) > 0.5
+    # the hinge corner stays where it was
+    pin = world.physics.bodies[0][world.physics.creatures + EAST_DOOR].local_to_world((0.25, -0.7))
+    assert np.hypot(pin.x - 3.1, pin.y + 0.79) < 0.03
+
+
+def test_a_hinged_door_cant_swing_in():
+    world = at_door(np.pi, SWING)
+    world.physics.place([0], np.array([[(OUTSIDE[0], 0.4)]]))
+    walk(world, 1.0, -1, 3)
+    assert abs(world.physics.block_angle[0, EAST_DOOR]) < 0.05
+
+
+def test_pulling_a_door_out_is_credited_to_whoever_holds_it():
+    world = at_door(0.0)
+    walk(world, 1.0, 1, 3)
+    # paid up to a metre out, however far it went
+    assert world.pulled[0, 0] == pytest.approx(1.0, abs=0.02)
+    pushed = at_door(0.0)
+    walk(pushed, 1.0, -1, 3)
+    assert pushed.pulled[0, 0] == 0
+
+
+def test_ajar_hinged_doors_start_swung_out_by_the_opening():
+    train = load_train()
+    start = replace(train.start, ajar=1.0, opening=0.5)
+    env = Forage(SWING, replace(train, start=start), 2, 0)
+    angles = env.world.physics.block_angle[:, [EAST_DOOR, EAST_DOOR + 1]]
+    assert np.all(np.abs(angles) > 0.2) and np.all(np.abs(angles) < 0.5)
+    # swung out, not in: their middles are further from the arena's centre
+    assert np.all(np.abs(env.world.block_pos[:, [EAST_DOOR, EAST_DOOR + 1], 0]) > 2.85)
+    # and the start doesn't count as anyone's pull
+    assert not env.world.pulled.any() and np.allclose(env.world.door_out, env.world._door_gap())
+
+
+def test_old_run_records_load_without_hinges():
+    recorded = load(DEFAULT).to_dict()
+    for b in recorded['block']:
+        del b['hinge']
+    assert all(not b.hinge for b in build(Config, upgrade(recorded)).block)

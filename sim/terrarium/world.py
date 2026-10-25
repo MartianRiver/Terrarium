@@ -35,8 +35,15 @@ from .physics import Physics
 log = Logger('world')
 
 PLACE_TRIES = 200
+# a door counts as pulled out up to this far from where it started (metres)
+DOOR = 1.0
 # a ground-jelly slot with nothing in it; food that grows has a regrow timer instead
 EMPTY = -1
+
+
+def rotate(v: np.ndarray, angle: float) -> np.ndarray:
+    cos, sin = np.cos(angle), np.sin(angle)
+    return np.array([v[0] * cos - v[1] * sin, v[0] * sin + v[1] * cos])
 
 
 def box_gap(points: np.ndarray, b) -> np.ndarray:
@@ -109,6 +116,11 @@ class World:
         self.holding = np.zeros((arenas, n), bool)
         # ticks the grip lasts for after the last yes to grab
         self.gripping = np.zeros((arenas, n), int)
+        # blocks one creature can drag (the vault's doors), how far each is from where it started (up to DOOR metres),
+        # and the metres each creature has moved them out while holding on
+        self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
+        self.door_out = np.zeros((arenas, len(self.doors)))
+        self.pulled = np.zeros((arenas, n))
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -181,6 +193,8 @@ class World:
         self.spent[idx] = 0
         self.holding[idx] = False
         self.gripping[idx] = 0
+        self.pulled[idx] = 0
+        self.door_out[idx] = 0
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -215,6 +229,8 @@ class World:
             self.holding = self.physics.grab(self.gripping > 0, g.reach, g.grip)
             np.maximum(self.gripping - 1, 0, out=self.gripping)
         self.physics.step(change * (c.mass / cfg.dt))
+        if self.doors:
+            self._pulled()
 
         e = cfg.energy
         # a sprint costs by how hard it runs: standing still through one is free
@@ -398,14 +414,42 @@ class World:
         return p
 
     def pull_out(self, arenas: np.ndarray, metres: float):
-        """Move every block one creature could drag this far out from the arena's centre, in these arenas."""
-        cfg = self.cfg
-        light = [k for k, b in enumerate(cfg.block) if b.mass * cfg.ground.friction < cfg.grab.grip]
-        if not light or not arenas.any():
+        """Move every block one creature could drag this far out from the arena's centre, in these arenas. A hinged
+        one swings out about its hinge until its far end has moved this far."""
+        if not self.doors or not arenas.any():
             return
-        start = np.array([(cfg.block[k].x, cfg.block[k].y) for k in light])
-        out = start / np.maximum(np.hypot(*start.T), 1e-9)[:, None] * metres
-        self.physics.shift(np.nonzero(arenas)[0], light, start + out)
+        to, angles = [], []
+        for k in self.doors:
+            b = self.cfg.block[k]
+            start = np.array([b.x, b.y])
+            if not b.hinge:
+                to.append(start + start / max(np.hypot(*start), 1e-9) * metres)
+                angles.append(b.angle)
+                continue
+            cos, sin = np.cos(b.angle), np.sin(b.angle)
+            pin = start + (b.hinge[0] * cos - b.hinge[1] * sin, b.hinge[0] * sin + b.hinge[1] * cos)
+            reach = np.hypot(*(start - pin)) + np.hypot(b.w, b.h) / 2
+            turn = min(metres / reach, np.pi / 2)
+            # whichever way takes its middle further from the arena's centre
+            spins = [pin + rotate(start - pin, t) for t in (turn, -turn)]
+            best = int(np.hypot(*spins[1]) > np.hypot(*spins[0]))
+            to.append(spins[best])
+            angles.append(b.angle + (turn, -turn)[best])
+        self.physics.shift(np.nonzero(arenas)[0], self.doors, np.array(to), np.array(angles))
+        self.door_out[arenas] = self._door_gap()[arenas]
+
+    def _door_gap(self) -> np.ndarray:
+        start = np.array([(self.cfg.block[k].x, self.cfg.block[k].y) for k in self.doors])
+        return np.minimum(np.hypot(*(self.physics.block_pos[:, self.doors] - start).transpose(2, 0, 1)), DOOR)
+
+    def _pulled(self):
+        # whoever holds a door as it gets further out is credited with how far (and debited if it goes back)
+        gap = self._door_gap()
+        moved = gap - self.door_out
+        self.door_out = gap
+        for (a, c), k in self.physics.held_block.items():
+            if k in self.doors:
+                self.pulled[a, c] += moved[a, self.doors.index(k)]
 
     def touching_block(self) -> np.ndarray:
         """(arenas, creatures): who has a block within grab's reach."""
