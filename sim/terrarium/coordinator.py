@@ -31,6 +31,8 @@ log = Logger('coordinator')
 PORT = 5194
 ROLES = ('admin', *jobs.MACHINES)
 LIMITS = {'blob': 16_000_000, 'result': 8_000_000, 'json': 64_000}
+# requests a minute per machine token, and how many it may make at once; a worker makes a few a minute
+RATE, BURST = 60, 60
 
 
 class Refused(Exception):
@@ -68,12 +70,30 @@ class Tokens:
         write_atomic(self.path, (json.dumps(tokens, indent=1) + '\n').encode())
 
 
+class Bucket:
+    """Requests per token: a token that floods the coordinator gets 429s, not the others' share."""
+
+    def __init__(self, rate: float = RATE, burst: float = BURST):
+        self.rate, self.burst = rate / 60, burst
+        self.left: dict[str, tuple[float, float]] = {}
+        self.lock = threading.Lock()
+
+    def take(self, name: str, now: float | None = None) -> bool:
+        now = time.time() if now is None else now
+        with self.lock:
+            left, then = self.left.get(name, (self.burst, now))
+            left = min(self.burst, left + (now - then) * self.rate)
+            self.left[name] = (left - 1 if left >= 1 else left, now)
+            return left >= 1
+
+
 class Queue:
     def __init__(self, root: Path, signers: Path | None = jobs.SIGNERS):
         self.store, self.tokens = Store(root), Tokens(root)
         self.signers = signers if signers and signers.exists() and shutil.which('ssh-keygen') else None
         self.workers: dict[str, dict] = {}
         self.lock = threading.Lock()
+        self.bucket = Bucket()
 
     def seen(self, who: dict, info: dict | None = None):
         with self.lock:
@@ -141,6 +161,8 @@ def handler(queue: Queue):
                 who = queue.tokens.who(self.headers.get('Authorization', '').removeprefix('Bearer '))
                 if who is None:
                     raise Refused(401, 'no such token')
+                if who['role'] != 'admin' and not queue.bucket.take(who['name']):
+                    raise Refused(429, f'over {RATE} requests a minute')
                 self.dispatch(method, parts, who)
             except Refused as e:
                 self.json({'error': str(e)}, e.status)

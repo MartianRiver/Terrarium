@@ -17,6 +17,8 @@
 # parent is a .pt path, "run:<run id>/<checkpoint>" from runs/, or
 # "job:<name>" for the final checkpoint of an earlier job in the same batch.
 # on = "rented" (or "trusted", "donor") keeps a job to that kind of machine.
+# chunk = N splits a job into pieces of N samples, each carrying on from the
+# last, so a lent machine never holds more than a short job.
 
 import argparse
 import io
@@ -51,7 +53,7 @@ SERVER = os.environ.get('TERRARIUM_JOBS', 'http://127.0.0.1:5194')
 AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
-FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str}
+FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int}
 # the kinds of machine a job can be kept to; a token's role says which one a worker is
 MACHINES = ('trusted', 'rented', 'donor')
 
@@ -136,6 +138,8 @@ def load_batch(path: Path) -> list[dict]:
                 raise BadJob(f'{path.name} job {name}: no {key}')
         if job.get('on') not in (None, *MACHINES):
             raise BadJob(f'{path.name} job {name}: on is one of {", ".join(MACHINES)}')
+        if job.get('chunk', 1) < 1:
+            raise BadJob(f'{path.name} job {name}: chunk is a number of samples')
         out.append(job)
     return out
 
@@ -164,20 +168,49 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
     code = {'commit': commit, 'bundle': blob(snapshot.bundle(repo)), 'overlay': extra and blob(extra)}
     trusted = extra is not None or not snapshot.public(commit, repo)
     ids, out = {}, []
-    for n, job in enumerate(load_batch(path)):
+    for job in load_batch(path):
         world, train = path.parent / job['world'], path.parent / job['train']
-        samples = tomllib.loads(train.read_text()).get('ppo', {}).get('samples')
+        text = train.read_text()
+        samples = tomllib.loads(text).get('ppo', {}).get('samples')
         if not isinstance(samples, int):
             raise BadJob(f'{train.name}: no [ppo] samples')
-        spec = {'format': FORMAT, 'id': secrets.token_hex(6), 'batch': batch, 'name': job['name'],
-                'added': time.time() + n * 1e-3, 'code': code, 'trusted': trusted,
-                'world': blob(world.read_bytes()), 'world_file': world.name,
-                'train': blob(train.read_bytes()), 'train_file': train.name,
-                'parent': parent(job['parent'], path.parent, runs, ids, blob), 'seed': job['seed'], 'samples': samples,
-                'on': job.get('on')}
-        ids[job['name']] = spec['id']
-        out.append(spec)
+        chunk = job.get('chunk') or samples
+        pieces = -(-samples // chunk)
+        before = parent(job['parent'], path.parent, runs, ids, blob)
+        for i in range(pieces):
+            name = job['name'] if pieces == 1 else f'{job["name"]}.{i + 1}'
+            if name in ids:
+                raise BadJob(f'{path.name}: two jobs named {name}')
+            size = min(chunk, samples - i * chunk)
+            spec = {'format': FORMAT, 'id': secrets.token_hex(6), 'batch': batch, 'name': name,
+                    'added': time.time() + len(out) * 1e-3, 'code': code, 'trusted': trusted,
+                    'world': blob(world.read_bytes()), 'world_file': world.name,
+                    'train': blob(train.read_bytes() if pieces == 1 else with_samples(text, size).encode()),
+                    'train_file': train.name, 'parent': before,
+                    # each piece plays its own episodes, not the first piece's again
+                    'seed': job['seed'] + 1000 * i, 'samples': size, 'on': job.get('on')}
+            ids[name] = spec['id']
+            before = {'job': spec['id']}
+            out.append(spec)
+        # job:<name> means the last piece
+        ids[job['name']] = out[-1]['id']
     return out, blobs
+
+
+def with_samples(text: str, samples: int) -> str:
+    """A train.toml with [ppo] samples changed, checked by reading it back."""
+    section, lines = None, []
+    for line in text.splitlines(keepends=True):
+        if found := re.match(r'\s*\[([^\[\]]+)\]', line):
+            section = found.group(1).strip()
+        if section == 'ppo' and re.match(r'\s*samples\s*=', line):
+            line = f'samples = {samples}\n'
+        lines.append(line)
+    out, want = ''.join(lines), tomllib.loads(text)
+    want['ppo']['samples'] = samples
+    if tomllib.loads(out) != want:
+        raise BadJob(f"couldn't set [ppo] samples to {samples}")
+    return out
 
 
 def parent(text: str, here: Path, runs: Path, ids: dict, blob) -> dict | None:
@@ -225,7 +258,9 @@ class Client:
 
 
 def token(path: Path) -> str:
-    return path.read_text().strip()
+    data = path.read_bytes()
+    # Windows PowerShell's `echo x > file` writes UTF-16 with a byte-order mark
+    return (data.decode('utf-16') if data[:2] in (b'\xff\xfe', b'\xfe\xff') else data.decode('utf-8-sig')).strip()
 
 
 def add(client: Client, path: Path, key: Path = KEY, runs: Path = ROOT, repo: Path = snapshot.REPO) -> list[dict]:

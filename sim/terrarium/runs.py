@@ -4,7 +4,6 @@
 # it keeps the diff so it can be understood, and can never be promoted.
 
 import json
-import os
 import platform
 import subprocess
 import sys
@@ -31,6 +30,11 @@ def dirty() -> bool:
 def cpu() -> str:
     if sys.platform == 'darwin':
         return subprocess.run(['sysctl', '-n', 'machdep.cpu.brand_string'], capture_output=True, text=True).stdout.strip()
+    if sys.platform == 'win32':
+        import winreg
+        # platform.processor() there is only the family and model numbers
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as key:
+            return winreg.QueryValueEx(key, 'ProcessorNameString')[0].strip()
     info = Path('/proc/cpuinfo')
     names = [line.split(':', 1)[1].strip() for line in info.read_text().splitlines() if line.startswith('model name')] \
         if info.exists() else []
@@ -51,7 +55,9 @@ def cpu_quota(cgroup: Path = Path('/sys/fs/cgroup')) -> int | None:
 
 
 def memory_gb() -> int:
-    return round(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / 2**30)
+    # here, not at the top: the coordinator imports this module and runs on a bare python
+    import psutil
+    return round(psutil.virtual_memory().total / 2**30)
 
 
 def commit() -> str:
