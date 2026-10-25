@@ -124,6 +124,7 @@ w = 1.3
 h = 1.3
 mass = 4.0
 friction = 0.6
+hinge = []
 
 [[block]]
 x = -3.0
@@ -133,3 +134,4 @@ w = 2.4
 h = 1.1
 mass = 12.0
 friction = 0.6
+hinge = []

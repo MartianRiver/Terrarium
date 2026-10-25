@@ -73,6 +73,7 @@ ${marks ? '<p class="review">Review build: drafts are shown and marked. Not the 
   <a class="name" href="/">Terrarium</a>
   <nav aria-label="Site">
     <a href="/watch/">Watch</a>
+    <a href="/brains/">Brains</a>
     <a href="/notes/">Notes</a>
     <a href="${REPO}">Code</a>
   </nav>
@@ -187,8 +188,62 @@ write('notes', page({
   title: 'Notes',
   description: 'Write-ups of what I tried, what worked and what didn’t.',
   path: '/notes/',
-  body: `<h1>Notes</h1>\n<p>What I tried, what worked, what didn’t and what I tried next. The full lab record, every run and dead end, is in the repo’s <a href="${REPO}/tree/main/docs/notes">docs/notes</a>.</p>\n${list(notes)}`,
+  body: `<h1>Notes</h1>\n<p>What I tried, what worked, what didn’t and what I tried next. The full lab record, every run and dead end, is in the repo’s <a href="${REPO}/tree/HEAD/docs/notes">docs/notes</a>.</p>\n${list(notes)}`,
 }));
+
+// the gallery itself (/replays/gallery/index.json and its replays) is published apart from the site, every 15 min
+// while training runs (python -m terrarium.gallery), so the page reads it when it opens
+const BRAINS = `<script>
+const box = document.getElementById('gallery');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 90 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
+function brain(b, i, extra = '') {
+  const n = b.numbers, bits = [];
+  if (n.alive !== undefined) bits.push(n.alive + ' s alive');
+  if (n.food_per_minute !== undefined) bits.push(n.food_per_minute + ' food a minute');
+  if (n.stored !== undefined) bits.push(n.stored + ' stored');
+  if (n.through_first_night) bits.push(n.through_first_night[0] + ' of ' + n.through_first_night[1] + ' colonies through night 1');
+  const tested = n.episodes ? ' <span class="when">tested over ' + n.episodes + ' episodes</span>' : '';
+  return '<li><a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(b.replay) + '&follow&gallery=' + i + '">Watch</a> <b>' + esc(b.name) + '</b>'
+    + ' <span class="when">' + esc(b.world) + ' · ' + (b.samples / 1e6).toFixed(1) + 'M samples, ' + Math.round(b.total / 1e6) + 'M in all' + extra + '</span>'
+    + (bits.length ? '<span class="nums">' + esc(bits.join(' · ')) + '</span>' + tested : '') + '</li>';
+}
+fetch('/replays/gallery/index.json', { cache: 'no-cache' }).then((r) => {
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}).then((g) => {
+  let i = 0, html = '';
+  const flat = [];
+  for (const s of g.steps) {
+    html += '<h2>' + esc(s.title) + '</h2>' + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + '<ol class="brains">';
+    for (const b of s.brains) html += brain(b, i++);
+    html += '</ol>';
+  }
+  const now = g.training.concat(g.latest);
+  if (now.length) {
+    html = '<h2>Training now</h2><p>The newest brains from the forks training right now, as they come back from the GPUs they train on.</p><ol class="brains">'
+      + now.map((b) => brain(b, i++, b.finished ? ' · finished ' + ago(b.finished) : ' · training')).join('') + '</ol>' + html;
+  }
+  if (g.asides.length) {
+    html += '<h2>On the side</h2><ol class="brains">' + g.asides.map((b) => brain(b, i++).replace('</b>', '</b> <span class="aside">' + esc(b.title) + '</span>')
+      .replace('</li>', '<p>' + esc(b.text) + '</p></li>')).join('') + '</ol>';
+  }
+  box.innerHTML = html + '<p class="when">Updated ' + ago(g.updated) + '.</p>';
+}).catch(() => {
+  box.innerHTML = '<p>The gallery isn’t up right now. The <a href="/watch/">latest brain</a> still plays.</p>';
+});
+</script>`;
+write('brains', page({
+  title: 'Brains',
+  description: 'Every brain the Terrikins have had, from the first that learned to eat to the ones training now. Watch any of them.',
+  path: '/brains/',
+  body: `<h1>Brains</h1>
+<p>Every brain the one training now came from, back to the first, and a few side experiments. Watch plays one for three minutes in the world it trained in, in the same garden each time. The numbers are its own test results in that world, and the worlds got harder as they went, so they compare within a step more than across them.</p>
+<div id="gallery"><p>Loading…</p></div>
+${BRAINS}`,
+}));
+// a review build shows the gallery as built on this machine (SITE_GALLERY)
+if (review && process.env.SITE_GALLERY) cpSync(process.env.SITE_GALLERY, join(out, 'replays', 'gallery'), { recursive: true });
 
 const used = new Set();
 for (const n of notes) {

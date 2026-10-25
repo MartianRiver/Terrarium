@@ -1,6 +1,6 @@
 # The site
 
-terrarium.martianriver.com is a front page, the notes, and the viewer at `/watch/`. Everything is static: no framework, no analytics, no cookies.
+terrarium.martianriver.com is a front page, the notes, a gallery of brains at `/brains/`, and the viewer at `/watch/`. Everything is static: no framework, no analytics, no cookies.
 
 | | |
 |---|---|
@@ -10,6 +10,7 @@ terrarium.martianriver.com is a front page, the notes, and the viewer at `/watch
 | `site/clips.json` | every clip a post can show, and where it's cut from |
 | `site/site.css`, `hero.jpg`, `card.jpg` | the look, the front page's still, the link preview image |
 | `site/fonts/` | Nunito, served from the site itself, with its licence (SIL OFL) |
+| `site/gallery.toml` | the gallery's steps, their captions, and side experiments |
 | `viewer/site.mjs` | turns those into pages |
 
 ```
@@ -17,7 +18,7 @@ cd viewer
 npm run site        # dist-site/: the viewer in watch/, the pages beside it
 ```
 
-Deploying is an rsync of `dist-site/` to the web server. Anything unfinished in a page or a published post, like a draft marker or a note of what's still to write (the same list the commit checks refuse), stops `npm run site`, which deletes what it had built so a half-made site can't be deployed. A review build still shows it. Old links like `/?replay=…&follow` are sent on to `/watch/` with their query.
+Deploying is an rsync of `dist-site/` to the web server, leaving out `replays/gallery/` (published on its own, below). Anything unfinished in a page or a published post, like a draft marker or a note of what's still to write (the same list the commit checks refuse), stops `npm run site`, which deletes what it had built so a half-made site can't be deployed. A review build still shows it. Old links like `/?replay=…&follow` are sent on to `/watch/` with their query.
 
 ## Posts
 
@@ -65,3 +66,16 @@ A review copy looks exactly like the published site, and tells search engines to
 Clips stay out of the repo. `site/clips.json` names each one's master by its path in the clips backups folder, with where to start, how long, how wide and an optional crop (ffmpeg's `w:h:x:y`). The build cuts them with ffmpeg from `SITE_CLIPS` into small muted H.264 loops with a poster frame, and caches them by their settings. A post shows one with `{{clip name}}`, and its front matter's `clips:` has to list exactly the ones it shows, or the build stops.
 
 Longer videos go on YouTube, unlisted: `{{youtube VIDEO_ID Title}}` shows a button, and nothing loads from YouTube until it's pressed.
+
+## The gallery of brains
+
+`/brains/` lists every brain the one training now came from, back to the first, grouped into the steps `site/gallery.toml` names, then the newest brains of the training going on now, then a few side experiments. Each has a Watch link, and a replay opened from there gets a bar to step to the brain before or after it. The numbers are each run's own evals, in the world it trained in.
+
+The page is static and reads `/replays/gallery/index.json` when it opens. That and the replays come from
+
+```
+cd sim
+uv run python -m terrarium.gallery OUT --line 'pbt-t*'
+```
+
+which traces the lineage from the best scored run of the line being trained (`--line`, matched against run names), records a 3-minute replay of each brain in its own world (seed 0, the same as the runs page), and writes OUT/index.json. While training runs, it's rebuilt and synced to the server's `replays/gallery/` every 15 minutes, so the newest brains show up without redeploying the site. A review build shows a local one with `SITE_GALLERY=OUT`.

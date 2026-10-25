@@ -123,6 +123,8 @@ class Block:
     h: float
     mass: float
     friction: float
+    # a point on the block (its own frame) pinned to the ground, so it swings about it like a door; [] for none
+    hinge: tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -177,6 +179,7 @@ class Reward:
     snug: float
     warm: float
     effort: float
+    door: float
 
 
 @dataclass(frozen=True)
@@ -204,6 +207,7 @@ class Start:
     fresh: tuple[str, ...]
     staggered: bool
     ajar: float
+    opening: float
 
 
 @dataclass(frozen=True)
@@ -262,7 +266,10 @@ SINCE = {'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest'
 
 def upgrade(data: dict) -> dict:
     """A recorded world config with the keys it predates filled in, so the world it describes is unchanged."""
-    return {**data, **{k: {**old, **data.get(k, {})} for k, old in SINCE.items()}}
+    out = {**data, **{k: {**old, **data.get(k, {})} for k, old in SINCE.items()}}
+    if 'block' in data:
+        out['block'] = [{'hinge': [], **b} for b in data['block']]
+    return out
 
 
 def load(path: Path | str = DEFAULT) -> Config:

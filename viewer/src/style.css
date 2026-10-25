@@ -86,3 +86,30 @@ body {
     display: none;
   }
 }
+
+#gallery {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.8);
+  backdrop-filter: blur(6px);
+  font-size: 0.9em;
+}
+
+#gallery a {
+  color: inherit;
+  white-space: nowrap;
+}
+
+#gallery span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

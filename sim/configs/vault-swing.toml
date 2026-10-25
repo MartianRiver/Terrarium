@@ -1,0 +1,243 @@
+# vault.toml with doors that swing (an experiment, 0.3): each door is pinned at its outer corner, so pulling its far
+# end out swings it open, and a shorter pull opens more of the doorway than sliding the whole door out does.
+# Metres, seconds, kilograms, radians.
+
+tick_hz = 20
+# pymunk steps per tick, and the overlap it allows before pushing apart (see docs/physics.md)
+substeps = 2
+slop = 0.01
+
+[arena]
+size = 26.0
+
+[creature]
+radius = 0.45
+mass = 1.0
+max_speed = 2.4
+# backing up, as a share of max_speed
+reverse = 0.3
+turn_rate = 3.5
+# how quickly velocity catches up with what the creature asks for, per second
+accel = 8.0
+friction = 0.2
+
+[energy]
+start = 0.8
+# per second, just for being alive
+drain = 0.01
+# extra per second at full thrust
+move = 0.02
+# extra per second at full turn, times the square of how hard it turns: steering costs next to nothing,
+# spinning on the spot doesn't
+turn = 0.004
+# from one common food
+food = 0.4
+
+[colonies]
+count = 3
+size = 6
+nest_radius = 1.6
+# nests sit this far from the centre, as a share of half the arena
+nest_distance = 0.68
+# creatures start on a ring this far from their nest's centre
+spawn_ring = 2.5
+
+[food]
+count = 28
+radius = 0.25
+regrow_min = 6.0
+regrow_max = 12.0
+# food never grows closer than this to a nest's edge or a wall
+clearance = 1.5
+# food grows back in this many patches, placed anew each episode, within patch_radius of their centres
+patches = 4
+patch_radius = 2.5
+# of the patches, how many sit in the middle of the arena instead (where a vault of blocks can close them in)
+middle = 2
+
+[crop]
+# food picked up while too full to eat it is carried instead, up to this many, and unloaded in the nest
+capacity = 2
+# share of top speed lost per food carried
+slow = 0.15
+# food in each crop at the start (a training world can start them full)
+start = 0
+
+[jelly]
+# what one food in the store gives back when eaten, against [energy] food fresh
+energy = 0.4
+# only a creature below this energy eats from the store (from its own crop, any with room for it)
+hunger = 0.3
+
+[night]
+# a day and its night take this long, the night being the last `length` of it; 0 turns nights off.
+# At nightfall the food standing goes, and none grows back until dawn
+cycle = 120.0
+length = 60.0
+# the light fades over this long before nightfall, and comes back over this long after dawn
+dusk = 10.0
+# extra energy per second at full dark, for the cold
+cold = 0.02
+# share of the cold kept off in its own nest, and by each nestmate within reach (m, centre to centre)
+nest = 1.0
+huddle = 0.25
+reach = 1.5
+
+[sprint]
+# a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
+# thrust, and none again until `cooldown` seconds after it ends
+speed = 1.6
+seconds = 1.5
+cooldown = 6.0
+energy = 0.04
+
+[grab]
+# a creature saying yes to grab takes hold of a block within reach of its body (metres from its edge), or the first
+# to come within reach, for `seconds` from its last yes, and drags it along, up to grip newtons (a creature pushes
+# with about 19 at full thrust from standing), for energy a second while it holds on; grip 0 turns it off
+reach = 0.15
+grip = 30.0
+seconds = 2.0
+energy = 0.01
+
+[ground]
+# how fast a sliding block slows, m/s² (friction coefficient times g)
+friction = 1.2
+
+[vision]
+# a fan of rays spread evenly across fov, centred on the heading
+rays = 16
+# 200°
+fov = 3.49
+range = 8.0
+
+[episode]
+# a training arena starts over after this long, or once everyone in it is dead
+seconds = 360.0
+
+# the walls, 0.5 thick around a room 5.2 across; mass enough that nothing a creature does moves them
+
+[[block]]
+x = 0.0
+y = 2.85
+angle = 0.0
+w = 6.2
+h = 0.5
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = 0.0
+y = -2.85
+angle = 0.0
+w = 6.2
+h = 0.5
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = 2.85
+y = 1.7
+angle = 0.0
+w = 0.5
+h = 1.8
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = 2.85
+y = -1.7
+angle = 0.0
+w = 0.5
+h = 1.8
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = -2.85
+y = 1.7
+angle = 0.0
+w = 0.5
+h = 1.8
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = -2.85
+y = -1.7
+angle = 0.0
+w = 0.5
+h = 1.8
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+# the doors, in 1.6 m doorways on the east and west walls, light enough for one creature to pull; hinged at the
+# outer corner nearest the south wall, clear of the north wall by 19 cm so they swing out without catching it
+
+[[block]]
+x = 2.85
+y = -0.09
+angle = 0.0
+w = 0.5
+h = 1.4
+mass = 3.0
+friction = 0.6
+hinge = [0.25, -0.7]
+
+[[block]]
+x = -2.85
+y = -0.09
+angle = 0.0
+w = 0.5
+h = 1.4
+mass = 3.0
+friction = 0.6
+hinge = [-0.25, -0.7]
+
+# posts just inside each doorway that stop a door being pushed in, leaving 1.3 m between them to walk through
+
+[[block]]
+x = 2.45
+y = 0.65
+angle = 0.0
+w = 0.3
+h = 0.3
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = 2.45
+y = -0.65
+angle = 0.0
+w = 0.3
+h = 0.3
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = -2.45
+y = 0.65
+angle = 0.0
+w = 0.3
+h = 0.3
+mass = 1000.0
+friction = 0.6
+hinge = []
+
+[[block]]
+x = -2.45
+y = -0.65
+angle = 0.0
+w = 0.3
+h = 0.3
+mass = 1000.0
+friction = 0.6
+hinge = []

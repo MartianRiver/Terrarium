@@ -23,7 +23,7 @@ The world grows a stage at a time, and every stage's brain starts from the last 
 
 **0.5 Foxglove: working together.** Signals, scent marks, and food and blocks too heavy for one Terrikin to move alone.
 
-Every stage, and what has to be true before it counts as done, is in the [roadmap](https://github.com/MartianRiver/Terrarium/blob/main/ROADMAP.md).
+Every stage, and what has to be true before it counts as done, is in the [roadmap](https://github.com/MartianRiver/Terrarium/blob/HEAD/ROADMAP.md).
 
 ## Notes
 

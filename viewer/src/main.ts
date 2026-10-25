@@ -1,5 +1,6 @@
 import { clock } from './clock';
 import { createDemo } from './demo';
+import { galleryBar } from './gallery';
 import { createLogger } from './lib/logger';
 import { readReplay, ReplayError, type Replay } from './replay';
 import { createStage } from './stage';
@@ -212,6 +213,8 @@ function boot() {
     if (url.origin === location.origin) void open(name, () => fetchReplay(url));
     else setStatus('error', `Won’t fetch a replay from another site (${url.origin}). Click or press Esc to close this.`);
   }
+  const place = Number(params.get('gallery'));
+  if (params.has('gallery') && Number.isInteger(place)) void galleryBar(place);
   const watching = !SITE && params.has('latest');
   if (watching) void openLatest();
 

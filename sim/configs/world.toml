@@ -122,6 +122,8 @@ w = 1.3
 h = 1.3
 mass = 4.0
 friction = 0.6
+# a point on the block, in its own frame, pinned to the ground so it swings about it like a door; [] for none
+hinge = []
 
 [[block]]
 x = -3.0
@@ -131,3 +133,4 @@ w = 2.4
 h = 1.1
 mass = 12.0
 friction = 0.6
+hinge = []

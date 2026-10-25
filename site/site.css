@@ -322,3 +322,38 @@ figure {
 .clips figure {
   margin: 0;
 }
+
+.brains {
+  padding: 0;
+  list-style: none;
+}
+
+.brains li {
+  margin: 0 0 14px;
+  padding-left: 76px;
+  position: relative;
+}
+
+.brains .play {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.85em;
+  text-decoration: none;
+}
+
+.brains .nums {
+  display: block;
+}
+
+.brains .aside {
+  color: var(--muted);
+}
+
+.brains p {
+  margin: 2px 0 0;
+}

@@ -41,6 +41,8 @@ class Physics:
         self.reads = [pymunk.batch.Buffer() for _ in range(self.arenas)]
         # (arena, creature) -> the joint it holds a block by
         self.held: dict[tuple[int, int], PivotJoint] = {}
+        # and which block that is
+        self.held_block: dict[tuple[int, int], int] = {}
         self.writes = [pymunk.batch.Buffer() for _ in range(self.arenas)]
         self.read()
 
@@ -74,6 +76,8 @@ class Physics:
             slide.max_force = b.mass * cfg.ground.friction
             spin.max_force = friction_torque(cfg, b.w, b.h, b.mass)
             space.add(slide, spin)
+            if b.hinge:
+                space.add(PivotJoint(space.static_body, body, body.local_to_world(b.hinge), b.hinge))
         r = WALL_THICKNESS / 2
         out = cfg.arena.size / 2 + r
         corners = [(-out, -out), (out, -out), (out, out), (-out, out)]
@@ -116,6 +120,7 @@ class Physics:
             joint.max_force = grip
             self.spaces[a].add(joint)
             self.held[int(a), int(c)] = joint
+            self.held_block[int(a), int(c)] = self.bodies[a].index(block) - self.creatures
         holding = np.zeros(want.shape, bool)
         for a, c in self.held:
             holding[a, c] = True
@@ -126,17 +131,19 @@ class Physics:
         return np.array([[space.point_query_nearest(body.position, r, BLOCKS) is not None for body in bodies[:self.creatures]]
                          for space, bodies in zip(self.spaces, self.bodies)])
 
-    def shift(self, arenas, blocks: list[int], to: np.ndarray):
-        """Put these blocks at to (len(blocks), 2) in each of arenas, standing still."""
+    def shift(self, arenas, blocks: list[int], to: np.ndarray, angles: np.ndarray):
+        """Put these blocks at to (len(blocks), 2) and angles in each of arenas, standing still."""
         for a in arenas:
-            for k, (x, y) in zip(blocks, to):
+            for k, (x, y), angle in zip(blocks, to, angles):
                 body = self.bodies[a][self.creatures + k]
                 body.position = (float(x), float(y))
+                body.angle = float(angle)
                 body.velocity = (0, 0)
                 body.angular_velocity = 0
         self.read()
 
     def let_go(self, a, c):
+        self.held_block.pop((int(a), int(c)), None)
         joint = self.held.pop((int(a), int(c)), None)
         if joint is not None:
             self.spaces[a].remove(joint)
