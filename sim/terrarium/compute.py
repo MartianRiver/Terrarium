@@ -40,11 +40,13 @@ def metrics(run: Path) -> list[dict]:
 
 def seconds(run: Path) -> float:
     record = read_run(run)
+    # time a lent machine's worker held the job paused while its owner used it
+    paused = record.get('paused', 0)
     if 'finished' in record:
-        return (when(record['finished']) - when(record['started'])).total_seconds()
+        return (when(record['finished']) - when(record['started'])).total_seconds() - paused
     # stopped or still going: as far as its last update
     rows = metrics(run)
-    return rows[-1]['seconds'] if rows else 0.0
+    return rows[-1]['seconds'] - paused if rows else 0.0
 
 
 def sessions(path: Path = SESSIONS) -> list[dict]:

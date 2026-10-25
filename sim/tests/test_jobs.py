@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tarfile
 import threading
+import tomllib
 
 import pytest
 
@@ -216,17 +217,39 @@ def test_an_overlay_rebuilds_the_dirty_tree_on_top_of_the_commit(repo, tmp_path)
     assert snapshot.overlay(repo) is None
 
 
-def test_public_code_is_only_what_main_or_next_holds(repo, tmp_path):
-    mirror_parent = tmp_path / 'home'
-    mirror_parent.mkdir()
-    head = snapshot.commit(repo)
-    snapshot.from_public(tmp_path / 'ok', mirror_parent / 'mirror.git', str(repo), head)
+def commit_on(repo, branch: str, text: str) -> str:
+    git(repo, 'switch', '-q', '-c', branch, 'next')
+    (repo / 'sim' / 'a.py').write_text(text)
+    git(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', branch)
+    return snapshot.commit(repo)
+
+
+def test_public_code_is_what_a_branch_of_the_repo_holds_and_not_a_pull_request(repo, tmp_path):
+    # repo stands in for GitHub: its branches are what was pushed, refs/pull/ what forks offer
+    mirror = tmp_path / 'home' / 'mirror.git'
+    mirror.parent.mkdir()
+    snapshot.from_public(tmp_path / 'ok', mirror, str(repo), snapshot.commit(repo))
     assert (tmp_path / 'ok' / 'sim' / 'a.py').exists()
-    git(repo, 'switch', '-q', '-c', 'private')
-    (repo / 'sim' / 'a.py').write_text('a = 3\n')
-    git(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'private')
+    pushed = commit_on(repo, 'jelly', 'a = 3\n')
+    snapshot.from_public(tmp_path / 'jelly', mirror, str(repo), pushed)
+    assert (tmp_path / 'jelly' / 'sim' / 'a.py').read_text() == 'a = 3\n'
+    fork = commit_on(repo, 'fork', 'a = 4\n')
+    git(repo, 'update-ref', 'refs/pull/1/head', fork)
+    git(repo, 'switch', '-q', 'next')
+    git(repo, 'branch', '-q', '-D', 'fork')
     with pytest.raises(PermissionError):
-        snapshot.from_public(tmp_path / 'no', mirror_parent / 'mirror.git', str(repo), snapshot.commit(repo))
+        snapshot.from_public(tmp_path / 'no', mirror, str(repo), fork)
+    assert (mirror / 'refs' / 'pull').exists() or 'refs/pull/1/head' in (mirror / 'packed-refs').read_text()
+    with pytest.raises(PermissionError):
+        snapshot.from_public(tmp_path / 'no', mirror, str(repo), 'f' * 40)
+
+
+def test_a_job_is_trusted_unless_its_commit_is_on_an_origin_branch(repo):
+    assert snapshot.public(snapshot.commit(repo), repo)
+    local = commit_on(repo, 'local', 'a = 5\n')
+    assert not snapshot.public(local, repo)
+    git(repo, 'update-ref', 'refs/remotes/origin/local', 'HEAD')
+    assert snapshot.public(local, repo)
 
 
 def test_a_batch_file_becomes_specs_with_every_input_named_by_hash(repo, tmp_path):
@@ -305,6 +328,39 @@ def test_a_donor_gets_public_jobs_and_only_their_blobs(server, tmp_path, monkeyp
     assert (path / 'evals.json').exists() and jobs.sync(c['admin'], runs) == []
 
 
+def test_a_long_job_can_go_out_in_pieces_that_carry_on_from_each_other(repo, tmp_path):
+    (repo / 'sim' / 'train.toml').write_text('[ppo]\nsamples = 1_000  # all of it\nlr = 3e-4\n[reward]\nsamples = 2\n')
+    git(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'longer')
+    git(repo, 'update-ref', 'refs/remotes/origin/next', 'HEAD')
+    batch = tmp_path / 'grid.toml'
+    batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n'
+                     '[[job]]\nname = "long"\nchunk = 400\nseed = 1\n'
+                     '[[job]]\nname = "after"\nparent = "job:long"\n')
+    made, blobs = jobs.specs(batch, tmp_path / 'runs', repo)
+    assert [(s['name'], s['samples'], s['seed']) for s in made] == \
+        [('long.1', 400, 1), ('long.2', 400, 1001), ('long.3', 200, 2001), ('after', 1000, 0)]
+    assert made[0]['parent'] is None
+    assert [s['parent'] for s in made[1:]] == [{'job': made[0]['id']}, {'job': made[1]['id']}, {'job': made[2]['id']}]
+    train = tomllib.loads(blobs[made[2]['train']].decode())
+    assert train == {'ppo': {'samples': 200, 'lr': 3e-4}, 'reward': {'samples': 2}}
+    assert blobs[made[3]['train']] == (repo / 'sim' / 'train.toml').read_bytes()
+    batch.write_text('world = "w"\ntrain = "t"\n[[job]]\nname = "x"\nchunk = 0\n')
+    with pytest.raises(jobs.BadJob, match='chunk'):
+        jobs.load_batch(batch)
+
+
+def test_a_token_that_floods_the_coordinator_is_slowed_alone(server):
+    _, c = server
+    bucket = coordinator.Bucket(rate=60, burst=3)
+    assert [bucket.take('pod', now=0) for _ in range(4)] == [True, True, True, False]
+    assert bucket.take('mac', now=0) and bucket.take('pod', now=1.5) and not bucket.take('pod', now=1.6)
+    for _ in range(coordinator.BURST):
+        c['donor'].call('POST', '/api/claim', {})
+    assert c['donor'].call('POST', '/api/claim', {})[0] == 429
+    assert c['trusted'].call('POST', '/api/claim', {})[0] == 204
+    assert all(c['admin'].call('GET', '/api/jobs')[0] == 200 for _ in range(coordinator.BURST + 1))
+
+
 def test_oversized_uploads_are_refused_before_they_are_read(server, monkeypatch):
     _, c = server
     monkeypatch.setitem(coordinator.LIMITS, 'blob', 10)
@@ -341,7 +397,7 @@ def test_a_trusted_worker_runs_a_signed_job_on_uncommitted_code(server, repo, ke
     [s] = jobs.add(c['admin'], batch, k, tmp_path / 'runs', repo)
     monkeypatch.setattr(worker, 'sync', lambda sim: None)
 
-    def command(spec, inputs):
+    def command(spec, inputs, sim):
         return [sys.executable, '-c', FAKE_TRAIN, jobs.run_name(spec), str(inputs['world'])]
 
     w = worker.Worker(c['trusted'], tmp_path / 'home', trusted=True, signers=signers, instance=57436340,
@@ -361,6 +417,7 @@ def test_a_trusted_worker_runs_a_signed_job_on_uncommitted_code(server, repo, ke
     assert str(tmp_path) not in (path / 'run.json').read_text()
     assert (path / 'overlay.tar.gz').read_bytes() == snapshot.overlay(repo)
     assert path.name.endswith(jobs.run_name(s)) and not stale.exists()
+    assert (tmp_path / 'home' / 'runs' / path.name / 'evals.json').exists()
 
 
 @needs_ssh

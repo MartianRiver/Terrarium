@@ -5,7 +5,8 @@
 # the run comes out as scratch, with its own diff.patch, never promotable.
 #
 # Donors never take a bundle or an overlay: they fetch the commit from the
-# public repo themselves and only run it if it's on main or next (worker.py).
+# public repo themselves and only run it if it's on one of its branches
+# (worker.py).
 
 import gzip
 import io
@@ -13,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 from pathlib import Path
@@ -23,12 +25,13 @@ from .store import member
 log = Logger('snapshot')
 
 REPO = Path(__file__).resolve().parent.parent.parent
-PUBLIC = ('origin/main', 'origin/next')
 MANIFEST = '.overlay.json'
+# a checkout's .venv can run past Windows' 260-character paths
+LONG = ['-c', 'core.longpaths=true'] if sys.platform == 'win32' else []
 
 
 def git(*args, cwd: Path = REPO, check: bool = True) -> str:
-    return subprocess.run(['git', *args], capture_output=True, text=True, cwd=cwd, check=check).stdout.strip()
+    return subprocess.run(['git', *LONG, *args], capture_output=True, text=True, cwd=cwd, check=check).stdout.strip()
 
 
 def commit(repo: Path = REPO) -> str:
@@ -79,12 +82,12 @@ def overlay(repo: Path = REPO, under: str = 'sim') -> bytes | None:
     return buf.getvalue()
 
 
-def public(commit: str, repo: Path) -> bool:
-    for ref in PUBLIC:
-        if subprocess.run(['git', 'merge-base', '--is-ancestor', commit, ref], cwd=repo,
-                          capture_output=True).returncode == 0:
-            return True
-    return False
+def public(commit: str, repo: Path, branches: str = 'refs/remotes/origin/') -> bool:
+    """Is commit on a branch pushed to origin? In a mirror the branches are refs/heads/. Only branches count:
+    GitHub also serves pull requests' refs, and a commit someone pushed to a fork can be fetched through those."""
+    found = subprocess.run(['git', 'for-each-ref', '--contains', commit, '--format=%(refname)', branches],
+                           cwd=repo, capture_output=True, text=True)
+    return found.returncode == 0 and bool(found.stdout.strip())
 
 
 def apply(tree: Path, data: bytes):
@@ -110,17 +113,13 @@ def from_bundle(dest: Path, data: bytes, commit: str, extra: bytes | None = None
 
 
 def from_public(dest: Path, mirror: Path, url: str, commit: str):
-    """A checkout of a commit that's on the public repo's main or next, fetched from there."""
+    """A checkout of a commit that's on one of the public repo's branches, fetched from there."""
     if not mirror.exists():
         git('clone', '-q', '--mirror', url, str(mirror), cwd=mirror.parent)
     else:
         git('remote', 'update', '--prune', cwd=mirror)
-    # a mirror's branches are refs/heads/*; name them the way public() looks for them
-    for branch in ('main', 'next'):
-        if git('rev-parse', '--verify', '-q', f'refs/heads/{branch}', cwd=mirror, check=False):
-            git('update-ref', f'refs/remotes/origin/{branch}', f'refs/heads/{branch}', cwd=mirror)
-    if not public(commit, mirror):
-        raise PermissionError(f'{commit[:12]} is not on the public main or next')
+    if not public(commit, mirror, 'refs/heads/'):
+        raise PermissionError(f'{commit[:12]} is not on a branch of {url}')
     git('clone', '-q', '--no-checkout', '--shared', str(mirror), str(dest), cwd=mirror.parent)
     git('checkout', '-q', '--detach', commit, cwd=dest)
 

@@ -5,18 +5,19 @@ description = "Headless sim for Terrarium"
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.5.4",
+    "psutil>=7.2.2",
     "pymunk>=7.3.1",
-    "torch>=2.14.1; sys_platform != 'linux'",
+    "torch>=2.14.1; sys_platform == 'darwin'",
 ]
 
-# On Linux torch comes with one of these: uv sync --extra cpu, or --extra cuda for an NVIDIA GPU
-# (CUDA 12.6 builds). PyPI's Linux wheels would bring CUDA whether it's wanted or not.
+# On Linux and Windows torch comes with one of these: uv sync --extra cpu, or --extra cuda for an NVIDIA GPU
+# (CUDA 12.6 builds). PyPI's Linux wheels would bring CUDA whether it's wanted or not, and its Windows ones never do.
 [project.optional-dependencies]
 cpu = [
-    "torch>=2.14.1; sys_platform == 'linux'",
+    "torch>=2.14.1; sys_platform != 'darwin'",
 ]
 cuda = [
-    "torch>=2.14.1; sys_platform == 'linux'",
+    "torch>=2.14.1; sys_platform != 'darwin'",
 ]
 
 [tool.uv]
