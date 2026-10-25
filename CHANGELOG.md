@@ -28,11 +28,17 @@ A choice can be held for several ticks (`[ppo] repeat`): rewards over those tick
 
 The runs page shows the compute behind each brain: hours and dollars per machine for its run and every run behind its parent, back to the first, plus all training so far per machine, rented machines that never ran anything included. A rented machine's bill is split across the runs it hosted. Run records now keep the CPU, memory and the parent checkpoint's own notes (which run and how far in).
 
+Creatures can grab a block now: a yes/no action (schema v6, `[grab]`) that takes hold of the nearest block within reach, or the first to come that close, for 2 s from the last yes, and drags it along, for a little energy a second. The brain senses how much of its grip is left. It's off in every world but a new experiment, `configs/vault.toml`: the night world with half the food (`[food] middle`) growing in a room walled in by blocks too heavy to move, behind two doors that can only be pulled out. Evals count food eaten from the middle, blocks moved, how often grab says yes with a block in reach, deaths away from the nest in daylight (foragers that couldn't feed themselves), and the share of meals eaten with another colony close by; `eat` at home now counts a hungry carrier that unloads and eats on the same tick, and `--policy` on its own scores only the brains given. Food keeps clear of a block's own box instead of a circle round it, so food spots drawn for a seed changed in every world with blocks. The viewer has a `&lite` mode for laptops: one pixel per point, no shadows or bloom, 30 frames a second.
+
+Moving costs more than thrust now. Turning costs energy by its square (`[energy] turn`), so steering is close to free and spinning on the spot isn't, and sprint is a new yes/no action (schema v5, `[sprint]`): a burst at 1.6 times top speed for 1.5 s, costing energy by how hard it runs, then 6 s before the next. The brain senses how much of a burst is left and how rested it is. Both are on in `configs/night.toml` (which also now gives jelly the 0.4 the night brains trained on, and grows half its food in the middle, between the nests, `[food] middle`) and off in the other worlds. A train config's `[reward] effort` charges the energy spent moving as it's spent, in food's worth. Evals count how often sprint says yes when it can, and how hard brains turn out by day and in the nest at night. Old run records still rebuild, with turning free and sprint off.
+
 Training runs can go through a job queue (`docs/compute.md`): I sign each job, a coordinator hands jobs out, and workers on my machines, rented GPUs and later lent ones check the signature and every input, train, and send the run back. Donated machines only run code that's public on `main` or `next`. Rented machines have their own kind of token, and a batch can say `on = "rented"` to keep its jobs off my own machines (or `"trusted"` to keep them on).
 
 The repo has a README, the MIT licence, and issue templates for bugs and ideas (issues are welcome; pull requests aren't taken).
 
 Notes on what was tried in each stage, dead ends included, are in `docs/notes/`.
+
+The compute ledger names my own machines (the MacBook Air, 15-inch, M3, 16 GB) and each rented pod's GPU and CPU, and counts a pod's whole rental, setup and idle time included, next to its training hours, on the runs page too.
 
 ## 0.2.0: Solo forager
 

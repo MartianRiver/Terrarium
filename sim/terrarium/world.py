@@ -16,6 +16,14 @@
 # With nights on ([night], night.py), the food standing at nightfall goes and
 # none grows back until dawn, and the dark is cold: it drains energy faster,
 # except in the nest or close to nestmates.
+#
+# Moving costs energy: thrust, turning (by its square, so steering is cheap and
+# spinning isn't) and sprinting, a burst of speed with a cooldown ([sprint]),
+# chosen like unload and eat.
+#
+# With [grab] on, a creature can take hold of a block it touches and drag it
+# about, paying a little energy a second while it holds on. A yes grips for a
+# couple of seconds, so a grab is something tried now and then that lasts.
 
 import numpy as np
 
@@ -29,6 +37,14 @@ log = Logger('world')
 PLACE_TRIES = 200
 # a ground-jelly slot with nothing in it; food that grows has a regrow timer instead
 EMPTY = -1
+
+
+def box_gap(points: np.ndarray, b) -> np.ndarray:
+    """How far each of points (n, 2) is from block b where it started (0 inside it)."""
+    d = points - (b.x, b.y)
+    cos, sin = np.cos(b.angle), np.sin(b.angle)
+    x, y = d[:, 0] * cos + d[:, 1] * sin, -d[:, 0] * sin + d[:, 1] * cos
+    return np.hypot(np.maximum(np.abs(x) - b.w / 2, 0), np.maximum(np.abs(y) - b.h / 2, 0))
 
 
 class World:
@@ -85,6 +101,14 @@ class World:
         self.store = np.zeros((arenas, len(self.nests)), int)
         self.stored = np.zeros((arenas, n), int)
         self.jelly = np.zeros((arenas, n), int)
+        # ticks left of each creature's sprint, and of its rest before it can sprint again
+        self.sprinting = np.zeros((arenas, n), int)
+        self.resting = np.zeros((arenas, n), int)
+        # energy each has spent moving (thrust, turn, sprint) since its arena started
+        self.spent = np.zeros((arenas, n))
+        self.holding = np.zeros((arenas, n), bool)
+        # ticks the grip lasts for after the last yes to grab
+        self.gripping = np.zeros((arenas, n), int)
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -120,7 +144,7 @@ class World:
         if (np.abs(self.nests) + reach > self.cfg.arena.size / 2).any():
             raise ConfigError(f'colonies.spawn_ring {self.cfg.colonies.spawn_ring} reaches past the walls')
         for i, b in enumerate(self.cfg.block):
-            gap = np.hypot(*(self.nests - (b.x, b.y)).T) - np.hypot(b.w, b.h) / 2
+            gap = box_gap(self.nests, b)
             if (gap <= reach).any():
                 raise ConfigError(f'block[{i}] at ({b.x}, {b.y}) is close enough to a nest for creatures to spawn inside it')
 
@@ -152,6 +176,11 @@ class World:
         self.store[idx] = 0
         self.stored[idx] = 0
         self.jelly[idx] = 0
+        self.sprinting[idx] = 0
+        self.resting[idx] = 0
+        self.spent[idx] = 0
+        self.holding[idx] = False
+        self.gripping[idx] = 0
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -161,24 +190,41 @@ class World:
         log.debug('arenas reset', tick=self.tick, count=len(idx))
 
     def step(self, actions: np.ndarray):
-        """actions (arenas, creatures, k): thrust and turn, then unload and eat (yes when above 0) if k is 4."""
-        cfg, c = self.cfg, self.cfg.creature
+        """actions (arenas, creatures, k): thrust and turn, then unload, eat, sprint and grab (yes when above 0), as
+        many of those as k has room for."""
+        cfg, c, s, g = self.cfg, self.cfg.creature, self.cfg.sprint, self.cfg.grab
         # the dead don't move
         actions = np.clip(actions, -1, 1) * self.alive[..., None]
         thrust, turn = actions[..., 0], actions[..., 1]
-        unload, eat = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k else np.zeros_like(self.alive)
-                       for k in (2, 3))
+        unload, eat, sprint, grab = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k
+                                     else np.zeros_like(self.alive) for k in (2, 3, 4, 5))
+        if s.on:
+            go = sprint & (self.sprinting == 0) & (self.resting == 0)
+            self.sprinting[go] = round(s.seconds * cfg.tick_hz)
+        bursting = self.sprinting > 0
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
         self.heading = (self.heading + np.pi) % (2 * np.pi) - np.pi
-        speed = np.where(thrust >= 0, thrust, thrust * c.reverse) * c.max_speed * (1 - cfg.crop.slow * self.crop)
+        speed = (np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse)
+                 * c.max_speed * (1 - cfg.crop.slow * self.crop))
         target = np.stack([np.cos(self.heading), np.sin(self.heading)], -1) * speed[..., None]
         # the force that closes this share of the gap to the wanted velocity in one tick, if nothing's in the way
         change = (target - self.vel) * min(1.0, c.accel * cfg.dt)
+        if g.on:
+            self.gripping[grab] = round(g.seconds * cfg.tick_hz)
+            self.holding = self.physics.grab(self.gripping > 0, g.reach, g.grip)
+            np.maximum(self.gripping - 1, 0, out=self.gripping)
         self.physics.step(change * (c.mass / cfg.dt))
 
         e = cfg.energy
-        self.energy = np.clip(self.energy - (e.drain + e.move * np.abs(thrust) + self._cold()) * cfg.dt, 0, 1)
+        # a sprint costs by how hard it runs: standing still through one is free
+        effort = (e.move * np.abs(thrust) + e.turn * turn * turn + s.energy * bursting * np.maximum(thrust, 0)
+                  + g.energy * self.holding) * cfg.dt
+        self.spent += effort
+        self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt, 0, 1)
+        self.sprinting[bursting] -= 1
+        np.maximum(self.resting - 1, 0, out=self.resting)
+        self.resting[bursting & (self.sprinting == 0)] = round(s.cooldown * cfg.tick_hz)
         self._nightfall()
         self._regrow()
         # eating on the tick it would have run out still saves it
@@ -188,6 +234,9 @@ class World:
         dying = self.alive & (self.energy <= 0)
         if dying.any():
             self.alive &= ~dying
+            self.sprinting[dying] = 0
+            self.holding[dying] = False
+            self.gripping[dying] = 0
             self.physics.remove(dying)
             log.debug('creatures died', tick=self.tick, count=int(dying.sum()))
         self.age += 1
@@ -321,14 +370,15 @@ class World:
     def _place_patches(self, a):
         # the centres keep a patch's radius from the walls, so the whole patch is ground food can grow on
         for p in range(self.cfg.food.patches):
-            self.patch_pos[a, p] = self._open_ground(a, margin=self.cfg.food.patch_radius)
+            middle = p < self.cfg.food.middle
+            self.patch_pos[a, p] = 0 if middle else self._open_ground(a, margin=self.cfg.food.patch_radius)
 
     def _open_ground(self, a, around=None, margin=0.0):
         """A random spot clear of walls, nests and blocks: anywhere, or within patch_radius of around."""
         cfg = self.cfg
         room = cfg.arena.size / 2 - cfg.food.clearance - margin
         nest_gap = cfg.colonies.nest_radius + cfg.food.clearance
-        block_gap = np.array([np.hypot(b.w, b.h) / 2 for b in cfg.block]) + cfg.food.radius
+        half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2) + cfg.food.radius
 
         def pick():
             if around is None:
@@ -340,9 +390,32 @@ class World:
         for _ in range(PLACE_TRIES):
             inside = (np.abs(p) <= room).all()
             near_nest = (np.hypot(*(self.nests - p).T) < nest_gap).any()
-            near_block = len(block_gap) and (np.hypot(*(self.physics.block_pos[a] - p).T) < block_gap).any()
+            near_block = len(half) and self._on_block(a, p, half)
             if inside and not near_nest and not near_block:
                 return p
             p = pick()
         log.warn('no open ground found, placing food anyway', arena=int(a), tries=PLACE_TRIES)
         return p
+
+    def pull_out(self, arenas: np.ndarray, metres: float):
+        """Move every block one creature could drag this far out from the arena's centre, in these arenas."""
+        cfg = self.cfg
+        light = [k for k, b in enumerate(cfg.block) if b.mass * cfg.ground.friction < cfg.grab.grip]
+        if not light or not arenas.any():
+            return
+        start = np.array([(cfg.block[k].x, cfg.block[k].y) for k in light])
+        out = start / np.maximum(np.hypot(*start.T), 1e-9)[:, None] * metres
+        self.physics.shift(np.nonzero(arenas)[0], light, start + out)
+
+    def touching_block(self) -> np.ndarray:
+        """(arenas, creatures): who has a block within grab's reach."""
+        if not self.cfg.grab.on:
+            return np.zeros_like(self.alive)
+        return self.physics.near_block(self.cfg.grab.reach) & self.alive
+
+    def _on_block(self, a, p, half):
+        # in each block's own frame, so a long thin one keeps food off itself and not off a circle around it
+        d = p - self.physics.block_pos[a]
+        cos, sin = np.cos(self.physics.block_angle[a]), np.sin(self.physics.block_angle[a])
+        x, y = d[:, 0] * cos + d[:, 1] * sin, -d[:, 0] * sin + d[:, 1] * cos
+        return ((np.abs(x) < half[:, 0]) & (np.abs(y) < half[:, 1])).any()

@@ -68,8 +68,10 @@ function boot() {
     return;
   }
 
+  const params = new URLSearchParams(location.search);
+  const lite = params.has('lite');
   const container = document.getElementById('world')!;
-  const stage = createStage(container);
+  const stage = createStage(container, lite);
   let make = demoSource;
   let source!: Source;
   let view: WorldView | undefined;
@@ -86,8 +88,6 @@ function boot() {
     log.error('webgl context lost');
     setStatus('error', 'Lost the graphics context. Reload to try again.');
   });
-
-  const params = new URLSearchParams(location.search);
 
   // from the top: a replay that has run out loops, and R does the same by hand
   function restart(newWorld = false) {
@@ -210,7 +210,13 @@ function boot() {
   const watching = !SITE && params.has('latest');
   if (watching) void openLatest();
 
+  // lite draws 30 frames a second at most
+  const gap = lite ? 1000 / 30 - 2 : 0;
   function frame(now: number) {
+    if (now - last < gap) {
+      requestAnimationFrame(frame);
+      return;
+    }
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     const tickSeconds = 1 / source.info.tickHz;

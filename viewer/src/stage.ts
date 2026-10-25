@@ -27,11 +27,12 @@ const INTRO = new THREE.Vector3(16, 15, 47);
 const DRIFT_TURN = 0.05;
 const UP = new THREE.Vector3(0, 1, 0);
 
-export function createStage(container: HTMLElement) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// lite (&lite) draws for a cool laptop: one pixel per point, no antialiasing, shadows or bloom
+export function createStage(container: HTMLElement, lite = false) {
+  const renderer = new THREE.WebGLRenderer({ antialias: !lite });
+  renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !lite;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
@@ -67,8 +68,7 @@ export function createStage(container: HTMLElement) {
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), 0.35, 0.5, 0.92);
-  composer.addPass(bloom);
+  if (!lite) composer.addPass(new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), 0.35, 0.5, 0.92));
   composer.addPass(new OutputPass());
 
   function resize() {

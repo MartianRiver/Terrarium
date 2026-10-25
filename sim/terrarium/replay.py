@@ -41,6 +41,9 @@ def frame(world: World, a: int) -> dict:
                   'size': size, 'energy': _r(e), 'signal': -1, 'carrying': int(k)}
                  for i, c, (x, y), h, s, e, k in zip(world.creature_id, world.colony, world.pos[a], world.heading[a],
                                                      speed, world.energy[a], world.crop[a])]
+    if cfg.grab.on:
+        for c, held in zip(creatures, world.holding[a]):
+            c['holding'] = int(held)
     here = world.food_present[a]
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}

@@ -21,6 +21,9 @@ home = 0.5
 # towards company; at night, with no food about, it's the thing to do
 snug = 0.0
 warm = 0.0
+# per food's worth of energy spent moving (thrust, turn, sprint), charged as it's spent: the reward feels what the
+# body pays straight away, not only once it's hungry later. 1 makes food and effort one energy budget
+effort = 0.0
 
 [ppo]
 # samples to train on in all: one creature making one choice is one sample
@@ -59,3 +62,6 @@ fresh = []
 # with nights on, each arena starts at a random time of day instead of dawn, so a batch isn't all
 # day or all night (arenas started together stay in step); evals always start at dawn
 staggered = false
+# with grab on, this share of arenas start with the blocks one creature can drag (the vault's doors) pulled a metre
+# out, so what's behind them can be found before pulling them is learned; evals always start them shut
+ajar = 0.0

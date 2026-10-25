@@ -5,7 +5,7 @@ cd sim
 uv run python -m terrarium.train solo-first --world configs/solo.toml
 ```
 
-PPO trains one brain for every creature, CleanRL-style:
+PPO trains one brain, and every creature runs its own copy of it, CleanRL-style:
 
 1. **Rollouts on the CPU.** `[ppo] arenas` run side by side, each for `steps` ticks per rollout. `--workers N` splits the arenas between N processes.
 2. **Advantages** from GAE.
@@ -70,7 +70,7 @@ uv run python -m terrarium.compute vast    # Vast's charges per instance, checke
 
 The hours come from every run in `runs/`: start to finish, or up to its last update for one that was stopped. Scratch runs and abandoned ones count, since they're part of what it took. A run on a rented machine counts once it's fetched.
 
-The dollars come from [`sim/compute.toml`](../sim/compute.toml), one `[[session]]` per rented machine, written when it's destroyed. The bill includes setup, downloads and idle time, so it's more than the training hours at the list price. `compute vast` reads the charges with `VAST_API_KEY` from the environment or `.env`, and says which instances are missing or differ.
+The dollars come from [`sim/compute.toml`](../sim/compute.toml), one `[[session]]` per rented machine, written when it's destroyed. The bill includes setup, downloads and idle time, so it's more than the training hours at the list price, and the ledger shows each machine's rented hours (start to destroyed) next to its training hours. A session also names the `cpu` and cores it came with, which tells apart pods with the same GPU at the same time. `[[machine]]` entries name my own machines, matched by the CPU and memory their runs record. `compute vast` reads the charges with `VAST_API_KEY` from the environment or `.env`, and says which instances are missing or differ.
 
 Running the Mac isn't counted in dollars.
 
@@ -83,7 +83,7 @@ npm run dev                         # in viewer/, then open /runs.html
 
 The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (reward per life, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent. Watch opens one in the viewer.
 
-Each run's page also says what went into the brain it ends with, per machine: hours and dollars for the run and every run behind its parent, back to the first. A parent that was a checkpoint partway through a run counts up to that checkpoint, and a brain made from another without training (new actions set up, say) is followed through to the one it came from, if its checkpoint's meta names it as `parent`. A rented machine's bill is shared across the runs it hosted by their hours, idle time included; rentals with the same GPU at the same time can't be told apart, so they share their runs. The list ends with everything so far per machine, including rentals that never ran anything.
+Each run's page also says what went into the brain it ends with, per machine: hours and dollars for the run and every run behind its parent, back to the first. A parent that was a checkpoint partway through a run counts up to that checkpoint, and a brain made from another without training (new actions set up, say) is followed through to the one it came from, if its checkpoint's meta names it as `parent`. A rented machine's bill is shared across the runs it hosted by their hours, idle time included; rentals with the same GPU at the same time can only be told apart by their `cpu`, and without one they share their runs. Training hours add up every run, so a pod running three at once shows more training than rented time. The list ends with everything so far per machine, including rentals with no training run on them (evals, probes, failed starts).
 
 The replay is recorded the first time it's asked for, in the run's own world from `run.json` rather than today's config, and kept in the run's `replays/` folder. One takes a second or two. The replay seed picks the arena: the same seed gives every generation the same layout, which is the fair way to compare them. A run on another machine shows up once it's fetched.
 

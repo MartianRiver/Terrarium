@@ -16,9 +16,13 @@ What else v2 counts, for colonies:
 
 - **jelly** eaten from the store, per creature
 - **deaths**: how many died, how many of them with jelly in their own store (**by jelly**), how many in their own nest, and whole **colonies lost**
-- how often each yes/no action says yes where it matters: `unload` at home with something in the crop, `unload` away from any nest with something in it (dumping), `eat` when hungry with something in the crop, and `eat` when hungry at home with no crop and jelly in the store
+- how often each yes/no action says yes where it matters: `unload` at home with something in the crop, `unload` away from any nest with something in it (dumping), `eat` when hungry with something in the crop, and `eat` when hungry at home with jelly in the store (crop or not: a carrier unloads and eats on the same tick), `sprint` whenever it's rested and could, and `grab` whenever a block is within reach
+- **turning**: the mean of turn squared (what turning costs by) out by day and in its own nest at night, to see spinning go
+- **away by day**: deaths away from its own nest in full daylight, when food is out and there's no cold: a forager that couldn't keep itself fed
+- **contested**: the share of meals eaten with a creature of another colony within 1.5 m of the food as it went
+- **from the middle**: food eaten from the patches in the middle of the arena, per arena (in the vault, food only a door opened gets to), and **blocks moved**: how many blocks ended an episode more than half a metre from where they started
 
-A brain steers by its mean action, so the evals score what it's learned rather than its exploration. Its yes/no actions (`unload`, `eat`) are drawn instead, at the odds the brain gives them, with seeded noise so the numbers repeat: a yes/no action taken by its mean is never yes until the brain is sure, and in 0.3 that hid a brain that couldn't eat on purpose ([notes/0.3.md](notes/0.3.md), "Evals v2"). Replays use the same. `--modes mean` scores it all by the mean, the way evals v1 did, and `--modes sampled` with everything drawn, as in training. Training ends by scoring the last checkpoint all three ways.
+A brain steers by its mean action, so the evals score what it's learned rather than its exploration. Its yes/no actions (`unload`, `eat`, `sprint`, `grab`) are drawn instead, at the odds the brain gives them, with seeded noise so the numbers repeat: a yes/no action taken by its mean is never yes until the brain is sure, and in 0.3 that hid a brain that couldn't eat on purpose ([notes/0.3.md](notes/0.3.md), "Evals v2"). Replays use the same. `--modes mean` scores it all by the mean, the way evals v1 did, and `--modes sampled` with everything drawn, as in training. Training ends by scoring the last checkpoint all three ways.
 
 `--held-out` plays seed 2,000,000 instead: worlds kept for promotion, which nothing gets tuned on.
 

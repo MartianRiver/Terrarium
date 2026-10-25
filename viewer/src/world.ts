@@ -19,6 +19,7 @@ export interface CreatureState {
   energy: number; // 0..1
   signal: number; // SIGNAL_OFF or 0..SIGNAL_COUNT-1
   carrying: number; // food eaten past full, held in its crop to make jelly; 0 in replays from before 0.3
+  holding: number; // 1 while it grips a block (grab); 0 in replays of worlds without grab
 }
 
 export interface FoodState {

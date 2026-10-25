@@ -1,7 +1,7 @@
 # The world as training sees it: every creature in every arena is one sample,
 # observed as a self token plus a token per ray (terrarium.schema), rewarded
 # for the energy it gets from food and for food it stores, charged for eating
-# the store's jelly and punished for dying (configs/train.toml), with part of
+# the store's jelly and for the energy it spends moving, and punished for dying (configs/train.toml), with part of
 # each reward shared out over its colony. Carrying food home is paid on the way
 # (potential-based shaping, Ng, Harada & Russell 1999): what's in the crop is
 # worth more the nearer home it is, and the reward is the change in that worth,
@@ -44,10 +44,16 @@ def observe(world: World, last: np.ndarray) -> Observation:
     # how much jelly its colony has, as an ant knows how hungry its nest is: near 1 at a jelly a member
     store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
+    # how much of its sprint is left, how far through its rest it is (1: it can sprint now; 0 with sprint off), and
+    # holding a block, how much of its grip is left
+    s = cfg.sprint
+    sprinting = world.sprinting / max(round(s.seconds * cfg.tick_hz), 1)
+    rested = (1 - world.resting / max(round(s.cooldown * cfg.tick_hz), 1)) * (world.sprinting == 0) * s.on
     me = np.stack([world.energy, forward, side, last[..., 0], last[..., 1],
                    np.hypot(home[..., 0], home[..., 1]) / v.range, np.sin(bearing), np.cos(bearing),
                    world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony, store,
-                   np.broadcast_to(world.light()[:, None], store.shape)], -1)
+                   np.broadcast_to(world.light()[:, None], store.shape), sprinting, rested,
+                   world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1)], -1)
 
     angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
     shape = sight.dist.shape
@@ -63,6 +69,8 @@ class Forage:
         self.world = World(cfg, arenas, seed)
         self.staggered = train.start.staggered and cfg.night.on
         self._stagger(np.ones(arenas, bool))
+        self.ajar = train.start.ajar if cfg.grab.on else 0.0
+        self._open(np.ones(arenas, bool))
         self.reward = train.reward
         self.repeat = train.ppo.repeat
         if self.world.episode_ticks % self.repeat:
@@ -92,7 +100,7 @@ class Forage:
         A sample is done when its creature dies or its arena ends."""
         w, r = self.world, self.reward
         actions = np.clip(actions, -1, 1).reshape(*self.last.shape[:2], -1)
-        before = {k: getattr(w, k).copy() for k in ('fed', 'stored', 'jelly', 'alive')}
+        before = {k: getattr(w, k).copy() for k in ('fed', 'spent', 'stored', 'jelly', 'alive')}
         alive = before['alive']
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
@@ -105,7 +113,7 @@ class Forage:
                 warm = night.warmth(w.pos, w.alive, w.colony, w.nest_at() == w.colony, w.cfg.night)
                 snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
         self.last = actions[..., :2].copy()
-        own = (r.food * (w.fed - before['fed']) / w.cfg.energy.food + r.stored * (w.stored - before['stored'])
+        own = ((r.food * (w.fed - before['fed']) - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food + r.stored * (w.stored - before['stored'])
                + r.jelly * (w.jelly - before['jelly']) + r.death * (alive & ~w.alive) + w.cfg.dt * (r.alive * lived + snug))
         ended = w.ended.copy()
         died = alive & ~w.alive
@@ -117,8 +125,13 @@ class Forage:
         self.final = self.observe() if cut.any() else None
         w.reset(ended)
         self._stagger(ended)
+        self._open(ended)
         self.last[ended] = 0
         return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
+
+    def _open(self, arenas: np.ndarray):
+        if self.ajar > 0:
+            self.world.pull_out(arenas & (self.world.rng.uniform(size=len(arenas)) < self.ajar), 1.0)
 
     def _stagger(self, arenas: np.ndarray):
         # a start in the dark loses its standing food on the first step, as at nightfall

@@ -1,7 +1,17 @@
 # Rented machines, one [[session]] each, oldest first. The hours of training come
 # from the runs themselves (runs/); this is what each rental cost, setup,
-# downloads and idle time included. `ended` decides which stage a session counts
-# towards, and `python -m terrarium.compute vast` checks `dollars` against Vast.
+# downloads and idle time included; `cpu` is the CPU and the cores the rental
+# came with. `ended` decides which stage a session counts towards, and
+# `python -m terrarium.compute vast` checks `dollars` against Vast.
+# [[machine]] names my own machines by the cpu and memory their runs record (or the
+# platform, for runs from before those were recorded).
+
+[[machine]]
+cpu = "Apple M3"
+memory_gb = 16
+# runs from before cpu and memory were recorded say only their platform; my only Mac has been this one
+platform = "macOS"
+name = "MacBook Air 15-inch, M3, 16 GB unified memory"
 
 [[session]]
 provider = "vast"
@@ -191,3 +201,73 @@ started = "2026-10-24T22:34:01+11:00"
 ended = "2026-10-25T06:07:30+11:00"
 dollars = 0.677
 note = "jelly night lab: two slots of the automated forks from 22:38 to 06:00 (its evals ran 20 min oversubscribed once: the host shows 128 cores)"
+
+[[session]]
+provider = "vast"
+instance = 57587621
+gpu = "RTX 3060"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-25T11:45:50+11:00"
+ended = "2026-10-25T12:00:51+11:00"
+dollars = 0.025
+note = "population pod: stuck in uv sync for 13 min, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57588627
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T11:54:37+11:00"
+ended = "2026-10-25T12:31:11+11:00"
+dollars = 0.068
+note = "first vault runs (doors shut, 16M each); its end evals were lost to a stray kill"
+
+[[session]]
+provider = "vast"
+instance = 57589313
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T12:01:26+11:00"
+ended = "2026-10-25T12:11:33+11:00"
+dollars = 0.001
+note = "population pod: never reached running, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57592156
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T12:27:22+11:00"
+ended = "2026-10-25T12:31:11+11:00"
+dollars = 0.012
+note = "baseline evals: stopped by the same stray kill before it ran anything"
+
+[[session]]
+provider = "vast"
+instance = 57592705
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T12:32:35+11:00"
+ended = "2026-10-25T13:06:30+11:00"
+dollars = 0.066
+note = "evals of the new night world (middle food) and the vault, with baselines"
+
+[[session]]
+provider = "vast"
+instance = 57593719
+gpu = "RTX 4070"
+cpu = "Xeon Gold 6138, 40 cores"
+started = "2026-10-25T12:42:30+11:00"
+ended = "2026-10-25T13:17:35+11:00"
+dollars = 0.124
+note = "food sweep: nester, carrier and m5-25 at 28, 20, 14, 10 and 7 food"
+
+[[session]]
+provider = "vast"
+instance = 57597006
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T13:19:02+11:00"
+ended = "2026-10-25T14:05:41+11:00"
+dollars = 0.070
+note = "meant for the vault runs; hung in uv sync for 40 minutes and never trained"

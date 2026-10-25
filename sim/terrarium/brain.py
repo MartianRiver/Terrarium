@@ -1,7 +1,7 @@
 # The brain: attention over a self token and one token per ray, each ray
 # token being what it hit (an embedding per kind) plus where (a linear map of
 # its features). The self token's output drives the policy (a Gaussian over the
-# actions) and the value estimate. One brain acts for every creature.
+# actions) and the value estimate. Every creature runs a copy of the same brain.
 #
 # Checkpoints carry their schema and are refused when it doesn't fit (schema.py).
 # A brain from shorter lists loads with every new weight zero, which is what

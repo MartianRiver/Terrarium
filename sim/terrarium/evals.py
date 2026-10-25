@@ -37,6 +37,8 @@ SEED = 1_000_000
 # kept for promotion: nothing gets tuned while looking at it
 HELD_OUT = 2_000_000
 EPISODES = 64
+# a meal is contested when a creature of another colony is this close to the food as it goes (metres)
+SNATCH = 1.5
 
 Policy = Callable[[World], np.ndarray]
 
@@ -107,7 +109,15 @@ CONTEXTS = {
     'unload_home': (lambda w, nest, mine: (nest == w.colony) & (w.crop > 0), 2),
     'unload_away': (lambda w, nest, mine: (nest < 0) & (w.crop > 0), 2),
     'eat_hungry_crop': (lambda w, nest, mine: (w.crop > 0) & (w.energy < w.cfg.jelly.hunger), 3),
-    'eat_hungry_home': (lambda w, nest, mine: (nest == w.colony) & (w.crop == 0) & (w.energy < w.cfg.jelly.hunger) & (mine > 0), 3),
+    # crop or not: a carrier home hungry unloads and eats jelly on the same tick
+    'eat_hungry_home': (lambda w, nest, mine: (nest == w.colony) & (w.energy < w.cfg.jelly.hunger) & (mine > 0), 3),
+    'sprint_ready': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on, 4),
+    'grab_block': (lambda w, nest, mine: w.touching_block() & w.cfg.grab.on, 5),
+}
+# how hard it turns (the mean of turn squared, what turning costs by) out by day and in its nest at night
+PLACES = {
+    'day_out': lambda w, home: ~home & (w.light() == 1)[:, None],
+    'night_home': lambda w, home: home & w.dark[:, None],
 }
 
 
@@ -154,13 +164,22 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     policy = make(world)
     shape = world.alive.shape
     lived, meals, stored, jelly = (np.zeros(shape, int) for _ in range(4))
-    died, beside_jelly, at_nest, in_dark = (np.zeros(shape, bool) for _ in range(4))
+    died, beside_jelly, at_nest, in_dark, away_by_day = (np.zeros(shape, bool) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
     nights = np.zeros(shape, int)
     colonies = np.unique(world.colony)
     first_dawn = np.zeros((episodes, len(colonies)), bool)
     dawned = np.zeros(episodes, bool)
     actions = {k: [0, 0] for k in CONTEXTS}
+    turning = {k: [0, 0.0] for k in PLACES}
+    # food that grows in the middle patches (inside a vault, if the world has one), and how far blocks got moved
+    f = np.arange(world.food_pos.shape[1])
+    middle = (f < world.wild) & (f % max(cfg.food.patches, 1) < cfg.food.middle)
+    from_middle = np.zeros(episodes, int)
+    # meals of growing food, and those with a creature of another colony close by when it went
+    meals_seen, contested = 0, 0
+    start = np.array([(b.x, b.y) for b in cfg.block]).reshape(-1, 2)
+    moved = np.zeros((episodes, len(cfg.block)))
     done = np.zeros(episodes, bool)
     while not done.all():
         before = world.alive & ~done[:, None]
@@ -173,8 +192,23 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
                 seen = before & where(world, nest, mine)
                 actions[name][0] += seen.sum()
                 actions[name][1] += (seen & (action[..., yes] > 0)).sum()
+        for name, where in PLACES.items():
+            seen = before & where(world, home)
+            turning[name][0] += seen.sum()
+            turning[name][1] += (np.clip(action[..., 1], -1, 1) ** 2 * seen).sum()
         was_dark = world.dark.copy()
+        by_day = world.light()[:, None] == 1
+        growing = world.food_present & (f < world.wild)
+        pos, food_pos = world.pos.copy(), world.food_pos.copy()
         world.step(action)
+        # food goes at nightfall too; only count it eaten on other ticks
+        eaten = growing & ~world.food_present & ~(world.dark & ~was_dark)[:, None] & ~done[:, None]
+        from_middle += (eaten & middle).sum(1)
+        for a, i in zip(*np.nonzero(eaten)):
+            d = np.where(before[a], np.hypot(*(pos[a] - food_pos[a, i]).T), np.inf)
+            rival = world.colony != world.colony[d.argmin()]
+            meals_seen += 1
+            contested += bool((d[rival] < SNATCH).any())
         lived += before
         dawn = was_dark & ~world.dark & ~done
         nights += dawn[:, None] & world.alive
@@ -187,11 +221,13 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         beside_jelly |= gone & (mine > 0)
         at_nest |= gone & home
         in_dark |= gone & world.dark[:, None]
+        away_by_day |= gone & ~home & by_day
         # an arena that has ended stops counting; the others carry on
         finished = world.ended & ~done
         meals[finished] = world.meals[finished]
         stored[finished] = world.stored[finished]
         jelly[finished] = world.jelly[finished]
+        moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         done |= finished
     alive = lived / cfg.tick_hz
     per_minute = meals / (alive / 60)
@@ -201,13 +237,18 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'food_per_minute': summary(per_minute), 'seconds_alive': summary(alive),
         'food': summary(meals), 'stored': summary(stored), 'jelly': summary(jelly),
         'deaths': {'creatures': died.size, 'died': int(died.sum()), 'beside_jelly': int(beside_jelly.sum()),
-                   'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()),
+                   'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()), 'away_by_day': int(away_by_day.sum()),
                    'colonies': len(lost) * episodes, 'colonies_lost': int(np.sum(lost))},
         # with nights on: how many each lived through, and the colonies still going at the first dawn (None if the
         # episode is over before one)
         'nights': summary(nights),
         'through_first_night': int(first_dawn.sum()) if cfg.night.on and cfg.episode.seconds > cfg.night.cycle else None,
         'actions': {k: {'ticks': int(n), 'yes': y / n if n else None} for k, (n, y) in actions.items()},
+        'turning': {k: float(t / n) if n else None for k, (n, t) in turning.items()},
+        'from_middle': summary(from_middle[:, None]),
+        'contested': {'meals': meals_seen, 'share': contested / meals_seen if meals_seen else None},
+        # blocks more than half a metre from where they started, per arena at its end
+        'blocks_moved': summary((moved > 0.5).sum(1)[:, None]),
     }
 
 
@@ -234,7 +275,7 @@ def beats(brain: dict, baseline: dict) -> list[str]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--policy', nargs='+', choices=sorted(POLICIES), default=['random'])
+    parser.add_argument('--policy', nargs='*', choices=sorted(POLICIES), default=['random'], help='none with --policy alone, to score only brains')
     parser.add_argument('--config', default=str(DEFAULT))
     parser.add_argument('--brain', nargs='*', default=[], help='checkpoints to score alongside the policies')
     parser.add_argument('--modes', nargs='+', choices=MODES, default=['drawn'], help='how each brain picks its actions')
@@ -267,10 +308,16 @@ def main():
               + (f'  {d["in_dark"]:7}  {r["nights"]["mean"]:6.2f}  {r["through_first_night"] if r["through_first_night"] is not None else "–":>8} of {d["colonies"]:<4}'
                  if cfg.night.on else ''))
         log.info('eval done', policy=name, food_per_minute=round(f['mean'], 3), seconds_alive=round(s['mean'], 1))
-    print(f'\n{"yes on":<{width}}  ' + '  '.join(f'{k:>16}' for k in CONTEXTS))
+    print(f'\n{"yes on":<{width}}  ' + '  '.join(f'{k:>16}' for k in CONTEXTS) + '  ' + '  '.join(f'{"turn² " + k:>16}' for k in PLACES))
     for name, r in results.items():
         rates = [r['actions'][k]['yes'] for k in CONTEXTS]
-        print(f'{name:<{width}}  ' + '  '.join(f'{"–" if y is None else f"{y:.1%}":>16}' for y in rates))
+        print(f'{name:<{width}}  ' + '  '.join(f'{"–" if y is None else f"{y:.1%}":>16}' for y in rates) + '  '
+              + '  '.join(f'{"–" if t is None else f"{t:.2f}":>16}' for t in (r['turning'][k] for k in PLACES)))
+    print(f'\n{"meals":<{width}}  {"away by day":>11}  {"contested":>9}  {"from middle":>11}  {"blocks moved":>12}')
+    for name, r in results.items():
+        share = r['contested']['share']
+        print(f'{name:<{width}}  {r["deaths"]["away_by_day"]:11}  {"–" if share is None else f"{share:.1%}":>9}'
+              f'  {r["from_middle"]["mean"]:11.1f}  {r["blocks_moved"]["mean"]:12.2f}')
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

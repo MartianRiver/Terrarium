@@ -16,7 +16,7 @@ Line 1 is the header:
 
 Every line after it is one `Frame`, one per tick, starting from the tick before the first step. `info` and `Frame` are the types in [viewer/src/world.ts](../viewer/src/world.ts). `source` says where the run came from (commit, with `-dirty` if the working tree had changes; seed; brain; the full config). The viewer logs it and never depends on it.
 
-From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty. Worlds with nights also give each frame `light`, from 1 by day to 0 at night; without it, it's always day.
+From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty. Worlds with nights also give each frame `light`, from 1 by day to 0 at night; without it, it's always day. In worlds with grab on, each creature has `holding`, 1 while it grips a block (drawn as an arm reaching to it).
 
 A dead creature stays in the frames with `energy` 0 where it fell, and the viewer draws a tombstone there that fades after 20 s. From 0.3 the sim takes a dead body out of the world (nothing bumps into it or sees it); in older replays it could still be pushed, and its stone stays where it died.
 
@@ -38,4 +38,4 @@ uv run python -m terrarium.record ../samples/0.1-random.jsonl.gz --seconds 30 --
 
 That runs one arena with random actions. A 30 second replay is about 165 kB. It stops early if the episode ends: everyone dead, or `[episode] seconds` up. `--config configs/solo.toml` records the solo forager on its own.
 
-To watch one, use **Open replay** in the viewer or drop the file anywhere on the page. It loops at the end; R restarts it. F follows the creature from close up (the first one, while there are colonies), and `&follow` in the address does the same from the start. `&nodroppings` hides the droppings (viewer-only, after every third meal). `&intro` starts low outside the dome, circling slowly until the first F swoops down to the creature.
+To watch one, use **Open replay** in the viewer or drop the file anywhere on the page. It loops at the end; R restarts it. F follows the creature from close up (the first one, while there are colonies), and `&follow` in the address does the same from the start. `&nodroppings` hides the droppings (viewer-only, after every third meal). `&intro` starts low outside the dome, circling slowly until the first F swoops down to the creature. `&lite` draws for a laptop on battery: one pixel per point, no antialiasing, shadows or bloom, and at most 30 frames a second.
