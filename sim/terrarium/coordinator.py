@@ -9,7 +9,8 @@
 #   donor    someone else's machine: only jobs on public code, and only the
 #            blobs of the job it holds right now
 #
-# /api/health and /api/board (what each machine has done, board.py) need no token.
+# /api/health and /api/board (what each machine has done, board.py) need no token. /api/admin is River's
+# page for tokens and machines, signed in with Google (admin.py).
 #
 #   uv run python -m terrarium.coordinator serve --root DIR [--port 5192]
 #   uv run python -m terrarium.coordinator token NAME --role donor --root DIR   (prints the token once)
@@ -17,6 +18,7 @@
 
 import argparse
 import json
+import os
 import secrets
 import shutil
 import threading
@@ -24,7 +26,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import board, jobs
+from . import admin, board, jobs
 from .log import Logger
 from .store import Full, Gone, Store, sha256, write_atomic
 
@@ -157,7 +159,9 @@ class Queue:
         return False
 
 
-def handler(queue: Queue):
+def handler(queue: Queue, env=None):
+    desk = admin.Desk(queue, os.environ if env is None else env)
+
     class Handler(BaseHTTPRequestHandler):
         server_version = 'terrarium-jobs'
 
@@ -181,6 +185,8 @@ def handler(queue: Queue):
                 if parts == ['api', 'board'] and method == 'GET':
                     # public, and read by the site from its own origin
                     return self.json(queue.board(), cors=True)
+                if parts[:2] == ['api', 'admin'] or parts[:3] == ['api', 'auth', 'google']:
+                    return desk.handle(self, method, parts)
                 who = queue.tokens.who(self.headers.get('Authorization', '').removeprefix('Bearer '))
                 if who is None:
                     raise Refused(401, 'no such token')
@@ -291,8 +297,9 @@ def handler(queue: Queue):
     return Handler
 
 
-def serve(root: Path, port: int = PORT, host: str = '127.0.0.1', signers: Path | None = jobs.SIGNERS) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer((host, port), handler(Queue(root, signers)))
+def serve(root: Path, port: int = PORT, host: str = '127.0.0.1', signers: Path | None = jobs.SIGNERS,
+          env=None) -> ThreadingHTTPServer:
+    return ThreadingHTTPServer((host, port), handler(Queue(root, signers), env))
 
 
 def main():
