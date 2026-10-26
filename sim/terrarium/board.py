@@ -3,14 +3,18 @@
 # addresses, no job progress, and nothing about what its owner is doing right
 # now (a lent machine "waiting" says someone is at it), so last active is a day.
 # Workers report themselves; what they send is cut down to known fields here
-# before it's kept or shown.
+# before it's kept or shown. What my machines and rented GPUs trained outside the
+# queue comes from board.toml, written from the ledger (compute.py).
 
 import time
+import tomllib
+from pathlib import Path
 
 # trusted machines are River's own
 KINDS = {'trusted': 'mine', 'rented': 'rented', 'donor': 'lent'}
 INFO = {'platform': str, 'slots': int, 'trusted': bool, 'version': int, 'state': str, 'reason': str}
 TEXT = 120
+OUTSIDE = Path(__file__).resolve().parent.parent / 'board.toml'
 
 
 def text(value) -> str | None:
@@ -62,14 +66,21 @@ def work(jobs: list[dict]) -> dict[str, dict]:
     return done
 
 
+def outside(path: Path | None = None) -> list[dict]:
+    path = path or OUTSIDE
+    return tomllib.loads(path.read_text()).get('machine', []) if path.exists() else []
+
+
 def kind_of(role: str | None) -> str | None:
     return KINDS.get(role or '')
 
 
-def summary(jobs: list[dict], workers: dict[str, dict], roles: dict[str, str], now: float | None = None) -> dict:
+def summary(jobs: list[dict], workers: dict[str, dict], roles: dict[str, str], now: float | None = None,
+            ledger: list[dict] | None = None) -> dict:
     now = now or time.time()
     done = work(jobs)
     machines = []
+    off = {m['name']: m for m in ledger or []}
     for name in sorted(set(workers) | set(done)):
         seen = workers.get(name, {})
         kind = kind_of(seen.get('role') or roles.get(name))
@@ -82,6 +93,15 @@ def summary(jobs: list[dict], workers: dict[str, dict], roles: dict[str, str], n
         machines.append({'name': name, 'kind': kind, 'gpu': gpus[0] if gpus else specs.get('cpu'),
                          'samples': d['samples'], 'hours': round(d['seconds'] / 3600, 2), 'jobs': d['jobs'],
                          'last_active': time.strftime('%Y-%m-%d', time.gmtime(last)) if last else None})
+    for m in machines:
+        if o := off.pop(m['name'], None):
+            m['samples'] += o['samples']
+            m['hours'] = round(m['hours'] + o['hours'], 2)
+            m['jobs'] += o['runs']
+            m['gpu'] = m['gpu'] or o['gpu']
+            m['last_active'] = max(filter(None, (m['last_active'], o['last_active'])))
+    machines += [{'name': o['name'], 'kind': o['kind'], 'gpu': o['gpu'], 'samples': o['samples'], 'hours': o['hours'],
+                  'jobs': o['runs'], 'last_active': o['last_active']} for o in off.values()]
     machines.sort(key=lambda m: -m['samples'])
     totals = {}
     for kind in KINDS.values():

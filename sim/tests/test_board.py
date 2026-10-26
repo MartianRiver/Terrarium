@@ -14,8 +14,9 @@ REPORT = {'platform': 'Windows-10', 'slots': 1, 'trusted': False, 'version': 3, 
 
 
 @pytest.fixture
-def server(tmp_path):
+def server(tmp_path, monkeypatch):
     root = tmp_path / 'coord'
+    monkeypatch.setattr(board, 'OUTSIDE', tmp_path / 'board.toml')
     httpd = coordinator.serve(root, port=0, signers=None)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     url = f'http://127.0.0.1:{httpd.server_address[1]}'
@@ -59,6 +60,28 @@ def test_a_report_is_kept_through_a_restart(server):
     again = coordinator.Queue(root, signers=None)
     assert again.workers['pod']['info']['specs']['memory_gb'] == 16
     assert again.board()['machines'][0]['kind'] == 'rented'
+
+
+def test_what_trained_outside_the_queue_is_added_by_name(server, monkeypatch):
+    root, url, c = server
+    monkeypatch.setattr(jobs, 'verify', lambda *a: True)
+    (root.parent / 'board.toml').write_text(
+        '[[machine]]\nname = "laptop"\nkind = "mine"\ngpu = "Apple M3"\nsamples = 500\nhours = 1.5\nruns = 3\n'
+        'last_active = "2026-10-20"\n'
+        '[[machine]]\nname = "rented RTX 3060 12 GB"\nkind = "rented"\ngpu = "RTX 3060 12 GB"\nsamples = 9000\n'
+        'hours = 4.0\nruns = 7\nlast_active = "2026-10-25"\n')
+    c['laptop'].json('POST', '/api/status', REPORT)
+    upload(c['admin'], spec('b' * 12))
+    c['laptop'].json('POST', '/api/claim', {})
+    c['laptop'].json('PUT', f'/api/jobs/{"b" * 12}/result', result(f'20261026-120000-nbbb-{"b" * 12}'))
+    _, shown = get(url)
+    rented, laptop = shown['machines']
+    assert rented == {'name': 'rented RTX 3060 12 GB', 'kind': 'rented', 'gpu': 'RTX 3060 12 GB', 'samples': 9000,
+                      'hours': 4.0, 'jobs': 7, 'last_active': '2026-10-25'}
+    # the queue's own numbers for a machine it knows, plus the ledger's; the token decides its kind
+    assert laptop['kind'] == 'lent' and laptop['samples'] == spec()['samples'] + 500 and laptop['jobs'] == 4
+    assert laptop['last_active'] > '2026-10-20'
+    assert shown['totals']['rented'] == {'machines': 1, 'samples': 9000, 'hours': 4.0}
 
 
 def test_clean_keeps_known_fields_of_the_right_kinds():

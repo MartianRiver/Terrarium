@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from terrarium.compute import behind, everything, lineage_hours, rented_on, seconds, spent, totals
+from terrarium.compute import behind, board, everything, lineage_hours, rented_on, seconds, spent, totals
 
 
 def make_run(root, name, started, finished=None, last=None, brain='', parent=None):
@@ -145,3 +145,24 @@ def test_cpu_names_and_old_records():
     mine = [{'cpu': 'Apple M3', 'memory_gb': 16, 'platform': 'macOS', 'name': 'the Air'}]
     assert hardware({'machine': {'platform': 'macOS-26.6.2-arm64-arm-64bit-Mach-O', 'processor': 'arm'}}, [], mine) == 'the Air'
     assert hardware({'machine': M3}, [], mine) == 'the Air'
+
+
+def test_the_board_gets_my_machines_and_rented_gpus_but_not_what_the_queue_counted(tmp_path):
+    runs = tmp_path / 'runs'
+    make_trained(runs, 'mac', '2026-10-24T09:00:00+1100', '2026-10-24T10:00:00+1100', M3, 'mps')
+    make_trained(runs, 'pod', '2026-10-23T23:30:00+0000', '2026-10-24T00:30:00+0000', POD, 'cuda', 'NVIDIA GeForce RTX 3060')
+    make_trained(runs, 'ti', '2026-10-23T23:30:00+0000', '2026-10-24T00:30:00+0000', POD, 'cuda', 'NVIDIA GeForce RTX 4060 Ti')
+    # a queue run on the Mac's test queue, before the one on Atlas
+    make_trained(runs, 'early-job', '2026-10-24T11:00:00+1100', '2026-10-24T11:30:00+1100', M3, 'mps')
+    (runs / 'early-job' / 'job.json').write_text('{}')
+    # the queue on Atlas counts its own, a lent machine's included
+    make_trained(runs, 'lent', '2026-10-26T15:00:00+1100', '2026-10-26T16:00:00+1100', POD, 'cuda', 'NVIDIA GeForce RTX 3050 Ti Laptop GPU')
+    (runs / 'lent' / 'job.json').write_text('{}')
+    sessions = tmp_path / 'compute.toml'
+    sessions.write_text('[[machine]]\ncpu = "Apple M3"\nmemory_gb = 16\nname = "MacBook Air"\nhandle = "river-m3"\n'
+                        '[gpu_memory]\n"RTX 3060" = 12\n')
+    rows = {r['name']: r for r in board(runs, sessions)}
+    assert sorted(rows) == ['rented RTX 3060 12 GB', 'rented RTX 4060 Ti', 'river-m3']
+    assert rows['river-m3'] == {'name': 'river-m3', 'kind': 'mine', 'gpu': 'Apple M3', 'samples': 400, 'hours': 1.5,
+                                'runs': 2, 'last_active': '2026-10-24'}
+    assert rows['rented RTX 3060 12 GB']['kind'] == 'rented' and rows['rented RTX 3060 12 GB']['samples'] == 200
