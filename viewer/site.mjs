@@ -305,9 +305,13 @@ fetch(BOARD_URL).then((r) => {
     box.innerHTML = html + '<p>No machines on it yet.</p>';
     return;
   }
-  html += '<div class="board"><table><thead><tr><th>Machine</th><th>Kind</th><th>GPU</th><th>Samples</th><th>Hours</th><th>Jobs</th><th>Last active</th></tr></thead><tbody>'
-    + b.machines.map((m) => '<tr><td>' + esc(m.name) + '</td><td>' + esc(m.kind) + '</td><td>' + esc(m.gpu || '–') + '</td><td>' + samples(m.samples)
-      + '</td><td>' + m.hours.toFixed(1) + '</td><td>' + m.jobs + '</td><td>' + esc(m.last_active || '–') + '</td></tr>').join('')
+  const gpu = (m) => esc((m.gpu || '–').replace(/^NVIDIA /, '').replace(/^GeForce /, ''));
+  // a rented row is named for its GPU, which has a column of its own; on a phone the GPU goes under the name instead
+  const machine = (m) => (m.kind === 'rented' ? 'Rented' : esc(m.name)) + '<span class="gpu-under">' + gpu(m) + '</span>';
+  const day = (d) => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '–';
+  html += '<div class="board"><table><thead><tr><th>Machine</th><th class="gpu">GPU</th><th class="n">Samples</th><th class="n">Hours</th><th class="n">Jobs</th><th class="n last">Last active</th></tr></thead><tbody>'
+    + b.machines.map((m) => '<tr><td>' + machine(m) + '</td><td class="gpu">' + gpu(m) + '</td><td class="n">' + samples(m.samples)
+      + '</td><td class="n">' + m.hours.toFixed(1) + '</td><td class="n">' + m.jobs + '</td><td class="n last">' + day(m.last_active) + '</td></tr>').join('')
     + '</tbody></table></div>';
   box.innerHTML = html;
 }).catch(() => {
