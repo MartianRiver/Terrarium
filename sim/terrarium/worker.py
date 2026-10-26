@@ -49,7 +49,7 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
-VERSION = 3
+VERSION = 4
 
 
 def cpus() -> int:
@@ -130,6 +130,7 @@ class Worker:
         self.client, self.home, self.slots, self.trusted = client, Path(home), slots, trusted
         self.paused, self.draining, self.stopping = paused, False, threading.Event()
         self.rules, self.watch = rules, watch or machine.Watch(rules)
+        self.awake = machine.Awake()
         self.verdict = machine.Verdict('go', '')
         share = max(1, int(cpus() * rules.cpu) // slots)
         self.threads, self.rollouts = share, rollouts or max(1, min(8, share - 1))
@@ -216,8 +217,10 @@ class Worker:
                 if ' 410 ' in str(e):
                     log.warn('job taken away', id=task.id)
                     task.gone.set()
+                    # the whole tree: rollout and eval processes left behind would hold the GPU, and
+                    # look like another program using it
                     if task.proc and task.proc.poll() is None:
-                        task.proc.terminate()
+                        machine.kill(task.proc.pid)
             except (urllib.error.URLError, OSError) as e:
                 log.warn('beat failed', id=task.id, error=str(e))
 
@@ -274,6 +277,9 @@ class Worker:
                 task.paused += now - since
                 task.paused_at, task.state, task.reason = None, 'training', ''
                 log.info('job resumed', id=task.id)
+        # a paused job lets it sleep: on battery, or with someone at it, sleep is the owner's call
+        self.awake.hold(self.rules.keep_awake and any(t.state in ('preparing', 'training') and not t.gone.is_set()
+                                                      for t in list(self.tasks.values())))
 
     # one job
 

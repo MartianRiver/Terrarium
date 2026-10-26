@@ -1,8 +1,9 @@
 # What a worker on a lent machine keeps to, so it never gets in its owner's way
 # (docs/compute.md): it only trains when nobody has touched the machine for a
 # while and it's on mains power, uses at most half the CPU at low priority,
-# pauses when the GPU runs hot, and gives the job back when another program
-# (a game) starts using the GPU. Rented machines skip all of it.
+# pauses when the GPU runs hot, gives the job back when another program (a game)
+# starts using the GPU, and keeps the machine from sleeping while a job trains.
+# Rented machines skip all of it.
 #
 # Rules are the settings; Watch reads the machine every few seconds and says
 # what the worker may do right now: go, pause (suspend the job) or stop (hand
@@ -42,11 +43,12 @@ class Rules:
     share_gpu: bool = False   # keep training while other programs use the GPU
     suspended: float = 30     # minutes a job may sit paused before it goes back to the queue
     keep_gb: float = 2        # space for the runs this machine made, oldest deleted first
+    keep_awake: bool = True   # no sleeping while a job trains (the screen can still go off)
 
     @classmethod
     def anytime(cls) -> 'Rules':
         """A rented machine: nobody else is using it."""
-        return cls(cooldown=0, battery=True, cpu=1, gpu_temp=0, share_gpu=True)
+        return cls(cooldown=0, battery=True, cpu=1, gpu_temp=0, share_gpu=True, keep_awake=False)
 
 
 
@@ -115,6 +117,41 @@ class Watch:
         if self.hot:
             return Verdict('pause', f'GPU at {seen.temp:.0f} °C')
         return Verdict('go', 'idle' if r.cooldown else 'allowed while in use')
+
+
+# Windows' SetThreadExecutionState flags
+ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+
+
+class Awake:
+    """Keeps the machine from going to sleep while a job trains: the times a worker trains are the times
+    nobody's at it, which is just when sleep comes. The screen can still turn off. On Windows the request
+    belongs to the thread that makes it, so hold() is only called from the worker's guard thread; elsewhere
+    it's a helper process (caffeinate, systemd-inhibit) that also ends if the worker does."""
+
+    def __init__(self):
+        self.on = False
+        self.helper: subprocess.Popen | None = None
+
+    def hold(self, on: bool):
+        if on == self.on:
+            return
+        self.on = on
+        if sys.platform == 'win32':
+            ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | (ES_SYSTEM_REQUIRED if on else 0))
+        elif on:
+            me = str(psutil.Process().pid)
+            cmd = (['caffeinate', '-i', '-w', me] if sys.platform == 'darwin' else
+                   ['systemd-inhibit', '--what=sleep:idle', '--who=terrarium worker', '--why=training a job',
+                    'tail', f'--pid={me}', '-f', '/dev/null'])
+            if shutil.which(cmd[0]):
+                self.helper = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                log.warn("nothing here to keep the machine awake with; it may sleep mid-job", tool=cmd[0])
+        elif self.helper:
+            self.helper.terminate()
+            self.helper = None
+        log.info('keeping the machine awake' if on else 'letting the machine sleep')
 
 
 class Probes:

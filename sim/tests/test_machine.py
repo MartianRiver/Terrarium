@@ -2,7 +2,9 @@ import json
 import signal
 import subprocess
 import sys
+import time
 
+import psutil
 import pytest
 
 from terrarium import jobs, machine, worker
@@ -168,6 +170,50 @@ def test_a_game_hands_the_job_back_straight_away(running):
     assert task.state == 'handed back' and task.reason == 'something is running full screen'
     assert wk.state() == ('working', 'something is running full screen')
     assert proc.wait(timeout=10) is not None
+
+
+class Holds:
+    def __init__(self):
+        self.calls = []
+
+    def hold(self, on):
+        self.calls.append(on)
+
+
+def test_the_machine_is_kept_awake_while_a_job_trains_but_not_while_it_is_paused(running):
+    wk, task, _, fake, _ = running
+    wk.awake = holds = Holds()
+    wk.mind(now=1000)
+    fake.seen = QUIET._replace(plugged=False)
+    wk.mind(now=1010)
+    wk.rules = Rules(keep_awake=False)
+    fake.seen = QUIET
+    wk.mind(now=1020)
+    assert holds.calls == [True, False, False] and task.state == 'training'
+    assert Rules.anytime().keep_awake is False
+
+
+def test_a_job_taken_away_ends_with_everything_it_started(tmp_path):
+    class Taken(Client):
+        def json(self, method, path, body=None):
+            raise RuntimeError(f'{method} {path}: 410 not yours any more')
+
+    wk = worker.Worker(Taken(), tmp_path, rules=Rules(), watch=watch()[0])  # type: ignore[arg-type]
+    task = worker.Task({'spec': {'id': 'b' * 12, 'name': 'n', 'batch': 'b', 'samples': 64}, 'sig': ''})
+    # a training run with a rollout process of its own, as train starts them
+    task.proc = subprocess.Popen([sys.executable, '-c', 'import subprocess, sys, time; '
+                                  'subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"]); time.sleep(60)'])
+    wk.tasks[task.id] = task
+    family = machine.tree(task.proc.pid)
+    for _ in range(50):
+        if len(family) == 2:
+            break
+        time.sleep(0.1)
+        family = machine.tree(task.proc.pid)
+    assert len(family) == 2
+    wk.beat()
+    assert task.gone.is_set()
+    assert all(not p.is_running() or p.status() == psutil.STATUS_ZOMBIE for p in family)
 
 
 def test_cores_are_shared_out_by_the_cpu_rule(tmp_path, monkeypatch):

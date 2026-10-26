@@ -76,6 +76,7 @@ On a machine someone uses, the worker keeps to these rules by default (`machine.
 - **Half the CPU, at low priority.** On Windows it's a hard cap on the worker and everything it starts (a job object), so a job can't take more however it's written, and a job dies with the worker if the worker crashes. Elsewhere it's the number of threads and processes a job gets, plus `nice`.
 - **Not hot.** Above 85 °C on the GPU it pauses until it's 5 degrees cooler.
 - **Not for long.** A job paused for 30 minutes goes back to the queue for another machine.
+- **Awake while it trains.** A job runs when nobody's at the machine, which is just when it would go to sleep, so while one trains (not while it's paused) the worker asks the system to stay awake: `SetThreadExecutionState` on Windows, `caffeinate` on macOS, `systemd-inhibit` on Linux. The screen still turns off. Once the job ends or is paused, sleep works as you set it.
 
 What a paused job doesn't hold: the CPU. It does keep the memory it had, a little of it on the GPU. Time spent paused is written into the run (`paused`, in seconds) and left out of its hours (`terrarium.compute`).
 
@@ -89,6 +90,7 @@ gpu_temp = 85      # pause above this; 0 for no limit
 share_gpu = false  # keep training while other programs use the GPU
 suspended = 30     # minutes a job may sit paused before it goes back
 keep_gb = 2        # space for the runs this machine made
+keep_awake = true  # no sleeping while a job trains
 ```
 
 | flag | |
