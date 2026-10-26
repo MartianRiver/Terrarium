@@ -9,7 +9,9 @@ import { Eggs } from './eggs';
 import { type Box, Grips, type Holder } from './grips';
 import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
+import { Flowers } from './nectar';
 import { BlockView, FoodView } from './props';
+import { Dust } from './sprint';
 import { Tombstones } from './tombstones';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
@@ -39,17 +41,21 @@ export class WorldView {
   // where the first creature was last drawn, for the follow camera
   focus: { x: number; y: number } | null = null;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0 };
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;
   private eggs: Eggs;
+  private flowers: Flowers;
+  private dust: Dust;
 
   constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
     this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
     this.tombstones = new Tombstones(scene, info.tickHz);
     this.grips = new Grips(scene);
     this.eggs = new Eggs(scene, info.tickHz);
+    this.flowers = new Flowers(scene, info.tickHz);
+    this.dust = new Dust(scene);
     for (const nest of info.nests) {
       const pile = new JellyPile(nest);
       this.piles.set(nest.colony, pile);
@@ -70,6 +76,7 @@ export class WorldView {
     this.droppings?.push(frame);
     this.tombstones.push(frame);
     this.eggs.push(frame);
+    this.flowers.push(frame);
     for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
@@ -93,6 +100,7 @@ export class WorldView {
       // the dead are a tombstone now
       blob.root.visible = !this.tombstones.isDead(c.id);
       if (blob.root.visible) blob.update(s, this.info.maxSpeed, dt, time);
+      if (blob.root.visible && blob.sprinting) this.dust.kick(c.id, s.x, s.y, s.heading, dt, time, c.nectar > 0);
       if (c.holding && blob.root.visible) holders.push({ x: s.x, y: s.y, colony: c.colony });
     }
     const boxes: Box[] = [];
@@ -105,9 +113,11 @@ export class WorldView {
     this.grips.update(holders, boxes);
     this.droppings?.render(this.frame.tick, alpha);
     this.tombstones.render(this.frame.tick, alpha);
-    for (const f of this.food.values()) f.update(dt, time);
+    this.flowers.render(this.frame.tick, alpha, time);
+    this.dust.render(dt);
+    for (const f of this.food.values()) f.update(dt);
     this.dyingFood = this.dyingFood.filter((f) => {
-      const alive = f.update(dt, time);
+      const alive = f.update(dt);
       if (!alive) this.scene.remove(f.root);
       return alive;
     });
@@ -123,6 +133,8 @@ export class WorldView {
     this.droppings?.clear();
     this.tombstones.clear();
     this.eggs.clear();
+    this.flowers.clear();
+    this.dust.clear();
     this.grips.clear();
     for (const block of this.blocks.values()) {
       this.scene.remove(block.root);

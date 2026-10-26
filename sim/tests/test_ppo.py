@@ -1,4 +1,5 @@
 import json
+import subprocess
 from dataclasses import replace
 
 import numpy as np
@@ -173,3 +174,12 @@ def test_cpu_quota_reads_cgroup_v1(tmp_path):
     assert cpu_quota(tmp_path) == 15
     (tmp_path / 'cpu' / 'cpu.cfs_quota_us').write_text('-1\n')
     assert cpu_quota(tmp_path) is None
+
+
+def test_a_run_refuses_to_start_when_git_cant_say_what_code_it_is(tmp_path, monkeypatch):
+    # a tree rsynced onto a pod belongs to another user, and git there refuses to read it
+    refused = subprocess.CompletedProcess([], 128, '', 'fatal: detected dubious ownership in repository')
+    monkeypatch.setattr(runs.subprocess, 'run', lambda *a, **k: refused)
+    with pytest.raises(runs.GitError, match='safe.directory'):
+        runs.Run('x', {}, scratch=True, root=tmp_path)
+    assert runs.commit() == 'unknown'

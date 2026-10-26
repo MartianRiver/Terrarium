@@ -102,6 +102,20 @@ seconds = 1.5
 cooldown = 6.0
 energy = 0.04
 
+[flowers]
+# now and then by day a nectar flower opens somewhere clear of nests and walls, every every_min to every_max seconds
+# while fewer than `count` are open, and closes after `open` seconds or at nightfall. The first to touch one drinks
+# it all: `food` foods' worth, eaten or carried like food, and `boost` seconds at `speed` times its top speed.
+# count 0 is off
+count = 0
+every_min = 15.0
+every_max = 30.0
+open = 15.0
+radius = 0.35
+food = 3
+boost = 8.0
+speed = 1.25
+
 [grab]
 # a creature saying yes to grab takes hold of a block within reach of its body (metres from its edge), or the first
 # to come within reach, for `seconds` from its last yes, and drags it along, up to grip newtons (a creature pushes

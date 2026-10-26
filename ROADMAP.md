@@ -38,7 +38,7 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 
 ## 0.3 Daisy: Colony basics
 
-*Mac and rented GPUs.* Three colonies of six, a nest each, every Terrikin with its own copy of the same brain. Carry food home as jelly, get through the night on it, and race the other colonies for food there isn't enough of.
+*Mac and rented GPUs.* Three colonies of six, a nest each, every Terrikin with its own copy of the same brain. Find food, carry it home as jelly, get through the night on it, and grow the colony from what's stored.
 
 - New inputs, added so the 0.2 brain still loads: whether a creature a ray hits is from the same colony. A flag rather than a colony number, so one brain works for every colony.
 - Nests are something rays can see, own and other. Each creature also knows the distance and direction to its own nest, the way an ant keeps track of the way home. This may get fuzzier in later stages, so remembering and scent trails have something to do.
@@ -49,13 +49,14 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 - **Smell.** Food gives off a smell that spreads and fades, and only part of it gets past a block. A Terrikin senses how strong it is and which way it gets stronger, so it can tell food is that way before it can see any: behind a block, round a wall, or past another Terrikin.
 - **Day and night.** Food stops growing at night and what's left standing goes, so the store is what gets a colony through to morning. Nights are cold: energy drains faster, less so in the nest or close to nestmates, so huddling can pay. They can sense the light, and dusk dims slowly, so night can be seen coming. Nights have to be longer than a Terrikin can last on what's in its body, or there's no point keeping a store.
 - **Hatching.** A store above a threshold pays jelly for an egg in the nest, which hatches a new Terrikin, full-grown for now: in the place of one the colony lost, or in room for two more past the six it started with. So a store can buy back what the night took, and a colony that gathers well can end the episode bigger than it started.
-- Sprint: faster, costs energy, has a cooldown. For getting to food before another colony does, and later for getting out of the way. Turning costs energy too, by how hard, so steering is cheap and spinning on the spot isn't.
-- **Scarcity.** Only enough food for about two colonies' worth of Terrikins to live through all three nights of an episode, so colonies race each other for it. With every colony running the same brain, which one makes it is down to place and luck; telling better brains apart starts with a brain for each colony in 0.4.
+- Sprint: twice walking speed, costs energy, has a cooldown, and kicks up dust so you can see it. For getting to food before another colony does, and later for getting out of the way. Turning costs energy too, by how hard, so steering is cheap and spinning on the spot isn't.
+- **Enough food to grow.** At first I wanted only enough food for about two colonies, so they'd race for it. With every colony running the same brain, though, which one makes it is down to place and luck, and in a world that lean half the Terrikins starved, turning in circles far from home. So 0.3 has enough food for colonies to grow if they forage well, eat when they need to and keep a store for the night. Scarcity comes back once each colony has its own brain (0.4).
+- **Nectar flowers.** Now and then by day a flower opens somewhere, rich with nectar, and closes again after a few seconds. The first to reach it gets several foods' worth and a burst of speed for a while. It's rare and doesn't wait, so it's worth spotting from far off and sprinting to. Its colours are a rainbow lorikeet's.
 - Foraging is checked in the colony world, not alone. Isolated ant workers die young even with food to hand (Koto et al. 2015), and a colony brain alone turned out the same way, so a lone Terrikin is scored as a number to watch, not held to what the 0.2 brain did.
 - **Evals v2:** scripted foragers that carry food home (and one that also goes home at dusk) as the baselines, like greedy was for 0.2. Food stored and eaten, deaths and where they happen (away from the nest by day: a forager that couldn't feed itself), colonies through the night, how often another colony is close when food is eaten, how big colonies get, and seeds held back for the release. Head to head, too: a different brain in each colony of the same arenas, each taking every seat in turn.
 - The brain is learned, never copied: forks that train side by side and copy whichever is doing best (population-based training) are how it gets there.
 
-Done when creatures carry food home and store it, colonies get through the night on the store and by huddling, about two colonies in three live through all three nights on food for two, colonies hatch new Terrikins from their store, foragers away from the nest keep themselves fed, and the brain beats the one it started from.
+Done when creatures carry food home and store it, colonies get through all three nights on the store and by huddling, colonies grow by hatching new Terrikins from their store, Terrikins don't starve with jelly at home, foragers away from the nest keep themselves fed, and the brain beats the one it started from.
 
 ## 0.4 Elderflower: Growth
 
@@ -63,6 +64,7 @@ Done when creatures carry food home and store it, colonies get through the night
 
 - **Hatchlings.** What hatches starts small and slow instead of full-grown, feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size. Once that works, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job.
 - **Room set by the food.** No fixed size per colony: the arena has room for so many Terrikins in all, and one colony growing leaves less room for the others. A colony that's better at finding food, getting it home and keeping it grows, and the food is the limit.
+- A bigger garden with more Terrikins in it, and food to match.
 - **A brain for each colony.** Each colony's Terrikins learn from their own colony only, with its own reward blend and dials. Colonies that do well found new ones carrying a copy of their brain, and colonies that die out take theirs with them, so the world picks which brains carry on, not a score I choose. What changes from parent to child is small, like the drives (what each one is paid for) and the body; what they do with them is still learned.
 - Seeing which nestmates are carrying food, the way harvester ants judge how much is out there by who comes home loaded.
 - Episodes long enough for growth to compound, or worlds that don't start over at all.
@@ -140,7 +142,7 @@ Done when it's running and worth checking in on.
 
 ## Walking
 
-A separate track, after the colony stages. In the sim a creature slides on a plane, and the waddle is only the viewer's. Here it gets a real body with legs in 3D physics, and a small body brain learns to walk, taking the colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.5) becomes something it has to get up from. It's the step towards a real robot. It learns to walk from rewards and costs alone, never from recordings of how real animals move.
+A separate track, worked on beside the colony stages. In the sim a Terrikin slides on a plane, and its waddle is only the viewer's. The walker is an ant instead: a head, thorax and gaster, six legs of three parts each, a motor at every leg joint, feet that feel the ground, and a centre of mass it has to keep over its feet (`&ant` in the viewer shows the body, walking a hand-made gait for now). In 3D physics, a small body brain learns to stand, then to walk where it's asked, taking a colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.5) becomes something it has to get up from. It's the step towards a real robot. It learns to walk from rewards and costs alone, never from recordings of how real animals move.
 
 ## Lab
 

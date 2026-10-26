@@ -42,7 +42,7 @@ describe('reading', () => {
     const plain = await readReplay(new TextEncoder().encode(text));
     const zipped = await readReplay(bytes(gzipSync(text)));
     expect(zipped).toEqual(plain);
-    expect(plain.frames[1].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0 });
+    expect(plain.frames[1].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0, nectar: 0, sprinting: 0 });
   });
 
   test('carrying and stores are read when there, and empty in replays from before them', () => {
@@ -59,6 +59,14 @@ describe('reading', () => {
     expect(replay.frames.map((f) => f.creatures[0].holding)).toEqual([0, 1]);
   });
 
+  test('flowers, nectar and sprints are read when there, and none in worlds without them', () => {
+    const later = { ...frame, creatures: [{ ...frame.creatures[0], nectar: 6.5, sprinting: 1 }], flowers: [{ id: 9, x: 5, y: -2 }] };
+    const replay = parseReplay(lines(header, frame, later));
+    expect(replay.frames.map((f) => f.flowers)).toEqual([[], [{ id: 9, x: 5, y: -2 }]]);
+    expect(replay.frames.map((f) => [f.creatures[0].nectar, f.creatures[0].sprinting])).toEqual([[0, 0], [6.5, 1]]);
+    refuses(lines(header, { ...later, flowers: [{ id: 9, x: 'here', y: 0 }] }), /flowers/);
+  });
+
   test('the light is read when there, and full day in worlds without nights', () => {
     const replay = parseReplay(lines(header, frame, { ...frame, light: 0.25 }));
     expect(replay.frames.map((f) => f.light)).toEqual([1, 0.25]);
@@ -67,7 +75,7 @@ describe('reading', () => {
 
   test('fields it doesn\'t know are ignored', () => {
     const replay = parseReplay(lines({ ...header, later: 1 }, { ...frame, weather: 'rain', creatures: [{ ...frame.creatures[0], mood: 2 }] }));
-    expect(replay.frames[0].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0 });
+    expect(replay.frames[0].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0, nectar: 0, sprinting: 0 });
   });
 
   test('refuses a newer format, saying so', () => {

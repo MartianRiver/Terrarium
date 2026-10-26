@@ -5,7 +5,7 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type EggState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
+  type BlockState, type CreatureState, type EggState, type FlowerState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
@@ -92,10 +92,12 @@ function readFrame(o: Obj, where: string): Frame {
         heading: num(c, 'heading', w), speed: num(c, 'speed', w), size: num(c, 'size', w),
         energy: num(c, 'energy', w), signal, carrying: c.carrying === undefined ? 0 : int(c, 'carrying', w),
         holding: c.holding === undefined ? 0 : int(c, 'holding', w),
+        nectar: c.nectar === undefined ? 0 : num(c, 'nectar', w),
+        sprinting: c.sprinting === undefined ? 0 : int(c, 'sprinting', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {
-      if (f.kind !== 'common' && f.kind !== 'rich' && f.kind !== 'jelly') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
+      if (f.kind !== 'common' && f.kind !== 'jelly') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
       return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w) };
     }),
     blocks: list(o, 'blocks', where, (b, w): BlockState => ({
@@ -106,6 +108,7 @@ function readFrame(o: Obj, where: string): Frame {
     eggs: o.eggs === undefined ? [] : list(o, 'eggs', where, (e, w): EggState => ({
       id: int(e, 'id', w), colony: int(e, 'colony', w), x: num(e, 'x', w), y: num(e, 'y', w), progress: num(e, 'progress', w),
     })),
+    flowers: o.flowers === undefined ? [] : list(o, 'flowers', where, (f, w): FlowerState => ({ id: int(f, 'id', w), x: num(f, 'x', w), y: num(f, 'y', w) })),
   };
 }
 

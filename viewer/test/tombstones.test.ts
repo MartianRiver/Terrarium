@@ -7,8 +7,8 @@ import { Tombstones } from '../src/tombstones';
 import type { Frame } from '../src/world';
 
 const HZ = 20;
-const blob = { id: 7, colony: 1, x: 3, y: 2, heading: 0, speed: 0, size: 1, energy: 0.5, signal: -1, carrying: 0, holding: 0 };
-const frame = (tick: number, energy: number): Frame => ({ tick, creatures: [{ ...blob, energy }], food: [], blocks: [], stores: [], light: 1, eggs: [] });
+const blob = { id: 7, colony: 1, x: 3, y: 2, heading: 0, speed: 0, size: 1, energy: 0.5, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0 };
+const frame = (tick: number, energy: number): Frame => ({ tick, creatures: [{ ...blob, energy }], food: [], blocks: [], stores: [], light: 1, eggs: [], flowers: [] });
 
 test('one stone where it fell, which fades and goes', () => {
   const scene = new THREE.Scene();

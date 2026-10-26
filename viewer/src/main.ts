@@ -1,7 +1,9 @@
+import { AntStudy } from './ant';
 import { clock } from './clock';
 import { createDemo } from './demo';
 import { galleryBar } from './gallery';
 import { createLogger } from './lib/logger';
+import { withNectar } from './preview';
 import { readReplay, ReplayError, type Replay } from './replay';
 import { createStage } from './stage';
 import type { Frame, WorldInfo } from './world';
@@ -115,7 +117,11 @@ function boot() {
     try {
       const replay = await readReplay(new Uint8Array(await read()));
       log.info('replay opened', { name, version: replay.version, frames: replay.frames.length, source: replay.source.commit });
-      make = () => replaySource(replay, name);
+      // &preview lays make-believe nectar flowers and sprints over the replay (preview.ts)
+      make = () => {
+        const src = replaySource(replay, name);
+        return params.has('preview') ? { ...src, step: withNectar(src.info, src.step) } : src;
+      };
       restart(true);
       setStatus('ok');
     } catch (err) {
@@ -195,9 +201,12 @@ function boot() {
       log.info(paused ? 'paused' : 'resumed');
     }
     if (e.key === 'f' || e.key === 'F') follow(!following);
+    if (ant && (e.key === 'j' || e.key === 'J')) ant.marked = !ant.marked;
   });
 
   restart(true);
+  // &ant: a sketch of a walking ant beside whatever is playing; F follows it
+  const ant = params.has('ant') ? new AntStudy(stage.scene) : null;
   if (params.has('intro')) stage.intro();
   if (params.has('follow')) follow(true);
   // the public site has no runs page; the link goes back to the front page instead
@@ -250,7 +259,8 @@ function boot() {
       }
     }
     view!.render(acc / tickSeconds, paused ? 0 : dt, now / 1000);
-    stage.track(following ? view!.focus : null, snap ? Infinity : paused ? 0 : dt);
+    ant?.update(paused ? 0 : dt);
+    stage.track(following ? (ant?.focus ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
     snap = false;
     stage.render(now / 1000);
 

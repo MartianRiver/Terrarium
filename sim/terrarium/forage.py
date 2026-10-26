@@ -46,8 +46,8 @@ def observe(world: World, last: np.ndarray) -> Observation:
     # how much jelly its colony has, as an ant knows how hungry its nest is: near 1 at a jelly a member
     store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
-    # how much of its sprint is left, how far through its rest it is (1: it can sprint now; 0 with sprint off), and
-    # holding a block, how much of its grip is left
+    # how much of its sprint is left, how far through its rest it is (1: it can sprint now; 0 with sprint off),
+    # holding a block, how much of its grip is left, and how much of a nectar boost
     s = cfg.sprint
     sprinting = world.sprinting / max(round(s.seconds * cfg.tick_hz), 1)
     rested = (1 - world.resting / max(round(s.cooldown * cfg.tick_hz), 1)) * (world.sprinting == 0) * s.on
@@ -56,7 +56,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony, store,
                    np.broadcast_to(world.light()[:, None], store.shape), sprinting, rested,
                    world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1),
-                   *world.smelled()], -1)
+                   *world.smelled(), world.nectar / max(round(cfg.flowers.boost * cfg.tick_hz), 1)], -1)
 
     angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
     shape = sight.dist.shape

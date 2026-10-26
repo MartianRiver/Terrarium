@@ -18,8 +18,19 @@ log = Logger('runs')
 ROOT = Path(__file__).resolve().parent.parent.parent / 'runs'
 
 
+class GitError(RuntimeError):
+    pass
+
+
 def git(*args) -> str:
-    return subprocess.run(['git', *args], capture_output=True, text=True, cwd=Path(__file__).parent).stdout.strip()
+    """git's output, or GitError: a run whose code can't be named mustn't pass for a clean one."""
+    out = subprocess.run(['git', *args], capture_output=True, text=True, cwd=Path(__file__).parent)
+    if out.returncode:
+        why = out.stderr.strip()
+        if 'dubious ownership' in why:
+            why += "\n(a tree copied in from another user, as on a pod: git config --global --add safe.directory '*')"
+        raise GitError(f'git {" ".join(args)} failed: {why}')
+    return out.stdout.strip()
 
 
 def dirty() -> bool:
@@ -61,7 +72,11 @@ def memory_gb() -> int:
 
 
 def commit() -> str:
-    return (git('rev-parse', '--short', 'HEAD') or 'unknown') + ('-dirty' if dirty() else '')
+    """For replay headers, which can be recorded outside a checkout."""
+    try:
+        return git('rev-parse', '--short', 'HEAD') + ('-dirty' if dirty() else '')
+    except GitError:
+        return 'unknown'
 
 
 class DirtyTree(RuntimeError):
