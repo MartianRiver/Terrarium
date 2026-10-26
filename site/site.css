@@ -81,6 +81,7 @@ a {
 .top nav a {
   margin-left: 18px;
   color: var(--text);
+  white-space: nowrap;
 }
 
 main {
@@ -238,8 +239,13 @@ footer a {
   body {
     font-size: 17px;
   }
+  /* the name on its own line, the links under it */
+  .top {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
   .top nav a {
-    margin-left: 12px;
+    margin: 0 16px 0 0;
   }
   .pitch h1 {
     font-size: 2.1rem;
@@ -356,4 +362,18 @@ figure {
 
 .brains p {
   margin: 2px 0 0;
+}
+
+/* Terrarium at Home */
+.saved {
+  font-size: 1.05em;
+}
+
+.board {
+  overflow-x: auto;
+}
+
+.board td,
+.board th {
+  white-space: nowrap;
 }

@@ -37,6 +37,8 @@ LIMITS = {'blob': 16_000_000, 'result': 8_000_000, 'json': 64_000}
 RATE, BURST = 60, 60
 # seconds between writes of workers.json when nothing but the time last seen has changed
 SAVE_EVERY = 60
+# seconds the site and Cloudflare may keep /api/board
+BOARD_TTL = 30
 
 
 class Refused(Exception):
@@ -275,7 +277,8 @@ def handler(queue: Queue):
             self.send_response(status)
             self.send_header('Content-Type', kind)
             self.send_header('Content-Length', str(len(body)))
-            self.send_header('Cache-Control', 'no-store')
+            # the public board can sit in Cloudflare for a bit; nothing else may
+            self.send_header('Cache-Control', f'public, max-age={BOARD_TTL}' if cors else 'no-store')
             if cors:
                 self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()

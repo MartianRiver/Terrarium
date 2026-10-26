@@ -28,7 +28,7 @@ What it never does:
 
 - run a command, script or path the coordinator sends. The API has four calls: claim a job, fetch a file by hash, renew the claim, upload the result (plus give a job back when stopping).
 - listen on anything but `127.0.0.1`: its status page and pause/resume are for you, on your machine.
-- write outside its home folder (`~/.terrarium/worker`), or send anything but the run it made. A result is the run folder `train` wrote (`run.json`, `metrics.jsonl`, `evals.json`, checkpoints) plus the signed job: configs, numbers, your OS and CPU, Python and package versions. Paths in it are relative to the job's checkout, so your username isn't in them. The training log stays on your machine.
+- write outside its home folder (`~/.terrarium/worker`), apart from uv's own cache of the Python and packages it downloads (PyTorch included), or send anything but the run it made. A result is the run folder `train` wrote (`run.json`, `metrics.jsonl`, `evals.json`, checkpoints) plus the signed job: configs, numbers, your OS and CPU, Python and package versions. Paths in it are relative to the job's checkout, so your username isn't in them. The training log stays on your machine.
 
 What you're still trusting:
 
@@ -112,9 +112,9 @@ Native Windows is the way to run it on a gaming PC: it's the only place the work
    winget install Git.Git
    winget install astral-sh.uv
    ```
-   Then open a new terminal so both are on the path.
+   Then open a new terminal so both are on the path: a normal PowerShell, not "Run as administrator", which starts in `C:\Windows\system32` where git can't write (and the worker shouldn't run as administrator anyway).
 2. Check `nvidia-smi` prints your GPU. If it doesn't, update the NVIDIA driver.
-3. Clone and start it as above, from `Terrarium\sim`.
+3. `cd ~`, then clone and start it as above, from `Terrarium\sim`.
 
 Close the window, or press Ctrl-C, to stop it. A job it was running goes back to the queue (closing the window does this through the lease, about five minutes later). The Windows parts (the GPU counters, the CPU cap, idle and full-screen checks) have tests for their logic, but haven't run on a Windows machine yet; the first friend's laptop is that test.
 
