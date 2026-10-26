@@ -5,6 +5,7 @@
 #
 #   uv run python -m terrarium.compute         # per stage, and what's been spent since the last promotion
 #   uv run python -m terrarium.compute vast    # Vast's charges per instance, next to what compute.toml says
+#   uv run python -m terrarium.compute board   # board.toml: what trained outside the queue, for the public board
 
 import json
 import os
@@ -14,7 +15,7 @@ import time
 import tomllib
 import urllib.request
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -22,6 +23,9 @@ from .runs import ROOT
 
 SESSIONS = Path(__file__).resolve().parent.parent / 'compute.toml'
 BEGINNING = datetime.fromisoformat('2000-01-01T00:00:00+00:00')
+# the queue on Atlas took its first job this day; queue runs from before were tests on a queue on the Mac
+QUEUE_OPENED = datetime.fromisoformat('2026-10-26T00:00:00+11:00')
+BOARD = SESSIONS.parent / 'board.toml'
 
 
 def when(stamp: str) -> datetime:
@@ -217,6 +221,56 @@ def everything(root: Path, path: Path = SESSIONS) -> dict:
             'rented_hours': sum(map(rented_hours, rentals)), 'dollars': sum(float(s['dollars']) for s in rentals)}
 
 
+def on_board(record: dict, rentals: list[dict], mine: list[dict], sizes: dict[str, int]) -> tuple[str, str, str] | None:
+    """The board's name, kind and GPU for a run on one of my machines (one with a handle) or a rented GPU."""
+    if record.get('device') == 'cuda':
+        rental = next((s for s in rentals if rented_on(record, s)), {})
+        gpu = (record.get('gpu') or rental.get('gpu') or '').removeprefix('NVIDIA ').removeprefix('GeForce ')
+        if not gpu:
+            return None
+        memory = rental.get('gpu_memory_gb') or sizes.get(gpu)
+        gpu = f'{gpu} {memory} GB' if memory else gpu
+        return f'rented {gpu}', 'rented', gpu
+    named = hardware(record, rentals, mine)
+    own = next((k for k in mine if k['name'] == named and 'handle' in k), None)
+    return (own['handle'], 'mine', own['cpu']) if own else None
+
+
+def board(root: Path = ROOT, path: Path = SESSIONS) -> list[dict]:
+    """What my machines and rented GPUs trained outside the queue, per board name. Runs that came through the
+    queue on Atlas are counted there already."""
+    rentals, mine = sessions(path), machines(path)
+    sizes = tomllib.loads(path.read_text()).get('gpu_memory', {}) if path.exists() else {}
+    rows: dict[str, dict] = {}
+    for r in sorted(root.iterdir()):
+        if not (r / 'run.json').exists():
+            continue
+        record = read_run(r)
+        if (r / 'job.json').exists() and when(record['started']) >= QUEUE_OPENED:
+            continue
+        who = on_board(record, rentals, mine, sizes)
+        if not who:
+            continue
+        name, kind, gpu = who
+        secs, done = seconds(r), metrics(r)
+        row = rows.setdefault(name, {'name': name, 'kind': kind, 'gpu': gpu, 'samples': 0, 'hours': 0.0, 'runs': 0,
+                                     'last_active': ''})
+        row['samples'] += done[-1]['samples'] if done else 0
+        row['hours'] += secs / 3600
+        row['runs'] += 1
+        ended = (when(record['started']) + timedelta(seconds=secs)).astimezone(timezone.utc).date().isoformat()
+        row['last_active'] = max(row['last_active'], ended)
+    return sorted(({**r, 'hours': round(r['hours'], 2)} for r in rows.values()), key=lambda r: -r['samples'])
+
+
+def write_board(rows: list[dict], out: Path):
+    lines = ['# What my machines and rented GPUs trained outside the queue, from runs/ and compute.toml',
+             '# (`python -m terrarium.compute board`). The board adds it to what the queue counts; runs count as jobs.']
+    for r in rows:
+        lines += ['', '[[machine]]'] + [f'{k} = {json.dumps(v)}' for k, v in r.items()]
+    out.write_text('\n'.join(lines) + '\n')
+
+
 def totals(root: Path, record: dict, brains: list[dict], until: datetime, path: Path = SESSIONS) -> dict:
     """[brain.compute] for a brain being promoted now: this stage, and every stage up to it."""
     before = brains[-1]['compute'] if brains else {'until': BEGINNING.isoformat(), 'total_hours': 0, 'total_dollars': 0}
@@ -279,10 +333,13 @@ def main():
     from .promote import lineage
     if sys.argv[1:] == ['vast']:
         check_vast()
+    elif sys.argv[1:] == ['board']:
+        write_board(board(), BOARD)
+        print(BOARD.read_text())
     elif not sys.argv[1:]:
         report(lineage())
     else:
-        raise SystemExit('usage: python -m terrarium.compute [vast]')
+        raise SystemExit('usage: python -m terrarium.compute [vast|board]')
 
 
 if __name__ == '__main__':

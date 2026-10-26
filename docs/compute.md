@@ -58,11 +58,11 @@ cd Terrarium/sim
 uv run python -m terrarium.worker --server https://terrarium-jobs.martianriver.com
 ```
 
-The first time, it asks for the token and saves it as `~/.terrarium/worker/token`. The worker itself doesn't need torch. Each job's checkout gets its own, the CUDA build when `nvidia-smi` works and the CPU one otherwise.
+The first time, it asks for the token and saves it as `~/.terrarium/worker/token`. The worker itself doesn't need torch. Each job's checkout gets its own, the CUDA build when `nvidia-smi` works and the CPU one otherwise; on a Mac it's PyPI's build, which trains on the Mac's GPU (Apple silicon and macOS 14 or later only).
 
 While it runs, `uv run python -m terrarium.worker status` (or http://127.0.0.1:5191/status) shows what it's doing and why: `ready`, `waiting` (on battery, in use, a game on the GPU), `working`, or `paused`. `pause`, `resume` and `drain` (finish the current job, then stop) do what they say.
 
-Every minute, working or not, the worker tells the coordinator what the machine is (OS, CPU, cores, memory, and each NVIDIA GPU with its memory) and that same state and reason. That's everything it sends about your machine: no hostname, user name or files. The coordinator keeps only those fields, cut short, and only I can read them. The public board (`/api/board`, shown on the site) has each machine's name, kind (mine, rented or lent), GPU, samples trained, hours, jobs done and the day it was last active. It never shows the state: "waiting" would tell anyone that you're at your computer. Ctrl-C (or Ctrl-Break, or SIGTERM) hands unfinished jobs back to the queue; that doesn't count against them.
+Every minute, working or not, the worker tells the coordinator what the machine is (OS, CPU, cores, memory, and each NVIDIA GPU with its memory) and that same state and reason. That's everything it sends about your machine: no hostname, user name or files. The coordinator keeps only those fields, cut short, and only I can read them. The public board (`/api/board`, shown on the site) has each machine's name, kind (mine, rented or lent), GPU, samples trained, hours, jobs done and the day it was last active. It never shows the state: "waiting" would tell anyone that you're at your computer. What my Mac and rented GPUs trained outside the queue is added from `sim/board.toml`, which `python -m terrarium.compute board` writes from `runs/` and `compute.toml` (rented GPUs by model, and memory where Vast only has the one size), leaving out runs that came through the queue on Atlas; a run counts as a job there. Ctrl-C (or Ctrl-Break, or SIGTERM) hands unfinished jobs back to the queue; that doesn't count against them.
 
 Each job builds a checkout of its commit with its own `.venv` under `~/.terrarium/worker/code/`. It's big with the CUDA build of torch, and it's reused for every job on the same commit. Deleting the folder while the worker is stopped is always safe. The runs your machine made stay in `~/.terrarium/worker/runs/`, oldest deleted first past 2 GB.
 
@@ -103,7 +103,7 @@ keep_awake = true  # no sleeping while a job trains
 | `--max-load X` | don't take a job while the 1-minute load average is above X |
 | `--trusted` | also run uncommitted code; only for my own machines |
 
-What it can't see: on macOS, other programs on the GPU (there's no NVIDIA there; full screen isn't checked either). On Linux, keyboard and mouse (X and Wayland have no one way to ask, so a Linux machine always counts as away; set `--cooldown 0` and pause it yourself, or don't run it on a machine you sit at). Other GPU programs on Linux come from `nvidia-smi pmon`.
+What it can't see: on macOS, other programs on the GPU, its temperature (there's no NVIDIA there) or anything full screen. On Linux, keyboard and mouse (X and Wayland have no one way to ask, so a Linux machine always counts as away; set `--cooldown 0` and pause it yourself, or don't run it on a machine you sit at). Other GPU programs on Linux come from `nvidia-smi pmon`.
 
 ### On Windows
 

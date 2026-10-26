@@ -12,6 +12,16 @@ memory_gb = 16
 # runs from before cpu and memory were recorded say only their platform; my only Mac has been this one
 platform = "macOS"
 name = "MacBook Air 15-inch, M3, 16 GB unified memory"
+# its name on the board (its queue token's handle)
+handle = "river-m3"
+
+# GPU memory by model, for the board, where every Vast offer of the model has the same (checked 2026-10-26).
+# Vast forgets a destroyed instance, so the 3080 (10 or 20 GB) and 4060 Ti (8 or 16) go by model unless
+# a session has its own gpu_memory_gb.
+[gpu_memory]
+"RTX 3060" = 12
+"RTX 3070" = 8
+"A10" = 24
 
 [[session]]
 provider = "vast"

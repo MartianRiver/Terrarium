@@ -122,7 +122,7 @@ class Queue:
         roles = {t['name']: t['role'] for t in self.tokens.load().values()}
         with self.lock:
             workers = json.loads(json.dumps(self.workers))
-        return board.summary(self.store.all(), workers, roles)
+        return board.summary(self.store.all(), workers, roles, ledger=board.outside())
 
     def add(self, body: dict):
         spec, sig = body.get('spec'), body.get('sig')
