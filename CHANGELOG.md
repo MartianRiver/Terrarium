@@ -74,6 +74,8 @@ In the local viewer, a click follows a Terrikin, and every Terrikin has a name. 
 
 The public board also shows what my Mac and rented GPUs trained outside the queue (`sim/board.toml`, written by `python -m terrarium.compute board` from the ledger: rented GPUs grouped by model and memory, runs counted as jobs, queue runs left to the queue). Terrarium at Home says a Mac with Apple silicon can lend a hand too, with real speeds, and what the worker can't check on one. The board's table fits the page: rented machines are named by their GPU's own column, and on a phone the GPU moves under the name too.
 
+`train --rivals` trains several brains side by side in one world, one to a colony, each taking every seat over the arenas and learning only from its own colonies.
+
 ## 0.2.0: Solo forager
 
 The first trained brain. One creature alone in the arena with 8 berries learns to keep itself fed. On the evals it eats 18.4 berries a minute and lives out every 3-minute episode. Random actions manage 0.26 and starve in under a minute. A scripted forager that beelines for the nearest berry it sees gets 13.8, so the brain beats that too.

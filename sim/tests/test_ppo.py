@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from terrarium import load, runs
-from terrarium.brain import SHAPE, Brain, tensors
+from terrarium.brain import SHAPE, Brain, save, tensors
 from terrarium.brain import load as load_brain
 from terrarium.config import DEFAULT, TRAIN, load_train
 from terrarium.forage import Forage
@@ -183,3 +183,31 @@ def test_a_run_refuses_to_start_when_git_cant_say_what_code_it_is(tmp_path, monk
     with pytest.raises(runs.GitError, match='safe.directory'):
         runs.Run('x', {}, scratch=True, root=tmp_path)
     assert runs.commit() == 'unknown'
+
+
+def test_rivals_learn_beside_the_parent(tmp_path):
+    world, trainer = short(tmp_path)
+    world.write_text((DEFAULT.parent / 'colony.toml').read_text().replace('seconds = 360.0', 'seconds = 3.0'))
+    brains = {'parent': Brain(**SHAPE), 'coins': Brain(**SHAPE), 'narrow': Brain(width=32, layers=2, heads=4)}
+    brains['coins'].to_bernoulli()
+    for name, brain in brains.items():
+        save(brain, tmp_path / f'{name}.pt')
+    run = train('rivals', world, trainer, tmp_path / 'parent.pt', scratch=True, root=tmp_path / 'runs', device='cpu',
+                gpu_collect=True, rivals=[tmp_path / 'coins.pt', tmp_path / 'narrow.pt'], rival_lr=[1e-4, 2e-4])
+    record = json.loads((run.dir / 'run.json').read_text())
+    assert [r['lr'] for r in record['rivals']] == [1e-4, 2e-4] and record['rivals'][1]['shape']['width'] == 32
+    for k, name in ((1, 'coins'), (2, 'narrow')):
+        after, meta = load_brain(next((run.dir / 'rivals' / str(k)).glob('*.pt')))
+        assert after.shape == brains[name].shape and after.yes_no == brains[name].yes_no and meta['rival'] == k
+        # it learned: its weights moved
+        assert not torch.equal(after.policy.weight, brains[name].policy.weight)
+    row = json.loads((run.dir / 'metrics.jsonl').read_text().splitlines()[0])
+    assert all(np.isfinite(row[f'policy_loss_{k}']) for k in range(3)) and row['policy_loss'] == row['policy_loss_0']
+
+
+def test_rivals_need_gpu_collect(tmp_path):
+    world, trainer = short(tmp_path)
+    save(Brain(**SHAPE), tmp_path / 'b.pt')
+    with pytest.raises(ValueError, match='gpu-collect'):
+        train('x', world, trainer, tmp_path / 'b.pt', scratch=True, root=tmp_path / 'runs', device='cpu',
+              rivals=[tmp_path / 'b.pt'])
