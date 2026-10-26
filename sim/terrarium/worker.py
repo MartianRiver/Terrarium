@@ -49,7 +49,7 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
-VERSION = 4
+VERSION = 5
 
 
 def cpus() -> int:
@@ -551,6 +551,8 @@ def main():
     else:
         rules = machine.load(args.home / 'settings.toml', cooldown=args.cooldown, battery=args.battery,
                              cpu=args.cpu, gpu_temp=args.gpu_temp, share_gpu=args.share_gpu)
+    if why := jobs.can_verify(args.signers):
+        sys.exit(f'{why}\nSee "Running a worker" in docs/compute.md.')
     machine.limit(rules)
     client = jobs.Client(args.server, token(args.token_file or args.home / 'token'))
     worker = Worker(client, args.home, args.slots, args.trusted, args.paused, args.rollouts, args.max_load,

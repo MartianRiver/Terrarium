@@ -198,6 +198,25 @@ def test_a_signed_spec_verifies_and_any_change_breaks_it(key):
     assert not jobs.verify(s | {'code': s['code'] | {'commit': 'd' * 40}}, sig, signers)
 
 
+@needs_ssh
+def test_a_worker_can_tell_at_start_whether_it_can_check_signatures(key, monkeypatch):
+    assert jobs.can_verify() is None
+    _, other = key
+    assert 'against' in jobs.can_verify(other)
+    monkeypatch.setattr(jobs, 'keygen', lambda: '/no/such/ssh-keygen')
+    assert jobs.can_verify().startswith('no ssh-keygen')
+
+
+def test_on_windows_the_ssh_keygen_that_comes_with_git_is_used(tmp_path, monkeypatch):
+    (tmp_path / 'cmd').mkdir()
+    (tmp_path / 'usr' / 'bin').mkdir(parents=True)
+    monkeypatch.setattr(jobs.sys, 'platform', 'win32')
+    monkeypatch.setattr(jobs.shutil, 'which', lambda name: str(tmp_path / 'cmd' / 'git.exe'))
+    assert jobs.keygen() == 'ssh-keygen'
+    (tmp_path / 'usr' / 'bin' / 'ssh-keygen.exe').touch()
+    assert jobs.keygen() == str(tmp_path.resolve() / 'usr' / 'bin' / 'ssh-keygen.exe')
+
+
 def test_an_overlay_rebuilds_the_dirty_tree_on_top_of_the_commit(repo, tmp_path):
     (repo / 'sim' / 'a.py').write_text('a = 2\n')
     (repo / 'sim' / 'new').mkdir()

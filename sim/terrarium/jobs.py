@@ -26,7 +26,9 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -64,6 +66,26 @@ class BadJob(ValueError):
 
 # signing
 
+# a fixed spec signed by the key in allowed_signers, so a worker can tell at start whether it can check jobs
+CHECK = {'check': 'job signatures can be checked on this machine'}
+CHECK_SIG = """-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgESv0LuORjJnLlKgAclZ2tVCb8a
+0k9AhUbRJ1z5CAUy0AAAANdGVycmFyaXVtLWpvYgAAAAAAAAAGc2hhNTEyAAAAUwAAAAtz
+c2gtZWQyNTUxOQAAAEDxbr7OTySR0dbD6Xsb76ozm74K24lCa4q0cmP5v00orzX+w1FSoQ
++c8j8GuHbI2qkybOjq6dy3603hyhOFWnEL
+-----END SSH SIGNATURE-----
+"""
+
+
+def keygen() -> str:
+    # Windows 10's own OpenSSH may predate -Y (OpenSSH 8.1); Git for Windows brings a recent one
+    if sys.platform == 'win32' and (git := shutil.which('git')):
+        bundled = Path(git).resolve().parent.parent / 'usr' / 'bin' / 'ssh-keygen.exe'
+        if bundled.exists():
+            return str(bundled)
+    return 'ssh-keygen'
+
+
 def canonical(spec: dict) -> bytes:
     return json.dumps(spec, sort_keys=True, separators=(',', ':')).encode()
 
@@ -72,18 +94,33 @@ def sign(spec: dict, key: Path = KEY) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         data = Path(tmp) / 'job.json'
         data.write_bytes(canonical(spec))
-        subprocess.run(['ssh-keygen', '-q', '-Y', 'sign', '-f', str(key), '-n', NAMESPACE, str(data)],
+        subprocess.run([keygen(), '-q', '-Y', 'sign', '-f', str(key), '-n', NAMESPACE, str(data)],
                        check=True, capture_output=True)
         return (Path(tmp) / 'job.json.sig').read_text()
 
 
-def verify(spec: dict, sig: str, signers: Path = SIGNERS) -> bool:
+def checked(spec: dict, sig: str, signers: Path) -> subprocess.CompletedProcess:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / 'job.sig'
         path.write_text(sig)
-        done = subprocess.run(['ssh-keygen', '-Y', 'verify', '-f', str(signers), '-I', PRINCIPAL, '-n', NAMESPACE,
+        return subprocess.run([keygen(), '-Y', 'verify', '-f', str(signers), '-I', PRINCIPAL, '-n', NAMESPACE,
                                '-s', str(path)], input=canonical(spec), capture_output=True)
-        return done.returncode == 0
+
+
+def verify(spec: dict, sig: str, signers: Path = SIGNERS) -> bool:
+    return checked(spec, sig, signers).returncode == 0
+
+
+def can_verify(signers: Path = SIGNERS) -> str | None:
+    """None if this machine checks a known good signature, else why not."""
+    try:
+        done = checked(CHECK, CHECK_SIG, signers)
+    except OSError as e:
+        return f'no ssh-keygen to check job signatures with ({e})'
+    if done.returncode == 0:
+        return None
+    said = (done.stderr or done.stdout).decode(errors='replace').strip()[:300]
+    return f'{keygen()} can\'t check job signatures against {signers}: {said}'
 
 
 def check(spec: dict):
