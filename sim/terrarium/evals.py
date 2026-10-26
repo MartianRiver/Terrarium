@@ -139,10 +139,15 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu') -> 
     # it chooses every `repeat` ticks, as it did in training, and holds its choice in between
     repeat = meta.get('repeat', 1)
     spread = brain.log_std.detach().exp().cpu().numpy()
+    yes_no = np.isin(brain.schema['actions'], YES_NO)
     if mode == 'drawn':
-        spread = spread * np.isin(brain.schema['actions'], YES_NO)
+        spread = spread * yes_no
     elif mode == 'mean':
         spread = spread * 0
+    # a brain whose yes/no actions are coins tosses them (drawn, sampled) or takes the likelier side (mean)
+    coins = yes_no if brain.yes_no == 'bernoulli' else None
+    if coins is not None:
+        spread = spread * ~coins
 
     def make(world: World) -> Policy:
         last = np.zeros((world.arenas, len(world.colony), 2))
@@ -154,6 +159,10 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu') -> 
             if ticks % repeat == 0:
                 mean = brain.act(observe(w, last), sample=False)
                 mean = mean + spread * noise.standard_normal(mean.shape, dtype=mean.dtype)
+                if coins is not None:
+                    odds = mean[..., coins]
+                    yes = odds > 0 if mode == 'mean' else noise.random(odds.shape) < 1 / (1 + np.exp(-odds))
+                    mean[..., coins] = np.where(yes, 1.0, -1.0)
                 held = np.clip(mean, -1, 1).reshape(*last.shape[:2], -1)
                 last = held[..., :2]
             ticks += 1
@@ -179,6 +188,9 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     emptied = np.zeros((episodes, len(colonies)), bool)
     at_end = np.zeros((episodes, len(colonies)), bool)
     hatched = np.zeros((episodes, len(colonies)), int)
+    # Terrikins alive in each colony at the end, and the most it had at once
+    size_end = np.zeros((episodes, len(colonies)), int)
+    size_peak = np.zeros((episodes, len(colonies)), int)
     dawned = np.zeros(episodes, bool)
     actions = {k: [0, 0] for k in CONTEXTS}
     turning = {k: [0, 0.0] for k in PLACES}
@@ -232,7 +244,9 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         at_nest += gone & home
         in_dark += gone & world.dark[:, None]
         away_by_day += gone & ~home & by_day
-        going = np.stack([world.alive[:, world.colony == c].any(1) for c in colonies], 1)
+        counts = np.stack([world.alive[:, world.colony == c].sum(1) for c in colonies], 1)
+        going = counts > 0
+        size_peak = np.where(done[:, None], size_peak, np.maximum(size_peak, counts))
         emptied |= ~going & ~done[:, None]
         # an arena that has ended stops counting; the others carry on
         finished = world.ended & ~done
@@ -241,20 +255,28 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         jelly[finished] = world.jelly[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         hatched[finished] = world.hatched[finished]
+        size_end[finished] = counts[finished]
         at_end[finished] = going[finished] & (world.age[finished, None] >= world.episode_ticks)
         done |= finished
-    alive = lived / cfg.tick_hz
-    per_minute = meals / (alive / 60)
+    # per starting place: a colony's room to grow shows in its size, not here
+    starters = ~world.spare
+    alive = lived[:, starters] / cfg.tick_hz
+    per_minute = meals[:, starters] / (alive / 60)
     return {
         'episodes': episodes, 'seed': seed,
         'food_per_minute': summary(per_minute), 'seconds_alive': summary(alive),
-        'food': summary(meals), 'stored': summary(stored), 'jelly': summary(jelly),
+        'food': summary(meals[:, starters]), 'stored': summary(stored[:, starters]), 'jelly': summary(jelly[:, starters]),
         'deaths': {'creatures': died.size, 'died': int(died.sum()), 'beside_jelly': int(beside_jelly.sum()),
                    'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()), 'away_by_day': int(away_by_day.sum()),
                    'colonies': emptied.size, 'colonies_lost': int(emptied.sum())},
         # per colony an episode, and the colonies that hatched at least one
         'hatched': {**summary(hatched), 'colonies': int((hatched > 0).sum())},
         'colonies_to_the_end': int(at_end.sum()),
+        'colony_size': {'start': cfg.colonies.size, 'end': summary(size_end), 'peak': summary(size_peak)},
+        # colony by colony, summed or averaged over the episodes, for head-to-head evals (versus.py)
+        'per_colony': {'to_the_end': at_end.sum(0).tolist(), 'lost': emptied.sum(0).tolist(),
+                       'size_end': size_end.mean(0).tolist(), 'hatched': hatched.mean(0).tolist(),
+                       'alive': [float(alive[:, world.colony[starters] == c].mean()) for c in colonies]},
         # with nights on: how many each lived through, and the colonies still going at the first dawn (None if the
         # episode is over before one)
         'nights': summary(nights),
@@ -332,7 +354,7 @@ def main():
     print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}  {"p10":>5}  {"stored":>12}  {"jelly":>5}'
           f'  {"died":>5}  {"by jelly":>8}  {"colonies lost":>13}'
           + (f'  {"in dark":>7}  {"nights":>6}  {"through night 1":>15}' if cfg.night.on else '')
-          + (f'  {"to the end":>10}  {"hatched":>7}  {"hatching":>9}' if cfg.hatch.on else ''))
+          + (f'  {"to the end":>10}  {"hatched":>7}  {"hatching":>9}  {"size at end":>11}  {"peak":>5}' if cfg.hatch.on else ''))
     for name, r in results.items():
         f, s, st, d = r['food_per_minute'], r['seconds_alive'], r['stored'], r['deaths']
         print(f'{name:<{width}}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}  {s["p10"]:5.0f}'
@@ -341,7 +363,8 @@ def main():
               + (f'  {d["in_dark"]:7}  {r["nights"]["mean"]:6.2f}  {r["through_first_night"] if r["through_first_night"] is not None else "–":>8} of {d["colonies"]:<4}'
                  if cfg.night.on else '')
               + (f'  {r["colonies_to_the_end"]:>3} of {d["colonies"]:<4}  {r["hatched"]["mean"]:7.2f}'
-                 f'  {r["hatched"]["colonies"]:>9}' if cfg.hatch.on else ''))
+                 f'  {r["hatched"]["colonies"]:>9}  {r["colony_size"]["end"]["mean"]:11.2f}  {r["colony_size"]["peak"]["mean"]:5.2f}'
+                 if cfg.hatch.on else ''))
         log.info('eval done', policy=name, food_per_minute=round(f['mean'], 3), seconds_alive=round(s['mean'], 1))
     print(f'\n{"yes on":<{width}}  ' + '  '.join(f'{k:>16}' for k in CONTEXTS) + '  ' + '  '.join(f'{"turn² " + k:>16}' for k in PLACES))
     for name, r in results.items():

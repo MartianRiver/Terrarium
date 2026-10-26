@@ -21,6 +21,7 @@ Nests are flat ground, so they don't stop a ray. A ray reports reaching one only
 - **Grab,** yes when above 0: takes hold of the nearest block within 15 cm of its body, or the first to come that close, for 2 s from its last yes, and drags it along. It costs a little energy a second while it holds on. It's off (grip 0) in every world but the vault.
 - **Training samples** from a Gaussian around the brain's mean, with a learned spread, clipped to [-1, 1].
 - **Evals take the mean.**
+- **Yes/no actions can be coins instead** (`yes_no = "bernoulli"` in the checkpoint; `python -m terrarium.yesno IN OUT` turns one over). Each is then a coin whose odds the brain sets directly, and the world still gets +1 for yes and −1 for no. A Gaussian cut at 0 can push its mean so far down that yes stops being tried; a coin's odds are what training moves. Turned over, a brain keeps about the odds it had (Φ(z) ≈ sigmoid(1.702 z), within 2%), so it acts the same at first; a new coin starts at 5% yes, as a new Gaussian yes/no does. Evals toss coins in `drawn` and `sampled` modes and take the likelier side in `mean`.
 
 ## Inside
 

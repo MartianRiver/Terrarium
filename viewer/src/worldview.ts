@@ -5,6 +5,7 @@
 import type * as THREE from 'three';
 import { BlobView } from './blob';
 import { Droppings } from './droppings';
+import { Eggs } from './eggs';
 import { type Box, Grips, type Holder } from './grips';
 import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
@@ -42,11 +43,13 @@ export class WorldView {
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;
+  private eggs: Eggs;
 
   constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
     this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
     this.tombstones = new Tombstones(scene, info.tickHz);
     this.grips = new Grips(scene);
+    this.eggs = new Eggs(scene, info.tickHz);
     for (const nest of info.nests) {
       const pile = new JellyPile(nest);
       this.piles.set(nest.colony, pile);
@@ -66,12 +69,14 @@ export class WorldView {
     this.syncBlocks(frame);
     this.droppings?.push(frame);
     this.tombstones.push(frame);
+    this.eggs.push(frame);
     for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
   // alpha: 0..1 progress from the previous frame to the current one
   render(alpha: number, dt: number, time: number) {
     if (!this.frame) return;
+    this.eggs.render(this.frame.tick, alpha, time);
     const holders: Holder[] = [];
     for (const c of this.frame.creatures) {
       const p = this.prevCreatures.get(c.id) ?? c;
@@ -82,6 +87,7 @@ export class WorldView {
       s.heading = lerpAngle(p.heading, c.heading, alpha);
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
+      s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha);
       if (c === this.frame.creatures[0]) this.focus = { x: s.x, y: s.y };
       const blob = this.blobs.get(c.id)!;
       // the dead are a tombstone now
@@ -116,6 +122,7 @@ export class WorldView {
     for (const f of [...this.food.values(), ...this.dyingFood]) this.scene.remove(f.root);
     this.droppings?.clear();
     this.tombstones.clear();
+    this.eggs.clear();
     this.grips.clear();
     for (const block of this.blocks.values()) {
       this.scene.remove(block.root);

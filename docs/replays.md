@@ -20,7 +20,9 @@ From 0.3 each creature has `carrying` (food in its crop) and each frame has `sto
 
 A dead creature stays in the frames with `energy` 0 where it fell, and the viewer draws a tombstone there that fades after 20 s. From 0.3 the sim takes a dead body out of the world (nothing bumps into it or sees it); in older replays it could still be pushed, and its stone stays where it died.
 
-Positions are in metres and angles in radians, rounded to 3 decimals. A creature's `size` is its radius over 0.45 m, the radius the blob model is drawn at. Food gets a new id every time it regrows, and a Terrikin hatched in a lost one's place gets a new one too, because the viewer pops things in and out by id.
+Positions are in metres and angles in radians, rounded to 3 decimals. A creature's `size` is its radius over 0.45 m, the radius the blob model is drawn at. Food gets a new id every time it regrows, and a hatchling gets a new one too, because the viewer pops things in and out by id.
+
+Worlds with hatching give each frame `eggs`, a list of `{id, colony, x, y, progress}`: an egg lies where its Terrikin will hatch, `progress` goes from 0 when it's laid to 1, and the hatchling takes the egg's id, so the viewer cracks the egg and grows the hatchling from small to full size in its place. A colony's places it hasn't hatched into yet (`[colonies] room`) aren't in the frames at all.
 
 ## Changing it
 

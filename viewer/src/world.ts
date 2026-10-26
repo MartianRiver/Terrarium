@@ -60,6 +60,15 @@ export interface StoreState {
   jelly: number;
 }
 
+// an egg on its colony's nest; the Terrikin that hatches from it takes its id (worlds with hatching)
+export interface EggState {
+  id: number;
+  colony: number;
+  x: number;
+  y: number;
+  progress: number; // 0 when laid, 1 as it hatches
+}
+
 export interface Frame {
   tick: number;
   creatures: CreatureState[];
@@ -67,4 +76,5 @@ export interface Frame {
   blocks: BlockState[];
   stores: StoreState[]; // empty in replays from before 0.3
   light: number; // 1 by day, 0 at night; always 1 in worlds without nights
+  eggs: EggState[]; // empty in worlds without hatching and replays from before it
 }

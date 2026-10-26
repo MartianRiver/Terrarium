@@ -5,7 +5,7 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
+  type BlockState, type CreatureState, type EggState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
@@ -103,6 +103,9 @@ function readFrame(o: Obj, where: string): Frame {
     })),
     stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: int(s, 'jelly', w) })),
     light: o.light === undefined ? 1 : num(o, 'light', where),
+    eggs: o.eggs === undefined ? [] : list(o, 'eggs', where, (e, w): EggState => ({
+      id: int(e, 'id', w), colony: int(e, 'colony', w), x: num(e, 'x', w), y: num(e, 'y', w), progress: num(e, 'progress', w),
+    })),
   };
 }
 

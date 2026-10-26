@@ -59,13 +59,17 @@ class World:
         half = cfg.arena.size / 2
         angles = np.arange(col.count) / col.count * 2 * np.pi + np.pi / 2
         self.nests = np.stack([np.cos(angles), np.sin(angles)], -1) * half * col.nest_distance
-        self.colony = np.repeat(np.arange(col.count), col.size)
+        self.colony = np.repeat(np.arange(col.count), col.slots)
+        # each colony's places past its starting size: empty until it hatches into them
+        self.spare = np.tile(np.arange(col.slots) >= col.size, col.count)
         n = len(self.colony)
         self._check_layout()
 
         pos, self.heading = self._spawn(arenas)
-        self.energy = np.full((arenas, n), cfg.energy.start)
-        self.alive = np.ones((arenas, n), bool)
+        self.energy = np.where(self.spare, 0.0, np.full((arenas, n), cfg.energy.start))
+        self.alive = np.tile(~self.spare, (arenas, 1))
+        # places nobody has been in yet this episode, which replays leave out
+        self.unborn = np.tile(self.spare, (arenas, 1))
         # ticks since the arena last started, and the time of day (s) it started at: 0 is dawn
         self.age = np.zeros(arenas, int)
         self.clock = np.zeros(arenas)
@@ -73,9 +77,10 @@ class World:
         self.dark = np.zeros(arenas, bool)
         self.episode_ticks = round(cfg.episode.seconds * cfg.tick_hz)
         self.physics = Physics(cfg, pos)
+        self.physics.remove(self.unborn)
 
-        # ids the viewer keys on: blocks keep theirs, food gets a new one each time it regrows, and a creature
-        # hatched in a lost one's place gets a new one too
+        # ids the viewer keys on: blocks keep theirs, food gets a new one each time it regrows, and a hatchling
+        # gets the one its egg had
         self.creature_id = np.tile(np.arange(1, n + 1), (arenas, 1))
         self.block_id = np.arange(n + 1, n + len(cfg.block) + 1)
         self.next_id = np.full(arenas, n + len(cfg.block) + 1)
@@ -111,8 +116,11 @@ class World:
         self.holding = np.zeros((arenas, n), bool)
         # ticks the grip lasts for after the last yes to grab
         self.gripping = np.zeros((arenas, n), int)
-        # ticks until the egg laid in a lost creature's place hatches (0: none), and each colony's hatchlings
+        # ticks until the egg laid in an empty place hatches (0: none), where it lies, its id (the hatchling's
+        # too), and each colony's hatchlings
         self.egg = np.zeros((arenas, n), int)
+        self.egg_pos = np.zeros((arenas, n, 2))
+        self.egg_id = np.zeros((arenas, n), int)
         self.hatched = np.zeros((arenas, len(self.nests)), int)
         # blocks one creature can drag (the vault's doors)
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
@@ -158,7 +166,7 @@ class World:
 
     def _spawn(self, arenas):
         """Each colony on an evenly spaced ring around its nest, turned a random amount per arena."""
-        size = self.cfg.colonies.size
+        size = self.cfg.colonies.slots
         ring = np.arange(size) / size * 2 * np.pi
         turn = self.rng.uniform(0, 2 * np.pi, (arenas, len(self.nests), 1))
         a = (ring + turn).reshape(arenas, -1)
@@ -174,8 +182,13 @@ class World:
         pos, heading = self._spawn(len(idx))
         self.heading[idx] = heading
         self.physics.place(idx, pos)
-        self.energy[idx] = self.cfg.energy.start
-        self.alive[idx] = True
+        self.energy[idx] = np.where(self.spare, 0.0, self.cfg.energy.start)
+        self.alive[idx] = ~self.spare
+        self.unborn[idx] = self.spare
+        if self.spare.any():
+            gone = np.zeros_like(self.alive)
+            gone[idx] = self.spare
+            self.physics.remove(gone)
         self.age[idx] = 0
         self.dark[idx] = False
         self.meals[idx] = 0
@@ -360,25 +373,28 @@ class World:
             empty = (self.colony == c) & ~self.alive & (self.egg == 0)
             lays = np.flatnonzero(tended[:, c] & empty.any(1) & (self.store[:, c] >= max(h.threshold, h.cost)))
             if len(lays):
-                self.egg[lays, empty[lays].argmax(1)] = max(1, round(h.seconds * self.cfg.tick_hz))
+                slot = empty[lays].argmax(1)
+                self.egg[lays, slot] = max(1, round(h.seconds * self.cfg.tick_hz))
                 self.store[lays, c] -= h.cost
+                # laid where it will hatch, somewhere in the nest
+                angle = self.rng.uniform(0, 2 * np.pi, len(lays))
+                r = self.cfg.colonies.nest_radius / 2 * np.sqrt(self.rng.uniform(size=len(lays)))
+                self.egg_pos[lays, slot] = self.nests[c] + np.stack([np.cos(angle), np.sin(angle)], -1) * r[:, None]
+                self.egg_id[lays, slot] = self.next_id[lays]
+                self.next_id[lays] += 1
 
     def _born(self, due: np.ndarray):
-        """Hatchlings in these (arenas, creatures) slots, somewhere in their own nest."""
+        """Hatchlings in these (arenas, creatures) slots, where their eggs were."""
         a, i = np.nonzero(due)
-        angle = self.rng.uniform(0, 2 * np.pi, len(a))
-        r = self.cfg.colonies.nest_radius / 2 * np.sqrt(self.rng.uniform(size=len(a)))
-        pos = self.nests[self.colony[i]] + np.stack([np.cos(angle), np.sin(angle)], -1) * r[:, None]
-        self.physics.revive(a, i, pos)
+        self.physics.revive(a, i, self.egg_pos[a, i])
         self.heading[a, i] = self.rng.uniform(-np.pi, np.pi, len(a))
         self.energy[a, i] = self.cfg.energy.start
         self.alive[a, i] = True
+        self.unborn[a, i] = False
         self.crop[a, i] = 0
         self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = 0
         np.add.at(self.hatched, (a, self.colony[i]), 1)
-        for k, j in zip(a, i):
-            self.creature_id[k, j] = self.next_id[k]
-            self.next_id[k] += 1
+        self.creature_id[a, i] = self.egg_id[a, i]
         log.debug('creatures hatched', tick=self.tick, count=len(a))
 
     def smelled(self) -> tuple[np.ndarray, ...]:
