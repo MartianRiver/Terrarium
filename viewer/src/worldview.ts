@@ -2,7 +2,7 @@
 // rate; rendering interpolates between the last two so motion stays smooth at
 // any frame rate (and any replay speed later).
 
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { BlobView } from './blob';
 import { Droppings } from './droppings';
 import { Eggs } from './eggs';
@@ -11,6 +11,7 @@ import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
 import { Flowers } from './nectar';
 import { BlockView, FoodView } from './props';
+import type { Pose } from './sightfan';
 import { Dust } from './sprint';
 import { Tombstones } from './tombstones';
 import type { CreatureState, Frame, WorldInfo } from './world';
@@ -38,8 +39,11 @@ export class WorldView {
   private prevCreatures = new Map<number, CreatureState>();
   private prevBlocks = new Map<number, Frame['blocks'][number]>();
   private frame: Frame | null = null;
-  // where the first creature was last drawn, for the follow camera
-  focus: { x: number; y: number } | null = null;
+  // the Terrikin picked by clicking it (null: the first one), and where the followed one was last drawn
+  chosen: number | null = null;
+  focus: Pose | null = null;
+  focusId: number | null = null;
+  private ring: THREE.Mesh;
   private droppings: Droppings | null;
   private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0 };
   private piles = new Map<number, JellyPile>();
@@ -56,6 +60,11 @@ export class WorldView {
     this.eggs = new Eggs(scene, info.tickHz);
     this.flowers = new Flowers(scene, info.tickHz);
     this.dust = new Dust(scene);
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
+    this.ring.position.y = 0.02;
+    this.ring.visible = false;
+    scene.add(this.ring);
     for (const nest of info.nests) {
       const pile = new JellyPile(nest);
       this.piles.set(nest.colony, pile);
@@ -85,6 +94,9 @@ export class WorldView {
     if (!this.frame) return;
     this.eggs.render(this.frame.tick, alpha, time);
     const holders: Holder[] = [];
+    // a chosen Terrikin that has left the world (its place taken by a hatchling) can't be followed
+    if (this.chosen !== null && !this.blobs.has(this.chosen)) this.chosen = null;
+    const followed = this.chosen ?? this.frame.creatures[0]?.id;
     for (const c of this.frame.creatures) {
       const p = this.prevCreatures.get(c.id) ?? c;
       const s = this.scratch;
@@ -95,7 +107,12 @@ export class WorldView {
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
       s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha);
-      if (c === this.frame.creatures[0]) this.focus = { x: s.x, y: s.y };
+      if (c.id === followed) {
+        this.focus = { x: s.x, y: s.y, heading: s.heading };
+        this.focusId = c.id;
+        this.ring.position.x = s.x;
+        this.ring.position.z = s.y;
+      }
       const blob = this.blobs.get(c.id)!;
       // the dead are a tombstone now
       blob.root.visible = !this.tombstones.isDead(c.id);
@@ -110,6 +127,7 @@ export class WorldView {
       this.blocks.get(b.id)!.update(box);
       boxes.push(box);
     }
+    this.ring.visible = this.chosen !== null;
     this.grips.update(holders, boxes);
     this.droppings?.render(this.frame.tick, alpha);
     this.tombstones.render(this.frame.tick, alpha);
@@ -121,6 +139,19 @@ export class WorldView {
       if (!alive) this.scene.remove(f.root);
       return alive;
     });
+  }
+
+  // the Terrikin under a ray from the camera, or null
+  pick(ray: THREE.Raycaster): number | null {
+    const roots = new Map<THREE.Object3D, number>();
+    for (const [id, blob] of this.blobs) if (blob.root.visible) roots.set(blob.root, id);
+    for (const hit of ray.intersectObjects([...roots.keys()], true)) {
+      for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
+        const id = roots.get(o);
+        if (id !== undefined) return id;
+      }
+    }
+    return null;
   }
 
   // take everything out of the scene, before a replay starts over or another opens
@@ -136,6 +167,9 @@ export class WorldView {
     this.flowers.clear();
     this.dust.clear();
     this.grips.clear();
+    this.scene.remove(this.ring);
+    this.ring.geometry.dispose();
+    (this.ring.material as THREE.Material).dispose();
     for (const block of this.blocks.values()) {
       this.scene.remove(block.root);
       block.dispose();

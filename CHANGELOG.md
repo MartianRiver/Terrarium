@@ -70,6 +70,8 @@ Colonies have food enough to grow: `colony.toml` has 22 places food grows (14 wa
 
 Evals show what the sprint and flowers get used for: for each reason a Terrikin could have to sprint (a flower in view, food in view, a run home it needs, or just getting about), how often it says yes, its share of sprints, and how many paid off within 3 s; with flowers, how many opened and got drunk, how often one in view is headed for, and meals a minute on nectar and off it.
 
+In the local viewer, a click follows a Terrikin, and every Terrikin has a name. The brain window (B) shows what the followed one's brain takes in and makes of it as the replay plays: its rays lit by attention (in the world too), every attention head, its senses, the units its actions are read from, how things look to it over the episode, and its actions with their odds, each part explained when clicked. N draws the brain wired up, every unit firing and its strongest connections glowing with what they carry. The runs server records a Terrikin's mind on request (`terrarium.mind`) and can record a replay again on this machine when one from a pod has parted from it.
+
 ## 0.2.0: Solo forager
 
 The first trained brain. One creature alone in the arena with 8 berries learns to keep itself fed. On the evals it eats 18.4 berries a minute and lives out every 3-minute episode. Random actions manage 0.26 and starve in under a minute. A scripted forager that beelines for the nearest berry it sees gets 13.8, so the brain beats that too.

@@ -63,6 +63,20 @@ def test_a_replay_is_recorded_once_in_the_runs_world(tmp_path):
         runs.detail('..')
 
 
+def test_a_mind_is_recorded_once_beside_its_replay(tmp_path):
+    run = make_run(tmp_path, 'done', '2026-10-23T10:00:00+1100', '2026-10-23T10:30:00+1100', checkpoints=[32768])
+    runs = serve.Runs(tmp_path)
+    _, frames = replay.read(runs.replay('done', '00000032768.pt', 3))
+    who = frames[0]['creatures'][0]['id']
+    path = runs.mind('done', '00000032768.pt', 3, who)
+    assert path.name == f'00000032768-3.mind-{who}.jsonl.gz'
+    made = path.stat().st_mtime_ns
+    assert runs.mind('done', '00000032768.pt', 3, who).stat().st_mtime_ns == made
+    assert runs.replay('done', '00000032768.pt', 3, here=True).name == '00000032768-3-here.jsonl.gz'
+    with pytest.raises(serve.NotFound):
+        runs.mind('done', 'random', 3, who)
+
+
 def test_the_api_answers_and_refuses(tmp_path):
     make_run(tmp_path, 'done', '2026-10-23T10:00:00+1100', '2026-10-23T10:30:00+1100')
     server = serve.serve(tmp_path, 0)

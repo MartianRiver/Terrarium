@@ -87,11 +87,27 @@ Each run's page also says what went into the brain it ends with, per machine: ho
 
 The replay is recorded the first time it's asked for, in the run's own world from `run.json` rather than today's config, and kept in the run's `replays/` folder. One takes a second or two. The replay seed picks the arena: the same seed gives every generation the same layout, which is the fair way to compare them. A run on another machine shows up once it's fetched.
 
+### Inside a brain
+
+In a run's replay, click a Terrikin to follow it (a ring marks it, Esc lets go). Each Terrikin has a name, the same every time that episode plays. B opens the brain window on the one followed; it's local only, as it reads the brain through the runs server. The server plays the replay's episode again and writes down what that Terrikin's brain took in and made of it each time it chose (`terrarium/mind.py`, kept in the run's `replays/` folder as `<checkpoint>-<seed>.mind-<id>.jsonl.gz`; about 15 s and 1.5 MB for a 360 s episode). The window shows:
+
+- what it sees: its rays as a fan, in the colour of what each hit, brighter where its attention is; the same rays are drawn on the ground in the world
+- where its attention goes: every head of every layer, as its own token's weights over itself and each ray
+- what it feels: its senses
+- what it makes of it: the units its actions are read from
+- how things look: its guess at the reward still to come, over the whole episode
+- what it does: push and turn, and the odds of each yes/no with a tick when it said yes
+
+Click any part for what it means. N (or Wired) draws it wired up: senses and rays, its own token's units as it enters and after each layer, and its actions, each unit lit by its value, with the strongest connections into each unit (`/api/runs/<id>/wiring/<checkpoint>`; the feed-forward weights multiplied out, so attention shows as the rays reaching into each layer) glowing by what they carry.
+
+Episodes repeat exactly only on the machine that recorded them: a replay recorded on a pod can part from the same episode played on the Mac, and its mind would then be about another moment. The window checks the mind's positions against the replay and offers to record the replay again here (`?here`).
+
 Or by hand:
 
 ```
 uv run python -m terrarium.evals --config configs/solo.toml --policy random greedy --brain runs/<run>/checkpoints/<n>.pt
 uv run python -m terrarium.record out.jsonl.gz --config configs/solo.toml --seconds 180 --brain runs/<run>/checkpoints/<n>.pt
+uv run python -m terrarium.mind mind.jsonl.gz --config configs/solo.toml --brain runs/<run>/checkpoints/<n>.pt --creature 0
 ```
 
 Open the replay in the viewer.
