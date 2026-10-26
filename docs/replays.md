@@ -24,6 +24,8 @@ Positions are in metres and angles in radians, rounded to 3 decimals. A creature
 
 Worlds with hatching give each frame `eggs`, a list of `{id, colony, x, y, progress}`: an egg lies where its Terrikin will hatch, `progress` goes from 0 when it's laid to 1, and the hatchling takes the egg's id, so the viewer cracks the egg and grows the hatchling from small to full size in its place. A colony's places it hasn't hatched into yet (`[colonies] room`) aren't in the frames at all.
 
+Worlds with sprint give each creature `sprinting`, 1 mid-burst (drawn with dust kicked up behind it). Worlds with nectar flowers give each frame `flowers`, a list of `{id, x, y}` of the ones open, and each creature `nectar`, the seconds left of its boost (drawn with a happy face, and an antenna and jelly belly shimmering through a lorikeet's colours). A flower that leaves the list was drunk or closed, and the viewer folds it shut. Older replays have none of these; the viewer reads them as 0 and empty. `&preview` lays make-believe flowers and sprints over any replay, to see the look without them.
+
 ## Changing it
 
 - New fields can be added without bumping the version. The viewer ignores fields it doesn't know, so new ones have to be optional when read.

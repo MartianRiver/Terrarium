@@ -73,3 +73,16 @@ def test_runs_without_a_brain(monkeypatch, capsys):
     monkeypatch.setattr('sys.argv', ['evals', '--config', str(DEFAULT.parent / 'solo.toml'), '--policy', 'random', '--episodes', '2'])
     main()
     assert 'random' in capsys.readouterr().out
+
+
+def test_flowers_drunk_and_sprints_toward_them_are_counted():
+    colony = load(DEFAULT.parent / 'colony.toml')
+    short = replace(colony, episode=replace(colony.episode, seconds=40.0),
+                    flowers=replace(colony.flowers, every_min=1.0, every_max=2.0, count=4))
+    assert run(short, POLICIES['greedy'], 4)['flowers']['max'] >= 1
+
+    def tossing(world):
+        greedy, coin = POLICIES['greedy'](world), np.random.default_rng(0)
+        return lambda w: np.concatenate([greedy(w), coin.choice([-1.0, 1.0], (*w.alive.shape, 1))], -1)
+    seen = run(short, tossing, 4)['actions']['sprint_flower']
+    assert seen['ticks'] > 0 and 0 < seen['yes'] < 1

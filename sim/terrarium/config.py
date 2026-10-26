@@ -115,6 +115,22 @@ class Sprint:
 
 
 @dataclass(frozen=True)
+class Flowers:
+    count: int
+    every_min: float
+    every_max: float
+    open: float
+    radius: float
+    food: int
+    boost: float
+    speed: float
+
+    @property
+    def on(self) -> bool:
+        return self.count > 0
+
+
+@dataclass(frozen=True)
 class Grab:
     reach: float
     grip: float
@@ -181,6 +197,7 @@ class Config:
     hatch: Hatch
     night: Night
     sprint: Sprint
+    flowers: Flowers
     grab: Grab
     smell: Smell
     ground: Ground
@@ -292,6 +309,8 @@ SINCE = {'colonies': {'room': 0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
          'food': {'middle': 0},
+         'flowers': {'count': 0, 'every_min': 0.0, 'every_max': 0.0, 'open': 0.0, 'radius': 0.0, 'food': 0, 'boost': 0.0,
+                     'speed': 1.0},
          'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0},
          'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0}}
 

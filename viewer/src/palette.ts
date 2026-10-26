@@ -10,6 +10,15 @@ export const SIGNAL_COLOURS = [0xfff36b, 0x4dffb8, 0xff4fa3, 0x58e6ff, 0xffffff]
 // an unlit bulb: a warm grey, away from the signals (though near enough to the white one that 0.4 should swap it for a hue)
 export const SIGNAL_OFF_BULB = new Color(0x8c8279);
 
+// nectar shimmers through the colours of a rainbow lorikeet, so it can't pass for any steady signal
+export const LORIKEET = [0x2f6fe0, 0x3fbf4a, 0xffd23f, 0xff8a1f, 0xe8322f, 0x7a4fd6].map((c) => new Color(c));
+
+export function shimmer(time: number, seed: number, out: Color) {
+  const t = (time * 0.9 + seed) % LORIKEET.length;
+  const i = Math.floor(t);
+  return out.copy(LORIKEET[i]).lerp(LORIKEET[(i + 1) % LORIKEET.length], t - i);
+}
+
 if (SIGNAL_COLOURS.length !== SIGNAL_COUNT) throw new Error('signal palette size does not match SIGNAL_COUNT');
 
 // a garden under a glass dome on Mars, warm afternoon. Seasons will change these

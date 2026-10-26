@@ -1,5 +1,6 @@
-# Colonies (0.3's main world): night.toml with half the food (enough for about two colonies), and food smell and
-# hatching on. A colony can pay jelly from its store for an egg that hatches a new member, into the place of one it
+# Colonies (0.3's main world): night.toml with less food, slower Terrikins with a stronger sprint, and food smell,
+# hatching and nectar flowers on. There's food enough for the colonies to grow if they forage well and keep a store
+# for the night. A colony can pay jelly from its store for an egg that hatches a new member, into the place of one it
 # lost or into room to grow to eight, so a store is worth keeping above the line.
 # Metres, seconds, kilograms, radians.
 
@@ -14,7 +15,7 @@ size = 26.0
 [creature]
 radius = 0.45
 mass = 1.0
-max_speed = 2.4
+max_speed = 2.0
 # backing up, as a share of max_speed
 reverse = 0.3
 turn_rate = 3.5
@@ -46,7 +47,7 @@ nest_distance = 0.68
 spawn_ring = 2.5
 
 [food]
-count = 14
+count = 22
 radius = 0.25
 regrow_min = 6.0
 regrow_max = 12.0
@@ -97,10 +98,24 @@ reach = 1.5
 [sprint]
 # a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
 # thrust, and none again until `cooldown` seconds after it ends
-speed = 1.6
+speed = 2.0
 seconds = 1.5
 cooldown = 6.0
 energy = 0.04
+
+[flowers]
+# now and then by day a nectar flower opens somewhere clear of nests and walls, every every_min to every_max seconds
+# while fewer than `count` are open, and closes after `open` seconds or at nightfall. The first to touch one drinks
+# it all: `food` foods' worth, eaten or carried like food, and `boost` seconds at `speed` times its top speed.
+# count 0 is off
+count = 1
+every_min = 15.0
+every_max = 30.0
+open = 15.0
+radius = 0.35
+food = 3
+boost = 8.0
+speed = 1.25
 
 [grab]
 # a creature saying yes to grab takes hold of a block within reach of its body (metres from its edge), or the first

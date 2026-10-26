@@ -21,6 +21,11 @@
 # spinning isn't) and sprinting, a burst of speed with a cooldown ([sprint]),
 # chosen like unload and eat.
 #
+# With [flowers] on, a nectar flower opens now and then by day, rare and rich:
+# the first to touch one drinks it all, food's worth several times over (eaten
+# or carried like food) and a burst of speed that lasts a few seconds. It closes
+# by itself before long, so it's worth hurrying to.
+#
 # With [grab] on, a creature can take hold of a block it touches and drag it
 # about, paying a little energy a second while it holds on. A yes grips for a
 # couple of seconds, so a grab is something tried now and then that lasts.
@@ -122,6 +127,15 @@ class World:
         self.egg_pos = np.zeros((arenas, n, 2))
         self.egg_id = np.zeros((arenas, n), int)
         self.hatched = np.zeros((arenas, len(self.nests)), int)
+        # open nectar flowers: where, ticks until each closes (0: not open), ids, and ticks until the next opens
+        fl = cfg.flowers
+        self.flower_pos = np.zeros((arenas, fl.count, 2))
+        self.flower_left = np.zeros((arenas, fl.count), int)
+        self.flower_id = np.zeros((arenas, fl.count), int)
+        self.flower_due = self._flower_wait(arenas)
+        # ticks left of each creature's nectar boost, and the flowers each has drunk since its arena started
+        self.nectar = np.zeros((arenas, n), int)
+        self.drunk = np.zeros((arenas, n), int)
         # blocks one creature can drag (the vault's doors)
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
         self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors) if cfg.smell.on else None
@@ -147,6 +161,10 @@ class World:
     @property
     def food_present(self):
         return self.food_regrow == 0
+
+    @property
+    def flowers_open(self):
+        return self.flower_left > 0
 
     @property
     def ended(self):
@@ -204,6 +222,10 @@ class World:
         self.gripping[idx] = 0
         self.egg[idx] = 0
         self.hatched[idx] = 0
+        self.flower_left[idx] = 0
+        self.flower_due[idx] = self._flower_wait(len(idx))
+        self.nectar[idx] = 0
+        self.drunk[idx] = 0
         self.creature_id[idx] = np.arange(1, len(self.colony) + 1)
         if self.smell:
             self.smell.reset(idx)
@@ -231,8 +253,8 @@ class World:
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
         self.heading = (self.heading + np.pi) % (2 * np.pi) - np.pi
-        speed = (np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse)
-                 * c.max_speed * (1 - cfg.crop.slow * self.crop))
+        top = c.max_speed * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop)
+        speed = np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse) * top
         target = np.stack([np.cos(self.heading), np.sin(self.heading)], -1) * speed[..., None]
         # the force that closes this share of the gap to the wanted velocity in one tick, if nothing's in the way
         change = (target - self.vel) * min(1.0, c.accel * cfg.dt)
@@ -250,11 +272,16 @@ class World:
         self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt, 0, 1)
         self.sprinting[bursting] -= 1
         np.maximum(self.resting - 1, 0, out=self.resting)
+        np.maximum(self.nectar - 1, 0, out=self.nectar)
         self.resting[bursting & (self.sprinting == 0)] = round(s.cooldown * cfg.tick_hz)
         self._nightfall()
         self._regrow()
+        if cfg.flowers.on:
+            self._bloom()
         # eating on the tick it would have run out still saves it
         self._eat()
+        if cfg.flowers.on:
+            self._drink()
         self._unload(unload)
         self._feed(eat)
         if self.smell:
@@ -263,6 +290,7 @@ class World:
         if dying.any():
             self.alive &= ~dying
             self.sprinting[dying] = 0
+            self.nectar[dying] = 0
             self.holding[dying] = False
             self.gripping[dying] = 0
             self.physics.remove(dying)
@@ -306,6 +334,51 @@ class World:
         self.food_regrow[arena, food] = np.where(wild, self.rng.integers(lo, hi + 1, len(arena)), EMPTY)
         self.eaten += len(arena)
         log.trace('food eaten', tick=self.tick, count=len(arena))
+
+    def _drink(self):
+        """The first to touch an open flower drinks it: its food's worth eaten while hungry, the rest carried while
+        there's room in the crop, and a boost of speed."""
+        cfg = self.cfg
+        reach = cfg.creature.radius + cfg.flowers.radius
+        dx = self.pos[:, :, None, 0] - self.flower_pos[:, None, :, 0]
+        dy = self.pos[:, :, None, 1] - self.flower_pos[:, None, :, 1]
+        touching = (dx * dx + dy * dy < reach * reach) & self.flowers_open[:, None] & self.alive[..., None]
+        drunk = touching.any(1)
+        if not drunk.any():
+            return
+        arena, flower = np.nonzero(drunk)
+        who = touching.argmax(1)[arena, flower]
+        self.flower_left[arena, flower] = 0
+        np.add.at(self.drunk, (arena, who), 1)
+        self.nectar[arena, who] = round(cfg.flowers.boost * cfg.tick_hz)
+        for _ in range(cfg.flowers.food):
+            hungry = self.energy[arena, who] <= 1 - cfg.energy.food
+            self.energy[arena[hungry], who[hungry]] += cfg.energy.food
+            self.fed[arena[hungry], who[hungry]] += cfg.energy.food
+            room = ~hungry & (self.crop[arena, who] < cfg.crop.capacity)
+            self.crop[arena[room], who[room]] += 1
+        log.trace('flowers drunk', tick=self.tick, count=len(arena))
+
+    def _bloom(self):
+        """By day, a flower opens once the wait for it is up, if there's room for another; open ones wither."""
+        np.maximum(self.flower_left - 1, 0, out=self.flower_left)
+        day = ~self.dark
+        self.flower_due[day] = np.maximum(self.flower_due[day] - 1, 0)
+        free = ~self.flowers_open
+        for a in np.flatnonzero(day & (self.flower_due == 0) & free.any(1)):
+            f = free[a].argmax()
+            self.flower_pos[a, f] = self._open_ground(a)
+            self.flower_left[a, f] = round(self.cfg.flowers.open * self.cfg.tick_hz)
+            self.flower_id[a, f] = self.next_id[a]
+            self.next_id[a] += 1
+            self.flower_due[a] = self._flower_wait(1)[0]
+
+    def _flower_wait(self, count: int) -> np.ndarray:
+        fl, hz = self.cfg.flowers, self.cfg.tick_hz
+        # drawn only with flowers on, so worlds without them keep their food where it was
+        if not fl.on:
+            return np.zeros(count, int)
+        return self.rng.integers(round(fl.every_min * hz), round(fl.every_max * hz) + 1, count)
 
     def nest_at(self) -> np.ndarray:
         """Which nest each creature is standing in, -1 for none, (arenas, creatures)."""
@@ -392,7 +465,7 @@ class World:
         self.alive[a, i] = True
         self.unborn[a, i] = False
         self.crop[a, i] = 0
-        self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = 0
+        self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = self.nectar[a, i] = 0
         np.add.at(self.hatched, (a, self.colony[i]), 1)
         self.creature_id[a, i] = self.egg_id[a, i]
         log.debug('creatures hatched', tick=self.tick, count=len(a))
@@ -423,6 +496,8 @@ class World:
         self.dark = dark
         if not fell.any():
             return
+        # flowers close at nightfall
+        self.flower_left[fell] = 0
         standing = (self.food_regrow[:, :self.wild] == 0) & fell[:, None]
         hz = self.cfg.tick_hz
         lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)

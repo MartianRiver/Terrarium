@@ -2,7 +2,7 @@
 // layered on top of the sim state; none of it feeds back into the sim.
 
 import * as THREE from 'three';
-import { COLONY_COLOURS, SIGNAL_COLOURS, SIGNAL_OFF_BULB } from './palette';
+import { COLONY_COLOURS, SIGNAL_COLOURS, SIGNAL_OFF_BULB, shimmer } from './palette';
 import { SIGNAL_OFF, type CreatureState } from './world';
 
 // drawn at this scale its widest point (the arms) matches the sim's 0.45 m body
@@ -66,6 +66,8 @@ const HUNGRY_BELOW = 0.3;
 const FULL_ABOVE = 0.85;
 // a full crop shows as a glowing jelly belly, like a honeypot ant's; this many fills it
 const CROP_FULL = 2;
+const AMBER = new THREE.Color(0xffb03a);
+const AMBER_GLOW = new THREE.Color(0xff8a1f);
 
 function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number, number, number], scale: [number, number, number] | number, shadow = true) {
   const m = new THREE.Mesh(geo, mat);
@@ -95,6 +97,12 @@ export class BlobView {
     color: 0xffb03a, emissive: 0xff8a1f, emissiveIntensity: 0.35, roughness: 0.15, clearcoat: 1, transparent: true, opacity: 0.85,
   });
   private crop = 0;
+  private mouth: THREE.Mesh;
+  private blush: THREE.Mesh[] = [];
+  // nectar: a shimmering bulb and belly and a happy face; sprinting: stretched out and quick-footed
+  private joy = 0;
+  private dash = 0;
+  private sheen = new THREE.Color();
 
   private seed = Math.random() * 100;
   private phase = 0;
@@ -126,7 +134,8 @@ export class BlobView {
     this.body.add(mesh(bodyGeo, this.skin, [0, 0, 0], [1, 1, DEPTH]));
     this.body.position.y = LEGS;
 
-    this.body.add(seat(mesh(mouthGeo, dark, [0, 0, 0], 1, false), 0, 0.41, 0.004, Math.PI));
+    this.mouth = seat(mesh(mouthGeo, dark, [0, 0, 0], 1, false), 0, 0.41, 0.004, Math.PI);
+    this.body.add(this.mouth);
     for (const side of [-1, 1]) {
       const eye = seat(mesh(ball, dark, [0, 0, 0], [0.052, 0.085, 0.035]), side * 0.14, 0.52, 0.012);
       const glint = mesh(ball, glintMat, [0.3, 0.35, 0.8], 0.3, false);
@@ -135,7 +144,9 @@ export class BlobView {
       this.glints.push(glint);
       this.body.add(eye);
 
-      this.body.add(seat(mesh(ball, blushMat, [0, 0, 0], [0.055, 0.032, 0.02], false), side * 0.25, 0.44, 0.006));
+      const blush = seat(mesh(ball, blushMat, [0, 0, 0], [0.055, 0.032, 0.02], false), side * 0.25, 0.44, 0.006);
+      this.blush.push(blush);
+      this.body.add(blush);
 
       const arm = mesh(ball, this.limbs, [side * 0.43, 0.36, 0.04], [0.08, 0.13, 0.08]);
       this.arms.push(arm);
@@ -176,11 +187,19 @@ export class BlobView {
     }
     this.lastYaw = yaw;
 
+    const ease = Math.min(1, dt * 6);
+    this.joy += (s.nectar > 0 ? 1 - this.joy : -this.joy) * ease;
+    this.dash += (s.sprinting > 0 ? 1 - this.dash : -this.dash) * ease;
     this.applyEnergy(s.energy, dt);
     this.animateWalk(s.speed / maxSpeed, dt, time);
     this.animateEyes(dt, time);
     this.applySignal(s.signal, dt);
     this.applyCrop(s.carrying, dt);
+    this.applyNectar(time);
+  }
+
+  get sprinting() {
+    return this.dash > 0.5;
   }
 
   private animateWalk(moving: number, dt: number, time: number) {
@@ -190,13 +209,14 @@ export class BlobView {
     this.stride += ((moving > 0.08 ? (0.5 + moving * 0.5) * spring : 0) - this.stride) * Math.min(1, dt * 6);
 
     const before = Math.floor(this.phase / Math.PI);
-    if (this.stride > 0.02) this.phase += dt * (7 + 7 * moving);
+    if (this.stride > 0.02) this.phase += dt * (7 + 7 * moving) * (1 + 0.7 * this.dash);
     // a little squash on each footfall
     if (Math.floor(this.phase / Math.PI) !== before) this.squashVel -= 0.8 * this.stride;
 
     const bob = Math.abs(Math.sin(this.phase)) * this.stride * 0.22;
     const breathe = Math.sin(time * 2.2 + this.seed) * 0.025 * (1 - this.stride);
-    const target = bob * 0.12 + breathe;
+    const hop = this.joy * 0.05 * Math.abs(Math.sin(time * 8 + this.seed));
+    const target = bob * 0.12 + breathe + hop;
     // the spring is stiff: stepped in one go at 10 fps it grows every frame instead of settling
     for (let left = dt; left > 0; left -= SPRING_STEP) {
       const h = Math.min(left, SPRING_STEP);
@@ -208,11 +228,11 @@ export class BlobView {
     const girth = 1 + this.full * 0.08 - this.hunger * 0.12;
     // never wider than the body it's drawn in
     const sxz = Math.min(1.04, girth / Math.sqrt(Math.max(0.5, sy)));
-    this.body.scale.set(sxz, sy, sxz);
+    this.body.scale.set(sxz * (1 - 0.06 * this.dash), sy * (1 - 0.1 * this.dash), sxz * (1 + 0.14 * this.dash));
     this.body.position.y = LEGS + bob * 0.16;
 
     // waddle: lean into the walk, rock side to side with each step
-    this.lean += ((moving * 0.08) - this.lean) * Math.min(1, dt * 5);
+    this.lean += ((moving * 0.08 + this.dash * 0.16) - this.lean) * Math.min(1, dt * 5);
     this.body.rotation.x = this.lean;
     const rock = Math.sin(this.phase) * 0.11 * this.stride;
     this.body.rotation.z = Math.max(-0.15, Math.min(0.15, -this.turn * 0.08 + rock));
@@ -243,7 +263,8 @@ export class BlobView {
     this.blinkLeft = Math.max(0, this.blinkLeft - dt);
     // heavy lids when starving
     const open = 0.085;
-    const eyeHeight = this.blinkLeft > 0 ? open * 0.12 : open * (1 - this.hunger * 0.5);
+    // happy eyes squeeze up into crescents
+    const eyeHeight = (this.blinkLeft > 0 ? open * 0.12 : open * (1 - this.hunger * 0.5)) * (1 - 0.6 * this.joy);
 
     // the glints lead into the turn, with a little idle wander
     const lookX = (Math.max(-0.35, Math.min(0.35, -this.turn * 0.15)) + Math.sin(time * 0.7 + this.seed) * 0.08) * 0.15;
@@ -269,6 +290,23 @@ export class BlobView {
     this.crop += (Math.min(1, carrying / CROP_FULL) - this.crop) * Math.min(1, dt * 6);
     this.belly.visible = this.crop > 0.02;
     this.belly.scale.set(0.2 * this.crop, 0.15 * this.crop, 0.06);
+  }
+
+  private applyNectar(time: number) {
+    const j = this.joy;
+    this.mouth.scale.set(1 + 0.7 * j, 1 + 1.1 * j, 1);
+    for (const b of this.blush) b.scale.set(0.055 * (1 + 0.5 * j), 0.032 * (1 + 0.5 * j), 0.02);
+    shimmer(time, this.seed, this.sheen);
+    if (j > 0.01) {
+      this.bulbMat.color.lerp(this.sheen, j);
+      this.bulbMat.emissive.copy(this.bulbMat.color);
+      this.bulbMat.emissiveIntensity = Math.max(this.bulbMat.emissiveIntensity, j * 1.2);
+    }
+    this.bellyMat.color.copy(AMBER).lerp(this.sheen, j);
+    this.bellyMat.emissive.copy(AMBER_GLOW).lerp(this.sheen, j);
+    const fill = Math.max(this.crop, j * 0.75);
+    this.belly.visible = fill > 0.02;
+    this.belly.scale.set(0.2 * fill, 0.15 * fill, 0.06);
   }
 
   private applySignal(signal: number, dt: number) {

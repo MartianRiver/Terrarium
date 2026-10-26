@@ -118,7 +118,20 @@ CONTEXTS = {
     'eat_hungry_home': (lambda w, nest, mine: (nest == w.colony) & (w.energy < w.cfg.jelly.hunger) & (mine > 0), 3),
     'sprint_ready': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on, 4),
     'grab_block': (lambda w, nest, mine: w.touching_block() & w.cfg.grab.on, 5),
+    'sprint_flower': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on & flower_in_view(w), 4),
 }
+
+
+def flower_in_view(w: World) -> np.ndarray:
+    """(arenas, creatures): an open flower within its field and range of view, blocked or not."""
+    d = w.flower_pos[:, None] - w.pos[:, :, None]                       # A,N,F,2
+    off = np.arctan2(d[..., 1], d[..., 0]) - w.heading[..., None]
+    off = (off + np.pi) % (2 * np.pi) - np.pi
+    v = w.cfg.vision
+    seen = (np.hypot(d[..., 0], d[..., 1]) < v.range) & (np.abs(off) <= v.fov / 2) & w.flowers_open[:, None]
+    return seen.any(-1)
+
+
 # how hard it turns (the mean of turn squared, what turning costs by) out by day and in its nest at night
 PLACES = {
     'day_out': lambda w, home: ~home & (w.light() == 1)[:, None],
@@ -177,7 +190,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     world = World(cfg, episodes, seed)
     policy = make(world)
     shape = world.alive.shape
-    lived, meals, stored, jelly = (np.zeros(shape, int) for _ in range(4))
+    lived, meals, stored, jelly, drunk = (np.zeros(shape, int) for _ in range(5))
     # deaths in each slot: with hatching, one slot can die more than once
     died, beside_jelly, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
@@ -253,6 +266,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         meals[finished] = world.meals[finished]
         stored[finished] = world.stored[finished]
         jelly[finished] = world.jelly[finished]
+        drunk[finished] = world.drunk[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         hatched[finished] = world.hatched[finished]
         size_end[finished] = counts[finished]
@@ -266,6 +280,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'episodes': episodes, 'seed': seed,
         'food_per_minute': summary(per_minute), 'seconds_alive': summary(alive),
         'food': summary(meals[:, starters]), 'stored': summary(stored[:, starters]), 'jelly': summary(jelly[:, starters]),
+        'flowers': summary(drunk[:, starters]),
         'deaths': {'creatures': died.size, 'died': int(died.sum()), 'beside_jelly': int(beside_jelly.sum()),
                    'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()), 'away_by_day': int(away_by_day.sum()),
                    'colonies': emptied.size, 'colonies_lost': int(emptied.sum())},
@@ -371,11 +386,11 @@ def main():
         rates = [r['actions'][k]['yes'] for k in CONTEXTS]
         print(f'{name:<{width}}  ' + '  '.join(f'{"–" if y is None else f"{y:.1%}":>16}' for y in rates) + '  '
               + '  '.join(f'{"–" if t is None else f"{t:.2f}":>16}' for t in (r['turning'][k] for k in PLACES)))
-    print(f'\n{"meals":<{width}}  {"away by day":>11}  {"contested":>9}  {"from middle":>11}  {"blocks moved":>12}')
+    print(f'\n{"meals":<{width}}  {"away by day":>11}  {"contested":>9}  {"from middle":>11}  {"blocks moved":>12}  {"flowers":>7}')
     for name, r in results.items():
         share = r['contested']['share']
         print(f'{name:<{width}}  {r["deaths"]["away_by_day"]:11}  {"–" if share is None else f"{share:.1%}":>9}'
-              f'  {r["from_middle"]["mean"]:11.1f}  {r["blocks_moved"]["mean"]:12.2f}')
+              f'  {r["from_middle"]["mean"]:11.1f}  {r["blocks_moved"]["mean"]:12.2f}  {r["flowers"]["mean"]:7.2f}')
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

@@ -6,7 +6,7 @@ export const SIGNAL_COUNT = 5;
 export const SIGNAL_OFF = -1;
 
 // jelly is what a Terrikin leaves when it unloads its crop outside a nest (0.3 on)
-export type FoodKind = 'common' | 'rich' | 'jelly';
+export type FoodKind = 'common' | 'jelly';
 
 export interface CreatureState {
   id: number;
@@ -20,6 +20,8 @@ export interface CreatureState {
   signal: number; // SIGNAL_OFF or 0..SIGNAL_COUNT-1
   carrying: number; // food eaten past full, held in its crop to make jelly; 0 in replays from before 0.3
   holding: number; // 1 while it grips a block (grab); 0 in replays of worlds without grab
+  nectar: number; // seconds left of a nectar boost; 0 in worlds without flowers
+  sprinting: number; // 1 mid-sprint; 0 in worlds without sprint and replays from before it
 }
 
 export interface FoodState {
@@ -69,6 +71,13 @@ export interface EggState {
   progress: number; // 0 when laid, 1 as it hatches
 }
 
+// an open nectar flower; it's gone once drunk or closed
+export interface FlowerState {
+  id: number;
+  x: number;
+  y: number;
+}
+
 export interface Frame {
   tick: number;
   creatures: CreatureState[];
@@ -77,4 +86,5 @@ export interface Frame {
   stores: StoreState[]; // empty in replays from before 0.3
   light: number; // 1 by day, 0 at night; always 1 in worlds without nights
   eggs: EggState[]; // empty in worlds without hatching and replays from before it
+  flowers: FlowerState[]; // empty in worlds without flowers
 }

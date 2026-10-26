@@ -12,7 +12,7 @@ import numpy as np
 
 from .world import World
 
-NOTHING, WALL, CREATURE, FOOD, BLOCK = range(5)
+NOTHING, WALL, CREATURE, FOOD, BLOCK, FLOWER = range(6)
 # rays start this far outside the body, so a creature never sees itself
 GAP = 0.01
 
@@ -41,6 +41,7 @@ def look(world: World) -> Sight:
     # the dead are gone from the world
     others = ~np.eye(n, dtype=bool) & world.alive[:, None, :]
     food = np.broadcast_to(world.food_present[:, None], (arenas, n, world.food_present.shape[1]))
+    flowers = np.broadcast_to(world.flowers_open[:, None], (arenas, n, world.flowers_open.shape[1]))
     half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2)
     creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start)
     hits = np.stack([
@@ -48,6 +49,7 @@ def look(world: World) -> Sight:
         creatures.min(-1),
         hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start).min(-1, initial=np.inf),
         hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start),
+        hit_circles(pos, dirs, world.flower_pos, cfg.flowers.radius, flowers, start).min(-1, initial=np.inf),
     ], -1)
     dist = hits.min(-1)
     seen = dist < v.range
