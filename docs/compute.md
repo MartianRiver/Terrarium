@@ -60,7 +60,9 @@ uv run python -m terrarium.worker --server https://terrarium-jobs.martianriver.c
 
 The first time, it asks for the token and saves it as `~/.terrarium/worker/token`. The worker itself doesn't need torch. Each job's checkout gets its own, the CUDA build when `nvidia-smi` works and the CPU one otherwise.
 
-While it runs, `uv run python -m terrarium.worker status` (or http://127.0.0.1:5191/status) shows what it's doing and why: `ready`, `waiting` (on battery, in use, a game on the GPU), `working`, or `paused`. `pause`, `resume` and `drain` (finish the current job, then stop) do what they say. Ctrl-C (or Ctrl-Break, or SIGTERM) hands unfinished jobs back to the queue; that doesn't count against them.
+While it runs, `uv run python -m terrarium.worker status` (or http://127.0.0.1:5191/status) shows what it's doing and why: `ready`, `waiting` (on battery, in use, a game on the GPU), `working`, or `paused`. `pause`, `resume` and `drain` (finish the current job, then stop) do what they say.
+
+Every minute, working or not, the worker tells the coordinator what the machine is (OS, CPU, cores, memory, and each NVIDIA GPU with its memory) and that same state and reason. That's everything it sends about your machine: no hostname, user name or files. The coordinator keeps only those fields, cut short, and only I can read them. The public board (`/api/board`, shown on the site) has each machine's name, kind (mine, rented or lent), GPU, samples trained, hours, jobs done and the day it was last active. It never shows the state: "waiting" would tell anyone that you're at your computer. Ctrl-C (or Ctrl-Break, or SIGTERM) hands unfinished jobs back to the queue; that doesn't count against them.
 
 Each job builds a checkout of its commit with its own `.venv` under `~/.terrarium/worker/code/`. It's big with the CUDA build of torch, and it's reused for every job on the same commit. Deleting the folder while the worker is stopped is always safe. The runs your machine made stay in `~/.terrarium/worker/runs/`, oldest deleted first past 2 GB.
 
@@ -147,6 +149,7 @@ uv run python -m terrarium.jobs add grid.toml     # signs with ~/.ssh/terrarium_
 uv run python -m terrarium.jobs list
 uv run python -m terrarium.jobs sync              # finished runs → runs/
 uv run python -m terrarium.jobs cancel ID | retry ID
+uv run python -m terrarium.jobs workers           # each machine's specs, state and when it last reported
 ```
 
 The code is this checkout's HEAD. A dirty tree goes as an overlay (every changed or untracked file under `sim/`, and the deleted ones), so the run trains on exactly what's on disk, comes out as scratch like any dirty run, and can never be promoted. The overlay itself is saved in the run folder as `overlay.tar.gz`, next to `diff.patch`, and `job.json` holds the signed job. A job is trusted (my machines only) when it has an overlay or its commit isn't on a branch pushed to `origin` yet.

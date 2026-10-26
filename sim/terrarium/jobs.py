@@ -316,6 +316,7 @@ def main():
     for name in ('cancel', 'retry'):
         sub.add_parser(name).add_argument('ids', nargs='+')
     sub.add_parser('sync')
+    sub.add_parser('workers')
     args = parser.parse_args()
     client = Client(args.server, token(args.token_file))
     match args.command:
@@ -335,6 +336,15 @@ def main():
         case 'sync':
             for path in sync(client, args.runs):
                 print(path.name)
+        case 'workers':
+            for name, w in client.json('GET', '/api/workers').items():
+                info = w.get('info') or {}
+                specs = info.get('specs') or {}
+                gpus = ', '.join(f'{g["name"]} {g["memory_gb"]} GB' for g in specs.get('gpus') or [])
+                ago = time.time() - w.get('seen', 0)
+                print(f'{name:<16} {w["role"]:<8} {info.get("state", "?"):<9} {ago / 60:>5.1f} min ago  '
+                      f'{specs.get("os") or info.get("platform", "")}; {specs.get("cpu")}, {specs.get("cores")} cores, '
+                      f'{specs.get("memory_gb")} GB; {gpus or "no NVIDIA GPU"}  {info.get("reason") or ""}')
 
 
 if __name__ == '__main__':
