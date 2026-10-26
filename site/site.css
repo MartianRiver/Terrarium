@@ -373,7 +373,38 @@ figure {
   overflow-x: auto;
 }
 
+.board table {
+  width: 100%;
+}
+
 .board td,
 .board th {
   white-space: nowrap;
+  vertical-align: top;
+}
+
+.board .gpu {
+  white-space: normal;
+}
+
+.board .n {
+  text-align: right;
+  padding: 4px 0 4px 12px;
+}
+
+.board .gpu-under {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .board .gpu,
+  .board .last {
+    display: none;
+  }
+
+  .board .gpu-under {
+    display: block;
+    font-size: 0.8em;
+    color: var(--muted);
+  }
 }

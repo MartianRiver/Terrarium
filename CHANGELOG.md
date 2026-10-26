@@ -72,7 +72,7 @@ Evals show what the sprint and flowers get used for: for each reason a Terrikin 
 
 In the local viewer, a click follows a Terrikin, and every Terrikin has a name. The brain window (B) shows what the followed one's brain takes in and makes of it as the replay plays: its rays lit by attention (in the world too), every attention head, its senses, the units its actions are read from, how things look to it over the episode, and its actions with their odds, each part explained when clicked. N draws the brain wired up, every unit firing and its strongest connections glowing with what they carry. The runs server records a Terrikin's mind on request (`terrarium.mind`) and can record a replay again on this machine when one from a pod has parted from it.
 
-The public board also shows what my Mac and rented GPUs trained outside the queue (`sim/board.toml`, written by `python -m terrarium.compute board` from the ledger: rented GPUs grouped by model and memory, runs counted as jobs, queue runs left to the queue). Terrarium at Home says a Mac with Apple silicon can lend a hand too, with real speeds, and what the worker can't check on one.
+The public board also shows what my Mac and rented GPUs trained outside the queue (`sim/board.toml`, written by `python -m terrarium.compute board` from the ledger: rented GPUs grouped by model and memory, runs counted as jobs, queue runs left to the queue). Terrarium at Home says a Mac with Apple silicon can lend a hand too, with real speeds, and what the worker can't check on one. The board's table fits the page: rented machines are named by their GPU's own column, and on a phone the GPU moves under the name too.
 
 ## 0.2.0: Solo forager
 
