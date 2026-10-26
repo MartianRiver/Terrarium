@@ -188,7 +188,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     shape = world.alive.shape
     lived, meals, stored, jelly, drunk = (np.zeros(shape, int) for _ in range(5))
     # deaths in each slot: with hatching, one slot can die more than once
-    died, beside_jelly, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
+    died, jelly_at_home, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
     nights = np.zeros(shape, int)
     colonies = np.unique(world.colony)
@@ -252,7 +252,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
             dawned |= first
         gone = before & ~world.alive
         died += gone
-        beside_jelly += gone & (mine > 0)
+        jelly_at_home += gone & (mine > 0)
         at_nest += gone & home
         in_dark += gone & world.dark[:, None]
         away_by_day += gone & ~home & by_day
@@ -280,7 +280,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'food_per_minute': summary(per_minute), 'seconds_alive': summary(alive),
         'food': summary(meals[:, starters]), 'stored': summary(stored[:, starters]), 'jelly': summary(jelly[:, starters]),
         'flowers': summary(drunk[:, starters]),
-        'deaths': {'creatures': died.size, 'died': int(died.sum()), 'beside_jelly': int(beside_jelly.sum()),
+        'deaths': {'creatures': died.size, 'died': int(died.sum()), 'jelly_at_home': int(jelly_at_home.sum()),
                    'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()), 'away_by_day': int(away_by_day.sum()),
                    'colonies': emptied.size, 'colonies_lost': int(emptied.sum())},
         # per colony an episode, and the colonies that hatched at least one
@@ -368,13 +368,13 @@ def main():
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {seed}; ± over arenas')
     width = max(8, *map(len, jobs))
     print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}  {"p10":>5}  {"stored":>12}  {"jelly":>5}'
-          f'  {"died":>5}  {"by jelly":>8}  {"colonies lost":>13}'
+          f'  {"died":>5}  {"jelly home":>10}  {"colonies lost":>13}'
           + (f'  {"in dark":>7}  {"nights":>6}  {"through night 1":>15}' if cfg.night.on else '')
           + (f'  {"to the end":>10}  {"hatched":>7}  {"hatching":>9}  {"size at end":>11}  {"peak":>5}' if cfg.hatch.on else ''))
     for name, r in results.items():
         f, s, st, d = r['food_per_minute'], r['seconds_alive'], r['stored'], r['deaths']
         print(f'{name:<{width}}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}  {s["p10"]:5.0f}'
-              f'  {st["mean"]:5.1f} ± {st["stderr"]:4.1f}  {r["jelly"]["mean"]:5.2f}  {d["died"]:5}  {d["beside_jelly"]:8}'
+              f'  {st["mean"]:5.1f} ± {st["stderr"]:4.1f}  {r["jelly"]["mean"]:5.2f}  {d["died"]:5}  {d["jelly_at_home"]:10}'
               f'  {d["colonies_lost"]:>6} of {d["colonies"]:<4}'
               + (f'  {d["in_dark"]:7}  {r["nights"]["mean"]:6.2f}  {r["through_first_night"] if r["through_first_night"] is not None else "–":>8} of {d["colonies"]:<4}'
                  if cfg.night.on else '')

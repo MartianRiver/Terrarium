@@ -71,7 +71,7 @@ start = 0
 # what one food in the store gives back when eaten, against [energy] food fresh
 energy = 0.4
 # only a creature below this energy eats from the store (from its own crop, any with room for it)
-hunger = 0.3
+hunger = 0.6
 
 [hatch]
 # a colony with an empty place (someone lost, or [colonies] room to grow) and at least `threshold` jelly in its

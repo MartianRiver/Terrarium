@@ -44,3 +44,43 @@ hours = 1.1
 dollars = 0.0
 total_hours = 1.1
 total_dollars = 0.0
+
+[[brain]]
+stage = "0.3"
+id = "c1c16fc46934c20bc1f1bfe823075f31f23e608750912ec583b21374255bb2be"
+file = "c1c16fc46934.pt"
+parent = "270452d565a544aec986a46d085129a8c1b834cc9912639f23207c751de7667a"
+commit = "4cb5cd640330db681547f9958184b0492cb308dd"
+run = "20261026-201831-pbt-y1-28"
+samples = 7962624
+schema = 8
+promoted = "2026-10-27"
+release = "v0.3.0"
+like = "a nematode worm (C. elegans) about forty times over, by wiring; still simpler than one in what it does, with no memory"
+
+[brain.evals]
+config = "colony.toml"
+seed = 2000000
+episodes = 64
+
+[brain.evals.brain]
+food_per_minute = 3.3
+food_per_minute_stderr = 0.015
+seconds_alive = 326.3
+seconds_alive_stderr = 2.0
+
+[brain.evals.random]
+food_per_minute = 0.414
+food_per_minute_stderr = 0.029
+seconds_alive = 41.0
+seconds_alive_stderr = 0.3
+
+[brain.compute]
+until = "2026-10-27T09:38:01+11:00"
+lineage_hours = 12.63
+runs = 1115
+hours = 170.61
+rented_hours = 170.06
+dollars = 20.57
+total_hours = 171.71
+total_dollars = 20.57

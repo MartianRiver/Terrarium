@@ -508,7 +508,7 @@ gpu = "RTX 3060"
 cpu = "EPYC 7662, 16 cores"
 started = "2026-10-25T21:35:12+11:00"
 ended = "2026-10-26T05:25:29+11:00"
-dollars = 0.703
+dollars = 0.709
 note = "PBT4, the drift diagnosis and PBT5 (pod r3)"
 
 [[session]]
@@ -520,3 +520,223 @@ started = "2026-10-25T21:35:11+11:00"
 ended = "2026-10-26T05:14:05+11:00"
 dollars = 0.699
 note = "PBT4, the drift diagnosis and PBT5 (pod r4)"
+
+[[session]]
+provider = "vast"
+instance = 57757843
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T14:13:00+11:00"
+ended = "2026-10-26T16:57:06+11:00"
+dollars = 0.22
+note = "PBT6 (pod s1)"
+
+[[session]]
+provider = "vast"
+instance = 57757892
+gpu = "RTX 3060"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-26T14:13:21+11:00"
+ended = "2026-10-26T14:21:27+11:00"
+dollars = 0.015
+note = "PBT6, setup hung, destroyed (pod s2)"
+
+[[session]]
+provider = "vast"
+instance = 57757952
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T14:13:42+11:00"
+ended = "2026-10-26T17:09:24+11:00"
+dollars = 0.233
+note = "PBT6 (pod s3)"
+
+[[session]]
+provider = "vast"
+instance = 57758010
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-26T14:14:03+11:00"
+ended = "2026-10-26T17:08:09+11:00"
+dollars = 0.272
+note = "PBT6 (pod s4)"
+
+[[session]]
+provider = "vast"
+instance = 57758861
+gpu = "RTX 3070"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-26T14:21:48+11:00"
+ended = "2026-10-26T14:30:30+11:00"
+dollars = 0.013
+note = "PBT6, setup hung, destroyed (pod s2)"
+
+[[session]]
+provider = "vast"
+instance = 57759971
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-26T14:34:33+11:00"
+ended = "2026-10-26T17:38:39+11:00"
+dollars = 0.612
+note = "PBT6 (pod s2)"
+
+[[session]]
+provider = "vast"
+instance = 57778803
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-26T17:58:57+11:00"
+ended = "2026-10-26T18:26:21+11:00"
+dollars = 0.099
+note = "the world grid for food and speed (pod w1)"
+
+[[session]]
+provider = "vast"
+instance = 57784807
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-26T19:06:05+11:00"
+ended = "2026-10-26T23:36:23+11:00"
+dollars = 0.41
+note = "PBT7 (pod u1)"
+
+[[session]]
+provider = "vast"
+instance = 57784938
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-26T19:07:05+11:00"
+ended = "2026-10-26T23:37:23+11:00"
+dollars = 0.428
+note = "PBT7 (pod u4)"
+
+[[session]]
+provider = "vast"
+instance = 57784979
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-26T19:07:25+11:00"
+ended = "2026-10-26T23:37:25+11:00"
+dollars = 0.428
+note = "PBT7 (pod u5)"
+
+[[session]]
+provider = "vast"
+instance = 57785384
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-26T19:11:13+11:00"
+ended = "2026-10-26T23:31:37+11:00"
+dollars = 0.417
+note = "PBT7 (pod u2)"
+
+[[session]]
+provider = "vast"
+instance = 57785446
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T19:11:48+11:00"
+ended = "2026-10-26T19:14:00+11:00"
+dollars = 0.007
+note = "PBT7, no ssh, destroyed (pod u3)"
+
+[[session]]
+provider = "vast"
+instance = 57806825
+gpu = "RTX A4000"
+cpu = "EPYC 7713, 16 cores"
+started = "2026-10-26T22:39:01+11:00"
+ended = "2026-10-27T01:47:01+11:00"
+dollars = 0.324
+note = "three brains in one world (pod r1)"
+
+[[session]]
+provider = "vast"
+instance = 57808742
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T22:58:15+11:00"
+ended = "2026-10-26T23:00:51+11:00"
+dollars = 0.007
+note = "PBT7, ssh dropped in setup, destroyed (pod u6)"
+
+[[session]]
+provider = "vast"
+instance = 57808743
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T22:58:15+11:00"
+ended = "2026-10-26T23:05:03+11:00"
+dollars = 0.013
+note = "PBT7, no ssh, destroyed (pod u7)"
+
+[[session]]
+provider = "vast"
+instance = 57808744
+gpu = "RTX 3080"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T22:58:15+11:00"
+ended = "2026-10-27T08:57:33+11:00"
+dollars = 1.173
+note = "PBT7 overnight (pod u8)"
+
+[[session]]
+provider = "vast"
+instance = 57809030
+gpu = "RTX A4000"
+cpu = "EPYC 7713, 16 cores"
+started = "2026-10-26T23:01:16+11:00"
+ended = "2026-10-26T23:04:13+11:00"
+dollars = 0.004
+note = "PBT7, shipped the wrong tree, destroyed (pod u6)"
+
+[[session]]
+provider = "vast"
+instance = 57809448
+gpu = "RTX 3080"
+cpu = "Core i9-10850K, 20 cores"
+started = "2026-10-26T23:04:16+11:00"
+ended = "2026-10-27T08:49:34+11:00"
+dollars = 1.393
+note = "PBT7 overnight (pod u9)"
+
+[[session]]
+provider = "vast"
+instance = 57809610
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T23:05:25+11:00"
+ended = "2026-10-26T23:07:31+11:00"
+dollars = 0.005
+note = "PBT7, no ssh, destroyed (pod u7)"
+
+[[session]]
+provider = "vast"
+instance = 57809900
+gpu = "RTX 3080"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T23:07:43+11:00"
+ended = "2026-10-27T08:47:55+11:00"
+dollars = 1.526
+note = "PBT7 overnight (pod u7)"
+
+[[session]]
+provider = "vast"
+instance = 57784853
+gpu = "RTX 3060"
+cpu = "unknown"
+started = "2026-10-26T19:06:30+11:00"
+ended = "2026-10-26T19:09:30+11:00"
+dollars = 0.002
+note = "PBT7, lost in setup with no log line; times from the instance's place between u1 and u4"
+
+[[session]]
+provider = "vast"
+instance = 57784897
+gpu = "RTX 3060"
+cpu = "unknown"
+started = "2026-10-26T19:06:45+11:00"
+ended = "2026-10-26T19:09:45+11:00"
+dollars = 0.002
+note = "PBT7, lost in setup with no log line; times from the instance's place between u1 and u4"

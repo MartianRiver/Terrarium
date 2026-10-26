@@ -56,13 +56,15 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 - **Evals v2:** scripted foragers that carry food home (and one that also goes home at dusk) as the baselines, like greedy was for 0.2. Food stored and eaten, deaths and where they happen (away from the nest by day: a forager that couldn't feed itself), colonies through the night, how often another colony is close when food is eaten, how big colonies get, and seeds held back for the release. Head to head, too: a different brain in each colony of the same arenas, each taking every seat in turn.
 - The brain is learned, never copied: forks that train side by side and copy whichever is doing best (population-based training) are how it gets there.
 
-Done when creatures carry food home and store it, colonies get through all three nights on the store and by huddling, colonies grow by hatching new Terrikins from their store, Terrikins don't starve with jelly at home, foragers away from the nest keep themselves fed, and the brain beats the one it started from.
+Done when creatures carry food home and store it, colonies get through all three nights on the store and by huddling, colonies grow by hatching new Terrikins from their store, and the brain beats the one it started from.
+
+Two things I wanted here moved to 0.4: Terrikins not starving with jelly at home, and foragers away from the nest keeping themselves fed. Most of the 0.3 brain's deaths are still like that, and a brain that can't tell how long it's been out can't know when to head back, so I think they need memory first.
 
 ## 0.4 Elderflower: Growth and memory
 
 *Rented GPUs.* Colonies that grow and shrink with what they gather, colonies that don't all think alike, and a brain that remembers. In 0.3 a colony could only grow by two, and with every colony running the same brain, three shrunken colonies sharing food for two was as good as it got: nothing paid a colony for growing, or for another one failing.
 
-- **Memory:** a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight and can't tell how long it's been out, so getting back to a patch it found, or home before it runs out, needs more than that. It's the biggest change to the brain since 0.2, so it goes in on its own first.
+- **Memory:** a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight and can't tell how long it's been out, so getting back to a patch it found, or home before it runs out, needs more than that. It's the biggest change to the brain since 0.2, so it goes in on its own first, tested in mazes (below).
 - **Hatchlings.** What hatches starts small and slow instead of full-grown, feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size. Once that works, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job.
 - **Room set by the food.** No fixed size per colony: the arena has room for so many Terrikins in all, and one colony growing leaves less room for the others. A colony that's better at finding food, getting it home and keeping it grows, and the food is the limit.
 - A bigger garden with more Terrikins in it, and food to match.
@@ -71,7 +73,7 @@ Done when creatures carry food home and store it, colonies get through all three
 - Episodes long enough for growth to compound, or worlds that don't start over at all.
 - Evals: how big each colony gets and how long it lasts, head to head between colonies' brains, and colonies founded.
 
-Done when foragers go back to a patch they remember, colonies grow from their store and shrink in lean times, hatchlings grow up on what their colony brings home, and the brains of the colonies that do well spread.
+Done when foragers go back to a patch they remember, Terrikins don't starve with jelly at home, foragers away from the nest keep themselves fed, colonies grow from their store and shrink in lean times, hatchlings grow up on what their colony brings home, and the brains of the colonies that do well spread.
 
 ## 0.5 Foxglove: The way home
 
@@ -143,6 +145,10 @@ Done when it's running and worth checking in on.
 ## Walking
 
 A separate track, worked on beside the colony stages. In the sim a Terrikin slides on a plane, and its waddle is only the viewer's. The walker is an ant instead: a head, thorax and gaster, six legs of three parts each, a motor at every leg joint, feet that feel the ground, and a centre of mass it has to keep over its feet (`&ant` in the viewer shows the body, walking a hand-made gait for now). In 3D physics, a small body brain learns to stand, then to walk where it's asked, taking a colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.5) becomes something it has to get up from. It's the step towards a real robot. It learns to walk from rewards and costs alone, never from recordings of how real animals move.
+
+## Mazes
+
+A side world from 0.4 on, started as soon as memory is in: one Terrikin, a new maze every episode, and food only at the end. Not learning a maze, but learning to solve any maze it's given, efficiently: scored on mazes it has never seen, by how close it gets to the shortest way, and by how much faster it gets on a second and third run through the same one. The mazes have loops, so keeping to one wall isn't enough. It starts small and gets bigger as it gets good, and it's how I'll know memory works.
 
 ## Lab
 
