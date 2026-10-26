@@ -39,7 +39,7 @@ def frame(world: World, a: int) -> dict:
     speed = np.hypot(world.vel[a, :, 0], world.vel[a, :, 1])
     creatures = [{'id': int(i), 'colony': int(c), 'x': _r(x), 'y': _r(y), 'heading': _r(h), 'speed': _r(s),
                   'size': size, 'energy': _r(e), 'signal': -1, 'carrying': int(k)}
-                 for i, c, (x, y), h, s, e, k in zip(world.creature_id, world.colony, world.pos[a], world.heading[a],
+                 for i, c, (x, y), h, s, e, k in zip(world.creature_id[a], world.colony, world.pos[a], world.heading[a],
                                                      speed, world.energy[a], world.crop[a])]
     if cfg.grab.on:
         for c, held in zip(creatures, world.holding[a]):

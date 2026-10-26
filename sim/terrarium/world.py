@@ -36,15 +36,8 @@ from .physics import Physics
 log = Logger('world')
 
 PLACE_TRIES = 200
-# a door counts as pulled out up to this far from where it started (metres)
-DOOR = 1.0
 # a ground-jelly slot with nothing in it; food that grows has a regrow timer instead
 EMPTY = -1
-
-
-def rotate(v: np.ndarray, angle: float) -> np.ndarray:
-    cos, sin = np.cos(angle), np.sin(angle)
-    return np.array([v[0] * cos - v[1] * sin, v[0] * sin + v[1] * cos])
 
 
 def box_gap(points: np.ndarray, b) -> np.ndarray:
@@ -81,8 +74,9 @@ class World:
         self.episode_ticks = round(cfg.episode.seconds * cfg.tick_hz)
         self.physics = Physics(cfg, pos)
 
-        # ids the viewer keys on: creatures and blocks keep theirs, food gets a new one each time it regrows
-        self.creature_id = np.arange(1, n + 1)
+        # ids the viewer keys on: blocks keep theirs, food gets a new one each time it regrows, and a creature
+        # hatched in a lost one's place gets a new one too
+        self.creature_id = np.tile(np.arange(1, n + 1), (arenas, 1))
         self.block_id = np.arange(n + 1, n + len(cfg.block) + 1)
         self.next_id = np.full(arenas, n + len(cfg.block) + 1)
         self.patch_pos = np.zeros((arenas, cfg.food.patches, 2))
@@ -117,11 +111,11 @@ class World:
         self.holding = np.zeros((arenas, n), bool)
         # ticks the grip lasts for after the last yes to grab
         self.gripping = np.zeros((arenas, n), int)
-        # blocks one creature can drag (the vault's doors), how far each is from where it started (up to DOOR metres),
-        # and the metres each creature has moved them out while holding on
+        # ticks until the egg laid in a lost creature's place hatches (0: none), and each colony's hatchlings
+        self.egg = np.zeros((arenas, n), int)
+        self.hatched = np.zeros((arenas, len(self.nests)), int)
+        # blocks one creature can drag (the vault's doors)
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
-        self.door_out = np.zeros((arenas, len(self.doors)))
-        self.pulled = np.zeros((arenas, n))
         self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors) if cfg.smell.on else None
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
@@ -195,8 +189,9 @@ class World:
         self.spent[idx] = 0
         self.holding[idx] = False
         self.gripping[idx] = 0
-        self.pulled[idx] = 0
-        self.door_out[idx] = 0
+        self.egg[idx] = 0
+        self.hatched[idx] = 0
+        self.creature_id[idx] = np.arange(1, len(self.colony) + 1)
         if self.smell:
             self.smell.reset(idx)
         self.food_regrow[idx, :self.wild] = 0
@@ -233,8 +228,6 @@ class World:
             self.holding = self.physics.grab(self.gripping > 0, g.reach, g.grip)
             np.maximum(self.gripping - 1, 0, out=self.gripping)
         self.physics.step(change * (c.mass / cfg.dt))
-        if self.doors:
-            self._pulled()
 
         e = cfg.energy
         # a sprint costs by how hard it runs: standing still through one is free
@@ -261,6 +254,8 @@ class World:
             self.gripping[dying] = 0
             self.physics.remove(dying)
             log.debug('creatures died', tick=self.tick, count=int(dying.sum()))
+        if cfg.hatch.on:
+            self._hatch()
         self.age += 1
         self.tick += 1
 
@@ -351,6 +346,41 @@ class World:
             self.jelly[gets] += 1
         np.clip(self.energy, 0, 1, out=self.energy)
 
+    def _hatch(self):
+        h = self.cfg.hatch
+        tended = np.stack([self.alive[:, self.colony == c].any(1) for c in range(len(self.nests))], 1)
+        # an egg needs someone left to tend it
+        self.egg[~tended[:, self.colony]] = 0
+        due = self.egg == 1
+        np.maximum(self.egg - 1, 0, out=self.egg)
+        if due.any():
+            self._born(due)
+        for c in range(len(self.nests)):
+            # one egg a tick per colony, in its lowest empty slot
+            empty = (self.colony == c) & ~self.alive & (self.egg == 0)
+            lays = np.flatnonzero(tended[:, c] & empty.any(1) & (self.store[:, c] >= max(h.threshold, h.cost)))
+            if len(lays):
+                self.egg[lays, empty[lays].argmax(1)] = max(1, round(h.seconds * self.cfg.tick_hz))
+                self.store[lays, c] -= h.cost
+
+    def _born(self, due: np.ndarray):
+        """Hatchlings in these (arenas, creatures) slots, somewhere in their own nest."""
+        a, i = np.nonzero(due)
+        angle = self.rng.uniform(0, 2 * np.pi, len(a))
+        r = self.cfg.colonies.nest_radius / 2 * np.sqrt(self.rng.uniform(size=len(a)))
+        pos = self.nests[self.colony[i]] + np.stack([np.cos(angle), np.sin(angle)], -1) * r[:, None]
+        self.physics.revive(a, i, pos)
+        self.heading[a, i] = self.rng.uniform(-np.pi, np.pi, len(a))
+        self.energy[a, i] = self.cfg.energy.start
+        self.alive[a, i] = True
+        self.crop[a, i] = 0
+        self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = 0
+        np.add.at(self.hatched, (a, self.colony[i]), 1)
+        for k, j in zip(a, i):
+            self.creature_id[k, j] = self.next_id[k]
+            self.next_id[k] += 1
+        log.debug('creatures hatched', tick=self.tick, count=len(a))
+
     def smelled(self) -> tuple[np.ndarray, ...]:
         """How strong the smell of food is where each creature stands (0 to 1), and which way off its heading it
         gets stronger (sin, cos); all 0 with smell off."""
@@ -425,44 +455,6 @@ class World:
             p = pick()
         log.warn('no open ground found, placing food anyway', arena=int(a), tries=PLACE_TRIES)
         return p
-
-    def pull_out(self, arenas: np.ndarray, metres: float):
-        """Move every block one creature could drag this far out from the arena's centre, in these arenas. A hinged
-        one swings out about its hinge until its far end has moved this far."""
-        if not self.doors or not arenas.any():
-            return
-        to, angles = [], []
-        for k in self.doors:
-            b = self.cfg.block[k]
-            start = np.array([b.x, b.y])
-            if not b.hinge:
-                to.append(start + start / max(np.hypot(*start), 1e-9) * metres)
-                angles.append(b.angle)
-                continue
-            cos, sin = np.cos(b.angle), np.sin(b.angle)
-            pin = start + (b.hinge[0] * cos - b.hinge[1] * sin, b.hinge[0] * sin + b.hinge[1] * cos)
-            reach = np.hypot(*(start - pin)) + np.hypot(b.w, b.h) / 2
-            turn = min(metres / reach, np.pi / 2)
-            # whichever way takes its middle further from the arena's centre
-            spins = [pin + rotate(start - pin, t) for t in (turn, -turn)]
-            best = int(np.hypot(*spins[1]) > np.hypot(*spins[0]))
-            to.append(spins[best])
-            angles.append(b.angle + (turn, -turn)[best])
-        self.physics.shift(np.nonzero(arenas)[0], self.doors, np.array(to), np.array(angles))
-        self.door_out[arenas] = self._door_gap()[arenas]
-
-    def _door_gap(self) -> np.ndarray:
-        start = np.array([(self.cfg.block[k].x, self.cfg.block[k].y) for k in self.doors])
-        return np.minimum(np.hypot(*(self.physics.block_pos[:, self.doors] - start).transpose(2, 0, 1)), DOOR)
-
-    def _pulled(self):
-        # whoever holds a door as it gets further out is credited with how far (and debited if it goes back)
-        gap = self._door_gap()
-        moved = gap - self.door_out
-        self.door_out = gap
-        for (a, c), k in self.physics.held_block.items():
-            if k in self.doors:
-                self.pulled[a, c] += moved[a, self.doors.index(k)]
 
     def touching_block(self) -> np.ndarray:
         """(arenas, creatures): who has a block within grab's reach."""

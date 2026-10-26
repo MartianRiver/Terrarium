@@ -70,6 +70,14 @@ energy = 0.4
 # only a creature below this energy eats from the store (from its own crop, any with room for it)
 hunger = 0.3
 
+[hatch]
+# a colony that has lost someone, with at least `threshold` jelly in its store, pays `cost` of it for an egg in the
+# nest, which hatches a full-grown Terrikin in the lost one's place after `seconds`. An egg needs someone left to
+# tend it: a colony with nobody alive loses its eggs. cost 0 is off
+cost = 0
+threshold = 0
+seconds = 0.0
+
 [night]
 # a day and its night take this long, the night being the last `length` of it; 0 turns nights off.
 # At nightfall the food standing goes, and none grows back until dawn
@@ -133,7 +141,6 @@ w = 1.3
 h = 1.3
 mass = 4.0
 friction = 0.6
-hinge = []
 
 [[block]]
 x = -3.0
@@ -143,4 +150,3 @@ w = 2.4
 h = 1.1
 mass = 12.0
 friction = 0.6
-hinge = []

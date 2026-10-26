@@ -1,7 +1,7 @@
 # Train a brain with PPO and keep a run record of it (runs.py).
 #
 #   uv run python -m terrarium.train NAME --world configs/solo.toml [--parent X.pt] [--seed 0] [--scratch]
-#                                         [--device cuda|mps|cpu] [--workers N] [--fast]
+#                                         [--device cuda|mps|cpu] [--workers N] [--fast] [--gpu-collect]
 #
 # Ends by scoring the last checkpoint on the evals next to random, three ways (evals.MODES: yes/no drawn,
 # all by the mean, all drawn as in training), into the run's evals.json.
@@ -22,7 +22,7 @@ from .brain import load as load_brain
 from .config import DEFAULT, TRAIN, load, load_train
 from .log import Logger
 from .ppo import advantages, update
-from .rollouts import Collector
+from .rollouts import Collector, OnDevice
 from .runs import ROOT, Run, cpu_quota
 
 log = Logger('train')
@@ -37,7 +37,7 @@ def best_device() -> str:
 def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, parent: Path | str | None = None,
           seed: int = 0, scratch: bool = False, root: Path = ROOT, device: str | None = None,
           workers: int = 1, score: bool = True, mix: list[tuple[Path | str, int]] | None = None,
-          fast: bool = False) -> Run:
+          fast: bool = False, gpu_collect: bool = False) -> Run:
     world_cfg, cfg = load(world_path), load_train(train_path)
     mixed = [(Path(w), load(w), n) for w, n in (mix or [])]
     ppo = cfg.ppo
@@ -60,15 +60,18 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         'train': {'file': Path(train_path).name, 'config': cfg.to_dict()},
         'parent': parent_record, 'schema': schema.current(), 'shape': learner.shape, 'seed': seed,
         'device': device, 'gpu': torch.cuda.get_device_name() if device == 'cuda' else None,
-        'workers': workers, 'threads': torch.get_num_threads(), 'fast': fast,
+        'workers': workers, 'threads': torch.get_num_threads(), 'fast': fast, 'gpu_collect': gpu_collect,
     }, scratch=scratch, root=root)
 
     learner.to(device)
     optimizer = torch.optim.Adam(learner.parameters(), lr=ppo.lr, eps=1e-5)
     # the same weights, compiled for the update; minibatch sizes change with how many are alive, hence dynamic
     model = cast(Brain, torch.compile(learner, dynamic=True)) if fast else learner
-    rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers,
-                         [(c, n) for _, c, n in mixed])
+    worlds = [(c, n) for _, c, n in mixed]
+    if gpu_collect:
+        rollouts = OnDevice(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner), workers, worlds, device)
+    else:
+        rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers, worlds)
     per_update = rollouts.samples * ppo.steps
     updates = max(1, ppo.samples // per_update)
     meta = {'run': run.id, 'commit': run.record['commit'], 'scratch': scratch,
@@ -81,7 +84,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         for group in optimizer.param_groups:
             group['lr'] = ppo.lr * (1 - (u - 1) / updates) if ppo.anneal else ppo.lr
         tick = time.perf_counter()
-        roll, last_value = rollouts.collect({k: v.cpu() for k, v in learner.state_dict().items()}, ppo.steps)
+        roll, last_value = rollouts.collect(learner.state_dict(), ppo.steps)
         adv, returns = advantages(roll.rewards, roll.values, roll.dones, last_value, ppo.gamma, ppo.lam)
         collected = time.perf_counter()
         stats = update(model, optimizer, roll, adv, returns, ppo, bf16=fast)
@@ -105,10 +108,11 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     if not score:
         run.finish(samples=updates * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint))
         return run
-    scores = {'random': evals.run(world_cfg, evals.random_policy),
-              'brain': evals.run(world_cfg, evals.brain_policy(checkpoint)),
-              'mean': evals.run(world_cfg, evals.brain_policy(checkpoint, 'mean')),
-              'sampled': evals.run(world_cfg, evals.brain_policy(checkpoint, 'sampled'))}
+    # on a Mac they stay on the CPU, as they always have
+    scores = evals.side_by_side(world_cfg, {'random': {'policy': 'random'}, 'brain': {'brain': checkpoint},
+                                            'mean': {'brain': checkpoint, 'mode': 'mean'},
+                                            'sampled': {'brain': checkpoint, 'mode': 'sampled'}},
+                                device='cuda' if device == 'cuda' else 'cpu')
     (run.dir / 'evals.json').write_text(json.dumps({'checkpoint': checkpoint.name, **scores}, indent=2) + '\n')
     run.finish(samples=updates * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint),
                evals={k: {m: round(v[m]['mean'], 3) for m in ('food_per_minute', 'seconds_alive')}
@@ -129,10 +133,12 @@ def main():
     parser.add_argument('--mix', nargs='*', default=[], metavar='WORLD:ARENAS',
                         help='arenas of other worlds to train in beside --world, e.g. configs/solo.toml:64')
     parser.add_argument('--fast', action='store_true', help='compile the update and run its forward pass in bfloat16 (CUDA)')
+    parser.add_argument('--gpu-collect', action='store_true',
+                        help='run the brain for rollouts once a step for every worker, on --device; workers only step the worlds')
     parser.add_argument('--no-evals', action='store_true', help="skip the evals at the end (when something else scores the run)")
     args = parser.parse_args()
     train(args.name, args.world, args.train, args.parent, args.seed, args.scratch, device=args.device,
-          workers=args.workers, score=not args.no_evals, fast=args.fast,
+          workers=args.workers, score=not args.no_evals, fast=args.fast, gpu_collect=args.gpu_collect,
           mix=[(w, int(n)) for w, n in (m.rsplit(':', 1) for m in args.mix)])
 
 

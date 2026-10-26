@@ -7,7 +7,7 @@ uv run python -m terrarium.train solo-first --world configs/solo.toml
 
 PPO trains one brain, and every creature runs its own copy of it, CleanRL-style:
 
-1. **Rollouts on the CPU.** `[ppo] arenas` run side by side, each for `steps` ticks per rollout. `--workers N` splits the arenas between N processes.
+1. **Rollouts on the CPU.** `[ppo] arenas` run side by side, each for `steps` ticks per rollout. `--workers N` splits the arenas between N processes. Each worker runs its own copy of the brain on the CPU to choose actions; with `--gpu-collect` the workers only step their worlds, and the brain chooses for all of them at once on `--device`, a step at a time.
 2. **Advantages** from GAE.
 3. **Updates.** A few clipped passes over each rollout, on CUDA if there is a GPU, else MPS on a Mac, else the CPU. `--device` picks one.
 
@@ -15,7 +15,7 @@ The learning rate falls linearly to zero over `samples`. Every number is in `sim
 
 The 0.2 brain took the default 20M samples, 52 minutes on the M3. Food per episode was at 50 by 3M samples and within a few percent of its final 55 by 5M, so most of that run was polish.
 
-Where it runs and how many workers are facts about the machine, not the training, so they're flags rather than config, and a run on a rented machine doesn't dirty the tree. With one worker the rollouts happen in the training process, seeded as they always were: the same seed gives the same brain. With more, worker i's arenas and sampling are seeded from (seed, i), so a run repeats for the same worker count but not across counts.
+Where it runs and how many workers are facts about the machine, not the training, so they're flags rather than config, and a run on a rented machine doesn't dirty the tree. With one worker the rollouts happen in the training process, seeded as they always were: the same seed gives the same brain. With more, worker i's arenas and sampling are seeded from (seed, i), so a run repeats for the same worker count but not across counts. `--gpu-collect` seeds the worlds the same way, but its actions are drawn from one generator in the training process (on the GPU's own, on CUDA), so its runs don't repeat a CPU-collected one; with one worker and `--device cpu` it plays exactly what the default does, which is how it's tested.
 
 Arenas that end start over at once. With colonies an arena carries on when one creature dies: the dead one's samples are marked inactive and left out of the update until its arena starts over, and each life counts as an episode in the metrics. Dying is an end. Running out of time isn't, since the limit is only there to give training fresh starts and a creature has no clock to see it coming: with `[ppo] bootstrap` on, a creature cut off alive is paid what its value says the rest is worth (Pardo et al., "Time Limits in Reinforcement Learning", 2018). Until 0.3 the cut counted as an end, which cost little while `gamma` looked 5 s ahead, and more once it looked 17 s ahead and things like storing food for the night pay later than that.
 
@@ -29,7 +29,7 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 
 | file | what |
 |---|---|
-| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file, id, and the meta saved in it: the run and samples it came from), schema, brain shape, seed, device, GPU, workers, torch threads, machine (platform, CPU, memory), python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
+| `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file, id, and the meta saved in it: the run and samples it came from), schema, brain shape, seed, device, GPU, workers, `fast` and `gpu_collect`, torch threads, machine (platform, CPU, memory), python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
 | `metrics.jsonl` | one line per update: samples, speed, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread |
 | `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
