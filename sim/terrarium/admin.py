@@ -247,7 +247,7 @@ class Desk:
         for name in sorted(set(tokens) | set(workers), key=str.lower):
             w, n = workers.get(name, {}), steady.get(name, {})
             info, d = w.get('info') or {}, done.get(name, {})
-            gpus = ', '.join(g['name'] for g in (info.get('specs') or {}).get('gpus') or [] if g.get('name')) or '–'
+            gpus, cpu, memory = parts(info.get('specs') or {})
             seen = ago(time.time() - w['seen']) if w.get('seen') else 'never'
             role = tokens.get(name)
             buttons = 'on the Mac' if role == 'admin' else (f'<form method="post">{form}<input type="hidden" name="name" value="{esc(name)}">'
@@ -255,13 +255,13 @@ class Desk:
                        '<button name="action" value="revoke">Revoke</button></form>') if role else 'revoked'
             rows.append(f'<tr><td>{esc(name)}</td><td>{esc(role or w.get("role", ""))}</td>'
                         f'<td>{esc(info.get("state", "–"))} <small>{esc(info.get("reason", ""))}</small></td>'
-                        f'<td>{seen}</td><td>{esc(gpus)}</td><td>{n.get("done", 0)}</td><td>{n.get("lost", 0)}</td>'
+                        f'<td>{seen}</td><td>{esc(gpus)}</td><td>{esc(cpu)}</td><td>{esc(memory)}</td><td>{n.get("done", 0)}</td><td>{n.get("lost", 0)}</td>'
                         f'<td>{n.get("failed", 0)}</td><td>{n.get("given back", 0)}</td>'
                         f'<td>{d.get("samples", 0) / 1e6:.1f}M</td><td>{buttons}</td></tr>')
         roles = ''.join(f'<option>{r}</option>' for r in ROLES)
         body = ((f'<p class="note">{esc(note)}</p>' if note else '')
                 + (f'<pre class="token">{esc(token)}</pre>' if token else '')
-                + '<h2>Machines</h2><table><tr><th>Handle</th><th>Role</th><th>Now</th><th>Last seen</th><th>GPU</th>'
+                + '<h2>Machines</h2><table><tr><th>Handle</th><th>Role</th><th>Now</th><th>Last seen</th><th>GPU</th><th>CPU</th><th>Memory</th>'
                   '<th>Done</th><th>Lost</th><th>Failed</th><th>Given back</th><th>Samples</th><th></th></tr>'
                 + ''.join(rows) + '</table>'
                 + f'<h2>New token</h2><form method="post">{form}<input name="name" placeholder="handle" required '
@@ -287,6 +287,14 @@ def ago(seconds: float) -> str:
     # the server's clock is UTC, so no times of day
     m = round(seconds / 60)
     return f'{m} min ago' if m < 120 else f'{m / 60:.0f} h ago' if m < 48 * 60 else f'{m / 1440:.0f} days ago'
+
+
+def parts(specs: dict) -> tuple[str, str, str]:
+    gpus = ', '.join(f"{g['name']} ({g['memory_gb']} GB)" if g.get('memory_gb') else g['name']
+                     for g in specs.get('gpus') or [] if g.get('name')) or '–'
+    cpu = ' · '.join(str(x) for x in (specs.get('cpu'), specs.get('cores') and f"{specs['cores']} threads", specs.get('os')) if x) or '–'
+    memory = f"{specs['memory_gb']} GB" if specs.get('memory_gb') else '–'
+    return gpus, cpu, memory
 
 
 def esc(s) -> str:
