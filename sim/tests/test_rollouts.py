@@ -3,10 +3,11 @@ from dataclasses import replace
 import numpy as np
 import torch
 
-from terrarium.brain import SHAPE, Brain
+from terrarium.brain import SHAPE, Brain, tensors
 from terrarium.config import DEFAULT, load, load_train
+from terrarium.forage import Observation
 from terrarium.ppo import Rollout
-from terrarium.rollouts import Collector, OnDevice
+from terrarium.rollouts import Collector, OnDevice, seats
 
 # nights, and episodes short enough that arenas run out of time inside a rollout, so the cut-off value is used
 NIGHT = load(DEFAULT.parent / 'night.toml')
@@ -67,3 +68,62 @@ def test_worlds_in_workers_join_up_in_order():
     finally:
         old.close()
     assert np.array_equal(first.me[0], roll.me[0])
+
+
+COLONY = load(DEFAULT.parent / 'colony.toml')
+
+
+def test_every_brain_takes_every_seat():
+    whose = seats([(COLONY, 4), (COLONY, 2)], 3).reshape(6, -1)
+    colony = np.repeat(np.arange(COLONY.colonies.count), COLONY.colonies.slots)
+    # one brain to a colony in every arena, and over the arenas each brain plays every colony
+    for arena in whose:
+        assert sorted(set(arena[colony == c][0] for c in range(3))) == [0, 1, 2]
+        for c in range(3):
+            assert len(set(arena[colony == c])) == 1
+    for c in range(3):
+        assert set(whose[:, colony == c][:, 0]) == {0, 1, 2}
+
+
+def sure_of(thrust: float) -> Brain:
+    """A brain that always thrusts this hard, near enough."""
+    brain = Brain(**SHAPE)
+    with torch.no_grad():
+        brain.policy.weight.zero_()
+        brain.policy.bias[0] = thrust
+        brain.log_std[0] = -20
+    return brain
+
+
+def test_each_brain_plays_its_own_colonies():
+    rollouts = OnDevice(COLONY, TRAIN, 3, 0, [sure_of(1.0), sure_of(-1.0), sure_of(0.0)])
+    try:
+        roll, last = rollouts.collect([b.state_dict() for b in rollouts.actors], 2)
+    finally:
+        rollouts.close()
+    thrust = roll.actions[..., 0]
+    for k, want in enumerate((1.0, -1.0, 0.0)):
+        assert np.allclose(thrust[:, rollouts.whose == k], want, atol=1e-3)
+    assert last.shape == (rollouts.samples,)
+
+
+def test_each_brain_scores_its_own_samples():
+    # the log odds and values kept for PPO are the playing brain's own, so its first ratio is exactly 1
+    torch.manual_seed(1)
+    brains = [Brain(**SHAPE), Brain(**SHAPE), Brain(width=32, layers=2, heads=4)]
+    brains[1].to_bernoulli()
+    rollouts = OnDevice(COLONY, TRAIN, 3, 0, brains)
+    try:
+        roll, _ = rollouts.collect([b.state_dict() for b in brains], 3)
+    finally:
+        rollouts.close()
+    flat = lambda x: x.reshape(-1, *x.shape[2:])
+    whose = np.tile(rollouts.whose, len(roll.me))
+    for k, brain in enumerate(rollouts.actors):
+        mine = (whose == k) & flat(roll.active)
+        with torch.no_grad():
+            obs = Observation(flat(roll.me)[mine], flat(roll.kinds)[mine], flat(roll.rays)[mine])
+            mean, value = brain(*tensors(obs, 'cpu'))
+            logp = brain.dist(mean).log_prob(torch.from_numpy(flat(roll.actions)[mine])).sum(-1)
+        assert np.allclose(logp.numpy(), flat(roll.logprobs)[mine], atol=1e-5)
+        assert np.allclose(value.numpy(), flat(roll.values)[mine], atol=1e-5)

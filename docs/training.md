@@ -23,6 +23,8 @@ A parent brain's actions can be started over with `[start] fresh` in the train c
 
 `[ppo] repeat` holds each choice for that many ticks and sums the rewards over them, so one sample is one creature making one choice, and `gamma` and `lam` count choices. At 20 Hz with `lam` 0.95, credit reaches about a second ahead; holding choices 4 ticks makes it four times that, and `gamma` 0.999 then looks about 200 s ahead instead of 50. Episode ticks must divide by it. The brain records it and acts the same way in evals and replays. `anneal = false` keeps the learning rate constant instead of falling to 0, for training in chunks that carry on from each other, and `--no-evals` skips the evals at the end when something else scores the run. `--fast` compiles the update and runs the brain's forward pass in bfloat16 (CUDA only; the losses stay float32); it's recorded in run.json.
 
+`--rivals B.pt C.pt` (with `--gpu-collect`) trains several brains in one world, one to a colony: brain k plays colony (k + arena) mod the number of brains, so over the arenas each one takes every seat, and each learns only from its own colonies' samples, at its own `--rival-lr`. The parent is brain 0 and its checkpoints go where they always do; the rivals' go in `rivals/<k>/`, and metrics ending `_k` are brain k's. The first try (notes, "Three brains in one world") made all three worse on their own, so it's there for experiments, not the main line.
+
 ## Run records
 
 Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside git:
