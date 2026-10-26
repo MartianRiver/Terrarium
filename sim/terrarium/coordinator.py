@@ -9,6 +9,8 @@
 #   donor    someone else's machine: only jobs on public code, and only the
 #            blobs of the job it holds right now
 #
+# /api/health and /api/board (what each machine has done, board.py) need no token.
+#
 #   uv run python -m terrarium.coordinator serve --root DIR [--port 5192]
 #   uv run python -m terrarium.coordinator token NAME --role donor --root DIR   (prints the token once)
 #   uv run python -m terrarium.coordinator revoke NAME --root DIR
@@ -22,7 +24,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import jobs
+from . import board, jobs
 from .log import Logger
 from .store import Full, Gone, Store, sha256, write_atomic
 
@@ -33,6 +35,8 @@ ROLES = ('admin', *jobs.MACHINES)
 LIMITS = {'blob': 16_000_000, 'result': 8_000_000, 'json': 64_000}
 # requests a minute per machine token, and how many it may make at once; a worker makes a few a minute
 RATE, BURST = 60, 60
+# seconds between writes of workers.json when nothing but the time last seen has changed
+SAVE_EVERY = 60
 
 
 class Refused(Exception):
@@ -91,16 +95,30 @@ class Queue:
     def __init__(self, root: Path, signers: Path | None = jobs.SIGNERS):
         self.store, self.tokens = Store(root), Tokens(root)
         self.signers = signers if signers and signers.exists() and shutil.which('ssh-keygen') else None
-        self.workers: dict[str, dict] = {}
+        # what each worker last said about itself, kept so the board outlives a restart
+        self.seen_path = Path(root) / 'workers.json'
+        self.workers: dict[str, dict] = json.loads(self.seen_path.read_text()) if self.seen_path.exists() else {}
+        self.saved = 0.0
         self.lock = threading.Lock()
         self.bucket = Bucket()
 
     def seen(self, who: dict, info: dict | None = None):
         with self.lock:
             entry = self.workers.setdefault(who['name'], {'role': who['role']})
-            entry['seen'] = time.time()
+            entry['role'], entry['seen'] = who['role'], time.time()
+            changed = False
             if info:
-                entry['info'] = {k: info[k] for k in ('platform', 'slots', 'trusted', 'version') if k in info}
+                kept = board.clean(info)
+                changed, entry['info'] = kept != entry.get('info'), kept
+            if changed or entry['seen'] - self.saved > SAVE_EVERY:
+                write_atomic(self.seen_path, (json.dumps(self.workers, indent=1) + '\n').encode())
+                self.saved = entry['seen']
+
+    def board(self) -> dict:
+        roles = {t['name']: t['role'] for t in self.tokens.load().values()}
+        with self.lock:
+            workers = json.loads(json.dumps(self.workers))
+        return board.summary(self.store.all(), workers, roles)
 
     def add(self, body: dict):
         spec, sig = body.get('spec'), body.get('sig')
@@ -158,6 +176,9 @@ def handler(queue: Queue):
             try:
                 if parts == ['api', 'health']:
                     return self.json({'ok': True})
+                if parts == ['api', 'board'] and method == 'GET':
+                    # public, and read by the site from its own origin
+                    return self.json(queue.board(), cors=True)
                 who = queue.tokens.who(self.headers.get('Authorization', '').removeprefix('Bearer '))
                 if who is None:
                     raise Refused(401, 'no such token')
@@ -208,6 +229,10 @@ def handler(queue: Queue):
                     # one worker per token, so a worker saying hello has just started
                     queue.seen(who, json.loads(self.body('json') or b'{}'))
                     self.json({'returned': queue.store.restarted(who['name'])})
+                case 'POST', ['api', 'status'] if worker:
+                    # a worker's minute-by-minute report, sent whether it's working or not
+                    queue.seen(who, json.loads(self.body('json') or b'{}'))
+                    self.json({'ok': True})
                 case 'POST', ['api', 'claim'] if worker:
                     info = json.loads(self.body('json') or b'{}')
                     queue.seen(who, info)
@@ -243,14 +268,16 @@ def handler(queue: Queue):
                 raise Refused(413, f'over {LIMITS[kind]} bytes')
             return self.rfile.read(int(length))
 
-        def json(self, body, status: int = 200):
-            self.send(json.dumps(body).encode(), 'application/json', status)
+        def json(self, body, status: int = 200, cors: bool = False):
+            self.send(json.dumps(body).encode(), 'application/json', status, cors=cors)
 
-        def send(self, body: bytes, kind: str, status: int = 200, head: bool = False):
+        def send(self, body: bytes, kind: str, status: int = 200, head: bool = False, cors: bool = False):
             self.send_response(status)
             self.send_header('Content-Type', kind)
             self.send_header('Content-Length', str(len(body)))
             self.send_header('Cache-Control', 'no-store')
+            if cors:
+                self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             if not head:
                 self.wfile.write(body)

@@ -49,12 +49,28 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
-VERSION = 2
+VERSION = 3
 
 
 def cpus() -> int:
     # containers report the host's cores; the cgroup quota is what this one may use
     return runs.cpu_quota() or os.cpu_count() or 1
+
+
+def specs() -> dict:
+    """What this machine is, for the coordinator's board. Read once, at start."""
+    gpus = []
+    if smi := shutil.which('nvidia-smi'):
+        for line in machine.run([smi, '--query-gpu=name,memory.total', '--format=csv,noheader,nounits']).splitlines():
+            name, _, mb = line.rpartition(',')
+            if name.strip() and mb.strip().isdigit():
+                gpus.append({'name': name.strip(), 'memory_gb': round(int(mb.strip()) / 1024)})
+    try:
+        cpu, memory = runs.cpu(), runs.memory_gb()
+    except (OSError, ValueError):
+        cpu, memory = platform.processor(), None
+    return {'os': f'{platform.system()} {platform.release()}', 'cpu': cpu, 'cores': os.cpu_count(),
+            'memory_gb': memory, 'gpus': gpus}
 
 
 def torch_extra() -> list[str]:
@@ -120,6 +136,7 @@ class Worker:
         self.max_load, self.instance, self.repo, self.signers = max_load, instance, repo, signers
         self.command = command or self.train_command
         self.tasks: dict[str, Task] = {}
+        self.specs = specs()
         self.lock = threading.Lock()
         self.building: dict[str, threading.Lock] = {}
         for d in ('code', 'jobs', 'runs'):
@@ -138,6 +155,7 @@ class Worker:
         while not self.stopping.is_set():
             if time.time() - last_beat >= BEAT:
                 self.beat()
+                self.report()
                 last_beat = time.time()
             if self.draining and not self.tasks:
                 break
@@ -173,7 +191,16 @@ class Worker:
         return True
 
     def info(self) -> dict:
-        return {'platform': platform.platform(), 'slots': self.slots, 'trusted': self.trusted, 'version': VERSION}
+        state, reason = self.state()
+        return {'platform': platform.platform(), 'slots': self.slots, 'trusted': self.trusted, 'version': VERSION,
+                'specs': self.specs, 'state': state, 'reason': reason}
+
+    def report(self):
+        # every minute, working or not, so the coordinator knows a waiting machine is still there
+        try:
+            self.client.json('POST', '/api/status', self.info())
+        except (urllib.error.URLError, OSError, RuntimeError) as e:
+            log.warn('status report failed', error=str(e))
 
     def start(self, job: dict):
         task = Task(job)
