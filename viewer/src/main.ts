@@ -1,8 +1,11 @@
+import * as THREE from 'three';
 import { AntStudy } from './ant';
+import { BrainView } from './brainview';
 import { clock } from './clock';
 import { createDemo } from './demo';
 import { galleryBar } from './gallery';
 import { createLogger } from './lib/logger';
+import { namesFor } from './names';
 import { withNectar } from './preview';
 import { readReplay, ReplayError, type Replay } from './replay';
 import { createStage } from './stage';
@@ -80,6 +83,18 @@ function boot() {
   let view: WorldView | undefined;
   let paused = false;
   let following = false;
+  // the Terrikin picked by clicking it, kept across restarts; null follows the first one
+  let chosen: number | null = null;
+  let nameOf = namesFor('demo');
+  // the picked Terrikin's name, above it
+  const tag = document.createElement('div');
+  tag.className = 'nametag';
+  tag.hidden = true;
+  document.body.append(tag);
+  const above = new THREE.Vector3();
+  let tick = 0;
+  // the brain window (B): local only, it reads brains through the runs server
+  const brain = SITE ? null : new BrainView(document.body, stage.scene, (url) => void open(`${url.pathname.split('/').pop()} (recorded here)`, () => fetchReplay(url), url));
   // after a restart the camera jumps to the blob rather than sweeping across the arena after it
   let snap = true;
   let opening = false;
@@ -98,8 +113,10 @@ function boot() {
     source = make();
     if (newWorld) stage.setWorld(source.info);
     view = new WorldView(stage.scene, source.info, !params.has('nodroppings'));
+    view.chosen = chosen;
     const first = source.step()!;
     view.push(first);
+    tick = first.tick;
     stage.light(first.light);
     acc = 0;
     snap = true;
@@ -111,7 +128,8 @@ function boot() {
     log.info(on ? 'following' : 'overview');
   }
 
-  async function open(name: string, read: () => Promise<ArrayBuffer>) {
+  // url: where it came from, if it was fetched
+  async function open(name: string, read: () => Promise<ArrayBuffer>, url: URL | null = null) {
     opening = true;
     setStatus('loading', `Reading ${name}…`);
     try {
@@ -122,6 +140,13 @@ function boot() {
         const src = replaySource(replay, name);
         return params.has('preview') ? { ...src, step: withNectar(src.info, src.step) } : src;
       };
+      if (newReplay(url)) chosen = null;
+      // a run's replay recorded again here is the same episode, so it keeps its names
+      const run = url && /^\/api\/runs\//.test(url.pathname) ? `${url.pathname}?${url.searchParams.get('seed')}` : null;
+      const brainId = (replay.source.brain as { id?: string } | undefined)?.id ?? String(replay.source.brain);
+      nameOf = namesFor(run ?? `${brainId}/${replay.source.seed}`);
+      brain?.playingNow(url, replay.frames);
+      if (brain) brain.name = nameOf;
       restart(true);
       setStatus('ok');
     } catch (err) {
@@ -133,6 +158,29 @@ function boot() {
     }
   }
   const openFile = (file: File) => open(file.name, () => file.arrayBuffer());
+  // ids only name the same Terrikins in the same episode: a run's replay recorded again here is that
+  let playing = '';
+  function newReplay(url: URL | null) {
+    const same = url ? `${url.pathname}?seed=${url.searchParams.get('seed')}` : '';
+    const changed = !same || same !== playing;
+    playing = same;
+    return changed;
+  }
+
+  // a click (not a drag) on a Terrikin follows it
+  const pointer = { x: 0, y: 0, at: 0 };
+  const caster = new THREE.Raycaster();
+  stage.renderer.domElement.addEventListener('pointerdown', (e) => Object.assign(pointer, { x: e.clientX, y: e.clientY, at: performance.now() }));
+  stage.renderer.domElement.addEventListener('pointerup', (e) => {
+    if (!view || Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) > 6 || performance.now() - pointer.at > 400) return;
+    const box = stage.renderer.domElement.getBoundingClientRect();
+    caster.setFromCamera(new THREE.Vector2(((e.clientX - box.left) / box.width) * 2 - 1, -((e.clientY - box.top) / box.height) * 2 + 1), stage.camera);
+    const id = view.pick(caster);
+    if (id === null) return;
+    chosen = view.chosen = id;
+    log.info('following a Terrikin', { id });
+    if (!following) follow(true);
+  });
 
   // ?replay=/api/runs/<id>/replay/<checkpoint> from the runs page; only this server's own urls
   async function fetchReplay(url: URL) {
@@ -165,7 +213,8 @@ function boot() {
       const bytes = await fetchReplay(new URL(`/api/runs/${run.id}/replay/${newest.file}?seed=0`, location.href));
       latest = `${run.id}/${newest.file}`;
       log.info('newer checkpoint', { run: run.id, samples: newest.samples });
-      await open(`${run.id.replace(/^\d{8}-\d{6}-/, '')} · ${(newest.samples / 1e6).toFixed(1)}M`, async () => bytes);
+      await open(`${run.id.replace(/^\d{8}-\d{6}-/, '')} · ${(newest.samples / 1e6).toFixed(1)}M`, async () => bytes,
+        new URL(`/api/runs/${run.id}/replay/${newest.file}?seed=0`, location.href));
     } catch (err) {
       log.warn('latest checkpoint not opened', { err: String(err) });
     } finally {
@@ -191,7 +240,13 @@ function boot() {
   const dismiss = () => status.dataset.kind === 'error' && view && setStatus('ok');
   status.addEventListener('click', dismiss);
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') dismiss();
+    if (e.key === 'Escape') {
+      dismiss();
+      chosen = null;
+      if (view) view.chosen = null;
+    }
+    if (brain && (e.key === 'b' || e.key === 'B')) brain.toggle();
+    if (brain && (e.key === 'n' || e.key === 'N')) brain.toggleNet();
     if (e.key === 'r' || e.key === 'R') {
       restart();
       log.info('restarted');
@@ -216,6 +271,14 @@ function boot() {
     runsLink.textContent = 'About';
   }
   // on the site, other replays are picked from the gallery; a file picker means nothing on a phone (dropping one still works)
+  if (brain) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Brain';
+    button.addEventListener('click', () => brain.toggle());
+    openButton.after(' ', button);
+    document.querySelector('#hud .hint')?.append(' · B brain · N wired up');
+  }
   if (SITE) {
     const brains = document.createElement('a');
     brains.href = '/brains/';
@@ -226,7 +289,7 @@ function boot() {
   if (wanted) {
     const url = new URL(wanted, location.href);
     const name = params.get('name') ?? url.pathname.split('/').pop()!;
-    if (url.origin === location.origin) void open(name, () => fetchReplay(url));
+    if (url.origin === location.origin) void open(name, () => fetchReplay(url), url);
     else setStatus('error', `Won’t fetch a replay from another site (${url.origin}). Click or press Esc to close this.`);
   }
   const place = Number(params.get('gallery'));
@@ -254,12 +317,21 @@ function boot() {
           break;
         }
         view!.push(next);
+        tick = next.tick;
         stage.light(next.light);
         acc -= tickSeconds;
       }
     }
     view!.render(acc / tickSeconds, paused ? 0 : dt, now / 1000);
     ant?.update(paused ? 0 : dt);
+    brain?.frame(view!.focusId, view!.focus, tick);
+    tag.hidden = chosen === null || !view!.focus;
+    if (!tag.hidden) {
+      const f = view!.focus!;
+      above.set(f.x, 1.3, f.y).project(stage.camera);
+      tag.style.transform = `translate(${((above.x + 1) / 2) * innerWidth}px, ${((1 - above.y) / 2) * innerHeight}px) translate(-50%, -100%)`;
+      if (tag.textContent !== nameOf(chosen!)) tag.textContent = nameOf(chosen!);
+    }
     stage.track(following ? (ant?.focus ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
     snap = false;
     stage.render(now / 1000);

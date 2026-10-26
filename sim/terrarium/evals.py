@@ -27,7 +27,7 @@ import torch
 
 from .brain import load as load_brain
 from .config import DEFAULT, Config, load
-from .forage import observe
+from .forage import Observation, observe
 from .log import Logger
 from .random_actions import RandomActions
 from .runs import cpu_quota
@@ -135,9 +135,11 @@ PLACES = {
 MODES = ('drawn', 'mean', 'sampled')
 
 
-def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu') -> Callable[[World], Policy]:
+def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
+                 watch: Callable[[Observation, np.ndarray], None] | None = None) -> Callable[[World], Policy]:
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
-    by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat."""
+    by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat. watch,
+    if given, sees each observation it chose from and the actions it chose (mind.py)."""
     brain, meta = load_brain(path)
     brain.eval().to(device)
     # it chooses every `repeat` ticks, as it did in training, and holds its choice in between
@@ -161,7 +163,8 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu') -> 
         def act(w: World) -> np.ndarray:
             nonlocal last, held, ticks
             if ticks % repeat == 0:
-                mean = brain.act(observe(w, last), sample=False)
+                obs = observe(w, last)
+                mean = brain.act(obs, sample=False)
                 mean = mean + spread * noise.standard_normal(mean.shape, dtype=mean.dtype)
                 if coins is not None:
                     odds = mean[..., coins]
@@ -169,6 +172,8 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu') -> 
                     mean[..., coins] = np.where(yes, 1.0, -1.0)
                 held = np.clip(mean, -1, 1).reshape(*last.shape[:2], -1)
                 last = held[..., :2]
+                if watch:
+                    watch(obs, held)
             ticks += 1
             assert held is not None
             return held

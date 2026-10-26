@@ -8,7 +8,9 @@
 #   GET /api/runs
 #   GET /api/runs/<id>  (with what went into its brain, per machine)
 #   GET /api/compute    (every run and rental so far, per machine)
-#   GET /api/runs/<id>/replay/<checkpoint.pt | random>?seed=0
+#   GET /api/runs/<id>/replay/<checkpoint.pt | random>?seed=0[&here]  (here: recorded again on this machine)
+#   GET /api/runs/<id>/mind/<checkpoint.pt>?seed=0&creature=ID  (one Terrikin's mind through that episode, mind.py)
+#   GET /api/runs/<id>/wiring/<checkpoint.pt>  (its strongest connections, for drawing it wired up)
 
 import argparse
 import json
@@ -22,6 +24,8 @@ from urllib.parse import parse_qs, urlsplit
 from . import compute
 from .config import Config, build, upgrade
 from .log import Logger
+from .brain import load as load_brain
+from .mind import track, wiring
 from .record import record
 from .runs import ROOT
 
@@ -84,12 +88,13 @@ class Runs:
                 'evals': json.loads(evals.read_text()) if evals.exists() else None,
                 'compute': compute.behind(self.root, run)}
 
-    def replay(self, id: str, checkpoint: str, seed: int) -> Path:
-        """random is generation 0: how a brain trained from scratch starts out."""
+    def replay(self, id: str, checkpoint: str, seed: int, here: bool = False) -> Path:
+        """random is generation 0: how a brain trained from scratch starts out. here records it again on this
+        machine, for a mind to match: one recorded on a pod can part from what this machine plays."""
         run = self.find(id)
         if checkpoint != 'random' and checkpoint not in {c['file'] for c in checkpoints(run)}:
             raise NotFound(f'{id} has no checkpoint {checkpoint}')
-        out = run / 'replays' / f'{Path(checkpoint).stem}-{seed}.jsonl.gz'
+        out = run / 'replays' / f'{Path(checkpoint).stem}-{seed}{"-here" if here else ""}.jsonl.gz'
         with self.recording:
             if not out.exists():
                 cfg = build(Config, upgrade(compute.read_run(run)['world']['config']))
@@ -97,6 +102,29 @@ class Runs:
                 partial = out.with_name(out.name + '.part')
                 brain = None if checkpoint == 'random' else run / 'checkpoints' / checkpoint
                 record(cfg, partial, round(SECONDS * cfg.tick_hz), seed, brain=brain)
+                partial.rename(out)
+        return out
+
+    def wiring(self, id: str, checkpoint: str) -> dict:
+        """A checkpoint's strongest connections (mind.wiring)."""
+        run = self.find(id)
+        if checkpoint not in {c['file'] for c in checkpoints(run)}:
+            raise NotFound(f'{id} has no checkpoint {checkpoint}')
+        brain, _ = load_brain(run / 'checkpoints' / checkpoint)
+        return wiring(brain)
+
+    def mind(self, id: str, checkpoint: str, seed: int, creature: int) -> Path:
+        """One Terrikin's mind through the episode of that replay (mind.py), recorded once."""
+        run = self.find(id)
+        if checkpoint not in {c['file'] for c in checkpoints(run)}:
+            raise NotFound(f'{id} has no checkpoint {checkpoint}')
+        out = run / 'replays' / f'{Path(checkpoint).stem}-{seed}.mind-{creature}.jsonl.gz'
+        with self.recording:
+            if not out.exists():
+                cfg = build(Config, upgrade(compute.read_run(run)['world']['config']))
+                out.parent.mkdir(exist_ok=True)
+                partial = out.with_name(out.name + '.part')
+                track(cfg, run / 'checkpoints' / checkpoint, partial, seed, creature)
                 partial.rename(out)
         return out
 
@@ -115,8 +143,15 @@ def handler(runs: Runs):
                     case ['api', 'runs', id]:
                         self.json(runs.detail(id))
                     case ['api', 'runs', id, 'replay', checkpoint]:
-                        seed = int(parse_qs(url.query).get('seed', ['0'])[0])
-                        self.send(runs.replay(id, checkpoint, seed).read_bytes(), 'application/gzip')
+                        query = parse_qs(url.query, keep_blank_values=True)
+                        seed = int(query.get('seed', ['0'])[0])
+                        self.send(runs.replay(id, checkpoint, seed, 'here' in query).read_bytes(), 'application/gzip')
+                    case ['api', 'runs', id, 'wiring', checkpoint]:
+                        self.json(runs.wiring(id, checkpoint))
+                    case ['api', 'runs', id, 'mind', checkpoint]:
+                        query = parse_qs(url.query)
+                        seed, creature = (int(query.get(k, ['0'])[0]) for k in ('seed', 'creature'))
+                        self.send(runs.mind(id, checkpoint, seed, creature).read_bytes(), 'application/gzip')
                     case _:
                         raise NotFound(f'nothing at {url.path}')
             except NotFound as e:
