@@ -32,6 +32,7 @@ from .log import Logger
 from .random_actions import RandomActions
 from .runs import cpu_quota
 from .schema import YES_NO
+from .tactics import REASONS, Tactics, flower_in_view
 from .vision import FOOD, NOTHING, look
 from .world import World
 
@@ -122,16 +123,6 @@ CONTEXTS = {
 }
 
 
-def flower_in_view(w: World) -> np.ndarray:
-    """(arenas, creatures): an open flower within its field and range of view, blocked or not."""
-    d = w.flower_pos[:, None] - w.pos[:, :, None]                       # A,N,F,2
-    off = np.arctan2(d[..., 1], d[..., 0]) - w.heading[..., None]
-    off = (off + np.pi) % (2 * np.pi) - np.pi
-    v = w.cfg.vision
-    seen = (np.hypot(d[..., 0], d[..., 1]) < v.range) & (np.abs(off) <= v.fov / 2) & w.flowers_open[:, None]
-    return seen.any(-1)
-
-
 # how hard it turns (the mean of turn squared, what turning costs by) out by day and in its nest at night
 PLACES = {
     'day_out': lambda w, home: ~home & (w.light() == 1)[:, None],
@@ -207,6 +198,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     dawned = np.zeros(episodes, bool)
     actions = {k: [0, 0] for k in CONTEXTS}
     turning = {k: [0, 0.0] for k in PLACES}
+    tactics = Tactics(world)
     # food that grows in the middle patches (inside a vault, if the world has one), and how far blocks got moved
     f = np.arange(world.food_pos.shape[1])
     middle = (f < world.wild) & (f % max(cfg.food.patches, 1) < cfg.food.middle)
@@ -227,6 +219,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
                 seen = before & where(world, nest, mine)
                 actions[name][0] += seen.sum()
                 actions[name][1] += (seen & (action[..., yes] > 0)).sum()
+        tactics.watch(world, before, nest, mine, action)
         for name, where in PLACES.items():
             seen = before & where(world, home)
             turning[name][0] += seen.sum()
@@ -236,6 +229,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         growing = world.food_present & (f < world.wild)
         pos, food_pos = world.pos.copy(), world.food_pos.copy()
         world.step(action)
+        tactics.after(world, done)
         # food goes at nightfall too; only count it eaten on other ticks
         eaten = growing & ~world.food_present & ~(world.dark & ~was_dark)[:, None] & ~done[:, None]
         from_middle += (eaten & middle).sum(1)
@@ -302,6 +296,8 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'contested': {'meals': meals_seen, 'share': contested / meals_seen if meals_seen else None},
         # blocks more than half a metre from where they started, per arena at its end
         'blocks_moved': summary((moved > 0.5).sum(1)[:, None]),
+        # what sprints and flowers get used for (tactics.py)
+        **tactics.result(),
     }
 
 
@@ -391,6 +387,19 @@ def main():
         share = r['contested']['share']
         print(f'{name:<{width}}  {r["deaths"]["away_by_day"]:11}  {"–" if share is None else f"{share:.1%}":>9}'
               f'  {r["from_middle"]["mean"]:11.1f}  {r["blocks_moved"]["mean"]:12.2f}  {r["flowers"]["mean"]:7.2f}')
+    if cfg.sprint.on:
+        print(f'\n{"sprints":<{width}}  {"a minute out":>12}  ' + '  '.join(f'{r + " yes · share · paid":>26}' for r in REASONS))
+        for name, r in results.items():
+            sp = r['sprints']
+            cells = [' · '.join('–' if v is None else f'{v:.1%}' for v in (sp[k]['yes'], sp[k]['share'], sp[k]['paid'])) for k in REASONS]
+            print(f'{name:<{width}}  {sp["per_minute_out"] or 0:12.2f}  ' + '  '.join(f'{c:>26}' for c in cells))
+    if cfg.flowers.on:
+        print(f'\n{"flowers":<{width}}  {"opened":>6}  {"drunk":>5}  {"headed for in view":>18}  {"meals/min out, nectar · not":>27}')
+        for name, r in results.items():
+            fl = r['flower_use']
+            print(f'{name:<{width}}  {fl["opened"]:6}  ' + '  '.join(f'{"–" if v is None else f"{v:.0%}":>{n}}'
+                                                             for v, n in ((fl['drunk'], 5), (fl['chased'], 18)))
+                  + '  ' + f'{" · ".join("–" if v is None else f"{v:.1f}" for v in r["nectar"].values()):>27}')
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 
