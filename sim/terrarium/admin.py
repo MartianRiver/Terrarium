@@ -255,13 +255,14 @@ class Desk:
                        '<button name="action" value="revoke">Revoke</button></form>') if role else 'revoked'
             rows.append(f'<tr><td>{esc(name)}</td><td>{esc(role or w.get("role", ""))}</td>'
                         f'<td>{esc(info.get("state", "–"))} <small>{esc(info.get("reason", ""))}</small></td>'
+                        f'<td>{esc(info.get("version", "–"))}</td>'
                         f'<td>{seen}</td><td>{esc(gpus)}</td><td>{esc(cpu)}</td><td>{esc(memory)}</td><td>{n.get("done", 0)}</td><td>{n.get("lost", 0)}</td>'
                         f'<td>{n.get("failed", 0)}</td><td>{n.get("given back", 0)}</td>'
                         f'<td>{d.get("samples", 0) / 1e6:.1f}M</td><td>{buttons}</td></tr>')
         roles = ''.join(f'<option>{r}</option>' for r in ROLES)
         body = ((f'<p class="note">{esc(note)}</p>' if note else '')
                 + (f'<pre class="token">{esc(token)}</pre>' if token else '')
-                + '<h2>Machines</h2><table><tr><th>Handle</th><th>Role</th><th>Now</th><th>Last seen</th><th>GPU</th><th>CPU</th><th>Memory</th>'
+                + '<h2>Machines</h2><table><tr><th>Handle</th><th>Role</th><th>Now</th><th>Version</th><th>Last seen</th><th>GPU</th><th>CPU</th><th>Memory</th>'
                   '<th>Done</th><th>Lost</th><th>Failed</th><th>Given back</th><th>Samples</th><th></th></tr>'
                 + ''.join(rows) + '</table>'
                 + f'<h2>New token</h2><form method="post">{form}<input name="name" placeholder="handle" required '

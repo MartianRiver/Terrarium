@@ -52,6 +52,7 @@ The first time, it asks for the token. The first job downloads about 2.5 GB (PyT
 
 ## Versions
 
+- **5** · 26 October 2026 · Checks when it starts that it can verify my signature, using the `ssh-keygen` that comes with Git on Windows (Windows 10's own may be too old).
 - **4** · 26 October 2026 · Keeps the computer awake while a job trains, and cleans up properly when a job is taken away (after a sleep, its leftover processes held the GPU).
 - **3** · 26 October 2026 · Says what the machine is and what it's doing every minute, for the board.
 - **2** · 25 October 2026 · The rules above that keep it out of your way, Windows included.
