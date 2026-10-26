@@ -8,6 +8,8 @@ Terrikins now live in a garden under a glass dome on Mars: a clay body with feet
 
 Training got faster and accounted for. torch has CPU and CUDA extras on Linux, `--device` and `--workers` split episodes over processes, and `terrarium.remote` trains on a rented GPU from a committed checkout. `terrarium.compute` adds up the hours of every run and the dollars of every rented machine (`sim/compute.toml`), and a promoted brain records what it took. The runs page (`runs.html`, with `terrarium.serve`) lists every run with its curves, live while it trains, and each checkpoint as a generation to watch.
 
+`train --rivals` trains several brains side by side in one world, one to a colony, each taking every seat over the arenas and learning only from its own colonies.
+
 The brain sees more (schema v2): the distance and direction to its own nest, whether a creature it sees is a nestmate, and how far its own and other nests are along each ray. The 0.2 brain loads and acts the same.
 
 Colonies carry food home (schema v3). Food eaten past full goes into a crop, like an ant's social stomach, and slows the carrier down. Two new actions: unload, which puts the crop into the nest's store, or onto the ground as jelly anyone can eat, and eat, from the crop or (when hungry, at home) from the store. Two new inputs say how full the crop is and whether it's home. Food grows in patches that move each episode. The reward pays for storing, can be partly shared with the colony, and pays a little for carrying food closer to home (and takes it back for walking off), which only moves reward earlier. `carrier` is the new scripted baseline: greedy that takes a full crop home. A new yes/no action now starts out mostly no, so it's tried now and then; zero-padding it made it fire half the time in training, which is why nothing stored for the first eight runs (`docs/notes/0.3.md` has the whole story).
@@ -73,8 +75,6 @@ Evals show what the sprint and flowers get used for: for each reason a Terrikin 
 In the local viewer, a click follows a Terrikin, and every Terrikin has a name. The brain window (B) shows what the followed one's brain takes in and makes of it as the replay plays: its rays lit by attention (in the world too), every attention head, its senses, the units its actions are read from, how things look to it over the episode, and its actions with their odds, each part explained when clicked. N draws the brain wired up, every unit firing and its strongest connections glowing with what they carry. The runs server records a Terrikin's mind on request (`terrarium.mind`) and can record a replay again on this machine when one from a pod has parted from it.
 
 The public board also shows what my Mac and rented GPUs trained outside the queue (`sim/board.toml`, written by `python -m terrarium.compute board` from the ledger: rented GPUs grouped by model and memory, runs counted as jobs, queue runs left to the queue). Terrarium at Home says a Mac with Apple silicon can lend a hand too, with real speeds, and what the worker can't check on one. The board's table fits the page: rented machines are named by their GPU's own column, and on a phone the GPU moves under the name too.
-
-`train --rivals` trains several brains side by side in one world, one to a colony, each taking every seat over the arenas and learning only from its own colonies.
 
 ## 0.2.0: Solo forager
 
