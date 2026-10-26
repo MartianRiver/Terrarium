@@ -16,6 +16,7 @@ If you have an NVIDIA GPU that's often idle, you can lend it. A small program, t
 - **Only my jobs, only public code.** Every job is signed by me, and your copy of the code checks the signature, not the server. The code a job runs is fetched from this repo on GitHub, and only if it's on one of its branches, so anything your machine runs, you (or anyone) can read first.
 - **Only when you're away.** It starts after 10 minutes without keyboard or mouse, only on mains power, and pauses the moment you're back. A game or anything full screen sends the job back to the queue and frees the GPU.
 - **Not all of it.** At most half the CPU, at low priority, and it pauses if the GPU passes 85 °C.
+- **Awake while it works.** While a job trains, it keeps the computer from going to sleep, so you don't have to change your power settings. The screen still turns off, and sleep works as normal again once the job is done or paused.
 - **Its own folder.** Jobs, their code and their runs live in `~/.terrarium/worker`. The one exception is [uv](https://docs.astral.sh/uv/), which keeps the Python and packages it downloads (PyTorch included) in its own cache. It listens only on your own machine.
 - **What it sends.** The runs it trained, and once a minute what your machine is (OS, CPU, cores, memory, NVIDIA GPU) and whether it's working, waiting or paused. No hostname, user name or files. The board shows your machine's name, its GPU and what it's trained, never whether you're at it.
 
@@ -51,6 +52,7 @@ The first time, it asks for the token. The first job downloads about 2.5 GB (PyT
 
 ## Versions
 
+- **4** · 26 October 2026 · Keeps the computer awake while a job trains, and cleans up properly when a job is taken away (after a sleep, its leftover processes held the GPU).
 - **3** · 26 October 2026 · Says what the machine is and what it's doing every minute, for the board.
 - **2** · 25 October 2026 · The rules above that keep it out of your way, Windows included.
 - **1** · 24 October 2026 · The first: signed jobs, public code only.
