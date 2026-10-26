@@ -40,6 +40,7 @@ def test_the_board_shows_what_a_machine_did_and_what_it_is_but_not_what_its_owne
     c['laptop'].json('PUT', f'/api/jobs/{"b" * 12}/result', result(f'20261026-120000-nbbb-{"b" * 12}'))
     headers, shown = get(url)
     assert headers['Access-Control-Allow-Origin'] == '*'
+    assert headers['Cache-Control'] == f'public, max-age={coordinator.BOARD_TTL}'
     [laptop] = [m for m in shown['machines'] if m['name'] == 'laptop']
     assert laptop['kind'] == 'lent' and laptop['gpu'] == 'NVIDIA GeForce RTX 3060 Laptop GPU'
     assert laptop['jobs'] == 1 and laptop['samples'] == spec()['samples'] and laptop['last_active']

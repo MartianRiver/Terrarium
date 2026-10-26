@@ -1,6 +1,6 @@
 # The site
 
-terrarium.martianriver.com is a front page, a blog, a gallery of brains at `/brains/`, and the viewer at `/watch/`. Everything is static: no framework, no analytics, no cookies.
+terrarium.martianriver.com is a front page, a blog, a gallery of brains at `/brains/`, a page for lending a GPU at `/at-home/`, and the viewer at `/watch/`. Everything is static: no framework, no analytics, no cookies.
 
 | | |
 |---|---|
@@ -79,3 +79,11 @@ uv run python -m terrarium.gallery OUT --line 'pbt-t*'
 ```
 
 which traces the lineage from the best scored run of the line being trained (`--line`, matched against run names), records a 3-minute replay of each brain in its own world (seed 0, the same as the runs page), and writes OUT/index.json. While training runs, it's rebuilt and synced to the server's `replays/gallery/` every 15 minutes, so the newest brains show up without redeploying the site. A review build shows a local one with `SITE_GALLERY=OUT`.
+
+## Terrarium at Home
+
+`/at-home/` is `site/at-home.md` (what the worker does, installing it, its versions) with two things put in where it has `<!-- reviews -->` and `<!-- board -->`.
+
+Reviews: each file in `site/reviews/` is one model's review of the worker's code, pasted in whole, with `model`, `date`, `commit` (the code it read), `verdict` (one line for the list) and an optional `link` to the conversation in its front matter. Each gets its own page at `/at-home/reviews/<file>/`. Under them, the prompt a reader can paste into a new chat to check the code themselves. With no reviews, only the prompt shows.
+
+The board is read live from the job queue's public `/api/board` (cached for 30 s) when the page opens. What lent machines trained is priced at what rented GPUs have cost per sample, from the page's front matter (`usd_per_billion`, where it came from, and the AUD rate and its date), so update those when the ledger moves.

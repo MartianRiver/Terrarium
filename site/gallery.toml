@@ -40,6 +40,11 @@ runs = ["pbt-t*"]
 title = "Sprint, turning costs and food in the middle"
 text = "Turning costs energy now, so spinning in the nest all night isn't free, and they can sprint. Half the food grows in the middle, between the nests. Eight forks again."
 
+[[step]]
+runs = ["pbt-[abvw]*", "diag-*"]
+title = "Three nights, and hatching"
+text = "A colony that loses someone can pay jelly from its store for an egg that hatches in the nest, and the food has a smell they can follow. Food tightened to what two colonies need. Forks trained here in two brain sizes, and the wider one got 87% of colonies through all three nights in the tests."
+
 [[aside]]
 run = "20261023-210128-colony-first"
 checkpoint = "00004939776.pt"
@@ -53,13 +58,12 @@ title = "The scripted copy"
 text = "A brain that started as a copy of a scripted forager that heads home at dusk, then trained like the rest. It's the bar the learned-only line is chasing, and never one carried forward: every brain above learned on its own."
 
 [[working]]
-title = "Three nights, and hatching"
-text = "The last thing 0.3 needs: colonies that keep their store full enough to hatch a new Terrikin when one dies, and still get through all three nights. A colony that loses someone can now pay jelly from its store for an egg that hatches in the nest, and the food has a smell they can follow. These forks train in that world, two brain sizes side by side, each also trying how much to pay them when their colony hatches one."
+title = "Room to grow"
+text = "Each colony can now grow past the six it starts with, up to eight, by hatching eggs from its store into empty places, not only into the place of one it lost. These forks carry on from the brain that got 87% of colonies through all three nights. Half of them now toss a coin for every yes or no (eat, unload, sprint), with odds the brain learns, where before a yes or no was read off a number that rarely crossed the line. The goal for 0.3: through all three nights, hatching on the way."
 score = "seconds_alive"
 show = 3
 
 [working.notes]
-"pbt-b*" = "Carried on in the world with hatching and smell, food tightened to what two colonies need."
-"pbt-v*" = "The same, in a brain twice as wide (four times the size)."
-"pbt-a*" = "The night brain, carried on in the world with hatching and smell."
-"pbt-w*" = "The night brain copied into one twice as wide (four times the size), carried on the same way."
+"pbt-g*" = "Carried on with room to grow."
+"pbt-y*" = "The same brain, with its yes and no answers turned into coin tosses at the odds it had."
+

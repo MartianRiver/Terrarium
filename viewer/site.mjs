@@ -75,6 +75,7 @@ ${marks ? '<p class="review">Review build: drafts are shown and marked. Not the 
     <a href="/watch/">Watch</a>
     <a href="/brains/">Brains</a>
     <a href="/blog/">Blog</a>
+    <a href="/at-home/">At Home</a>
     <a href="${REPO}">Code</a>
   </nav>
 </header>
@@ -155,7 +156,9 @@ const how = read(join(SITE, 'how.md'));
 // nothing unfinished goes public: the same list as check.py's UNFINISHED. A review build still shows it
 const UNFINISHED = [/^\W*DRAFT\b/m, /\bTBD\b/, /\bRiver (needs|has|is|still) to\b/i, /\bRiver to (write|add|check|fill|decide|review|edit|confirm)\b/i,
   /\b(River|me) to fill in\b/i, /\blorem\s+ipsum\b/i, /\[(fill|insert|add) [^\]]*\]/i, /\bplaceholder (text|paragraph|for River)\b/i];
-for (const [name, text] of [['index.md', home.body], ['how.md', how.body], ...notes.filter((n) => !n.draft).map((n) => [n.file, n.body])]) {
+const unfinished = [['index.md', home.body], ['how.md', how.body], ['at-home.md', read(join(SITE, 'at-home.md')).body],
+  ...notes.filter((n) => !n.draft).map((n) => [n.file, n.body])];
+for (const [name, text] of unfinished) {
   const hit = UNFINISHED.map((p) => text.match(p)?.[0]).find(Boolean);
   if (!review && hit) throw new Error(`site/${name} has something unfinished ("${hit}"), so it can't be published`);
 }
@@ -251,6 +254,77 @@ write('brains', page({
 <div id="gallery"><p>Loading…</p></div>
 ${BRAINS}`,
 }));
+// Terrarium at Home: the page, the reviews of the worker's code (site/reviews/, each a model's review pasted in
+// whole, with the commit it read) and the board, read live from the job queue
+const atHome = read(join(SITE, 'at-home.md'));
+for (const key of ['title', 'description', 'usd_per_billion', 'rate_from', 'aud_per_usd', 'aud_date']) {
+  if (!atHome.meta[key]) throw new Error(`site/at-home.md has no ${key}`);
+}
+const reviews = existsSync(join(SITE, 'reviews')) ? readdirSync(join(SITE, 'reviews')).filter((f) => f.endsWith('.md')).sort().reverse().map((f) => {
+  const { meta, body } = read(join(SITE, 'reviews', f));
+  for (const key of ['model', 'date', 'commit', 'verdict']) {
+    if (!meta[key]) throw new Error(`reviews/${f} has no ${key}`);
+  }
+  return { ...meta, body, slug: f.replace(/\.md$/, '') };
+}) : [];
+for (const r of reviews) {
+  const link = r.link ? ` · <a href="${escape(r.link)}">the conversation</a>` : '';
+  write(`at-home/reviews/${r.slug}`, page({
+    title: `${r.model} on the worker`,
+    description: r.verdict,
+    path: `/at-home/reviews/${r.slug}/`,
+    body: `<article>\n<h1>${escape(r.model)} on the worker</h1>\n<p class="when">${date(r.date)} · read the code at <a href="${REPO}/tree/${escape(r.commit)}">${escape(r.commit.slice(0, 7))}</a>${link}</p>\n${marked(r.body)}</article>\n<p><a href="/at-home/">Terrarium at Home</a></p>`,
+  }));
+}
+const PROMPT = `Read the code a volunteer's computer runs when they lend it to Terrarium at Home, in https://github.com/MartianRiver/Terrarium: sim/terrarium/worker.py, machine.py, snapshot.py and jobs.py, sim/allowed_signers, and the training it starts (sim/terrarium/train.py). docs/compute.md says what it claims to do.
+
+Tell me plainly: what it does on my computer, what it sends and to whom, whether it could ever run code that isn't public in that repo or that the author didn't sign, and anything that looks unsafe or that the docs leave out. Quote the lines each point rests on. I'm deciding whether to run it on my own PC.`;
+const reviewed = (reviews.length
+  ? '<ul class="notes">' + reviews.map((r) => `<li><a href="/at-home/reviews/${r.slug}/">${escape(r.model)}</a><span class="when">${date(r.date)} · code at ${escape(r.commit.slice(0, 7))}</span><p>${escape(r.verdict)}</p></li>`).join('') + '</ul>'
+  : '')
+  + `<p>Don’t take my word for it. ${reviews.length ? 'These are' : 'The best check is'} a model with no stake in it reading the code: paste this into a new chat with Claude or ChatGPT and read what it says.</p>
+<details><summary>The prompt</summary><pre>${escape(PROMPT)}</pre></details>`;
+const BOARD = `<div id="board"><p>Loading…</p></div>
+<script>
+const BOARD_URL = 'https://terrarium-jobs.martianriver.com/api/board';
+const PER_BILLION = ${Number(atHome.meta.usd_per_billion)}, AUD = ${Number(atHome.meta.aud_per_usd)};
+const box = document.getElementById('board');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const samples = (n) => n >= 1e9 ? (n / 1e9).toFixed(2) + 'G' : (n / 1e6).toFixed(n >= 1e8 ? 0 : 1) + 'M';
+const money = (usd) => 'A$' + (usd * AUD).toFixed(2) + ' (US$' + usd.toFixed(2) + ')';
+fetch(BOARD_URL).then((r) => {
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}).then((b) => {
+  const lent = b.totals.lent;
+  let html = lent.samples
+    ? '<p class="saved">Lent machines have trained <b>' + samples(lent.samples) + ' samples</b> over ' + lent.hours.toFixed(1)
+      + ' hours: about <b>' + money(lent.samples / 1e9 * PER_BILLION) + '</b> of rented GPU time.</p>'
+    : '<p class="saved">No lent machine has finished a job yet.</p>';
+  if (!b.machines.length) {
+    box.innerHTML = html + '<p>No machines on it yet.</p>';
+    return;
+  }
+  html += '<div class="board"><table><thead><tr><th>Machine</th><th>Kind</th><th>GPU</th><th>Samples</th><th>Hours</th><th>Jobs</th><th>Last active</th></tr></thead><tbody>'
+    + b.machines.map((m) => '<tr><td>' + esc(m.name) + '</td><td>' + esc(m.kind) + '</td><td>' + esc(m.gpu || '–') + '</td><td>' + samples(m.samples)
+      + '</td><td>' + m.hours.toFixed(1) + '</td><td>' + m.jobs + '</td><td>' + esc(m.last_active || '–') + '</td></tr>').join('')
+    + '</tbody></table></div>';
+  box.innerHTML = html;
+}).catch(() => {
+  box.innerHTML = '<p>The board isn’t answering right now. The queue may be restarting; try again in a minute.</p>';
+});
+</script>`;
+for (const mark of ['<!-- reviews -->', '<!-- board -->']) {
+  if (!atHome.body.includes(mark)) throw new Error(`site/at-home.md has no ${mark}`);
+}
+const rate = `<p class="when">Rented time is what my rented GPUs have cost per sample: US$${escape(atHome.meta.usd_per_billion)} a billion, from ${escape(atHome.meta.rate_from)}, at A$${escape(atHome.meta.aud_per_usd)} to the US dollar (the ECB’s rate on ${escape(atHome.meta.aud_date)}). It leaves out the power your machine uses.</p>`;
+write('at-home', page({
+  title: atHome.meta.title,
+  description: atHome.meta.description,
+  path: '/at-home/',
+  body: `<article>\n<h1>${escape(atHome.meta.title)}</h1>\n${marked(atHome.body).replace('<!-- reviews -->', () => reviewed).replace('<!-- board -->', () => BOARD + rate)}</article>`,
+}));
+
 // a review build shows the gallery as built on this machine (SITE_GALLERY)
 if (review && process.env.SITE_GALLERY) cpSync(process.env.SITE_GALLERY, join(out, 'replays', 'gallery'), { recursive: true });
 
