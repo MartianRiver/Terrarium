@@ -58,10 +58,11 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 
 Done when creatures carry food home and store it, colonies get through all three nights on the store and by huddling, colonies grow by hatching new Terrikins from their store, Terrikins don't starve with jelly at home, foragers away from the nest keep themselves fed, and the brain beats the one it started from.
 
-## 0.4 Elderflower: Growth
+## 0.4 Elderflower: Growth and memory
 
-*Rented GPUs.* Colonies that grow and shrink with what they gather, and colonies that don't all think alike. In 0.3 a colony could only grow by two, and with every colony running the same brain, three shrunken colonies sharing food for two was as good as it got: nothing paid a colony for growing, or for another one failing.
+*Rented GPUs.* Colonies that grow and shrink with what they gather, colonies that don't all think alike, and a brain that remembers. In 0.3 a colony could only grow by two, and with every colony running the same brain, three shrunken colonies sharing food for two was as good as it got: nothing paid a colony for growing, or for another one failing.
 
+- **Memory:** a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight and can't tell how long it's been out, so getting back to a patch it found, or home before it runs out, needs more than that. It's the biggest change to the brain since 0.2, so it goes in on its own first.
 - **Hatchlings.** What hatches starts small and slow instead of full-grown, feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size. Once that works, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job.
 - **Room set by the food.** No fixed size per colony: the arena has room for so many Terrikins in all, and one colony growing leaves less room for the others. A colony that's better at finding food, getting it home and keeping it grows, and the food is the limit.
 - A bigger garden with more Terrikins in it, and food to match.
@@ -70,18 +71,17 @@ Done when creatures carry food home and store it, colonies get through all three
 - Episodes long enough for growth to compound, or worlds that don't start over at all.
 - Evals: how big each colony gets and how long it lasts, head to head between colonies' brains, and colonies founded.
 
-Done when colonies grow from their store and shrink in lean times, hatchlings grow up on what their colony brings home, and the brains of the colonies that do well spread.
+Done when foragers go back to a patch they remember, colonies grow from their store and shrink in lean times, hatchlings grow up on what their colony brings home, and the brains of the colonies that do well spread.
 
-## 0.5 Foxglove: Memory and the way home
+## 0.5 Foxglove: The way home
 
-*Rented GPUs.* A brain that remembers, and a world with more to remember.
+*Rented GPUs.* A world with more to remember, now there's a brain that can.
 
-- Memory: a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight, and getting back to a patch it found needs more than that.
-- **Smelling the way home.** The exact sense of where the nest is goes, faded out over training once memory is in. Each nest gives off its colony's scent instead, so close by they can smell home, and further out they have to remember the way.
+- **Smelling the way home.** The exact sense of where the nest is goes, faded out over training, now that memory is in. Each nest gives off its colony's scent instead, so close by they can smell home, and further out they have to remember the way.
 - **Keeping the nest clean.** Droppings become real: they smell, and they're bad to live beside (how, still to work out), so carrying them away from the nest becomes a job, like an ant colony's waste heap.
 - The first danger: a dust devil drifts across the arena, knocking creatures over (they lie still for a moment) and making them drop what they carry. It's weather, not a creature: nothing about it learns.
 
-Done when foragers go back to a patch they remember, find their way home by smell, and creatures keep clear of dust devils.
+Done when foragers find their way home by smell and creatures keep clear of dust devils.
 
 ## 0.6 Gorse: Working together, moving things
 
