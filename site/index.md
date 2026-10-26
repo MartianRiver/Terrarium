@@ -19,9 +19,9 @@ The world grows a stage at a time, and every stage's brain starts from the last 
 
 ## What's next
 
-**0.4 Elderflower: growth and memory.** When a colony's store gets big enough it hatches a new Terrikin, so colonies grow in good times and shrink in lean ones. They get a little memory, so a forager can find its way back to a patch it found. And the first danger: dust devils.
+**0.4 Elderflower: growth.** Hatchlings that start small and grow up on what their colony brings home, colonies as big as their food lets them get, and a brain for each colony, so they can stop all thinking alike and the ones that do best spread.
 
-**0.5 Foxglove: working together.** Signals, scent marks, and food and blocks too heavy for one Terrikin to move alone.
+**0.5 Foxglove: memory and the way home.** A little memory, so a forager can find its way back to a patch it found, the smell of home to find the nest by, and the first danger: dust devils.
 
 Every stage, and what has to be true before it counts as done, is in the [roadmap](https://github.com/MartianRiver/Terrarium/blob/HEAD/ROADMAP.md).
 

@@ -18,7 +18,14 @@ What else v2 counts, for colonies:
 
 - **jelly** eaten from the store, per creature
 - **deaths**: how many died, how many of them with jelly in their own store (**by jelly**), how many in their own nest, and whole **colonies lost** (left with nobody alive at some point). With hatching on a slot can die more than once, so these count deaths, not creatures
-- with hatching on (`[hatch]`): **hatched**, Terrikins hatched per colony an episode, how many colonies hatched at least one (**hatching**), and the colonies with someone alive when the episode ran its full length (**to the end**: in a three-day world, through all three nights)
+- with hatching on (`[hatch]`): **hatched**, Terrikins hatched per colony an episode, how many colonies hatched at least one (**hatching**), the colonies with someone alive when the episode ran its full length (**to the end**: in a three-day world, through all three nights), and **colony size**: Terrikins alive in each colony at the end, and the most it had at once
+- with `[colonies] room` above 0, a colony starts with `size` and can hatch into the rest. Food per minute, seconds alive, food, stored and jelly are per *starting* place then (a place that starts empty would only pull the means down), so they stay comparable with worlds without room; what room adds shows in colony size
+
+**Head to head** (`terrarium.versus`): one policy or brain per colony in the same arenas, racing for the same food. Nests aren't equally placed, so each takes every seat in turn over the same episodes, and its numbers are added up over its seats: colonies to the end and lost, and size at the end, hatched and seconds alive averaged.
+
+```
+uv run python -m terrarium.versus nester A.pt B.pt --config configs/colony.toml --held-out [--out results.json]
+```
 - how often each yes/no action says yes where it matters: `unload` at home with something in the crop, `unload` away from any nest with something in it (dumping), `eat` when hungry with something in the crop, and `eat` when hungry at home with jelly in the store (crop or not: a carrier unloads and eats on the same tick), `sprint` whenever it's rested and could, and `grab` whenever a block is within reach
 - **turning**: the mean of turn squared (what turning costs by) out by day and in its own nest at night, to see spinning go
 - **away by day**: deaths away from its own nest in full daylight, when food is out and there's no cold: a forager that couldn't keep itself fed

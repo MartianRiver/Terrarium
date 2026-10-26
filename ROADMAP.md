@@ -48,37 +48,45 @@ Done when the trained blob clearly beats random on the evals, and there's a clip
 - Food grows in patches rather than evenly, since streams only form when food is clumped. Half of it grows in the middle, between the nests, so colonies meet over it.
 - **Smell.** Food gives off a smell that spreads and fades, and only part of it gets past a block. A Terrikin senses how strong it is and which way it gets stronger, so it can tell food is that way before it can see any: behind a block, round a wall, or past another Terrikin.
 - **Day and night.** Food stops growing at night and what's left standing goes, so the store is what gets a colony through to morning. Nights are cold: energy drains faster, less so in the nest or close to nestmates, so huddling can pay. They can sense the light, and dusk dims slowly, so night can be seen coming. Nights have to be longer than a Terrikin can last on what's in its body, or there's no point keeping a store.
-- **Hatching.** Once a colony has lost someone, a store above a threshold pays jelly to hatch a new Terrikin at the nest in its place, full-grown for now. So a store can buy back what the night took.
+- **Hatching.** A store above a threshold pays jelly for an egg in the nest, which hatches a new Terrikin, full-grown for now: in the place of one the colony lost, or in room for two more past the six it started with. So a store can buy back what the night took, and a colony that gathers well can end the episode bigger than it started.
 - Sprint: faster, costs energy, has a cooldown. For getting to food before another colony does, and later for getting out of the way. Turning costs energy too, by how hard, so steering is cheap and spinning on the spot isn't.
-- **Scarcity.** Only enough food for about two colonies' worth of Terrikins to live through all three nights of an episode, so colonies race each other for it. With every colony running the same brain, which one makes it is down to place and luck; telling better brains apart comes with rivals in 0.6.
+- **Scarcity.** Only enough food for about two colonies' worth of Terrikins to live through all three nights of an episode, so colonies race each other for it. With every colony running the same brain, which one makes it is down to place and luck; telling better brains apart starts with a brain for each colony in 0.4.
 - Foraging is checked in the colony world, not alone. Isolated ant workers die young even with food to hand (Koto et al. 2015), and a colony brain alone turned out the same way, so a lone Terrikin is scored as a number to watch, not held to what the 0.2 brain did.
-- **Evals v2:** scripted foragers that carry food home (and one that also goes home at dusk) as the baselines, like greedy was for 0.2. Food stored and eaten, deaths and where they happen (away from the nest by day: a forager that couldn't feed itself), colonies through the night, how often another colony is close when food is eaten, and seeds held back for the release.
+- **Evals v2:** scripted foragers that carry food home (and one that also goes home at dusk) as the baselines, like greedy was for 0.2. Food stored and eaten, deaths and where they happen (away from the nest by day: a forager that couldn't feed itself), colonies through the night, how often another colony is close when food is eaten, how big colonies get, and seeds held back for the release. Head to head, too: a different brain in each colony of the same arenas, each taking every seat in turn.
 - The brain is learned, never copied: forks that train side by side and copy whichever is doing best (population-based training) are how it gets there.
 
 Done when creatures carry food home and store it, colonies get through the night on the store and by huddling, about two colonies in three live through all three nights on food for two, colonies hatch new Terrikins from their store, foragers away from the nest keep themselves fed, and the brain beats the one it started from.
 
-## 0.4 Elderflower: Growth and memory
+## 0.4 Elderflower: Growth
 
-*Mac and rented GPUs.* A colony that grows and shrinks with what it gathers, and a brain that remembers.
+*Rented GPUs.* Colonies that grow and shrink with what they gather, and colonies that don't all think alike. In 0.3 a colony could only grow by two, and with every colony running the same brain, three shrunken colonies sharing food for two was as good as it got: nothing paid a colony for growing, or for another one failing.
 
-- **Hatchlings.** What hatches starts small and slow instead of full-grown, feeds itself from the store while it's at the nest, and grows into an adult, and a colony can grow past the size it started at, up to a cap. Body traits (size, speed) become inputs, so one brain works for every size. Once that works, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job.
+- **Hatchlings.** What hatches starts small and slow instead of full-grown, feeds itself from the store while it's at the nest, and grows into an adult. Body traits (size, speed) become inputs, so one brain works for every size. Once that works, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job.
+- **Room set by the food.** No fixed size per colony: the arena has room for so many Terrikins in all, and one colony growing leaves less room for the others. A colony that's better at finding food, getting it home and keeping it grows, and the food is the limit.
+- **A brain for each colony.** Each colony's Terrikins learn from their own colony only, with its own reward blend and dials. Colonies that do well found new ones carrying a copy of their brain, and colonies that die out take theirs with them, so the world picks which brains carry on, not a score I choose. What changes from parent to child is small, like the drives (what each one is paid for) and the body; what they do with them is still learned.
+- Seeing which nestmates are carrying food, the way harvester ants judge how much is out there by who comes home loaded.
+- Episodes long enough for growth to compound, or worlds that don't start over at all.
+- Evals: how big each colony gets and how long it lasts, head to head between colonies' brains, and colonies founded.
+
+Done when colonies grow from their store and shrink in lean times, hatchlings grow up on what their colony brings home, and the brains of the colonies that do well spread.
+
+## 0.5 Foxglove: Memory and the way home
+
+*Rented GPUs.* A brain that remembers, and a world with more to remember.
+
 - Memory: a few numbers the brain carries from one tick to the next. It forgets food the moment it's out of sight, and getting back to a patch it found needs more than that.
 - **Smelling the way home.** The exact sense of where the nest is goes, faded out over training once memory is in. Each nest gives off its colony's scent instead, so close by they can smell home, and further out they have to remember the way.
-- Seeing which nestmates are carrying food, the way harvester ants judge how much is out there by who comes home loaded.
-- **A brain for each colony.** Each colony's Terrikins learn from their own colony only, with its own reward blend and dials, and the colonies that do best get copied more. Until now every colony has run the same brain, so they couldn't settle on different ways of living.
 - **Keeping the nest clean.** Droppings become real: they smell, and they're bad to live beside (how, still to work out), so carrying them away from the nest becomes a job, like an ant colony's waste heap.
 - The first danger: a dust devil drifts across the arena, knocking creatures over (they lie still for a moment) and making them drop what they carry. It's weather, not a creature: nothing about it learns.
-- Evals: how big each colony gets.
 
-Done when the colony grows from its store and shrinks in lean times, foragers go back to a patch they remember, and creatures keep clear of dust devils.
+Done when foragers go back to a patch they remember, find their way home by smell, and creatures keep clear of dust devils.
 
-## 0.5 Foxglove: Working together, moving things
+## 0.6 Gorse: Working together, moving things
 
-*Mac, then rented GPUs.* Signal patch (free at first), scent marks (cost energy), rich food that needs two carriers, and blocks of varying weight, some needing two creatures.
+*Rented GPUs.* Signal patch (free at first), scent marks (cost energy), rich food that needs two carriers, and blocks of varying weight, some needing two creatures.
 
 - Two scent marks, one that draws others and a "no entry" one, as Pharaoh's ants use, laid on the same smell the food has. Both learned: no scripted trail-layers to get them started, even though that makes the first trails harder to find.
 - Shivering: spending energy to warm nestmates close by, so huddling can split into heaters and passengers, as it does in honeybees.
-
 - With dust devils about, a signal has more to mean than "help me carry this".
 - **Moving blocks on purpose.** Walking into a block isn't enough to move it: a hard push, costing energy, moves it the way the Terrikin is going. Blocks in the way of food first, then heavier ones that need two. In 0.3's tries, light blocks got pushed aside by Terrikins just walking at food, which isn't the same as moving them on purpose, and a grab-and-drag for doors never got learned (notes 0.3).
 - Shove: knocks the target back and makes it drop what it's carrying, no damage. Costs energy, has a cooldown. For clearing paths and moving things, and the same knock and drop as the dust devil's.
@@ -86,33 +94,26 @@ Done when the colony grows from its store and shrinks in lean times, foragers go
 
 Done when pairs team up on heavy food and heavy blocks, and creatures move things for a purpose. Maybe the first barriers, and freeloaders pushed off the store. Watch for signals or trails starting to mean something, warnings especially.
 
-## 0.6 Gorse: Rivals and conflict
+## 0.7 Honeysuckle: Rivals and conflict
 
-*Rented GPUs.* Two colonies, then three or four. Shoving rivals and stealing first, then attack, health and death. Friendly fire ramped in.
+*Rented GPUs.* Shoving rivals and stealing first, then attack, health and death. Friendly fire ramped in.
 
 - Rivals can take jelly from a nest's store and carry it home; the colony can push or fight them off.
-
-- Self-play against a pool of past brains, drawn from the lineage.
+- Self-play against a pool of past brains, drawn from the lineage, so a colony can't get good at beating only the rival in front of it.
 
 Done when there's stealing, guarding of food patches, fights and retreats. Possibly warning signals before attacks.
 
-## 0.7 Honeysuckle: Queen and brood
+## 0.8 Ivy: Queen and requeening
 
-*Rented GPUs.* A scripted queen, eggs, feeding, hatchlings growing up. Raiding rival brood becomes possible.
+*Rented GPUs.* A queen who lays the eggs, brood that needs feeding and guarding, and a colony that can lose its queen and raise a new one with food and time. The queen is a body with her own place in the colony, not a script: what she does, and what the rest do about her, is learned. Raiding rival brood becomes possible.
 
-Done when there are guards staying home, nurses near the brood, and raids on rival nests.
+Done when there are guards staying home, nurses near the brood, raids on rival nests, and colony crises and comebacks.
 
-## 0.8 Ivy: Farming and seasons
+## 0.9 Juniper: Farming and seasons
 
 *Rented GPUs.* Seeds, fertile soil, lean seasons.
 
 Done when colonies plant and defend farms, and different colonies settle on different strategies. The big one.
-
-## 0.9 Juniper: Requeening
-
-*Rented GPUs.* The queen can die, and a colony can raise a new one with food and time.
-
-Done when there are colony crises and comebacks.
 
 ## 1.0 Kingcup: The main world
 
@@ -139,7 +140,7 @@ Done when it's running and worth checking in on.
 
 ## Walking
 
-A separate track, after the colony stages. In the sim a creature slides on a plane, and the waddle is only the viewer's. Here it gets a real body with legs in 3D physics, and a small body brain learns to walk, taking the colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.4) becomes something it has to get up from. It's the step towards a real robot. It learns to walk from rewards and costs alone, never from recordings of how real animals move.
+A separate track, after the colony stages. In the sim a creature slides on a plane, and the waddle is only the viewer's. Here it gets a real body with legs in 3D physics, and a small body brain learns to walk, taking the colony brain's thrust and turn as what it's asked to do. Knocked over (from 0.5) becomes something it has to get up from. It's the step towards a real robot. It learns to walk from rewards and costs alone, never from recordings of how real animals move.
 
 ## Lab
 

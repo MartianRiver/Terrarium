@@ -35,6 +35,8 @@ food = 0.4
 [colonies]
 count = 3
 size = 6
+# places beyond those it starts with, empty until the colony hatches into them
+room = 0
 nest_radius = 1.6
 # nests sit this far from the centre, as a share of half the arena
 nest_distance = 0.68
@@ -69,9 +71,9 @@ energy = 0.25
 hunger = 0.3
 
 [hatch]
-# a colony that has lost someone, with at least `threshold` jelly in its store, pays `cost` of it for an egg in the
-# nest, which hatches a full-grown Terrikin in the lost one's place after `seconds`. An egg needs someone left to
-# tend it: a colony with nobody alive loses its eggs. cost 0 is off
+# a colony with an empty place (someone lost, or [colonies] room to grow) and at least `threshold` jelly in its
+# store pays `cost` of it for an egg in the nest, which hatches a full-grown Terrikin in that place after `seconds`.
+# An egg needs someone left to tend it: a colony with nobody alive loses its eggs. cost 0 is off
 cost = 0
 threshold = 0
 seconds = 0.0

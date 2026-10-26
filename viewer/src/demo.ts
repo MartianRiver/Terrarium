@@ -223,6 +223,7 @@ export function createDemo(seed = 7) {
       blocks: blocks.map((b) => ({ ...b })),
       stores: [],
       light: 1,
+      eggs: [],
     };
   }
 

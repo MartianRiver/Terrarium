@@ -39,10 +39,10 @@ def frame(world: World, a: int) -> dict:
     speed = np.hypot(world.vel[a, :, 0], world.vel[a, :, 1])
     creatures = [{'id': int(i), 'colony': int(c), 'x': _r(x), 'y': _r(y), 'heading': _r(h), 'speed': _r(s),
                   'size': size, 'energy': _r(e), 'signal': -1, 'carrying': int(k)}
-                 for i, c, (x, y), h, s, e, k in zip(world.creature_id[a], world.colony, world.pos[a], world.heading[a],
-                                                     speed, world.energy[a], world.crop[a])]
+                 for i, c, (x, y), h, s, e, k, u in zip(world.creature_id[a], world.colony, world.pos[a], world.heading[a],
+                                                        speed, world.energy[a], world.crop[a], world.unborn[a]) if not u]
     if cfg.grab.on:
-        for c, held in zip(creatures, world.holding[a]):
+        for c, held in zip(creatures, world.holding[a][~world.unborn[a]]):
             c['holding'] = int(held)
     here = world.food_present[a]
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
@@ -54,6 +54,12 @@ def frame(world: World, a: int) -> dict:
     out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
     if cfg.night.on:
         out['light'] = _r(world.light()[a])
+    if cfg.hatch.on:
+        # how far along each egg is, 0 when laid to 1 as it hatches; the hatchling takes the egg's id
+        total = max(1, round(cfg.hatch.seconds * cfg.tick_hz))
+        out['eggs'] = [{'id': int(world.egg_id[a, i]), 'colony': int(world.colony[i]), 'x': _r(world.egg_pos[a, i, 0]),
+                        'y': _r(world.egg_pos[a, i, 1]), 'progress': _r(1 - world.egg[a, i] / total)}
+                       for i in np.flatnonzero(world.egg[a])]
     return out
 
 

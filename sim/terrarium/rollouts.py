@@ -60,7 +60,7 @@ class Collector:
     def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain, workers: int = 1,
                  mix: list[tuple[Config, int]] | None = None):
         mix = mix or []
-        self.samples = sum(n * c.colonies.count * c.colonies.size for c, n in [(cfg, arenas), *mix])
+        self.samples = sum(n * c.colonies.count * c.colonies.slots for c, n in [(cfg, arenas), *mix])
         self.episodes = Episodes(self.samples, cfg.dt * train.ppo.repeat)
         self.local, self.pipes, self.procs = [], [], []
         if workers == 1:
@@ -178,7 +178,7 @@ class OnDevice:
         mix = mix or []
         parts = ([(cfg, arenas)] if workers == 1 else
                  [(cfg, len(a)) for a in np.array_split(np.arange(arenas), workers)]) + mix
-        sizes = [n * c.colonies.count * c.colonies.size for c, n in parts]
+        sizes = [n * c.colonies.count * c.colonies.slots for c, n in parts]
         self.samples = sum(sizes)
         self.ends = np.cumsum(sizes)[:-1]
         self.episodes = Episodes(self.samples, cfg.dt * train.ppo.repeat)

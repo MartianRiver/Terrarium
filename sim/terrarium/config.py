@@ -40,9 +40,15 @@ class Energy:
 class Colonies:
     count: int
     size: int
+    # places each colony has beyond the ones it starts with, empty until it hatches into them
+    room: int
     nest_radius: float
     nest_distance: float
     spawn_ring: float
+
+    @property
+    def slots(self) -> int:
+        return self.size + self.room
 
 
 @dataclass(frozen=True)
@@ -280,7 +286,8 @@ def convert(kind, value, where):
 
 # keys added after worlds were first recorded, as they were before: off. Only for reading old run
 # records (serve.py), never for configs on disk, which have every key
-SINCE = {'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
+SINCE = {'colonies': {'room': 0},
+         'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
