@@ -11,10 +11,15 @@
 # the light starts to fade and waits in the nest until it's full day.
 #
 #   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled]
+#                                    [--device cuda]
+#
+# Each policy (and each brain in each mode) is scored in its own process, side by side.
 
 import argparse
 import json
+import multiprocessing as mp
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -126,14 +131,14 @@ PLACES = {
 MODES = ('drawn', 'mean', 'sampled')
 
 
-def brain_policy(path: Path | str, mode: str = 'drawn') -> Callable[[World], Policy]:
+def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu') -> Callable[[World], Policy]:
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
     by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat."""
     brain, meta = load_brain(path)
-    brain.eval()
+    brain.eval().to(device)
     # it chooses every `repeat` ticks, as it did in training, and holds its choice in between
     repeat = meta.get('repeat', 1)
-    spread = brain.log_std.detach().exp().numpy()
+    spread = brain.log_std.detach().exp().cpu().numpy()
     if mode == 'drawn':
         spread = spread * np.isin(brain.schema['actions'], YES_NO)
     elif mode == 'mean':
@@ -164,11 +169,16 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     policy = make(world)
     shape = world.alive.shape
     lived, meals, stored, jelly = (np.zeros(shape, int) for _ in range(4))
-    died, beside_jelly, at_nest, in_dark, away_by_day = (np.zeros(shape, bool) for _ in range(5))
+    # deaths in each slot: with hatching, one slot can die more than once
+    died, beside_jelly, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
     nights = np.zeros(shape, int)
     colonies = np.unique(world.colony)
     first_dawn = np.zeros((episodes, len(colonies)), bool)
+    # colonies that were ever left with nobody, those still going when the episode ran its full length, and hatchlings
+    emptied = np.zeros((episodes, len(colonies)), bool)
+    at_end = np.zeros((episodes, len(colonies)), bool)
+    hatched = np.zeros((episodes, len(colonies)), int)
     dawned = np.zeros(episodes, bool)
     actions = {k: [0, 0] for k in CONTEXTS}
     turning = {k: [0, 0.0] for k in PLACES}
@@ -217,28 +227,34 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
             first_dawn[first] = np.stack([world.alive[:, world.colony == c].any(1) for c in colonies], 1)[first]
             dawned |= first
         gone = before & ~world.alive
-        died |= gone
-        beside_jelly |= gone & (mine > 0)
-        at_nest |= gone & home
-        in_dark |= gone & world.dark[:, None]
-        away_by_day |= gone & ~home & by_day
+        died += gone
+        beside_jelly += gone & (mine > 0)
+        at_nest += gone & home
+        in_dark += gone & world.dark[:, None]
+        away_by_day += gone & ~home & by_day
+        going = np.stack([world.alive[:, world.colony == c].any(1) for c in colonies], 1)
+        emptied |= ~going & ~done[:, None]
         # an arena that has ended stops counting; the others carry on
         finished = world.ended & ~done
         meals[finished] = world.meals[finished]
         stored[finished] = world.stored[finished]
         jelly[finished] = world.jelly[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
+        hatched[finished] = world.hatched[finished]
+        at_end[finished] = going[finished] & (world.age[finished, None] >= world.episode_ticks)
         done |= finished
     alive = lived / cfg.tick_hz
     per_minute = meals / (alive / 60)
-    lost = [died[:, world.colony == c].all(1) for c in colonies]
     return {
         'episodes': episodes, 'seed': seed,
         'food_per_minute': summary(per_minute), 'seconds_alive': summary(alive),
         'food': summary(meals), 'stored': summary(stored), 'jelly': summary(jelly),
         'deaths': {'creatures': died.size, 'died': int(died.sum()), 'beside_jelly': int(beside_jelly.sum()),
                    'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()), 'away_by_day': int(away_by_day.sum()),
-                   'colonies': len(lost) * episodes, 'colonies_lost': int(np.sum(lost))},
+                   'colonies': emptied.size, 'colonies_lost': int(emptied.sum())},
+        # per colony an episode, and the colonies that hatched at least one
+        'hatched': {**summary(hatched), 'colonies': int((hatched > 0).sum())},
+        'colonies_to_the_end': int(at_end.sum()),
         # with nights on: how many each lived through, and the colonies still going at the first dawn (None if the
         # episode is over before one)
         'nights': summary(nights),
@@ -250,6 +266,25 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         # blocks more than half a metre from where they started, per arena at its end
         'blocks_moved': summary((moved > 0.5).sum(1)[:, None]),
     }
+
+
+def score(cfg: Config, policy: str | None = None, brain: Path | str | None = None, mode: str = 'drawn',
+          episodes: int = EPISODES, seed: int = SEED, device: str = 'cpu', threads: int = 1) -> dict:
+    """One eval, of a scripted policy by name or of a brain in one of MODES."""
+    torch.set_num_threads(threads)
+    make = brain_policy(brain, mode, device) if brain else POLICIES[policy or 'random']
+    return run(cfg, make, episodes, seed)
+
+
+def side_by_side(cfg: Config, jobs: dict[str, dict], episodes: int = EPISODES, seed: int = SEED,
+                 device: str = 'cpu') -> dict:
+    """score() for each of jobs (name → its policy or brain and mode), each in its own process."""
+    threads = max(1, (cpu_quota() or torch.get_num_threads()) // len(jobs))
+    # spawn, not fork: a forked child of a process holding CUDA can hang
+    with ProcessPoolExecutor(len(jobs), mp_context=mp.get_context('spawn')) as pool:
+        running = {name: pool.submit(score, cfg, episodes=episodes, seed=seed, device=device, threads=threads, **job)
+                   for name, job in jobs.items()}
+        return {name: f.result() for name, f in running.items()}
 
 
 def summary(x: np.ndarray) -> dict:
@@ -281,32 +316,32 @@ def main():
     parser.add_argument('--modes', nargs='+', choices=MODES, default=['drawn'], help='how each brain picks its actions')
     parser.add_argument('--held-out', action='store_true', help=f'the promotion worlds (seed {HELD_OUT}) instead of {SEED}')
     parser.add_argument('--episodes', type=int, default=EPISODES)
+    parser.add_argument('--device', default='cpu', help="where the brains run; the worlds are always on the CPU")
     parser.add_argument('--out', help='write the results here as JSON')
     args = parser.parse_args()
-    # a rented container shows the host's cores, and torch starts a thread for each
-    if (quota := cpu_quota()) and quota < torch.get_num_threads():
-        torch.set_num_threads(quota)
     cfg = load(args.config)
     seed = HELD_OUT if args.held_out else SEED
 
-    makers: dict[str, Callable[[World], Policy]] = {name: POLICIES[name] for name in args.policy}
+    jobs: dict[str, dict] = {name: {'policy': name} for name in args.policy}
     for b in args.brain:
         for mode in args.modes:
-            makers[Path(b).name + ('' if mode == 'drawn' else f' {mode}')] = brain_policy(b, mode)
-    results = {}
+            jobs[Path(b).name + ('' if mode == 'drawn' else f' {mode}')] = {'brain': b, 'mode': mode}
+    results = side_by_side(cfg, jobs, args.episodes, seed, args.device)
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {seed}; ± over arenas')
-    width = max(8, *map(len, makers))
+    width = max(8, *map(len, jobs))
     print(f'{"policy":<{width}}  {"food/min":>14}  {"seconds alive":>16}  {"p10":>5}  {"stored":>12}  {"jelly":>5}'
           f'  {"died":>5}  {"by jelly":>8}  {"colonies lost":>13}'
-          + (f'  {"in dark":>7}  {"nights":>6}  {"through night 1":>15}' if cfg.night.on else ''))
-    for name, make in makers.items():
-        r = results[name] = run(cfg, make, args.episodes, seed)
+          + (f'  {"in dark":>7}  {"nights":>6}  {"through night 1":>15}' if cfg.night.on else '')
+          + (f'  {"to the end":>10}  {"hatched":>7}  {"hatching":>9}' if cfg.hatch.on else ''))
+    for name, r in results.items():
         f, s, st, d = r['food_per_minute'], r['seconds_alive'], r['stored'], r['deaths']
         print(f'{name:<{width}}  {f["mean"]:7.2f} ± {f["stderr"]:4.2f}  {s["mean"]:8.1f} ± {s["stderr"]:5.1f}  {s["p10"]:5.0f}'
               f'  {st["mean"]:5.1f} ± {st["stderr"]:4.1f}  {r["jelly"]["mean"]:5.2f}  {d["died"]:5}  {d["beside_jelly"]:8}'
               f'  {d["colonies_lost"]:>6} of {d["colonies"]:<4}'
               + (f'  {d["in_dark"]:7}  {r["nights"]["mean"]:6.2f}  {r["through_first_night"] if r["through_first_night"] is not None else "–":>8} of {d["colonies"]:<4}'
-                 if cfg.night.on else ''))
+                 if cfg.night.on else '')
+              + (f'  {r["colonies_to_the_end"]:>3} of {d["colonies"]:<4}  {r["hatched"]["mean"]:7.2f}'
+                 f'  {r["hatched"]["colonies"]:>9}' if cfg.hatch.on else ''))
         log.info('eval done', policy=name, food_per_minute=round(f['mean'], 3), seconds_alive=round(s['mean'], 1))
     print(f'\n{"yes on":<{width}}  ' + '  '.join(f'{k:>16}' for k in CONTEXTS) + '  ' + '  '.join(f'{"turn² " + k:>16}' for k in PLACES))
     for name, r in results.items():

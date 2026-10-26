@@ -1,15 +1,15 @@
 # The world as training sees it: every creature in every arena is one sample,
 # observed as a self token plus a token per ray (terrarium.schema), rewarded
 # for the energy it gets from food and for food it stores, charged for eating
-# the store's jelly and for the energy it spends moving, paid for pulling doors
-# out, and punished for dying (configs/train.toml), with part of each reward
-# shared out over its colony. Carrying food home is paid on the way
-# (potential-based shaping, Ng, Harada & Russell 1999): what's in the crop is
-# worth more the nearer home it is, and the reward is the change in that worth,
-# so it moves the store's pay earlier without changing which way of living
-# pays best. Arenas that end are started over straight away, so a step always
-# hands back a full batch; a creature that has died is still in it, marked
-# inactive, until its arena starts over.
+# the store's jelly and for the energy it spends moving, paid when its colony
+# hatches a new member, and punished for dying (configs/train.toml), with part
+# of each reward shared out over its colony. Carrying food home is paid on the
+# way (potential-based shaping, Ng, Harada & Russell 1999): what's in the crop
+# is worth more the nearer home it is, and the reward is the change in that
+# worth, so it moves the store's pay earlier without changing which way of
+# living pays best. Arenas that end are started over straight away, so a step
+# always hands back a full batch; a creature that has died is still in it,
+# marked inactive, until its arena starts over or a hatchling takes its place.
 #
 # Running out of time is an end like any other unless [ppo] bootstrap is on: then a
 # creature cut off alive is marked in `cut` and its last look kept in `final`, so the
@@ -72,9 +72,6 @@ class Forage:
         self.world = World(cfg, arenas, seed)
         self.staggered = train.start.staggered and cfg.night.on
         self._stagger(np.ones(arenas, bool))
-        self.ajar = train.start.ajar if cfg.grab.on else 0.0
-        self.opening = train.start.opening
-        self._open(np.ones(arenas, bool))
         self.reward = train.reward
         r = self.reward
         self.fun = Fun(self.world, r.novelty, r.variety) if r.novelty or r.variety else None
@@ -106,7 +103,7 @@ class Forage:
         A sample is done when its creature dies or its arena ends."""
         w, r = self.world, self.reward
         actions = np.clip(actions, -1, 1).reshape(*self.last.shape[:2], -1)
-        before = {k: getattr(w, k).copy() for k in ('fed', 'spent', 'stored', 'jelly', 'pulled', 'alive')}
+        before = {k: getattr(w, k).copy() for k in ('fed', 'spent', 'stored', 'jelly', 'hatched', 'alive')}
         alive = before['alive']
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
@@ -123,8 +120,8 @@ class Forage:
         self.last = actions[..., :2].copy()
         own = ((r.food * (w.fed - before['fed']) - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
-               + r.door * (w.pulled - before['pulled']) + r.death * (alive & ~w.alive) + w.cfg.dt * (r.alive * lived + snug)
-               + fun)
+               + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)
+               + w.cfg.dt * (r.alive * lived + snug) + fun)
         ended = w.ended.copy()
         died = alive & ~w.alive
         done = died | ended[:, None]
@@ -135,15 +132,10 @@ class Forage:
         self.final = self.observe() if cut.any() else None
         w.reset(ended)
         self._stagger(ended)
-        self._open(ended)
         if self.fun:
             self.fun.reset(ended)
         self.last[ended] = 0
         return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
-
-    def _open(self, arenas: np.ndarray):
-        if self.ajar > 0:
-            self.world.pull_out(arenas & (self.world.rng.uniform(size=len(arenas)) < self.ajar), self.opening)
 
     def _stagger(self, arenas: np.ndarray):
         # a start in the dark loses its standing food on the first step, as at nightfall

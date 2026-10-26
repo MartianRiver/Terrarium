@@ -71,6 +71,17 @@ class Jelly:
 
 
 @dataclass(frozen=True)
+class Hatch:
+    cost: int
+    threshold: int
+    seconds: float
+
+    @property
+    def on(self) -> bool:
+        return self.cost > 0
+
+
+@dataclass(frozen=True)
 class Night:
     cycle: float
     length: float
@@ -135,8 +146,6 @@ class Block:
     h: float
     mass: float
     friction: float
-    # a point on the block (its own frame) pinned to the ground, so it swings about it like a door; [] for none
-    hinge: tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -163,6 +172,7 @@ class Config:
     food: Food
     crop: Crop
     jelly: Jelly
+    hatch: Hatch
     night: Night
     sprint: Sprint
     grab: Grab
@@ -192,7 +202,7 @@ class Reward:
     snug: float
     warm: float
     effort: float
-    door: float
+    hatch: float
     novelty: float
     variety: float
 
@@ -221,8 +231,6 @@ class PPO:
 class Start:
     fresh: tuple[str, ...]
     staggered: bool
-    ajar: float
-    opening: float
 
 
 @dataclass(frozen=True)
@@ -274,6 +282,7 @@ def convert(kind, value, where):
 # records (serve.py), never for configs on disk, which have every key
 SINCE = {'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
          'energy': {'turn': 0.0},
+         'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
          'food': {'middle': 0},
          'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0},
@@ -284,7 +293,8 @@ def upgrade(data: dict) -> dict:
     """A recorded world config with the keys it predates filled in, so the world it describes is unchanged."""
     out = {**data, **{k: {**old, **data.get(k, {})} for k, old in SINCE.items()}}
     if 'block' in data:
-        out['block'] = [{'hinge': [], **b} for b in data['block']]
+        # the vault's hinged doors were taken out again (0.3): those worlds come back with doors that slide
+        out['block'] = [{k: v for k, v in b.items() if k != 'hinge'} for b in data['block']]
     return out
 
 

@@ -24,9 +24,8 @@ warm = 0.0
 # per food's worth of energy spent moving (thrust, turn, sprint), charged as it's spent: the reward feels what the
 # body pays straight away, not only once it's hungry later. 1 makes food and effort one energy budget
 effort = 0.0
-# per metre a block one creature can drag (a door) gets from where it started, up to a metre, paid to whoever holds
-# it as it goes (and taken back if they push it home again)
-door = 0.0
+# per Terrikin a colony hatches ([hatch] in the world), paid to each of its living members, then shared like the rest
+hatch = 0.0
 # fun, as boredom lets it be (fun.py): per metre a block moves while it's touching or holding it, and per tick of
 # yes to unload, eat, sprint or grab; each wears off the more that creature has done it lately, and comes back
 novelty = 0.0
@@ -69,8 +68,3 @@ fresh = []
 # with nights on, each arena starts at a random time of day instead of dawn, so a batch isn't all
 # day or all night (arenas started together stay in step); evals always start at dawn
 staggered = false
-# with grab on, this share of arenas start with the blocks one creature can drag (the vault's doors) pulled out
-# `opening`, so what's behind them can be found before pulling them is learned; evals always start them shut
-ajar = 0.0
-# how far out those blocks start, in metres (hinged ones swing out until their far end has moved this far)
-opening = 1.0

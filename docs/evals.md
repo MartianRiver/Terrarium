@@ -9,13 +9,16 @@ Each is reported as a mean ± standard error. Since evals v2 (0.3) the error is 
 
 ```
 cd sim
-uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled] [--held-out] [--out results.json]
+uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled] [--held-out] [--device cuda] [--out results.json]
 ```
+
+Each policy, and each brain in each mode, plays in its own process, side by side, sharing the CPU's threads. `--device` runs the brains on a GPU (training's own evals do on CUDA); the worlds stay on the CPU. On the CPU, a policy scored on its own or beside others gets exactly the same numbers as before. On a GPU the brain's arithmetic rounds a little differently, now and then an action comes out different, and the episodes drift apart from there: the same brain scored 265.0 ± 3.9 s alive on the CPU and 270.3 ± 3.7 on a GPU (night world, 64 episodes). That's within the noise, but not the same to the decimal, so brains being compared closely should be scored on the same device. All four sets took 11 minutes side by side on the CPU and 7 with the brains on the GPU (one after another, a vault run's took 30–40, in a slower world).
 
 What else v2 counts, for colonies:
 
 - **jelly** eaten from the store, per creature
-- **deaths**: how many died, how many of them with jelly in their own store (**by jelly**), how many in their own nest, and whole **colonies lost**
+- **deaths**: how many died, how many of them with jelly in their own store (**by jelly**), how many in their own nest, and whole **colonies lost** (left with nobody alive at some point). With hatching on a slot can die more than once, so these count deaths, not creatures
+- with hatching on (`[hatch]`): **hatched**, Terrikins hatched per colony an episode, how many colonies hatched at least one (**hatching**), and the colonies with someone alive when the episode ran its full length (**to the end**: in a three-day world, through all three nights)
 - how often each yes/no action says yes where it matters: `unload` at home with something in the crop, `unload` away from any nest with something in it (dumping), `eat` when hungry with something in the crop, and `eat` when hungry at home with jelly in the store (crop or not: a carrier unloads and eats on the same tick), `sprint` whenever it's rested and could, and `grab` whenever a block is within reach
 - **turning**: the mean of turn squared (what turning costs by) out by day and in its own nest at night, to see spinning go
 - **away by day**: deaths away from its own nest in full daylight, when food is out and there's no cold: a forager that couldn't keep itself fed

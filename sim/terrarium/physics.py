@@ -41,8 +41,6 @@ class Physics:
         self.reads = [pymunk.batch.Buffer() for _ in range(self.arenas)]
         # (arena, creature) -> the joint it holds a block by
         self.held: dict[tuple[int, int], PivotJoint] = {}
-        # and which block that is
-        self.held_block: dict[tuple[int, int], int] = {}
         self.writes = [pymunk.batch.Buffer() for _ in range(self.arenas)]
         self.read()
 
@@ -76,9 +74,6 @@ class Physics:
             slide.max_force = b.mass * cfg.ground.friction
             spin.max_force = friction_torque(cfg, b.w, b.h, b.mass)
             space.add(slide, spin)
-            if b.hinge:
-                pin = (b.hinge[0], b.hinge[1])
-                space.add(PivotJoint(space.static_body, body, body.local_to_world(pin), pin))
         r = WALL_THICKNESS / 2
         out = cfg.arena.size / 2 + r
         corners = [(-out, -out), (out, -out), (out, out), (-out, out)]
@@ -121,7 +116,6 @@ class Physics:
             joint.max_force = grip
             self.spaces[a].add(joint)
             self.held[int(a), int(c)] = joint
-            self.held_block[int(a), int(c)] = self.bodies[a].index(block) - self.creatures
         holding = np.zeros(want.shape, bool)
         for a, c in self.held:
             holding[a, c] = True
@@ -144,7 +138,6 @@ class Physics:
         self.read()
 
     def let_go(self, a, c):
-        self.held_block.pop((int(a), int(c)), None)
         joint = self.held.pop((int(a), int(c)), None)
         if joint is not None:
             self.spaces[a].remove(joint)
@@ -175,6 +168,16 @@ class Physics:
             body.velocity = (0, 0)
             for shape in body.shapes:
                 shape.filter = GONE
+        self.read()
+
+    def revive(self, arenas, creatures, pos: np.ndarray):
+        """Put these creatures (pairs of arena, creature) back in the world at pos (len, 2), standing still."""
+        for a, c, (x, y) in zip(arenas, creatures, pos):
+            body = self.bodies[a][c]
+            body.position = (float(x), float(y))
+            body.velocity = (0, 0)
+            for shape in body.shapes:
+                shape.filter = SOLID
         self.read()
 
     def step(self, force: np.ndarray):

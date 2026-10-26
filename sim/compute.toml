@@ -279,7 +279,7 @@ gpu = "RTX 4060 Ti"
 cpu = "Threadripper PRO 3995WX, 32 cores"
 started = "2026-10-25T15:33:46+11:00"
 ended = "2026-10-25T16:25:34+11:00"
-dollars = 0.163
+dollars = 0.178
 note = "vault grid: door1-shut and door1-ajar (door reward 1.0)"
 
 [[session]]
@@ -289,7 +289,7 @@ gpu = "RTX 4060 Ti"
 cpu = "Threadripper PRO 3995WX, 32 cores"
 started = "2026-10-25T15:39:21+11:00"
 ended = "2026-10-25T16:25:08+11:00"
-dollars = 0.144
+dollars = 0.159
 note = "vault grid: hinged doors, swing-ajar and swing-door"
 
 [[session]]
@@ -299,7 +299,7 @@ gpu = "RTX 3080"
 cpu = "Xeon E5-2696 v3, 16 cores"
 started = "2026-10-25T15:41:06+11:00"
 ended = "2026-10-25T16:30:26+11:00"
-dollars = 0.195
+dollars = 0.200
 note = "vault grid: curriculum chains cur-1..4 and curd-1..4 (doors from 0.7 open to shut)"
 
 [[session]]
@@ -309,7 +309,7 @@ gpu = "RTX 4060 Ti"
 cpu = "Threadripper PRO 3995WX, 32 cores"
 started = "2026-10-25T16:37:39+11:00"
 ended = "2026-10-25T16:43:16+11:00"
-dollars = 0.018
+dollars = 0.040
 note = "meant for the bf16 check; its configs predated hinge, ajar and door, every job failed in seconds"
 
 [[session]]
@@ -319,7 +319,7 @@ gpu = "RTX 4060 Ti"
 cpu = "Threadripper PRO 3995WX, 32 cores"
 started = "2026-10-25T16:44:03+11:00"
 ended = "2026-10-25T17:52:44+11:00"
-dollars = 0.216
+dollars = 0.243
 note = "bf16 check: update timed at widths 64, 128 and 256, plain and --fast; 4 x 4M from pbt-t5-4, plain and --fast, seeds 0 and 1"
 
 [[session]]
@@ -329,7 +329,7 @@ gpu = "RTX 3060"
 cpu = "EPYC 7662, 16 cores"
 started = "2026-10-25T16:50:19+11:00"
 ended = "2026-10-25T18:15:34+11:00"
-dollars = 0.117
+dollars = 0.138
 note = "vault with smell: doors shut, and ajar in half the arenas; then pbt-t5-4 widened to 128 scored against itself"
 
 [[session]]
@@ -339,5 +339,174 @@ gpu = "RTX 4060 Ti"
 cpu = "Threadripper PRO 3995WX, 32 cores"
 started = "2026-10-25T16:50:05+11:00"
 ended = "2026-10-25T18:52:32+11:00"
-dollars = 0.386
+dollars = 0.422
 note = "vault with smell: ajar in half the arenas with the door reward, and with the brain widened to 256"
+
+[[session]]
+provider = "vast"
+instance = 57610712
+gpu = "RTX 3080"
+cpu = "Xeon E5-2686 v4, 18 cores"
+started = "2026-10-25T15:32:49+11:00"
+ended = "2026-10-25T15:37:03+11:00"
+dollars = 0.015
+note = "meant for the vault grid; never answered ssh"
+
+[[session]]
+provider = "vast"
+instance = 57610751
+gpu = "RTX 3060"
+started = "2026-10-25T15:33:14+11:00"
+ended = "2026-10-25T15:40:44+11:00"
+dollars = 0.016
+note = "meant for the vault grid; never answered ssh"
+
+[[session]]
+provider = "vast"
+instance = 57633504
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T18:58:19+11:00"
+ended = "2026-10-25T19:53:04+11:00"
+dollars = 0.194
+note = "fun grid: vault-fun-var003, vault-fun-both, vault-fun-none"
+
+[[session]]
+provider = "vast"
+instance = 57633507
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T18:58:20+11:00"
+ended = "2026-10-25T20:38:30+11:00"
+dollars = 0.164
+note = "fun grid: vault-fun-nov03, vault-fun-nov1 (cut off at its cap in their evals)"
+
+[[session]]
+provider = "vast"
+instance = 57635973
+gpu = "RTX 3080"
+cpu = "Xeon E5-2696 v3, 16 cores"
+started = "2026-10-25T19:20:45+11:00"
+ended = "2026-10-25T20:29:02+11:00"
+dollars = 0.173
+note = "--gpu-collect bench at widths 64, 128 and 256, and 2 x 4M from pbt-t5-4 with it"
+
+[[session]]
+provider = "vast"
+instance = 57638240
+gpu = "RTX 3060"
+cpu = "Core i7-6900K, 16 cores"
+started = "2026-10-25T19:42:06+11:00"
+ended = "2026-10-25T19:57:43+11:00"
+dollars = 0.024
+note = "meant for the GPU eval check; timed out in uv sync"
+
+[[session]]
+provider = "vast"
+instance = 57640021
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T19:58:11+11:00"
+ended = "2026-10-25T20:19:38+11:00"
+dollars = 0.088
+note = "evals side by side, pbt-t5-4 in the night world, brains on the CPU and on the GPU"
+
+[[session]]
+provider = "vast"
+instance = 57587615
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-25T11:45:48+11:00"
+ended = "2026-10-25T21:33:55+11:00"
+dollars = 0.881
+note = "PBT2 and PBT3 (pod p1)"
+
+[[session]]
+provider = "vast"
+instance = 57587662
+gpu = "RTX 3060"
+cpu = "Xeon Gold 6154, 16 cores"
+started = "2026-10-25T11:46:10+11:00"
+ended = "2026-10-25T21:33:55+11:00"
+dollars = 0.915
+note = "PBT2 and PBT3 (pod p3)"
+
+[[session]]
+provider = "vast"
+instance = 57641514
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T20:12:08+11:00"
+ended = "2026-10-25T20:46:16+11:00"
+dollars = 0.135
+note = "blocks probe: nester and pbt-t5-4 in the open middle, a light ring of blocks and a ring that can't move"
+
+[[session]]
+provider = "vast"
+instance = 57644717
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T20:39:22+11:00"
+ended = "2026-10-25T21:25:26+11:00"
+dollars = 0.084
+note = "re-scoring vault-fun-nov03 and nov1; CPU evals ran past its 45 min cap, nothing saved"
+
+[[session]]
+provider = "vast"
+instance = 57648826
+gpu = "RTX 3060"
+cpu = "Xeon E5-2699 v4, 22 cores"
+started = "2026-10-25T21:16:49+11:00"
+ended = "2026-10-25T21:24:41+11:00"
+dollars = 0.010
+note = "meant for PBT4; never answered ssh"
+
+[[session]]
+provider = "vast"
+instance = 57598442
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-25T13:33:33+11:00"
+ended = "2026-10-25T21:43:43+11:00"
+dollars = 0.980
+note = "PBT3 and its held-out check (pod q1)"
+
+[[session]]
+provider = "vast"
+instance = 57648828
+gpu = "RTX 3060"
+cpu = "Xeon Gold 6154, 32 cores"
+started = "2026-10-25T21:16:49+11:00"
+ended = "2026-10-26T05:14:04+11:00"
+dollars = 1.026
+note = "PBT4, the drift diagnosis and PBT5 (pod r1)"
+
+[[session]]
+provider = "vast"
+instance = 57648827
+gpu = "RTX 3080"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T21:16:49+11:00"
+ended = "2026-10-26T05:14:27+11:00"
+dollars = 0.922
+note = "PBT4, the drift diagnosis and PBT5 (pod r2)"
+
+[[session]]
+provider = "vast"
+instance = 57650888
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-25T21:35:12+11:00"
+ended = "2026-10-26T05:25:29+11:00"
+dollars = 0.703
+note = "PBT4, the drift diagnosis and PBT5 (pod r3)"
+
+[[session]]
+provider = "vast"
+instance = 57650887
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T21:35:11+11:00"
+ended = "2026-10-26T05:14:05+11:00"
+dollars = 0.699
+note = "PBT4, the drift diagnosis and PBT5 (pod r4)"
