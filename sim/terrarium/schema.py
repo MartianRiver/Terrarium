@@ -6,12 +6,16 @@
 # The number of rays isn't part of it: each ray is its own token, so a brain
 # works with however many the config casts.
 
-VERSION = 1
-SELF = ('energy', 'forward_speed', 'side_speed', 'last_thrust', 'last_turn')
-RAY = ('distance', 'sin', 'cos')
+VERSION = 8
+SELF = ('energy', 'forward_speed', 'side_speed', 'last_thrust', 'last_turn',
+        'home_distance', 'home_sin', 'home_cos', 'carrying', 'at_home', 'store', 'light', 'sprinting', 'rested',
+        'holding', 'smell', 'smell_sin', 'smell_cos', 'nectar')
+RAY = ('distance', 'sin', 'cos', 'nestmate', 'own_nest', 'other_nest')
 # what a ray hit, in vision's order
-KINDS = ('nothing', 'wall', 'creature', 'food', 'block')
-ACTIONS = ('thrust', 'turn')
+KINDS = ('nothing', 'wall', 'creature', 'food', 'block', 'flower')
+ACTIONS = ('thrust', 'turn', 'unload', 'eat', 'sprint', 'grab')
+# yes when above 0; a new one starts leaning no (brain.py), so it's tried now and then rather than on every other tick
+YES_NO = ('unload', 'eat', 'sprint', 'grab')
 
 LISTS = ('self', 'ray', 'kinds', 'actions')
 

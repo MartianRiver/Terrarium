@@ -1,6 +1,7 @@
 // Dev-only log viewer. Toggle with the backtick key or the "logs" button.
 // Only imported when import.meta.env.DEV is true.
 
+import './devlog.css';
 import { clearLogs, formatEntry, getLogs, LEVELS, onLog, type Level, type LogEntry } from './lib/logger';
 
 const MAX_ROWS = 500;

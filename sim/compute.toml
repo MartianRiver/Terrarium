@@ -1,0 +1,743 @@
+# Rented machines, one [[session]] each, oldest first. The hours of training come
+# from the runs themselves (runs/); this is what each rental cost, setup,
+# downloads and idle time included; `cpu` is the CPU and the cores the rental
+# came with. `ended` decides which stage a session counts towards, and
+# `python -m terrarium.compute vast` checks `dollars` against Vast.
+# [[machine]] names my own machines by the cpu and memory their runs record (or the
+# platform, for runs from before those were recorded).
+
+[[machine]]
+cpu = "Apple M3"
+memory_gb = 16
+# runs from before cpu and memory were recorded say only their platform; my only Mac has been this one
+platform = "macOS"
+name = "MacBook Air 15-inch, M3, 16 GB unified memory"
+# its name on the board (its queue token's handle)
+handle = "river-m3"
+
+# GPU memory by model, for the board, where every Vast offer of the model has the same (checked 2026-10-26).
+# Vast forgets a destroyed instance, so the 3080 (10 or 20 GB) and 4060 Ti (8 or 16) go by model unless
+# a session has its own gpu_memory_gb.
+[gpu_memory]
+"RTX 3060" = 12
+"RTX 3070" = 8
+"A10" = 24
+"RTX A4000" = 16
+
+[[session]]
+provider = "vast"
+instance = 57306018
+gpu = "RTX 3060"
+started = "2026-10-23T13:02:00+11:00"
+ended = "2026-10-23T13:53:00+11:00"
+dollars = 0.271
+note = "measuring training speed: worker sweep, update profile, one 20M-sample scratch run. $0.151 of it was 3.9 GB of downloads (CUDA torch) at $0.039/GB"
+
+[[session]]
+provider = "vast"
+instance = 57436340
+gpu = "RTX 3080 Ti"
+started = "2026-10-24T10:16:00+11:00"
+ended = "2026-10-24T10:28:00+11:00"
+dollars = 0.034
+note = "jelly grid: never reachable over ssh, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57436343
+gpu = "RTX 3060 Ti"
+started = "2026-10-24T10:16:00+11:00"
+ended = "2026-10-24T10:28:00+11:00"
+dollars = 0.003
+note = "jelly grid: failed to start (Docker memory limit error), destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57436346
+gpu = "A10"
+started = "2026-10-24T10:16:00+11:00"
+ended = "2026-10-24T11:18:00+11:00"
+dollars = 0.263
+note = "jelly grid (docs/notes/0.3.md): 8 scratch runs, 4-12M samples, 3-5 side by side; last run finished 10:48, idle 30 min after it"
+
+[[session]]
+provider = "vast"
+instance = 57436349
+gpu = "A10"
+started = "2026-10-24T10:16:00+11:00"
+ended = "2026-10-24T11:18:00+11:00"
+dollars = 0.263
+note = "jelly grid (docs/notes/0.3.md): 6 scratch runs, 4M samples, 3 side by side; last run finished 10:41, idle 37 min after it"
+
+[[session]]
+provider = "vast"
+instance = 57456101
+gpu = "RTX A4000"
+started = "2026-10-24T13:44:47+11:00"
+ended = "2026-10-24T13:48:34+11:00"
+dollars = 0.008
+note = "job queue test on a pod: running but no ssh within 3 min, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57456578
+gpu = "RTX 3060"
+started = "2026-10-24T13:49:31+11:00"
+ended = "2026-10-24T13:59:40+11:00"
+dollars = 0.002
+note = "job queue test on a pod: never left loading in 10 min, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57457495
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T14:00:15+11:00"
+ended = "2026-10-24T14:00:59+11:00"
+dollars = 0.014
+note = "job queue test on a pod: up in 38 s, then destroyed by a bug in the test script before the worker started"
+
+[[session]]
+provider = "vast"
+instance = 57457702
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T14:02:32+11:00"
+ended = "2026-10-24T14:12:41+11:00"
+dollars = 0.089
+note = "job queue test on a pod: worker through an ssh tunnel to the Mac's coordinator, two chained 1M-sample solo jobs (rented-only), both done and synced"
+
+[[session]]
+provider = "vast"
+instance = 57463941
+gpu = "A10"
+started = "2026-10-24T15:12:54+11:00"
+ended = "2026-10-24T15:27:59+11:00"
+dollars = 0.082
+note = "jelly: two 8M-sample jobs side by side from the 24M brain through the job queue (jelly eaten paid 0 and 0.2), runs mirrored to the Mac while training"
+
+[[session]]
+provider = "vast"
+instance = 57477264
+gpu = "RTX 3060"
+started = "2026-10-24T17:27:04+11:00"
+ended = "2026-10-24T18:06:33+11:00"
+dollars = 0.058
+note = "jelly: scripted world probes (greedy vs carrier) on 16 CPU cores, ten worlds side by side: nights, lean spells, 720 s episodes, bigger arena, colonies of 12; no training"
+
+[[session]]
+provider = "vast"
+instance = 57482599
+gpu = "RTX 3060"
+started = "2026-10-24T18:19:13+11:00"
+ended = "2026-10-24T18:30:06+11:00"
+dollars = 0.009
+note = "jelly: night probes (scripted), ssh dropped after 3 min and the results were lost; the probe runner now runs detached"
+
+[[session]]
+provider = "vast"
+instance = 57483714
+gpu = "RTX 3060"
+started = "2026-10-24T18:31:17+11:00"
+ended = "2026-10-24T18:41:16+11:00"
+dollars = 0.009
+note = "jelly: night probes, never got going: ssh up after 9 min, then dropped during setup"
+
+[[session]]
+provider = "vast"
+instance = 57484660
+gpu = "RTX 3080"
+started = "2026-10-24T18:41:48+11:00"
+ended = "2026-10-24T19:23:18+11:00"
+dollars = 0.075
+note = "jelly: night probes, about 25x slower than the Mac per core for no clear reason (old Xeon E5-2698 v4); destroyed after the greedy rows, rest run on the Mac"
+
+[[session]]
+provider = "vast"
+instance = 57493929
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T20:15:05+11:00"
+ended = "2026-10-24T20:25:11+11:00"
+dollars = 0.003
+note = "jelly: night grid, never got going: still pulling the image after 10 min, destroyed"
+
+[[session]]
+provider = "vast"
+instance = 57494241
+gpu = "RTX 4070"
+started = "2026-10-24T20:17:05+11:00"
+ended = "2026-10-24T20:25:16+11:00"
+dollars = 0.018
+note = "jelly: night grid, never got going: running, but ssh refused the key for 3 min, destroyed"
+
+[[session]]
+provider = "vast"
+instance = 57494196
+gpu = "RTX 4060 Ti"
+started = "2026-10-24T20:16:41+11:00"
+ended = "2026-10-24T21:07:01+11:00"
+dollars = 0.194
+note = "jelly: night grid (8M samples each from the 24M brain in the night world), two jobs side by side, then two more: night-base, night-jelly04, night-720, night-nofresh"
+
+[[session]]
+provider = "vast"
+instance = 57493853
+gpu = "RTX 3070"
+started = "2026-10-24T20:14:44+11:00"
+ended = "2026-10-24T21:42:46+11:00"
+dollars = 0.180
+note = "jelly: night grid: night-g999 and night-stored0, then night-noboot and night-entropy, whose results never came back (the worker lost the coordinator at the end of training, so both were cancelled); up ~35 min longer than needed"
+
+[[session]]
+provider = "vast"
+instance = 57505793
+gpu = "RTX 3070"
+started = "2026-10-24T22:15:05+11:00"
+ended = "2026-10-25T06:07:17+11:00"
+dollars = 0.905
+note = "jelly night lab: choices held 4 ticks, gamma 0.999 and 0.996 (16M each), then kept warm as two slots of the automated forks (population-based training) until 06:00"
+
+[[session]]
+provider = "vast"
+instance = 57505948
+gpu = "RTX 3070"
+started = "2026-10-24T22:15:59+11:00"
+ended = "2026-10-25T06:07:23+11:00"
+dollars = 1.024
+note = "jelly night lab: choices held 8 ticks with gamma 0.998, and lam 0.99 (16M each), then two slots of the automated forks until 06:00"
+
+[[session]]
+provider = "vast"
+instance = 57507754
+gpu = "RTX 3060"
+started = "2026-10-24T22:34:01+11:00"
+ended = "2026-10-25T06:07:30+11:00"
+dollars = 0.677
+note = "jelly night lab: two slots of the automated forks from 22:38 to 06:00 (its evals ran 20 min oversubscribed once: the host shows 128 cores)"
+
+[[session]]
+provider = "vast"
+instance = 57587621
+gpu = "RTX 3060"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-25T11:45:50+11:00"
+ended = "2026-10-25T12:00:51+11:00"
+dollars = 0.025
+note = "population pod: stuck in uv sync for 13 min, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57588627
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T11:54:37+11:00"
+ended = "2026-10-25T12:31:11+11:00"
+dollars = 0.068
+note = "first vault runs (doors shut, 16M each); its end evals were lost to a stray kill"
+
+[[session]]
+provider = "vast"
+instance = 57589313
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T12:01:26+11:00"
+ended = "2026-10-25T12:11:33+11:00"
+dollars = 0.001
+note = "population pod: never reached running, destroyed unused"
+
+[[session]]
+provider = "vast"
+instance = 57592156
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T12:27:22+11:00"
+ended = "2026-10-25T12:31:11+11:00"
+dollars = 0.012
+note = "baseline evals: stopped by the same stray kill before it ran anything"
+
+[[session]]
+provider = "vast"
+instance = 57592705
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T12:32:35+11:00"
+ended = "2026-10-25T13:06:30+11:00"
+dollars = 0.066
+note = "evals of the new night world (middle food) and the vault, with baselines"
+
+[[session]]
+provider = "vast"
+instance = 57593719
+gpu = "RTX 4070"
+cpu = "Xeon Gold 6138, 40 cores"
+started = "2026-10-25T12:42:30+11:00"
+ended = "2026-10-25T13:17:35+11:00"
+dollars = 0.124
+note = "food sweep: nester, carrier and m5-25 at 28, 20, 14, 10 and 7 food"
+
+[[session]]
+provider = "vast"
+instance = 57597006
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T13:19:02+11:00"
+ended = "2026-10-25T14:05:41+11:00"
+dollars = 0.070
+note = "meant for the vault runs; hung in uv sync for 40 minutes and never trained"
+
+[[session]]
+provider = "vast"
+instance = 57610825
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T15:33:46+11:00"
+ended = "2026-10-25T16:25:34+11:00"
+dollars = 0.178
+note = "vault grid: door1-shut and door1-ajar (door reward 1.0)"
+
+[[session]]
+provider = "vast"
+instance = 57611391
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T15:39:21+11:00"
+ended = "2026-10-25T16:25:08+11:00"
+dollars = 0.159
+note = "vault grid: hinged doors, swing-ajar and swing-door"
+
+[[session]]
+provider = "vast"
+instance = 57611548
+gpu = "RTX 3080"
+cpu = "Xeon E5-2696 v3, 16 cores"
+started = "2026-10-25T15:41:06+11:00"
+ended = "2026-10-25T16:30:26+11:00"
+dollars = 0.200
+note = "vault grid: curriculum chains cur-1..4 and curd-1..4 (doors from 0.7 open to shut)"
+
+[[session]]
+provider = "vast"
+instance = 57618336
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T16:37:39+11:00"
+ended = "2026-10-25T16:43:16+11:00"
+dollars = 0.040
+note = "meant for the bf16 check; its configs predated hinge, ajar and door, every job failed in seconds"
+
+[[session]]
+provider = "vast"
+instance = 57619074
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T16:44:03+11:00"
+ended = "2026-10-25T17:52:44+11:00"
+dollars = 0.243
+note = "bf16 check: update timed at widths 64, 128 and 256, plain and --fast; 4 x 4M from pbt-t5-4, plain and --fast, seeds 0 and 1"
+
+[[session]]
+provider = "vast"
+instance = 57619794
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-25T16:50:19+11:00"
+ended = "2026-10-25T18:15:34+11:00"
+dollars = 0.138
+note = "vault with smell: doors shut, and ajar in half the arenas; then pbt-t5-4 widened to 128 scored against itself"
+
+[[session]]
+provider = "vast"
+instance = 57619769
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T16:50:05+11:00"
+ended = "2026-10-25T18:52:32+11:00"
+dollars = 0.422
+note = "vault with smell: ajar in half the arenas with the door reward, and with the brain widened to 256"
+
+[[session]]
+provider = "vast"
+instance = 57610712
+gpu = "RTX 3080"
+cpu = "Xeon E5-2686 v4, 18 cores"
+started = "2026-10-25T15:32:49+11:00"
+ended = "2026-10-25T15:37:03+11:00"
+dollars = 0.015
+note = "meant for the vault grid; never answered ssh"
+
+[[session]]
+provider = "vast"
+instance = 57610751
+gpu = "RTX 3060"
+started = "2026-10-25T15:33:14+11:00"
+ended = "2026-10-25T15:40:44+11:00"
+dollars = 0.016
+note = "meant for the vault grid; never answered ssh"
+
+[[session]]
+provider = "vast"
+instance = 57633504
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T18:58:19+11:00"
+ended = "2026-10-25T19:53:04+11:00"
+dollars = 0.194
+note = "fun grid: vault-fun-var003, vault-fun-both, vault-fun-none"
+
+[[session]]
+provider = "vast"
+instance = 57633507
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T18:58:20+11:00"
+ended = "2026-10-25T20:38:30+11:00"
+dollars = 0.164
+note = "fun grid: vault-fun-nov03, vault-fun-nov1 (cut off at its cap in their evals)"
+
+[[session]]
+provider = "vast"
+instance = 57635973
+gpu = "RTX 3080"
+cpu = "Xeon E5-2696 v3, 16 cores"
+started = "2026-10-25T19:20:45+11:00"
+ended = "2026-10-25T20:29:02+11:00"
+dollars = 0.173
+note = "--gpu-collect bench at widths 64, 128 and 256, and 2 x 4M from pbt-t5-4 with it"
+
+[[session]]
+provider = "vast"
+instance = 57638240
+gpu = "RTX 3060"
+cpu = "Core i7-6900K, 16 cores"
+started = "2026-10-25T19:42:06+11:00"
+ended = "2026-10-25T19:57:43+11:00"
+dollars = 0.024
+note = "meant for the GPU eval check; timed out in uv sync"
+
+[[session]]
+provider = "vast"
+instance = 57640021
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T19:58:11+11:00"
+ended = "2026-10-25T20:19:38+11:00"
+dollars = 0.088
+note = "evals side by side, pbt-t5-4 in the night world, brains on the CPU and on the GPU"
+
+[[session]]
+provider = "vast"
+instance = 57587615
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-25T11:45:48+11:00"
+ended = "2026-10-25T21:33:55+11:00"
+dollars = 0.881
+note = "PBT2 and PBT3 (pod p1)"
+
+[[session]]
+provider = "vast"
+instance = 57587662
+gpu = "RTX 3060"
+cpu = "Xeon Gold 6154, 16 cores"
+started = "2026-10-25T11:46:10+11:00"
+ended = "2026-10-25T21:33:55+11:00"
+dollars = 0.915
+note = "PBT2 and PBT3 (pod p3)"
+
+[[session]]
+provider = "vast"
+instance = 57641514
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-25T20:12:08+11:00"
+ended = "2026-10-25T20:46:16+11:00"
+dollars = 0.135
+note = "blocks probe: nester and pbt-t5-4 in the open middle, a light ring of blocks and a ring that can't move"
+
+[[session]]
+provider = "vast"
+instance = 57644717
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T20:39:22+11:00"
+ended = "2026-10-25T21:25:26+11:00"
+dollars = 0.084
+note = "re-scoring vault-fun-nov03 and nov1; CPU evals ran past its 45 min cap, nothing saved"
+
+[[session]]
+provider = "vast"
+instance = 57648826
+gpu = "RTX 3060"
+cpu = "Xeon E5-2699 v4, 22 cores"
+started = "2026-10-25T21:16:49+11:00"
+ended = "2026-10-25T21:24:41+11:00"
+dollars = 0.010
+note = "meant for PBT4; never answered ssh"
+
+[[session]]
+provider = "vast"
+instance = 57598442
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-25T13:33:33+11:00"
+ended = "2026-10-25T21:43:43+11:00"
+dollars = 0.980
+note = "PBT3 and its held-out check (pod q1)"
+
+[[session]]
+provider = "vast"
+instance = 57648828
+gpu = "RTX 3060"
+cpu = "Xeon Gold 6154, 32 cores"
+started = "2026-10-25T21:16:49+11:00"
+ended = "2026-10-26T05:14:04+11:00"
+dollars = 1.026
+note = "PBT4, the drift diagnosis and PBT5 (pod r1)"
+
+[[session]]
+provider = "vast"
+instance = 57648827
+gpu = "RTX 3080"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-25T21:16:49+11:00"
+ended = "2026-10-26T05:14:27+11:00"
+dollars = 0.922
+note = "PBT4, the drift diagnosis and PBT5 (pod r2)"
+
+[[session]]
+provider = "vast"
+instance = 57650888
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-25T21:35:12+11:00"
+ended = "2026-10-26T05:25:29+11:00"
+dollars = 0.709
+note = "PBT4, the drift diagnosis and PBT5 (pod r3)"
+
+[[session]]
+provider = "vast"
+instance = 57650887
+gpu = "RTX 3060"
+cpu = "Ryzen 9 3950X, 16 cores"
+started = "2026-10-25T21:35:11+11:00"
+ended = "2026-10-26T05:14:05+11:00"
+dollars = 0.699
+note = "PBT4, the drift diagnosis and PBT5 (pod r4)"
+
+[[session]]
+provider = "vast"
+instance = 57757843
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T14:13:00+11:00"
+ended = "2026-10-26T16:57:06+11:00"
+dollars = 0.22
+note = "PBT6 (pod s1)"
+
+[[session]]
+provider = "vast"
+instance = 57757892
+gpu = "RTX 3060"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-26T14:13:21+11:00"
+ended = "2026-10-26T14:21:27+11:00"
+dollars = 0.015
+note = "PBT6, setup hung, destroyed (pod s2)"
+
+[[session]]
+provider = "vast"
+instance = 57757952
+gpu = "RTX 3060"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T14:13:42+11:00"
+ended = "2026-10-26T17:09:24+11:00"
+dollars = 0.233
+note = "PBT6 (pod s3)"
+
+[[session]]
+provider = "vast"
+instance = 57758010
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-26T14:14:03+11:00"
+ended = "2026-10-26T17:08:09+11:00"
+dollars = 0.272
+note = "PBT6 (pod s4)"
+
+[[session]]
+provider = "vast"
+instance = 57758861
+gpu = "RTX 3070"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-26T14:21:48+11:00"
+ended = "2026-10-26T14:30:30+11:00"
+dollars = 0.013
+note = "PBT6, setup hung, destroyed (pod s2)"
+
+[[session]]
+provider = "vast"
+instance = 57759971
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-26T14:34:33+11:00"
+ended = "2026-10-26T17:38:39+11:00"
+dollars = 0.612
+note = "PBT6 (pod s2)"
+
+[[session]]
+provider = "vast"
+instance = 57778803
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-26T17:58:57+11:00"
+ended = "2026-10-26T18:26:21+11:00"
+dollars = 0.099
+note = "the world grid for food and speed (pod w1)"
+
+[[session]]
+provider = "vast"
+instance = 57784807
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-26T19:06:05+11:00"
+ended = "2026-10-26T23:36:23+11:00"
+dollars = 0.41
+note = "PBT7 (pod u1)"
+
+[[session]]
+provider = "vast"
+instance = 57784938
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-26T19:07:05+11:00"
+ended = "2026-10-26T23:37:23+11:00"
+dollars = 0.428
+note = "PBT7 (pod u4)"
+
+[[session]]
+provider = "vast"
+instance = 57784979
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-26T19:07:25+11:00"
+ended = "2026-10-26T23:37:25+11:00"
+dollars = 0.428
+note = "PBT7 (pod u5)"
+
+[[session]]
+provider = "vast"
+instance = 57785384
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-26T19:11:13+11:00"
+ended = "2026-10-26T23:31:37+11:00"
+dollars = 0.417
+note = "PBT7 (pod u2)"
+
+[[session]]
+provider = "vast"
+instance = 57785446
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T19:11:48+11:00"
+ended = "2026-10-26T19:14:00+11:00"
+dollars = 0.007
+note = "PBT7, no ssh, destroyed (pod u3)"
+
+[[session]]
+provider = "vast"
+instance = 57806825
+gpu = "RTX A4000"
+cpu = "EPYC 7713, 16 cores"
+started = "2026-10-26T22:39:01+11:00"
+ended = "2026-10-27T01:47:01+11:00"
+dollars = 0.324
+note = "three brains in one world (pod r1)"
+
+[[session]]
+provider = "vast"
+instance = 57808742
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T22:58:15+11:00"
+ended = "2026-10-26T23:00:51+11:00"
+dollars = 0.007
+note = "PBT7, ssh dropped in setup, destroyed (pod u6)"
+
+[[session]]
+provider = "vast"
+instance = 57808743
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T22:58:15+11:00"
+ended = "2026-10-26T23:05:03+11:00"
+dollars = 0.013
+note = "PBT7, no ssh, destroyed (pod u7)"
+
+[[session]]
+provider = "vast"
+instance = 57808744
+gpu = "RTX 3080"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T22:58:15+11:00"
+ended = "2026-10-27T08:57:33+11:00"
+dollars = 1.173
+note = "PBT7 overnight (pod u8)"
+
+[[session]]
+provider = "vast"
+instance = 57809030
+gpu = "RTX A4000"
+cpu = "EPYC 7713, 16 cores"
+started = "2026-10-26T23:01:16+11:00"
+ended = "2026-10-26T23:04:13+11:00"
+dollars = 0.004
+note = "PBT7, shipped the wrong tree, destroyed (pod u6)"
+
+[[session]]
+provider = "vast"
+instance = 57809448
+gpu = "RTX 3080"
+cpu = "Core i9-10850K, 20 cores"
+started = "2026-10-26T23:04:16+11:00"
+ended = "2026-10-27T08:49:34+11:00"
+dollars = 1.393
+note = "PBT7 overnight (pod u9)"
+
+[[session]]
+provider = "vast"
+instance = 57809610
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-26T23:05:25+11:00"
+ended = "2026-10-26T23:07:31+11:00"
+dollars = 0.005
+note = "PBT7, no ssh, destroyed (pod u7)"
+
+[[session]]
+provider = "vast"
+instance = 57809900
+gpu = "RTX 3080"
+cpu = "Xeon E5-2630 v4, 20 cores"
+started = "2026-10-26T23:07:43+11:00"
+ended = "2026-10-27T08:47:55+11:00"
+dollars = 1.526
+note = "PBT7 overnight (pod u7)"
+
+[[session]]
+provider = "vast"
+instance = 57784853
+gpu = "RTX 3060"
+cpu = "unknown"
+started = "2026-10-26T19:06:30+11:00"
+ended = "2026-10-26T19:09:30+11:00"
+dollars = 0.002
+note = "PBT7, lost in setup with no log line; times from the instance's place between u1 and u4"
+
+[[session]]
+provider = "vast"
+instance = 57784897
+gpu = "RTX 3060"
+cpu = "unknown"
+started = "2026-10-26T19:06:45+11:00"
+ended = "2026-10-26T19:09:45+11:00"
+dollars = 0.002
+note = "PBT7, lost in setup with no log line; times from the instance's place between u1 and u4"

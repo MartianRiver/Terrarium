@@ -38,15 +38,40 @@ def frame(world: World, a: int) -> dict:
     size = _r(cfg.creature.radius / BLOB_RADIUS)
     speed = np.hypot(world.vel[a, :, 0], world.vel[a, :, 1])
     creatures = [{'id': int(i), 'colony': int(c), 'x': _r(x), 'y': _r(y), 'heading': _r(h), 'speed': _r(s),
-                  'size': size, 'energy': _r(e), 'signal': -1}
-                 for i, c, (x, y), h, s, e in zip(world.creature_id, world.colony, world.pos[a], world.heading[a],
-                                                  speed, world.energy[a])]
+                  'size': size, 'energy': _r(e), 'signal': -1, 'carrying': int(k)}
+                 for i, c, (x, y), h, s, e, k, u in zip(world.creature_id[a], world.colony, world.pos[a], world.heading[a],
+                                                        speed, world.energy[a], world.crop[a], world.unborn[a]) if not u]
+    born = ~world.unborn[a]
+    if cfg.grab.on:
+        for c, held in zip(creatures, world.holding[a][born]):
+            c['holding'] = int(held)
+    if cfg.sprint.on:
+        for c, burst in zip(creatures, world.sprinting[a][born]):
+            c['sprinting'] = int(burst > 0)
+    if cfg.flowers.on:
+        # seconds of nectar boost left
+        for c, boost in zip(creatures, world.nectar[a][born]):
+            c['nectar'] = _r(boost / cfg.tick_hz)
     here = world.food_present[a]
-    food = [{'id': int(i), 'kind': 'common', 'x': _r(x), 'y': _r(y)}
-            for i, (x, y) in zip(world.food_id[a][here], world.food_pos[a][here])]
+    kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
+    food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
+            for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
     blocks = [{'id': int(i), 'x': _r(x), 'y': _r(y), 'angle': _r(t), 'w': b.w, 'h': b.h}
               for i, b, (x, y), t in zip(world.block_id, cfg.block, world.block_pos[a], world.block_angle[a])]
-    return {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks}
+    stores = [{'colony': c, 'jelly': int(j)} for c, j in enumerate(world.store[a])]
+    out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
+    if cfg.night.on:
+        out['light'] = _r(world.light()[a])
+    if cfg.flowers.on:
+        out['flowers'] = [{'id': int(world.flower_id[a, f]), 'x': _r(world.flower_pos[a, f, 0]), 'y': _r(world.flower_pos[a, f, 1])}
+                          for f in np.flatnonzero(world.flowers_open[a])]
+    if cfg.hatch.on:
+        # how far along each egg is, 0 when laid to 1 as it hatches; the hatchling takes the egg's id
+        total = max(1, round(cfg.hatch.seconds * cfg.tick_hz))
+        out['eggs'] = [{'id': int(world.egg_id[a, i]), 'colony': int(world.colony[i]), 'x': _r(world.egg_pos[a, i, 0]),
+                        'y': _r(world.egg_pos[a, i, 1]), 'progress': _r(1 - world.egg[a, i] / total)}
+                       for i in np.flatnonzero(world.egg[a])]
+    return out
 
 
 class Writer:

@@ -1,0 +1,69 @@
+# The gallery of brains on the site (/brains/, built by `python -m terrarium.gallery`): the steps the line of
+# brains took from the first one to the one training now, matched to runs by name (a run no step matches joins
+# the step before it), what's being worked on beside the line (its best runs so far), and side experiments worth
+# watching. Every number on the page comes from the runs' own evals, in the world each one trained in.
+
+[[bridge]]
+# the 0.2 brain with unload and eat added as new actions, before it trained in a colony
+parent = "02e5db9066b19e1a2d8ab659f7a53b470740823414793334d8682301230590dc"
+run = "20261023-112747-solo"
+
+[[step]]
+runs = ["solo"]
+title = "0.2 Clover: one Terrikin learns to eat"
+text = "Alone with 8 berries, rewarded only for staying fed. After 52 minutes of training on my MacBook Air it eats 18.4 berries a minute and never starves in the tests."
+# 0.2's run records don't rebuild in today's sim, so this is the replay released with it
+replay = "samples/0.2-forager.jsonl.gz"
+
+[[step]]
+runs = ["homing-*"]
+title = "Carrying food home"
+text = "Three colonies of six now, and a crop: food eaten when full is carried, and unloaded at the nest it becomes the colony's jelly. In a small test world, starting a few metres out with a full crop, this is the first brain that took its food home and stored it."
+
+[[step]]
+runs = ["full-*"]
+title = "Foraging for the colony"
+text = "Back in the whole world, with food to find. It stores more than a scripted carrier does, but it never eats from the store, so most of its deaths are next to a pile of jelly."
+
+[[step]]
+runs = ["n2-*"]
+title = "Nights"
+text = "Food stops growing at night and what's left goes, and the dark is cold, so the store and huddling at home are what get a colony to morning."
+
+[[step]]
+runs = ["pbt-m*"]
+title = "Forks that manage themselves"
+text = "From here eight copies train side by side, 4 million samples at a time, each with its own reward weights and settings. After every round the weakest takes over the brain and settings of a stronger one. Each brain here is the one the line kept from a round."
+
+[[step]]
+runs = ["pbt-t*"]
+title = "Sprint, turning costs and food in the middle"
+text = "Turning costs energy now, so spinning in the nest all night isn't free, and they can sprint. Half the food grows in the middle, between the nests. Eight forks again."
+
+[[step]]
+runs = ["pbt-[abvw]*", "diag-*"]
+title = "Three nights, and hatching"
+text = "A colony that loses someone can pay jelly from its store for an egg that hatches in the nest, and the food has a smell they can follow. Food tightened to what two colonies need. Forks trained here in two brain sizes, and the wider one got 87% of colonies through all three nights in the tests."
+
+[[step]]
+# PBT6's line in the lineage; PBT7's members took the same names, so its runs come next
+runs = ["pbt-y4-[1-3]"]
+title = "Room to grow, and coin tosses"
+text = "A colony can grow past the six it starts with, up to eight, by hatching into empty places as well as into the place of one it lost. These forks toss a coin for every yes or no (eat, unload, sprint), with odds the brain learns. The numbers went up, but in a world this lean half the Terrikins starved turning in circles far from home, so the next step has more food."
+
+[[step]]
+runs = ["pbt-y*", "pbt-g*"]
+title = "0.3 Daisy: colonies that grow"
+text = "Food enough to grow on, slower walking with a sprint twice as fast, and now and then a nectar flower that opens for a few seconds. These forks were scored on how many Terrikins are alive at the end, so a colony only does well by growing and keeping its members. The last one is the 0.3 brain: on 64 episodes it never trained on, every colony gets through all three nights, and they end with 6.4 Terrikins on average of the 6 they started with."
+
+[[aside]]
+run = "20261023-210128-colony-first"
+checkpoint = "00004939776.pt"
+title = "A reward hack"
+text = "The first colony brain found a loophole: food paid when it was picked up, so it grabbed a berry, dropped it behind itself and grabbed it again. 1,949 berries dropped in one episode, and almost nothing stored."
+
+[[aside]]
+run = "20261025-012704-pbt-c2-11"
+checkpoint = "00003981312.pt"
+title = "The scripted copy"
+text = "A brain that started as a copy of a scripted forager that heads home at dusk, then trained like the rest. It's the bar the learned-only line is chasing, and never one carried forward: every brain above learned on its own."

@@ -1,0 +1,60 @@
+{
+  "garden": {
+    "music": {"track": "jorisvermeer-playful-flute-strings-602299", "db": -17, "night_dip": 0.85},
+    "ambience": [
+      {"sound": "dragon-studio-gentle-wind-sounds-584728", "when": "always", "db": -40, "lowpass": 3000},
+      {"sound": "freesound_community-birds-in-the-morning-24147", "when": "day", "db": -36, "lowpass": 6000},
+      {"sound": "schorsch1964-night-atmosphere-with-crickets-374652", "when": "night", "db": -33, "lowpass": 3500}
+    ],
+    "world": {
+      "bite": {"sounds": ["universfield-bubble-pop-04-323580", "dragon-studio-bubble-pop-406640"], "db": -30, "rate": [0.75, 0.9], "lowpass": 3000},
+      "unload": {"sounds": ["universfield-bubble-pop-06-351337"], "db": -29, "rate": [0.55, 0.65], "lowpass": 2500},
+      "death": {"sounds": ["impactSoft_medium_000", "impactSoft_medium_001"], "db": -26, "rate": [0.75, 0.85], "fast": 0.6, "lowpass": 2500}
+    },
+    "label": {"sounds": ["universfield-thin-swoosh-352756"], "db": -35, "lead": 0.1, "lowpass": 5000},
+    "cut": {"sounds": ["dragon-studio-simple-whoosh-03-433005"], "db": -31, "lead": 0.3, "lowpass": 6000},
+    "stings": {
+      "01-hook@315": {"sounds": ["jingles_PIZZI00"], "db": -25},
+      "06-now@615": {"sounds": ["jingles_PIZZI00"], "db": -25}
+    }
+  },
+  "garden-quiet": {
+    "ambience": [
+      {"sound": "dragon-studio-gentle-wind-sounds-584728", "when": "always", "db": -40, "lowpass": 3000},
+      {"sound": "freesound_community-birds-in-the-morning-24147", "when": "day", "db": -36, "lowpass": 6000},
+      {"sound": "schorsch1964-night-atmosphere-with-crickets-374652", "when": "night", "db": -33, "lowpass": 3500}
+    ],
+    "world": {
+      "bite": {"sounds": ["universfield-bubble-pop-04-323580", "dragon-studio-bubble-pop-406640"], "db": -30, "rate": [0.75, 0.9], "lowpass": 3000},
+      "unload": {"sounds": ["universfield-bubble-pop-06-351337"], "db": -29, "rate": [0.55, 0.65], "lowpass": 2500},
+      "death": {"sounds": ["impactSoft_medium_000", "impactSoft_medium_001"], "db": -26, "rate": [0.75, 0.85], "fast": 0.6, "lowpass": 2500}
+    },
+    "label": {"sounds": ["universfield-thin-swoosh-352756"], "db": -35, "lead": 0.1, "lowpass": 5000},
+    "cut": {"sounds": ["dragon-studio-simple-whoosh-03-433005"], "db": -31, "lead": 0.3, "lowpass": 6000},
+    "stings": {
+      "01-hook@315": {"sounds": ["jingles_PIZZI00"], "db": -25},
+      "06-now@615": {"sounds": ["jingles_PIZZI00"], "db": -25}
+    }
+  },
+  "garden-pluto": {
+    "music": {"track": "holizna-a-small-town-on-pluto", "db": -13, "night_dip": 0.85},
+    "ambience": [
+      {"sound": "dragon-studio-gentle-wind-sounds-584728", "when": "always", "db": -40, "lowpass": 3000},
+      {"sound": "freesound_community-birds-in-the-morning-24147", "when": "day", "db": -36, "lowpass": 6000},
+      {"sound": "schorsch1964-night-atmosphere-with-crickets-374652", "when": "night", "db": -33, "lowpass": 3500}
+    ],
+    "world": {
+      "bite": {"sounds": ["universfield-bubble-pop-04-323580", "dragon-studio-bubble-pop-406640"], "db": -30, "rate": [0.75, 0.9], "lowpass": 3000},
+      "unload": {"sounds": ["universfield-bubble-pop-06-351337"], "db": -29, "rate": [0.55, 0.65], "lowpass": 2500},
+      "death": {"sounds": ["impactSoft_medium_000", "impactSoft_medium_001"], "db": -26, "rate": [0.75, 0.85], "fast": 0.6, "lowpass": 2500},
+      "hatch": {"sounds": ["fs150479-egg-crack"], "db": -30, "rate": [0.85, 0.95], "lowpass": 3000},
+      "nectar": {"sounds": ["fs715067-achievement-sparkle"], "db": -35, "lowpass": 6000}
+    },
+    "label": {"sounds": ["universfield-thin-swoosh-352756"], "db": -35, "lead": 0.1, "lowpass": 5000},
+    "cut": {"sounds": ["dragon-studio-simple-whoosh-03-433005"], "db": -31, "lead": 0.3, "lowpass": 6000},
+    "stings": {
+      "01-hook@315": {"sounds": ["jingles_PIZZI00"], "db": -25},
+      "06-now@615": {"sounds": ["jingles_PIZZI00"], "db": -25}
+    }
+  }
+}

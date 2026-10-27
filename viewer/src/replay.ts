@@ -5,7 +5,7 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type FoodState, type Frame, type NestInfo, type WorldInfo,
+  type BlockState, type CreatureState, type EggState, type FlowerState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
@@ -90,16 +90,25 @@ function readFrame(o: Obj, where: string): Frame {
       return {
         id: int(c, 'id', w), colony: int(c, 'colony', w), x: num(c, 'x', w), y: num(c, 'y', w),
         heading: num(c, 'heading', w), speed: num(c, 'speed', w), size: num(c, 'size', w),
-        energy: num(c, 'energy', w), signal,
+        energy: num(c, 'energy', w), signal, carrying: c.carrying === undefined ? 0 : int(c, 'carrying', w),
+        holding: c.holding === undefined ? 0 : int(c, 'holding', w),
+        nectar: c.nectar === undefined ? 0 : num(c, 'nectar', w),
+        sprinting: c.sprinting === undefined ? 0 : int(c, 'sprinting', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {
-      if (f.kind !== 'common' && f.kind !== 'rich') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
+      if (f.kind !== 'common' && f.kind !== 'jelly') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
       return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w) };
     }),
     blocks: list(o, 'blocks', where, (b, w): BlockState => ({
       id: int(b, 'id', w), x: num(b, 'x', w), y: num(b, 'y', w), angle: num(b, 'angle', w), w: num(b, 'w', w), h: num(b, 'h', w),
     })),
+    stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: int(s, 'jelly', w) })),
+    light: o.light === undefined ? 1 : num(o, 'light', where),
+    eggs: o.eggs === undefined ? [] : list(o, 'eggs', where, (e, w): EggState => ({
+      id: int(e, 'id', w), colony: int(e, 'colony', w), x: num(e, 'x', w), y: num(e, 'y', w), progress: num(e, 'progress', w),
+    })),
+    flowers: o.flowers === undefined ? [] : list(o, 'flowers', where, (f, w): FlowerState => ({ id: int(f, 'id', w), x: num(f, 'x', w), y: num(f, 'y', w) })),
   };
 }
 

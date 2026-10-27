@@ -26,11 +26,31 @@ def alone(rays=1, blocks=()):
     return world
 
 
+def seen(world):
+    sight = look(world)
+    return sight.dist, sight.kind
+
+
+def two_colonies():
+    """One creature in each of two colonies, one ray each: colony 0's nest is up the y axis, colony 1's down it."""
+    cfg = replace(CFG, colonies=replace(CFG.colonies, count=2, size=1), block=(),
+                  vision=replace(CFG.vision, rays=1, fov=0.0))
+    world = World(cfg)
+    world.food_regrow[:] = 1
+    return world
+
+
+def place(world, *spots):
+    for body, spot in zip(world.physics.bodies[0], spots):
+        body.position = spot
+    world.physics.read()
+
+
 def test_food_ahead():
     world = alone()
     world.food_regrow[0, 0] = 0
     world.food_pos[0, 0] = (3.0, 0)
-    dist, kind = look(world)
+    dist, kind = seen(world)
     assert kind[0, 0, 0] == FOOD
     assert dist[0, 0, 0] == pytest.approx(3.0 - CFG.food.radius)
 
@@ -38,7 +58,7 @@ def test_food_ahead():
 def test_eaten_food_is_not_seen():
     world = alone()
     world.food_pos[0, 0] = (3.0, 0)
-    dist, kind = look(world)
+    dist, kind = seen(world)
     assert kind[0, 0, 0] == NOTHING and dist[0, 0, 0] == RANGE
 
 
@@ -46,10 +66,10 @@ def test_wall_in_range_and_out():
     world = alone()
     world.physics.bodies[0][0].position = (CFG.arena.size / 2 - 2.0, 0)
     world.physics.read()
-    dist, kind = look(world)
+    dist, kind = seen(world)
     assert kind[0, 0, 0] == WALL and dist[0, 0, 0] == pytest.approx(2.0)
     world.heading[:] = np.pi
-    dist, kind = look(world)
+    dist, kind = seen(world)
     assert kind[0, 0, 0] == NOTHING and dist[0, 0, 0] == RANGE
 
 
@@ -58,7 +78,7 @@ def test_block_turned_and_nearest_wins():
     world = alone(blocks=(block,))
     world.food_regrow[0, 0] = 0
     world.food_pos[0, 0] = (6.0, 0)
-    dist, kind = look(world)
+    dist, kind = seen(world)
     # turned 45°, the box's near corner points straight back at the creature
     assert kind[0, 0, 0] == BLOCK
     assert dist[0, 0, 0] == pytest.approx(4.0 - block.w / np.sqrt(2))
@@ -73,9 +93,46 @@ def test_creatures_see_each_other_but_not_themselves():
         body.position = (x, 0)
     world.physics.read()
     world.heading[:] = [[0, np.pi]]
-    dist, kind = look(world)
+    dist, kind = seen(world)
     assert (kind[0, :, 0] == CREATURE).all()
     assert dist[0, :, 0] == pytest.approx(2.0 - R)
+    assert look(world).nestmate.all()
+    # the dead aren't there to see
+    world.alive[0, 1] = False
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == NOTHING
+
+
+def test_own_nest_and_others():
+    world = two_colonies()
+    nest = world.nests[0, 1]
+    place(world, (0, 3.0), (4.0, 0))
+    world.heading[:] = np.pi / 2
+    sight = look(world)
+    assert sight.own_nest[0, 0, 0] == pytest.approx(nest - CFG.colonies.nest_radius - 3.0)
+    assert sight.other_nest[0, 0, 0] == RANGE and sight.kind[0, 0, 0] == NOTHING
+    # facing the other way, from a little below the middle
+    place(world, (0, -2.0), (4.0, 0))
+    world.heading[:] = -np.pi / 2
+    sight = look(world)
+    assert sight.other_nest[0, 0, 0] == pytest.approx(nest - CFG.colonies.nest_radius - 2.0)
+    assert sight.own_nest[0, 0, 0] == RANGE
+
+
+def test_a_creature_hides_the_nest_behind_it():
+    world = two_colonies()
+    place(world, (0, 3.0), (0, 5.5))
+    world.heading[:] = np.pi / 2
+    sight = look(world)
+    assert sight.kind[0, 0, 0] == CREATURE and not sight.nestmate[0, 0, 0]
+    assert sight.own_nest[0, 0, 0] == RANGE
+
+
+def test_standing_on_the_nest_sees_it_straight_away():
+    world = two_colonies()
+    place(world, tuple(world.nests[0]), (4.0, 0))
+    world.heading[:] = -np.pi / 2
+    assert look(world).own_nest[0, 0, 0] == pytest.approx(R + GAP)
 
 
 def test_fan_spreads_across_fov():
@@ -92,7 +149,7 @@ def test_agrees_with_pymunk():
     for _ in range(200):
         world.step(act())
     world.food_regrow[:] = 1
-    dist, kind = look(world)
+    dist, kind = seen(world)
     dirs = directions(world.heading, CFG.vision.rays, CFG.vision.fov)
     start = R + GAP
     for a, space in enumerate(world.physics.spaces):

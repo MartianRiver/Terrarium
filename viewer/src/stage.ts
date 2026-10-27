@@ -1,5 +1,5 @@
-// Renderer, camera, lights, ground and decoration. Decoration is seeded and
-// purely visual: the sim never sees rocks or grass placed here.
+// Renderer, camera (orbit, follow, the &intro flyby), sky light, haze and bloom; the
+// garden (garden.ts) is rebuilt for each world layout.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -7,51 +7,70 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { createLogger } from './lib/logger';
-import { COLONY_COLOURS, GROUND, SKY } from './palette';
-import type { NestInfo, WorldInfo } from './world';
+import { buildGarden } from './garden';
+import { GARDEN } from './palette';
+import type { WorldInfo } from './world';
 
 const log = createLogger('stage');
 
-function seeded(seed: number) {
-  return () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
-}
+const OVERVIEW = new THREE.Vector3(0, 22, 26);
+// where the camera sits from the blob it follows, and how quickly it catches up (per second)
+const CLOSE_UP = new THREE.Vector3(0, 7, 9);
+const FOLLOW_RATE = 3;
+// switching between overview and close-up swings the camera over this long
+const SWING_SECONDS = 2;
+const SWING_RATE = 3;
+// &intro: low outside the dome, circling slowly until the first F swoops down to the blob.
+// Only turning (no closing in), so a replay seeked far ahead still starts outside
+const INTRO = new THREE.Vector3(16, 15, 47);
+const DRIFT_TURN = 0.05;
+const UP = new THREE.Vector3(0, 1, 0);
 
-export function createStage(container: HTMLElement) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// lite (&lite) draws for a cool laptop: one pixel per point, no antialiasing, shadows or bloom
+// turn (radians) swings the close-up round the blob it follows, so a reel can see a face coming its way
+export function createStage(container: HTMLElement, lite = false, turn = 0) {
+  const closeUp = CLOSE_UP.clone().applyAxisAngle(UP, turn);
+  const renderer = new THREE.WebGLRenderer({ antialias: !lite });
+  renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !lite;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.08;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(SKY);
-  scene.fog = new THREE.Fog(SKY, 40, 90);
+  scene.background = new THREE.Color(GARDEN.sky);
+  // dusty haze; the mesas (55–75 m out) show as silhouettes in it
+  scene.fog = new THREE.Fog(GARDEN.sky, 40, 115);
 
   const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 200);
-  camera.position.set(0, 22, 26);
+  camera.position.copy(OVERVIEW);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI / 2 - 0.12;
   controls.minDistance = 4;
   controls.maxDistance = 60;
   controls.target.set(0, 0, 0);
+  let close = false;
+  let swinging = 0;
+  let drifting = false;
+  const offset = new THREE.Vector3();
 
-  scene.add(new THREE.HemisphereLight(0xdff2ff, 0x6b7f4a, 1.4));
+  const ambient = new THREE.HemisphereLight(GARDEN.skyLight, GARDEN.groundLight, 1.45);
+  scene.add(ambient);
+  // day and night: everything that lights the scene, at full day, and the same at full night
+  const day = { sky: new THREE.Color(GARDEN.sky), skyLight: new THREE.Color(GARDEN.skyLight), ground: new THREE.Color(GARDEN.groundLight) };
+  const night = { sky: new THREE.Color(GARDEN.nightSky), skyLight: new THREE.Color(GARDEN.nightSkyLight), ground: new THREE.Color(GARDEN.nightGroundLight) };
+  let sun: THREE.DirectionalLight | null = null;
+  let shown = -1;
   // everything that depends on the world's layout, rebuilt when a different one opens
-  let world = new THREE.Group();
+  let garden: ReturnType<typeof buildGarden> | null = null;
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), 0.55, 0.5, 0.9);
-  composer.addPass(bloom);
+  if (!lite) composer.addPass(new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), 0.35, 0.5, 0.92));
   composer.addPass(new OutputPass());
 
   function resize() {
@@ -68,17 +87,62 @@ export function createStage(container: HTMLElement) {
   return {
     renderer, scene, camera,
     setWorld(info: WorldInfo) {
-      scene.remove(world);
-      disposeAll(world);
-      world = new THREE.Group();
-      addSun(world, info);
-      addGround(world, info);
-      for (const nest of info.nests) addNest(world, nest);
-      addDecor(world, info);
-      scene.add(world);
+      if (garden) {
+        scene.remove(garden.group);
+        disposeAll(garden.group);
+      }
+      garden = buildGarden(info);
+      scene.add(garden.group);
+      sun = null;
+      garden.group.traverse((o) => { if (o instanceof THREE.DirectionalLight) sun = o; });
+      shown = -1;
       log.debug('world built', { width: info.width, height: info.height, nests: info.nests.length });
     },
-    render() {
+    // slides the orbit after the blob (or back to the middle with null), keeping whatever angle and
+    // zoom it has, except while swinging between views; dt Infinity jumps straight there
+    track(at: { x: number; y: number } | null, dt: number) {
+      if (drifting && Number.isFinite(dt)) {
+        offset.subVectors(camera.position, controls.target).applyAxisAngle(UP, dt * DRIFT_TURN);
+        camera.position.addVectors(controls.target, offset);
+      }
+      if (!at && swinging <= 0) return;
+      const goal = at ?? { x: 0, y: 0 };
+      const k = 1 - Math.exp(-dt * FOLLOW_RATE);
+      const dx = (goal.x - controls.target.x) * k;
+      const dz = (goal.y - controls.target.z) * k;
+      controls.target.x += dx;
+      controls.target.z += dz;
+      camera.position.x += dx;
+      camera.position.z += dz;
+      if (swinging <= 0) return;
+      swinging -= dt;
+      offset.subVectors(camera.position, controls.target).lerp(close ? closeUp : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
+      camera.position.addVectors(controls.target, offset);
+    },
+    // 1 by day, 0 at night
+    light(level: number) {
+      if (Math.abs(level - shown) < 0.005) return;
+      shown = level;
+      (scene.background as THREE.Color).lerpColors(night.sky, day.sky, level);
+      (scene.fog as THREE.Fog).color.copy(scene.background as THREE.Color);
+      ambient.color.lerpColors(night.skyLight, day.skyLight, level);
+      ambient.groundColor.lerpColors(night.ground, day.ground, level);
+      ambient.intensity = 0.55 + 0.9 * level;
+      if (sun) (sun as THREE.DirectionalLight).intensity = 2.7 * level;
+      renderer.toneMappingExposure = 1.08 * (0.75 + 0.25 * level);
+    },
+    view(closeUp: boolean) {
+      drifting = false;
+      close = closeUp;
+      swinging = SWING_SECONDS;
+    },
+    intro() {
+      camera.position.copy(INTRO);
+      drifting = true;
+    },
+    // time in seconds, for the grass
+    render(time: number) {
+      garden?.tick(time);
       controls.update();
       composer.render();
     },
@@ -91,126 +155,9 @@ function disposeAll(root: THREE.Object3D) {
     if (o instanceof THREE.InstancedMesh) o.dispose();
     if (!(o instanceof THREE.Mesh)) return;
     o.geometry.dispose();
-    for (const m of [o.material].flat()) m.dispose();
-  });
-}
-
-function addSun(scene: THREE.Object3D, info: WorldInfo) {
-  const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
-  sun.position.set(12, 24, 8);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  const r = Math.max(info.width, info.height) * 0.75;
-  Object.assign(sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 70 });
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.03;
-  sun.shadow.radius = 4;
-  scene.add(sun);
-}
-
-function addGround(scene: THREE.Object3D, info: WorldInfo) {
-  const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(80, 64).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: GROUND, roughness: 1 }),
-  );
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  // slightly lighter play area so the bounds read clearly
-  const arena = new THREE.Mesh(
-    new THREE.PlaneGeometry(info.width, info.height).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(GROUND).offsetHSL(0.01, 0.02, 0.05), roughness: 1 }),
-  );
-  arena.position.y = 0.005;
-  arena.receiveShadow = true;
-  scene.add(arena);
-
-  // low rounded walls on the boundary
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9b99a, roughness: 0.9 });
-  const t = 0.5, h = 0.6;
-  const sides: [number, number, number, number][] = [
-    [0, -info.height / 2 - t / 2, info.width + t * 2, t],
-    [0, info.height / 2 + t / 2, info.width + t * 2, t],
-    [-info.width / 2 - t / 2, 0, t, info.height],
-    [info.width / 2 + t / 2, 0, t, info.height],
-  ];
-  for (const [x, z, w, d] of sides) {
-    const wall = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, 0.15), wallMat);
-    wall.position.set(x, h / 2, z);
-    wall.castShadow = true;
-    wall.receiveShadow = true;
-    scene.add(wall);
-  }
-}
-
-function addNest(scene: THREE.Object3D, nest: NestInfo) {
-  const tint = COLONY_COLOURS[nest.colony % COLONY_COLOURS.length];
-  const mound = new THREE.Mesh(
-    new THREE.SphereGeometry(nest.radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.32, 1),
-    new THREE.MeshStandardMaterial({ color: 0xa88a64, roughness: 1 }),
-  );
-  mound.position.set(nest.x, 0, nest.y);
-  mound.castShadow = true;
-  mound.receiveShadow = true;
-  scene.add(mound);
-
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(nest.radius * 0.28, 24).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x2b2018 }));
-  hole.position.set(nest.x, nest.radius * 0.32 + 0.01, nest.y);
-  scene.add(hole);
-
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(nest.radius * 1.05, nest.radius * 1.25, 48).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.8 }),
-  );
-  ring.position.set(nest.x, 0.012, nest.y);
-  ring.receiveShadow = true;
-  scene.add(ring);
-}
-
-function addDecor(scene: THREE.Object3D, info: WorldInfo) {
-  const rng = seeded(42);
-  const dummy = new THREE.Object3D();
-
-  // grass tufts across arena and surroundings
-  const tufts = 900;
-  const grass = new THREE.InstancedMesh(
-    new THREE.ConeGeometry(0.05, 0.3, 4).translate(0, 0.15, 0),
-    new THREE.MeshStandardMaterial({ color: 0x6f9f4b, roughness: 1 }),
-    tufts,
-  );
-  const spread = Math.max(info.width, info.height) * 1.6;
-  for (let i = 0; i < tufts; i++) {
-    dummy.position.set((rng() - 0.5) * spread, 0, (rng() - 0.5) * spread);
-    dummy.rotation.set((rng() - 0.5) * 0.4, rng() * Math.PI, (rng() - 0.5) * 0.4);
-    dummy.scale.setScalar(0.6 + rng() * 0.9);
-    dummy.updateMatrix();
-    grass.setMatrixAt(i, dummy.matrix);
-  }
-  scene.add(grass);
-
-  // rocks outside the walls only, so nothing looks like an obstacle the sim ignores
-  const rocks = 40;
-  const rock = new THREE.InstancedMesh(
-    new THREE.DodecahedronGeometry(0.6, 0),
-    new THREE.MeshStandardMaterial({ color: 0xa39c91, roughness: 0.95, flatShading: true }),
-    rocks,
-  );
-  rock.castShadow = true;
-  rock.receiveShadow = true;
-  const hx = info.width / 2 + 1.5, hz = info.height / 2 + 1.5;
-  for (let i = 0; i < rocks; i++) {
-    let x = 0, z = 0;
-    while (Math.abs(x) < hx && Math.abs(z) < hz) {
-      x = (rng() - 0.5) * (hx * 2 + 20);
-      z = (rng() - 0.5) * (hz * 2 + 20);
+    for (const m of [o.material].flat()) {
+      for (const v of Object.values(m)) if (v instanceof THREE.Texture) v.dispose();
+      m.dispose();
     }
-    dummy.position.set(x, 0.1, z);
-    dummy.rotation.set(rng() * 3, rng() * 3, rng() * 3);
-    const s = 0.5 + rng() * 1.6;
-    dummy.scale.set(s, s * (0.5 + rng() * 0.4), s);
-    dummy.updateMatrix();
-    rock.setMatrixAt(i, dummy.matrix);
-  }
-  scene.add(rock);
+  });
 }

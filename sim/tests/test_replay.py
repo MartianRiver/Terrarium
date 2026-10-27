@@ -21,7 +21,7 @@ def test_round_trip(tmp_path):
     assert [f['tick'] for f in frames] == list(range(TICKS + 1))
 
     last = frames[-1]
-    assert [c['id'] for c in last['creatures']] == list(world.creature_id)
+    assert [c['id'] for c in last['creatures']] == list(world.creature_id[0])
     pos = np.array([[c['x'], c['y']] for c in last['creatures']])
     assert np.abs(pos - world.pos[0]).max() <= 0.0005
     assert len(last['food']) == world.food_present[0].sum()

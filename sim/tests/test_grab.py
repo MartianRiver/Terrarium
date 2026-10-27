@@ -1,0 +1,100 @@
+from dataclasses import replace
+
+import numpy as np
+import pytest
+
+from terrarium import load
+from terrarium.config import DEFAULT, Config, build, upgrade
+from terrarium.forage import observe
+from terrarium.schema import SELF
+from terrarium.world import World
+
+VAULT = load(DEFAULT.parent / 'vault.toml')
+EAST_DOOR = 6
+# just outside the east door, touching its outer face
+OUTSIDE = (3.1 + VAULT.creature.radius + 0.05, 0.0)
+
+
+def at_door(heading):
+    cfg = replace(VAULT, colonies=replace(VAULT.colonies, count=1, size=1))
+    world = World(cfg)
+    world.physics.place([0], np.array([[OUTSIDE]]))
+    world.heading[:] = heading
+    world.clock[:] = 30.0
+    return world
+
+
+def walk(world, thrust, grab, seconds):
+    for _ in range(round(seconds * world.cfg.tick_hz)):
+        world.step(np.array([[[thrust, 0.0, -1, -1, -1, grab]]]))
+
+
+def test_a_door_pulls_out():
+    world = at_door(0.0)
+    walk(world, 1.0, 1, 3)
+    assert world.holding[0, 0]
+    assert world.block_pos[0, EAST_DOOR, 0] > 4.0
+
+
+def test_walking_away_without_holding_leaves_the_door():
+    world = at_door(0.0)
+    walk(world, 1.0, -1, 3)
+    assert not world.holding[0, 0]
+    assert world.block_pos[0, EAST_DOOR, 0] == pytest.approx(2.85, abs=0.01)
+
+
+def test_a_door_cant_be_pushed_in():
+    world = at_door(np.pi)
+    walk(world, 1.0, -1, 3)
+    assert world.block_pos[0, EAST_DOOR, 0] > 2.7
+
+
+def test_walls_dont_move():
+    world = at_door(0.0)
+    world.physics.place([0], np.array([[(3.1 + VAULT.creature.radius + 0.05, 1.7)]]))
+    walk(world, 1.0, 1, 3)
+    assert world.holding[0, 0]
+    assert np.hypot(*(world.block_pos[0, 2] - (2.85, 1.7))) < 0.01
+
+
+def test_holding_costs_and_letting_go_is_free():
+    held, free = at_door(0.0), at_door(0.0)
+    walk(held, 0.0, 1, 1)
+    walk(free, 0.0, -1, 1)
+    assert free.energy[0, 0] - held.energy[0, 0] == pytest.approx(VAULT.grab.energy, rel=0.05)
+    # a grip lasts its seconds after the last yes, then lets go
+    walk(held, 0.0, -1, VAULT.grab.seconds - 0.05)
+    assert held.holding[0, 0]
+    walk(held, 0.0, -1, 0.05)
+    assert not held.holding[0, 0] and not held.physics.held
+
+
+def test_the_brain_feels_its_grip_and_the_dead_let_go():
+    world = at_door(0.0)
+    walk(world, 0.0, 1, 0.05)
+    left = 1 - 1 / round(VAULT.grab.seconds * VAULT.tick_hz)
+    assert observe(world, np.zeros((1, 1, 2))).me[0, SELF.index('holding')] == pytest.approx(left)
+    world.energy[:] = 1e-6
+    walk(world, 0.0, 1, 0.05)
+    assert not world.alive[0, 0] and not world.holding[0, 0] and not world.physics.held
+
+
+def test_middle_patches_grow_in_the_vault():
+    world = World(VAULT, 8, 0)
+    f = world.food_pos[:, :world.wild]
+    inside = (np.abs(f) < 2.6).all(-1)
+    patches = VAULT.food.patches
+    assert inside[:, [i for i in range(world.wild) if i % patches < VAULT.food.middle]].all()
+
+
+def test_old_run_records_load_without_grab_or_a_middle():
+    recorded = load(DEFAULT).to_dict()
+    del recorded['grab'], recorded['food']['middle']
+    old = build(Config, upgrade(recorded))
+    assert not old.grab.on and old.food.middle == 0
+
+
+def test_old_run_records_with_hinged_doors_still_load():
+    recorded = load(DEFAULT.parent / 'vault.toml').to_dict()
+    recorded['block'][EAST_DOOR]['hinge'] = [0.25, -0.7]
+    assert build(Config, upgrade(recorded)).block == VAULT.block

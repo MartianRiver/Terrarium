@@ -16,7 +16,7 @@ Each release is a tag (`v0.2.0`) with an entry in [CHANGELOG.md](../CHANGELOG.md
 - A release merges `next` into `main` with a merge commit, so `main`'s history reads one stage at a time, then tags it.
 - An urgent fix goes on a branch off `main`, is released as 0.N.y, and `main` is merged back into `next`.
 
-Nothing is pushed straight to `main` or `next`. GitHub doesn't enforce that on a private repo, so a pre-push hook does.
+Nothing is pushed straight to `main` or `next`. A GitHub ruleset enforces that, and a pre-push hook catches it before it gets that far.
 
 ## What's kept across versions
 
@@ -37,9 +37,10 @@ When everything listed for the stage in the roadmap is on `next`, or has been mo
 4. Every sample replay, from every earlier version, plays in the viewer.
 5. There's a clip of what the stage was for.
 6. The roadmap, VISION.md and the changelog match what was built; the version is bumped in `viewer/package.json` (and the sim's `pyproject.toml` from 0.1).
+7. The site matches the release: "Where it's at" in `site/index.md`, the hero still if the stage has a better one, and the replay it plays. Then it's rebuilt and deployed ([site.md](site.md)).
 
 Then merge `next` into `main` by pull request, as a merge commit, and tag it.
 
 ## Changelog
 
-Written at release time from the commits on `next` since the last release (`git log --first-parent main..next`), in plain words: what changed, what to watch for in it, and anything a saved brain or replay needs.
+Kept as we go: the top section, **Unreleased**, gets a few plain sentences from each branch before it's merged (what changed, what to watch for, anything a saved brain or replay needs). At release time it becomes the version's entry, checked against the commits on `next` since the last release (`git log --first-parent main..next`).

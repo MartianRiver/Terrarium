@@ -1,0 +1,65 @@
+# What my machines and rented GPUs trained outside the queue, from runs/ and compute.toml
+# (`python -m terrarium.compute board`). The board adds it to what the queue counts; runs count as jobs.
+
+[[machine]]
+name = "rented RTX 3060 12 GB"
+kind = "rented"
+gpu = "RTX 3060 12 GB"
+samples = 2714083328
+hours = 66.73
+runs = 452
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented RTX 3080"
+kind = "rented"
+gpu = "RTX 3080"
+samples = 1873870848
+hours = 37.67
+runs = 252
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented RTX 3070 8 GB"
+kind = "rented"
+gpu = "RTX 3070 8 GB"
+samples = 1091321856
+hours = 21.88
+runs = 252
+last_active = "2026-10-25"
+
+[[machine]]
+name = "river-m3"
+kind = "mine"
+gpu = "Apple M3"
+samples = 609304576
+hours = 27.18
+runs = 105
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented RTX 4060 Ti"
+kind = "rented"
+gpu = "RTX 4060 Ti"
+samples = 305340416
+hours = 12.86
+runs = 33
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented RTX A4000 16 GB"
+kind = "rented"
+gpu = "RTX A4000 16 GB"
+samples = 119930880
+hours = 2.16
+runs = 5
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented A10 24 GB"
+kind = "rented"
+gpu = "A10 24 GB"
+samples = 79626240
+hours = 2.46
+runs = 16
+last_active = "2026-10-24"

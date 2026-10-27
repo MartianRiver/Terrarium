@@ -18,8 +18,19 @@ log = Logger('runs')
 ROOT = Path(__file__).resolve().parent.parent.parent / 'runs'
 
 
+class GitError(RuntimeError):
+    pass
+
+
 def git(*args) -> str:
-    return subprocess.run(['git', *args], capture_output=True, text=True, cwd=Path(__file__).parent).stdout.strip()
+    """git's output, or GitError: a run whose code can't be named mustn't pass for a clean one."""
+    out = subprocess.run(['git', *args], capture_output=True, text=True, cwd=Path(__file__).parent)
+    if out.returncode:
+        why = out.stderr.strip()
+        if 'dubious ownership' in why:
+            why += "\n(a tree copied in from another user, as on a pod: git config --global --add safe.directory '*')"
+        raise GitError(f'git {" ".join(args)} failed: {why}')
+    return out.stdout.strip()
 
 
 def dirty() -> bool:
@@ -27,8 +38,45 @@ def dirty() -> bool:
     return bool(git('status', '--porcelain'))
 
 
+def cpu() -> str:
+    if sys.platform == 'darwin':
+        return subprocess.run(['sysctl', '-n', 'machdep.cpu.brand_string'], capture_output=True, text=True).stdout.strip()
+    if sys.platform == 'win32':
+        import winreg
+        # platform.processor() there is only the family and model numbers
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as key:
+            return winreg.QueryValueEx(key, 'ProcessorNameString')[0].strip()
+    info = Path('/proc/cpuinfo')
+    names = [line.split(':', 1)[1].strip() for line in info.read_text().splitlines() if line.startswith('model name')] \
+        if info.exists() else []
+    return names[0] if names else platform.processor() or platform.machine()
+
+
+def cpu_quota(cgroup: Path = Path('/sys/fs/cgroup')) -> int | None:
+    """CPUs a container is allowed. torch and os count the host's cores, which can be eight times as many."""
+    try:
+        if (cgroup / 'cpu.max').exists():
+            quota, period = (cgroup / 'cpu.max').read_text().split()
+        else:
+            # cgroup v1, still on some Vast hosts; -1 is no limit
+            quota, period = ((cgroup / 'cpu' / f'cpu.cfs_{k}_us').read_text().strip() for k in ('quota', 'period'))
+        return None if quota in ('max', '-1') else max(1, int(quota) // int(period))
+    except (OSError, ValueError):
+        return None
+
+
+def memory_gb() -> int:
+    # here, not at the top: the coordinator imports this module and runs on a bare python
+    import psutil
+    return round(psutil.virtual_memory().total / 2**30)
+
+
 def commit() -> str:
-    return (git('rev-parse', '--short', 'HEAD') or 'unknown') + ('-dirty' if dirty() else '')
+    """For replay headers, which can be recorded outside a checkout."""
+    try:
+        return git('rev-parse', '--short', 'HEAD') + ('-dirty' if dirty() else '')
+    except GitError:
+        return 'unknown'
 
 
 class DirtyTree(RuntimeError):
@@ -51,7 +99,8 @@ class Run:
         self.record = {
             'id': self.id, 'started': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
             'commit': git('rev-parse', 'HEAD'), 'dirty': is_dirty, 'scratch': scratch,
-            'machine': {'platform': platform.platform(), 'processor': platform.processor() or platform.machine()},
+            'machine': {'platform': platform.platform(), 'processor': platform.processor() or platform.machine(),
+                        'cpu': cpu(), 'memory_gb': memory_gb()},
             'versions': {'python': sys.version.split()[0],
                          **{p: version(p) for p in ('numpy', 'pymunk', 'torch')}},
             **record,

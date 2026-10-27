@@ -48,7 +48,7 @@ def main():
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--config', default=None)
     parser.add_argument('--policy', choices=['random', 'greedy'], default='random')
-    parser.add_argument('--brain', help='a checkpoint; takes its mean action')
+    parser.add_argument('--brain', help='a checkpoint; steers by its mean, yes/no actions drawn')
     args = parser.parse_args()
     cfg = load(args.config) if args.config else load()
     record(cfg, args.out, round(args.seconds * cfg.tick_hz), args.seed, args.policy, args.brain)
