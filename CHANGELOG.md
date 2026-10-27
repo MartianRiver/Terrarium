@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Each nest has a low woven dome over it in its colony's colour, with a frosted cap and an open band at the bottom to walk in under, so the jelly and the huddle stay in view. It fades as the camera comes close. Only the viewer draws it: in the sim a nest is still a flat pad.
+
 Brains can have memory. `train --memory N` gives a brain N notes it carries from one choice to the next (a GRU), read back through a link that starts at zero, so it acts exactly as before until training finds a use for them. Notes start blank with each life and are wiped at death. A brain with memory is trained a whole creature's rollout at a time, replayed in order from the notes it began with, and `evals --wiped` scores it with its notes blanked before every choice, to show whether it uses them.
 
 `configs/spots.toml` is the first world built to need memory: one colony, no nights, little food, and nectar flowers that open only at two spots drawn anew each episode, 12 m apart (`[flowers] spots`, `spot_gap`; 0 keeps them anywhere). Evals have two new scripted policies, `chaser` (carrier that runs for any flower it sees) and `spotter` (chaser that knows the spots and waits at the nearest when there's nothing else to do). Notes for 0.4 start in `docs/notes/0.4.md`.

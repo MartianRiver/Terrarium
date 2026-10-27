@@ -140,9 +140,9 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
       camera.position.copy(INTRO);
       drifting = true;
     },
-    // time in seconds, for the grass
+    // time in seconds, for the grass; the nest domes fade by the camera
     render(time: number) {
-      garden?.tick(time);
+      garden?.tick(time, camera);
       controls.update();
       composer.render();
     },
