@@ -17,7 +17,7 @@ Each policy, and each brain in each mode, plays in its own process, side by side
 What else v2 counts, for colonies:
 
 - **jelly** eaten from the store, per creature
-- **deaths**: how many died, how many of them with jelly in their own store (**by jelly**), how many in their own nest, and whole **colonies lost** (left with nobody alive at some point). With hatching on a slot can die more than once, so these count deaths, not creatures
+- **deaths**: how many died, how many of them with jelly in their own store (**jelly home**, wherever they were), how many in their own nest, and whole **colonies lost** (left with nobody alive at some point). With hatching on a slot can die more than once, so these count deaths, not creatures
 - with hatching on (`[hatch]`): **hatched**, Terrikins hatched per colony an episode, how many colonies hatched at least one (**hatching**), the colonies with someone alive when the episode ran its full length (**to the end**: in a three-day world, through all three nights), and **colony size**: Terrikins alive in each colony at the end, and the most it had at once
 - with `[colonies] room` above 0, a colony starts with `size` and can hatch into the rest. Food per minute, seconds alive, food, stored and jelly are per *starting* place then (a place that starts empty would only pull the means down), so they stay comparable with worlds without room; what room adds shows in colony size
 - with flowers on (`[flowers]`): **flowers** drunk per Terrikin, and how often a Terrikin that could sprint says yes with an open flower in its field of view (`sprint_flower`, beside `sprint_ready` for any time it could)

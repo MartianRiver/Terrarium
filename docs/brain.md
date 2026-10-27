@@ -40,10 +40,13 @@ Each promoted brain gets a `like` in `sim/brains.toml`: the animal it's roughly 
 | | wiring | what it does |
 |---|---|---|
 | **0.2 brain** | 68,229 weights | 16 rays and its own energy and speed; no memory from one tick to the next; one drive, eating |
+| **0.3 brain** | 270,349 weights (width 128) | rays that tell nestmates, nests, food and flowers apart, smell, the light, its crop, its colony's store and the way home; still no memory; eating, carrying home, getting through the night and hatching |
 | C. elegans, a nematode worm | 302 neurons, about 6,400 chemical synapses and 900 gap junctions | its whole nervous system |
 | Fruit fly | 139,255 neurons, 5 × 10⁷ synapses | its whole brain |
 
 So the 0.2 brain is about ten times a worm's synapse count and a seven-hundredth of a fly's. It does much less than a worm: wiring on the scale of a worm, doing a small part of what one does.
+
+The 0.3 brain is about forty times a worm's synapse count and a hundred-and-eighty-fifth of a fly's. It does more than the 0.2 brain did, but still less than a worm, and it remembers nothing from one tick to the next.
 
 Sources, checked 2026-10-23:
 

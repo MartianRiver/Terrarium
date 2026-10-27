@@ -15,11 +15,11 @@ The world grows a stage at a time, and every stage's brain starts from the last 
 
 **0.2 Clover, done: one Terrikin teaching itself to eat.** After 52 minutes of training on my MacBook Air, it eats 18.4 berries a minute and never starves in the tests. Moving at random gets 0.26. A scripted forager that heads straight for the nearest berry gets 13.8, so the brain beats that too.
 
-**0.3 Daisy, nearly there: colonies.** Three colonies of six, a nest each. They carry food home in their crop, store it at the nest as jelly, and get through cold nights on it, huddled up at home. They've learned to do all of that by themselves; I'm training the last pieces now.
+**0.3 Daisy, done: colonies.** Three colonies of six, a nest each. They carry food home in their crop, store it at the nest as jelly, get through three cold nights on it huddled up at home, and hatch new Terrikins from what's left, so a colony can end bigger than it started. They learned all of that by themselves. What they can't do yet is remember anything from one moment to the next.
 
 ## What's next
 
-**0.4 Elderflower: growth and memory.** A little memory first, so a forager can find its way back to a patch it found and knows how long it's been out. Then hatchlings that start small and grow up on what their colony brings home, colonies as big as their food lets them get, and a brain for each colony, so they can stop all thinking alike and the ones that do best spread.
+**0.4 Elderflower: growth and memory.** A little memory first, so a forager can find its way back to a patch it found and knows how long it's been out. Then hatchlings that start small and grow up on what their colony brings home, colonies as big as their food lets them get, and a brain for each colony, so they can stop all thinking alike and the ones that do best spread. Beside it, a world of mazes, a new one every time, which is how I'll know the memory works.
 
 **0.5 Foxglove: the way home.** The smell of home to find the nest by, and the first danger: dust devils.
 

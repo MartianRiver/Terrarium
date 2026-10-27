@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased: 0.3 Daisy, colony basics
+## 0.3.0: Colony basics
 
-Kept as we go: each branch adds what it changed before it's merged, and the release turns this into the 0.3.0 entry.
+Colonies. Three colonies of six Terrikins forage, carry food home in a crop, store it as jelly, get through three cold nights on it huddled at home, and hatch new Terrikins from what's left. The 0.3 brain (`c1c16fc46934.pt`, from the run `pbt-y1-28`, in `sim/brains.toml`) learned all of it from reward, through forks that copy whichever is doing best. On 64 episodes no training saw, every colony gets through all three nights, and they end the six minutes with 6.40 Terrikins of the 6 they started with (up to 8), where nester, a scripted forager that heads home at dusk, ends with 3.09 and loses 61 of 192 colonies. That's 0.45 more than the brain its line started from, with a quarter fewer deaths. Most of the Terrikins that die still starve with jelly at home, and the 0.3 brain never sprints. Alone in the solo world it eats 6.29 food a minute (the 0.2 brain 5.23 by its mean) but dies in 21 of 64 episodes. The sample replay is `samples/0.3-colonies.jsonl.gz`.
 
 Terrikins now live in a garden under a glass dome on Mars: a clay body with feet and a waddle, a face, a colony-coloured tail, droppings (drawn only), a follow camera (F) and a flyby into the dome (`&intro`). The public site at terrarium.martianriver.com plays the latest brain (`npm run site`). The tools that made the first Instagram reel are in `viewer/reel/`. Droppings are smaller now. `viewer/reel/0.3.json` is the second reel's script, and `viewer/reel/sound.py` gives a reel sound that matches what's on screen (bites, unloads, deaths, day and night ambience, music).
 
@@ -77,6 +77,8 @@ In the local viewer, a click follows a Terrikin, and every Terrikin has a name. 
 The public board also shows what my Mac and rented GPUs trained outside the queue (`sim/board.toml`, written by `python -m terrarium.compute board` from the ledger: rented GPUs grouped by model and memory, runs counted as jobs, queue runs left to the queue). Terrarium at Home says a Mac with Apple silicon can lend a hand too, with real speeds, and what the worker can't check on one. The board's table fits the page: rented machines are named by their GPU's own column, and on a phone the GPU moves under the name too.
 
 The roadmap moves memory forward from 0.5 to 0.4 (now Growth and memory), where it goes in before the rest; 0.5 is the way home.
+
+In `colony.toml` a hungry Terrikin eats from the store below 0.6 energy, not 0.3: at 0.3 they left home with too little to get back on. The roadmap has a Mazes track, a side world from 0.4 on for testing memory: a new maze every episode, scored on mazes it has never seen. The evals' count of deaths with jelly in the colony's store is `jelly_at_home` now (was `beside_jelly`: it never meant the Terrikin was near the jelly).
 
 ## 0.2.0: Solo forager
 
