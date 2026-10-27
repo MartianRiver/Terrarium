@@ -77,14 +77,18 @@ function boot() {
   const params = new URLSearchParams(location.search);
   const lite = params.has('lite');
   const container = document.getElementById('world')!;
-  const stage = createStage(container, lite);
+  // &turn=degrees: the close-up from another side (a reel's shot of a face)
+  const stage = createStage(container, lite, (Number(params.get('turn')) || 0) * Math.PI / 180);
   let make = demoSource;
   let source!: Source;
   let view: WorldView | undefined;
   let paused = false;
   let following = false;
-  // the Terrikin picked by clicking it, kept across restarts; null follows the first one
-  let chosen: number | null = null;
+  // the Terrikin picked by clicking it (or by &pick), kept across restarts; null follows the first one
+  let chosen: number | null = params.has('pick') ? Number(params.get('pick')) : null;
+  // &look=x,y,heading: the close-up held on one spot instead of a Terrikin (a reel's shot of a nest)
+  const [lx, ly, lh] = (params.get('look') ?? '').split(',').map(Number);
+  const look = params.has('look') ? { x: lx, y: ly, heading: lh || 0 } : null;
   let nameOf = namesFor('demo');
   // the picked Terrikin's name, above it
   const tag = document.createElement('div');
@@ -114,6 +118,7 @@ function boot() {
     if (newWorld) stage.setWorld(source.info);
     view = new WorldView(stage.scene, source.info, !params.has('nodroppings'));
     view.chosen = chosen;
+    view.marked = !params.has('pick');
     const first = source.step()!;
     view.push(first);
     tick = first.tick;
@@ -140,7 +145,9 @@ function boot() {
         const src = replaySource(replay, name);
         return params.has('preview') ? { ...src, step: withNectar(src.info, src.step) } : src;
       };
-      if (newReplay(url)) chosen = null;
+      // opening another episode drops the pick; the page's first one keeps &pick
+      const first = !playing;
+      if (newReplay(url) && !first) chosen = null;
       // a run's replay recorded again here is the same episode, so it keeps its names
       const run = url && /^\/api\/runs\//.test(url.pathname) ? `${url.pathname}?${url.searchParams.get('seed')}` : null;
       const brainId = (replay.source.brain as { id?: string } | undefined)?.id ?? String(replay.source.brain);
@@ -332,7 +339,7 @@ function boot() {
       tag.style.transform = `translate(${((above.x + 1) / 2) * innerWidth}px, ${((1 - above.y) / 2) * innerHeight}px) translate(-50%, -100%)`;
       if (tag.textContent !== nameOf(chosen!)) tag.textContent = nameOf(chosen!);
     }
-    stage.track(following ? (ant?.focus ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
+    stage.track(following ? (ant?.focus ?? look ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
     snap = false;
     stage.render(now / 1000);
 
