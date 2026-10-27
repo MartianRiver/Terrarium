@@ -55,14 +55,14 @@ def cut_off(bootstrap: bool):
     torch.manual_seed(0)
     actor = Brain(**SHAPE)
     first = env.observe()
-    roll, _ = collect(env, actor, 2, first, Episodes(env.samples, cfg.dt))
+    roll, _, _ = collect(env, actor, 2, first, Episodes(env.samples, cfg.dt), actor.blank(env.samples))
     return env, actor, roll
 
 
 def test_the_time_limit_carries_on_the_value():
     env, actor, roll = cut_off(bootstrap=True)
     assert env.cut.all() and env.final is not None and roll.dones[1].all()
-    _, value = actor(*tensors(env.final, 'cpu'))
+    _, value, _ = actor(*tensors(env.final, 'cpu'))
     plain = cut_off(bootstrap=False)[2]
     # same world, same actions: the only difference is the value of where they got to
     assert np.allclose(roll.rewards[0], plain.rewards[0])

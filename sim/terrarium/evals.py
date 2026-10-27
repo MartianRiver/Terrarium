@@ -8,10 +8,13 @@
 # eating what it carries once it can without waste. Carrier is greedy that takes
 # its crop home and unloads it once it's full, and goes home to eat when it's
 # hungry and there's jelly in the store. Nester is carrier that heads home when
-# the light starts to fade and waits in the nest until it's full day.
+# the light starts to fade and waits in the nest until it's full day. Chaser is
+# carrier that runs for any flower it sees; spotter is chaser that knows where
+# flowers open (spots.toml) and waits at the nearest spot when there's nothing
+# else to do: the ceiling for what remembering the spots could be worth.
 #
 #   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled]
-#                                    [--device cuda]
+#                                    [--device cuda] [--wiped]
 #
 # Each policy (and each brain in each mode) is scored in its own process, side by side.
 
@@ -33,7 +36,7 @@ from .random_actions import RandomActions
 from .runs import cpu_quota
 from .schema import YES_NO
 from .tactics import REASONS, Tactics, flower_in_view
-from .vision import FOOD, NOTHING, look
+from .vision import FLOWER, FOOD, NOTHING, look
 from .world import World
 
 log = Logger('evals')
@@ -108,7 +111,47 @@ def nester_policy(world: World) -> Policy:
     return act
 
 
-POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'carrier': carrier_policy, 'nester': nester_policy}
+def chaser_policy(world: World) -> Policy:
+    """Carrier that runs for any open flower it sees."""
+    carrier = carrier_policy(world)
+    v = world.cfg.vision
+    angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+
+    def act(w: World) -> np.ndarray:
+        action = carrier(w)
+        sight = look(w)
+        flower = np.where(sight.kind == FLOWER, sight.dist, np.inf)
+        sees = np.isfinite(flower.min(-1))
+        action[..., 0] = np.where(sees, 1.0, action[..., 0])
+        action[..., 1] = np.where(sees, np.clip(angles[flower.argmin(-1)] * 3, -1, 1), action[..., 1])
+        return action
+    return act
+
+
+def spotter_policy(world: World) -> Policy:
+    """Chaser that knows where flowers open (the world's spots, as perfect memory would): with nothing to eat or
+    run for in view, it goes to the nearest spot and waits there. The most remembering the spots could be worth."""
+    chaser = chaser_policy(world)
+
+    def act(w: World) -> np.ndarray:
+        action = chaser(w)
+        if not w.cfg.flowers.spots:
+            return action
+        sight = look(w)
+        idle = ~((sight.kind == FOOD) | (sight.kind == FLOWER)).any(-1)
+        idle &= (w.crop < w.cfg.crop.capacity) & (w.energy >= w.cfg.jelly.hunger)
+        gap = w.flower_spots[:, None] - w.pos[:, :, None]                       # A,N,S,2
+        d = np.hypot(gap[..., 0], gap[..., 1])
+        near = np.take_along_axis(gap, d.argmin(-1)[..., None, None], 2)[:, :, 0]
+        bearing = (np.arctan2(near[..., 1], near[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
+        action[..., 0] = np.where(idle, np.where(d.min(-1) < 1.0, 0.0, 1.0), action[..., 0])
+        action[..., 1] = np.where(idle, np.clip(bearing * 3, -1, 1), action[..., 1])
+        return action
+    return act
+
+
+POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'carrier': carrier_policy, 'nester': nester_policy,
+            'chaser': chaser_policy, 'spotter': spotter_policy}
 
 # where a yes/no action is worth watching: (who's in that spot, the action's index)
 CONTEXTS = {
@@ -136,7 +179,8 @@ MODES = ('drawn', 'mean', 'sampled')
 
 
 def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
-                 watch: Callable[[Observation, np.ndarray], None] | None = None) -> Callable[[World], Policy]:
+                 watch: Callable[[Observation, np.ndarray, torch.Tensor], None] | None = None,
+                 wiped: bool = False) -> Callable[[World], Policy]:
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
     by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat. watch,
     if given, sees each observation it chose from and the actions it chose (mind.py)."""
@@ -159,12 +203,17 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
         last = np.zeros((world.arenas, len(world.colony), 2))
         noise = np.random.default_rng(SEED)
         held, ticks = None, 0
+        notes = brain.blank(last.shape[0] * last.shape[1])
 
         def act(w: World) -> np.ndarray:
-            nonlocal last, held, ticks
+            nonlocal last, held, ticks, notes
             if ticks % repeat == 0:
                 obs = observe(w, last)
-                mean = brain.act(obs, sample=False)
+                # wiped, a brain with memory forgets everything before each choice: how much it leans on its notes
+                before = brain.blank(len(notes)) if wiped else notes
+                mean, notes = brain.act(obs, sample=False, notes=before)
+                # the dead remember nothing, so a hatchling in their place starts blank
+                notes = notes * torch.from_numpy(w.alive.reshape(-1)).to(notes)[:, None]
                 mean = mean + spread * noise.standard_normal(mean.shape, dtype=mean.dtype)
                 if coins is not None:
                     odds = mean[..., coins]
@@ -173,7 +222,7 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
                 held = np.clip(mean, -1, 1).reshape(*last.shape[:2], -1)
                 last = held[..., :2]
                 if watch:
-                    watch(obs, held)
+                    watch(obs, held, before)
             ticks += 1
             assert held is not None
             return held
@@ -307,10 +356,11 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
 
 
 def score(cfg: Config, policy: str | None = None, brain: Path | str | None = None, mode: str = 'drawn',
-          episodes: int = EPISODES, seed: int = SEED, device: str = 'cpu', threads: int = 1) -> dict:
-    """One eval, of a scripted policy by name or of a brain in one of MODES."""
+          episodes: int = EPISODES, seed: int = SEED, device: str = 'cpu', threads: int = 1,
+          wiped: bool = False) -> dict:
+    """One eval, of a scripted policy by name or of a brain in one of MODES, its memory wiped or not."""
     torch.set_num_threads(threads)
-    make = brain_policy(brain, mode, device) if brain else POLICIES[policy or 'random']
+    make = brain_policy(brain, mode, device, wiped=wiped) if brain else POLICIES[policy or 'random']
     return run(cfg, make, episodes, seed)
 
 
@@ -352,6 +402,7 @@ def main():
     parser.add_argument('--config', default=str(DEFAULT))
     parser.add_argument('--brain', nargs='*', default=[], help='checkpoints to score alongside the policies')
     parser.add_argument('--modes', nargs='+', choices=MODES, default=['drawn'], help='how each brain picks its actions')
+    parser.add_argument('--wiped', action='store_true', help='also score each brain with its memory wiped before every choice')
     parser.add_argument('--held-out', action='store_true', help=f'the promotion worlds (seed {HELD_OUT}) instead of {SEED}')
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--device', default='cpu', help="where the brains run; the worlds are always on the CPU")
@@ -363,7 +414,10 @@ def main():
     jobs: dict[str, dict] = {name: {'policy': name} for name in args.policy}
     for b in args.brain:
         for mode in args.modes:
-            jobs[Path(b).name + ('' if mode == 'drawn' else f' {mode}')] = {'brain': b, 'mode': mode}
+            name = Path(b).name + ('' if mode == 'drawn' else f' {mode}')
+            jobs[name] = {'brain': b, 'mode': mode}
+            if args.wiped:
+                jobs[f'{name} wiped'] = {'brain': b, 'mode': mode, 'wiped': True}
     results = side_by_side(cfg, jobs, args.episodes, seed, args.device)
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {seed}; ± over arenas')
     width = max(8, *map(len, jobs))

@@ -16,9 +16,13 @@ SOLO = load(DEFAULT.parent / 'solo.toml')
 TRAIN = load_train()
 
 
-def play(make, steps=20, rounds=2):
+def play(make, steps=20, rounds=2, memory=0):
     torch.manual_seed(0)
     actor = Brain(**SHAPE)
+    if memory:
+        actor = actor.with_memory(memory)
+        # open the link, so the notes change what it does
+        torch.nn.init.normal_(actor.recall.weight, std=0.3)
     state = {k: v.clone() for k, v in actor.state_dict().items()}
     torch.manual_seed(7)
     rollouts = make(actor)
@@ -42,6 +46,15 @@ def test_one_worker_on_the_cpu_plays_exactly_what_collector_does():
     new = play(lambda actor: OnDevice(SHORT, TRAIN, 4, 3, actor))
     same(old, new)
     assert old[0][0][0].dones.any()
+
+
+def test_notes_carry_over_rollouts_the_same_both_ways():
+    # 15 steps, so a rollout doesn't end where the episodes do (10 ticks) and wipe every note
+    old = play(lambda actor: Collector(SHORT, TRAIN, 4, 3, actor), steps=15, memory=8)
+    new = play(lambda actor: OnDevice(SHORT, TRAIN, 4, 3, actor), steps=15, memory=8)
+    same(old, new)
+    # the second rollout starts from the notes the first left
+    assert np.abs(old[0][1][0].notes).sum() > 0
 
 
 def test_mixed_worlds_get_the_seeds_collector_gives_them():
@@ -123,7 +136,7 @@ def test_each_brain_scores_its_own_samples():
         mine = (whose == k) & flat(roll.active)
         with torch.no_grad():
             obs = Observation(flat(roll.me)[mine], flat(roll.kinds)[mine], flat(roll.rays)[mine])
-            mean, value = brain(*tensors(obs, 'cpu'))
+            mean, value, _ = brain(*tensors(obs, 'cpu'))
             logp = brain.dist(mean).log_prob(torch.from_numpy(flat(roll.actions)[mine])).sum(-1)
         assert np.allclose(logp.numpy(), flat(roll.logprobs)[mine], atol=1e-5)
         assert np.allclose(value.numpy(), flat(roll.values)[mine], atol=1e-5)

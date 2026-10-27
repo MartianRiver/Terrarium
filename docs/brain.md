@@ -30,6 +30,16 @@ Nests are flat ground, so they don't stop a ray. A ray reports reaching one only
 3. The self token's output gives the mean action and the value estimate.
 4. 69,517 weights (68,229 in the 0.2 brain, before the crop, the home sense, knowing it's home, the store, the light, the sprint senses, the grip, smell, nests, nestmates, unload, eat, sprint and grab), roughly 300 kB on disk.
 
+## Memory
+
+A brain can carry notes from one choice to the next: a GRU (Cho et al. 2014) after the encoder, which reads the self token's output each choice and updates its notes, and a linear link that reads the notes back into what the heads see. The link starts at zero, so a brain given memory (`train --memory N`) acts exactly as it did without, to the bit, until training finds a use for the notes; a test checks this on a brain with random weights, and the 0.3 brain given 128 notes scores exactly what it did in a short colony eval.
+
+- Each Terrikin's notes start blank when its life does (a new episode, or a hatchling taking a place) and are wiped when it dies.
+- What it costs, from the 0.3 brain's 270,349 weights: 32 notes add 19,776 (+7%), 64 add 45,568 (+17%), 128 add 115,584 (+43%), 256 add 329,344 (+122%).
+- How far back it learns: PPO replays each creature's choices in order through a whole rollout (`[ppo] steps` choices: 128, which is 12.8 s of world time with each choice held 2 ticks, as the 0.3 brain trained), so what it learns to write down is paid for by what that does within the rollout. The notes themselves carry on across rollouts, so it can remember longer than that, but credit for it has to come through the value estimate.
+- `evals --wiped` scores a brain with its notes blanked before every choice. A brain that gains from memory should drop back toward the same brain without it; one that doesn't drop isn't using its notes.
+- Widening a brain with memory isn't written yet: widen first, then add memory.
+
 ## Sort of on the level of
 
 Each promoted brain gets a `like` in `sim/brains.toml`: the animal it's roughly on the level of, for showing a stage to people. It's a loose ladder, not neuroscience. A weight isn't a synapse, which has timing and chemistry and changes as the animal lives, and an animal's nervous system runs its whole life, not one task. So it compares two things, and says both:

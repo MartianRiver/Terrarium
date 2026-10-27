@@ -11,6 +11,8 @@
 #
 # OnDevice can also play several brains against each other, one per colony: brain k plays colony (k + arena) mod
 # the number of brains, so across the arenas every brain takes every seat. `whose` says which brain each sample is.
+#
+# A brain with memory carries each creature's notes from one rollout into the next, as its life goes on.
 
 import multiprocessing as mp
 
@@ -20,7 +22,7 @@ import torch
 from .brain import Brain, tensors
 from .config import Config, Train
 from .forage import Forage, Observation
-from .ppo import Episodes, Rollout, collect
+from .ppo import Episodes, Rollout, collect, kept
 
 
 def seeds(seed: int, parts: int, workers: int) -> list[int]:
@@ -35,13 +37,14 @@ class Share:
         self.actor = actor
         self.episodes = Episodes(self.env.samples, cfg.dt * train.ppo.repeat)
         self.obs = self.env.observe()
+        self.notes = actor.blank(self.env.samples)
 
     def play(self, state: dict, steps: int) -> tuple[Rollout, np.ndarray, list]:
         """Load the learner's weights, play a rollout, and hand back the value after it and finished episodes."""
         self.actor.load_state_dict(state)
-        roll, self.obs = collect(self.env, self.actor, steps, self.obs, self.episodes)
+        roll, self.obs, self.notes = collect(self.env, self.actor, steps, self.obs, self.episodes, self.notes)
         with torch.no_grad():
-            last_value = self.actor(*tensors(self.obs, 'cpu'))[1].numpy()
+            last_value = self.actor(*tensors(self.obs, 'cpu'), self.notes)[1].numpy()
         finished, self.episodes.finished = self.episodes.finished, []
         return roll, last_value, finished
 
@@ -199,6 +202,9 @@ class OnDevice:
         self.gamma = train.ppo.gamma
         self.actors = [a.to(device) for a in (actor if isinstance(actor, list) else [actor])]
         self.actor, self.device = self.actors[0], device
+        if len(self.actors) > 1 and any(a.memory for a in self.actors):
+            raise ValueError("rivals with memory aren't written yet")
+        self.notes = self.actor.blank(self.samples)
         self.whose = seats(parts, len(self.actors))
         self.by_brain = [Episodes(self.samples, cfg.dt * train.ppo.repeat) for _ in self.actors]
         mine = seeds(seed, len(parts), workers)
@@ -212,9 +218,9 @@ class OnDevice:
         self.obs = join([o for o, _ in first])
         self.active = np.concatenate([a for _, a in first])
 
-    def _value(self, obs: Observation) -> torch.Tensor:
+    def _value(self, obs: Observation, notes: torch.Tensor) -> torch.Tensor:
         if len(self.actors) == 1:
-            return self.actor(*tensors(obs, self.device))[1]
+            return self.actor(*tensors(obs, self.device), notes)[1]
         value = torch.zeros(len(obs.me), device=self.device)
         for k, actor in enumerate(self.actors):
             mine = torch.from_numpy(self.whose == k).to(self.device)
@@ -228,7 +234,7 @@ class OnDevice:
     def _act(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Each brain's actions, log odds and values for its own samples."""
         if len(self.actors) == 1:
-            mean, value = self.actor(*tensors(self.obs, self.device))
+            mean, value, self.notes = self.actor(*tensors(self.obs, self.device), self.notes)
             dist = self.actor.dist(mean)
             action = dist.sample()
             return action.cpu().numpy(), dist.log_prob(action).sum(-1).cpu().numpy(), value.cpu().numpy()
@@ -236,7 +242,7 @@ class OnDevice:
         logps, values = np.zeros(self.samples, np.float32), np.zeros(self.samples, np.float32)
         for k, actor in enumerate(self.actors):
             mine = self.whose == k
-            mean, value = actor(*tensors(self._part(self.obs, k), self.device))
+            mean, value, _ = actor(*tensors(self._part(self.obs, k), self.device))
             dist = actor.dist(mean)
             action = dist.sample()
             actions[mine], values[mine] = action.cpu().numpy(), value.cpu().numpy()
@@ -246,7 +252,8 @@ class OnDevice:
     def collect(self, state: dict | list[dict], steps: int) -> tuple[Rollout, np.ndarray]:
         for actor, s in zip(self.actors, state if isinstance(state, list) else [state]):
             actor.load_state_dict(s)
-        keep: dict[str, list] = {k: [] for k in Rollout.__dataclass_fields__}
+        keep: dict[str, list] = {k: [] for k in Rollout.__dataclass_fields__ if k != 'notes'}
+        start = self.notes.cpu().numpy()[None]
         with torch.no_grad():
             for _ in range(steps):
                 actions, logps, values = self._act()
@@ -268,14 +275,15 @@ class OnDevice:
                 if any(g[4] is not None for g in got):
                     # cut off by the time limit: what's left is worth what the value says (shares that weren't
                     # cut have none, and count nothing)
-                    after = self._value(join([g[0] if g[4] is None else g[4] for g in got]))
+                    after = self._value(join([g[0] if g[4] is None else g[4] for g in got]), self.notes)
                     reward = reward + self.gamma * after.cpu().numpy() * np.concatenate([g[5] for g in got])
                 keep['rewards'].append(reward)
                 keep['dones'].append(done)
+                self.notes = kept(self.notes, self.active, done)
                 self.obs = join([g[0] for g in got])
                 self.active = np.concatenate([g[3] for g in got])
-            last_value = self._value(self.obs).cpu().numpy()
-        return Rollout(**{k: np.stack(v) for k, v in keep.items()}), last_value
+            last_value = self._value(self.obs, self.notes).cpu().numpy()
+        return Rollout(**{k: np.stack(v) for k, v in keep.items()}, notes=start), last_value
 
     def close(self):
         for share in self.shares:

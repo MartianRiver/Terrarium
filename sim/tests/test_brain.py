@@ -69,8 +69,8 @@ def test_a_brain_from_shorter_lists_acts_the_same(tmp_path):
     grown, _ = load_brain(tmp_path / 'old.pt')
 
     me, kinds, rays = observation(kinds=3)
-    mean, value = brain(me[:, :3], kinds, rays[..., :2])
-    mean2, value2 = grown(me, kinds, rays)
+    mean, value, _ = brain(me[:, :3], kinds, rays[..., :2])
+    mean2, value2, _ = grown(me, kinds, rays)
     assert torch.allclose(value, value2, atol=1e-6)
     assert torch.allclose(mean, mean2[:, :1], atol=1e-6)
     assert (mean2[:, 1] == 0).all()
@@ -84,11 +84,11 @@ def test_a_new_yes_no_action_is_tried_now_and_then(tmp_path):
     save(brain, tmp_path / 'old.pt')
     grown, _ = load_brain(tmp_path / 'old.pt')
     obs = Forage(SOLO, TRAIN, 64, seed=0).observe()
-    yes = np.concatenate([grown.act(obs) for _ in range(50)]) > 0
+    yes = np.concatenate([grown.act(obs)[0] for _ in range(50)]) > 0
     for name in schema.YES_NO:
         i = schema.ACTIONS.index(name)
         assert 0.03 < yes[:, i].mean() < 0.07
-        assert (grown.act(obs, sample=False)[:, i] < 0).all()
+        assert (grown.act(obs, sample=False)[0][:, i] < 0).all()
 
 
 def test_not_a_brain_is_refused(tmp_path):
@@ -104,7 +104,7 @@ def test_forage_observes_every_creature():
     assert obs.me.shape == (3, len(schema.SELF)) and obs.kinds.shape == (3, rays)
     assert obs.rays.shape == (3, rays, len(schema.RAY)) and obs.me.dtype == obs.rays.dtype == np.float32
     assert (obs.rays[..., 0] <= 1).all() and (obs.me[:, 0] == SOLO.energy.start).all()
-    mean, value = Brain(**SHAPE)(*tensors(obs, 'cpu'))
+    mean, value, _ = Brain(**SHAPE)(*tensors(obs, 'cpu'))
     assert mean.shape == (3, len(schema.ACTIONS)) and value.shape == (3,)
 
 
@@ -239,9 +239,9 @@ def test_an_action_can_start_over(tmp_path):
         brain.policy.weight[eat] = 1.0
         brain.policy.bias[eat] = 3.0
     obs = Forage(SOLO, TRAIN, 2, seed=0).observe()
-    before = brain.act(obs, sample=False)
+    before, _ = brain.act(obs, sample=False)
     brain.restart(('eat',))
-    after = brain.act(obs, sample=False)
+    after, _ = brain.act(obs, sample=False)
     assert np.allclose(after[:, eat], -1.0) and np.allclose(after[:, :eat], before[:, :eat])
     with pytest.raises(ValueError):
         brain.restart(('fly',))

@@ -2,7 +2,9 @@
 #
 #   uv run python -m terrarium.train NAME --world configs/solo.toml [--parent X.pt] [--seed 0] [--scratch]
 #                                         [--device cuda|mps|cpu] [--workers N] [--fast] [--gpu-collect]
-#                                         [--rivals B.pt C.pt [--rival-lr 5e-5 1e-4]]
+#                                         [--rivals B.pt C.pt [--rival-lr 5e-5 1e-4]] [--memory 128]
+#
+# --memory N gives the brain N notes of memory if it has none (brain.py); it acts as before until trained.
 #
 # With rivals, each colony is played by one of the brains (the parent's first), every brain taking every seat over
 # the arenas (rollouts.seats), and each learns only from its own colonies' samples. Their checkpoints go in
@@ -44,7 +46,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
           seed: int = 0, scratch: bool = False, root: Path = ROOT, device: str | None = None,
           workers: int = 1, score: bool = True, mix: list[tuple[Path | str, int]] | None = None,
           fast: bool = False, gpu_collect: bool = False, rivals: list[Path | str] | None = None,
-          rival_lr: list[float] | None = None) -> Run:
+          rival_lr: list[float] | None = None, memory: int = 0) -> Run:
     world_cfg, cfg = load(world_path), load_train(train_path)
     mixed = [(Path(w), load(w), n) for w, n in (mix or [])]
     ppo = cfg.ppo
@@ -60,6 +62,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         parent_record = {'file': str(parent), 'id': brain_id(parent), 'meta': made}
     else:
         learner, parent_record = Brain(**SHAPE), None
+    if memory and learner.memory != memory:
+        learner = learner.with_memory(memory)
     rivals = rivals or []
     if rivals and not gpu_collect:
         raise ValueError('rivals play with --gpu-collect only')
@@ -175,11 +179,12 @@ def main():
     parser.add_argument('--rivals', nargs='*', default=[], metavar='BRAIN',
                         help='brains that play the other colonies and learn beside the parent (needs --gpu-collect)')
     parser.add_argument('--rival-lr', nargs='*', type=float, help="each rival's learning rate (default the train config's)")
+    parser.add_argument('--memory', type=int, default=0, help='notes of memory to give a brain that has none')
     args = parser.parse_args()
     train(args.name, args.world, args.train, args.parent, args.seed, args.scratch, device=args.device,
           workers=args.workers, score=not args.no_evals, fast=args.fast, gpu_collect=args.gpu_collect,
           mix=[(w, int(n)) for w, n in (m.rsplit(':', 1) for m in args.mix)], rivals=args.rivals,
-          rival_lr=args.rival_lr)
+          rival_lr=args.rival_lr, memory=args.memory)
 
 
 if __name__ == '__main__':

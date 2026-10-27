@@ -7,7 +7,7 @@ from terrarium import load
 from terrarium.config import DEFAULT, Config, build, upgrade
 from terrarium.forage import observe
 from terrarium.replay import frame
-from terrarium.schema import SELF
+from terrarium.schema import ACTIONS, SELF
 from terrarium.vision import FLOWER, look
 from terrarium.world import World
 
@@ -124,3 +124,35 @@ def test_old_run_records_load_without_flowers():
     recorded = COLONY.to_dict()
     del recorded['flowers']
     assert not build(Config, upgrade(recorded)).flowers.on
+
+
+SPOTS = load(DEFAULT.parent / 'spots.toml')
+
+
+def test_with_spots_they_open_only_there_and_the_spots_stay_apart():
+    world = World(SPOTS, 8, seed=1)
+    fl = SPOTS.flowers
+    for a in range(8):
+        assert np.hypot(*(world.flower_spots[a, 0] - world.flower_spots[a, 1])) >= fl.spot_gap
+    opened = []
+    for _ in range(round(60 * HZ)):
+        before = world.flowers_open.copy()
+        world.step(np.zeros((8, len(world.colony), len(ACTIONS))))
+        opened += [(a, world.flower_pos[a, f].copy()) for a, f in zip(*np.nonzero(world.flowers_open & ~before))]
+    assert len(opened) > 8
+    for a, p in opened:
+        assert np.isclose(np.hypot(*(world.flower_spots[a] - p).T), 0).any()
+
+
+def test_spots_are_drawn_anew_each_episode():
+    world = World(SPOTS, 2, seed=2)
+    first = world.flower_spots.copy()
+    world.reset(np.array([True, False]))
+    assert not np.allclose(world.flower_spots[0], first[0]) and np.allclose(world.flower_spots[1], first[1])
+
+
+def test_old_run_records_have_flowers_anywhere():
+    recorded = COLONY.to_dict()
+    for key in ('spots', 'spot_gap'):
+        del recorded['flowers'][key]
+    assert build(Config, upgrade(recorded)).flowers.spots == 0
