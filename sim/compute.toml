@@ -22,6 +22,7 @@ handle = "river-m3"
 "RTX 3060" = 12
 "RTX 3070" = 8
 "A10" = 24
+"RTX A4000" = 16
 
 [[session]]
 provider = "vast"
