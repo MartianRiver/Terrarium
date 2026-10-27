@@ -113,6 +113,10 @@ radius = 0.35
 food = 3
 boost = 8.0
 speed = 1.25
+# 0: anywhere clear. Else they open only at this many spots, drawn anew each episode at least spot_gap metres
+# apart, so a creature that remembers where one opened knows where to look for the next
+spots = 0
+spot_gap = 0.0
 
 [grab]
 # a creature saying yes to grab takes hold of a block within reach of its body (metres from its edge), or the first

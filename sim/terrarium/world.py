@@ -24,7 +24,9 @@
 # With [flowers] on, a nectar flower opens now and then by day, rare and rich:
 # the first to touch one drinks it all, food's worth several times over (eaten
 # or carried like food) and a burst of speed that lasts a few seconds. It closes
-# by itself before long, so it's worth hurrying to.
+# by itself before long, so it's worth hurrying to. With `spots` set, flowers open
+# only at a few spots drawn anew each episode: a test of memory, since the spots
+# stay put while out of sight.
 #
 # With [grab] on, a creature can take hold of a block it touches and drag it
 # about, paying a little energy a second while it holds on. A yes grips for a
@@ -133,6 +135,9 @@ class World:
         self.flower_left = np.zeros((arenas, fl.count), int)
         self.flower_id = np.zeros((arenas, fl.count), int)
         self.flower_due = self._flower_wait(arenas)
+        self.flower_spots = np.zeros((arenas, fl.spots, 2))
+        for a in range(arenas):
+            self._place_spots(a)
         # ticks left of each creature's nectar boost, and the flowers each has drunk since its arena started
         self.nectar = np.zeros((arenas, n), int)
         self.drunk = np.zeros((arenas, n), int)
@@ -233,6 +238,7 @@ class World:
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
             self._place_patches(a)
+            self._place_spots(a)
             for f in range(self.wild):
                 self._grow(a, f)
         log.debug('arenas reset', tick=self.tick, count=len(idx))
@@ -367,11 +373,31 @@ class World:
         free = ~self.flowers_open
         for a in np.flatnonzero(day & (self.flower_due == 0) & free.any(1)):
             f = free[a].argmax()
-            self.flower_pos[a, f] = self._open_ground(a)
+            self.flower_pos[a, f] = self._flower_spot(a)
             self.flower_left[a, f] = round(self.cfg.flowers.open * self.cfg.tick_hz)
             self.flower_id[a, f] = self.next_id[a]
             self.next_id[a] += 1
             self.flower_due[a] = self._flower_wait(1)[0]
+
+    def _place_spots(self, a):
+        fl = self.cfg.flowers
+        for k in range(fl.spots):
+            for _ in range(PLACE_TRIES):
+                p = self._open_ground(a)
+                if all(np.hypot(*(p - q)) >= fl.spot_gap for q in self.flower_spots[a, :k]):
+                    break
+            else:
+                raise ValueError(f'no room for {fl.spots} flower spots {fl.spot_gap} m apart')
+            self.flower_spots[a, k] = p
+
+    def _flower_spot(self, a) -> np.ndarray:
+        """Where the next flower opens: anywhere clear, or one of the arena's spots without an open flower."""
+        if not self.cfg.flowers.spots:
+            return self._open_ground(a)
+        spots = self.flower_spots[a]
+        taken = self.flower_pos[a][self.flowers_open[a]]
+        free = [k for k in range(len(spots)) if not any(np.allclose(spots[k], t) for t in taken)]
+        return spots[free[self.rng.integers(len(free))]] if free else spots[self.rng.integers(len(spots))]
 
     def _flower_wait(self, count: int) -> np.ndarray:
         fl, hz = self.cfg.flowers, self.cfg.tick_hz

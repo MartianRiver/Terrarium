@@ -22,7 +22,7 @@ def test_thinking_step_by_step_is_the_brain_s_own_forward_pass():
     brain = Brain(32, 2, 4).eval()
     me, kinds, rays = torch.randn(5, 19), torch.randint(0, 6, (5, 16)), torch.randn(5, 16, 6)
     attention, units, _, mean, value = think(brain, me, kinds, rays)
-    want_mean, want_value = brain(me, kinds, rays)
+    want_mean, want_value, _ = brain(me, kinds, rays)
     assert torch.allclose(mean, want_mean, atol=1e-5) and torch.allclose(value, want_value, atol=1e-5)
     # each head's weights from the self token over itself and the 16 rays add up to 1
     assert attention.shape == (2, 5, 4, 17) and torch.allclose(attention.sum(-1), torch.ones(2, 5, 4))

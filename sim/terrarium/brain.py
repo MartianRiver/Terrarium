@@ -6,6 +6,11 @@
 # odds (Bernoulli): `yes_no` says which, and either way the world gets +1 for
 # yes and -1 for no. Every creature runs a copy of the same brain.
 #
+# A brain can have memory: notes it carries from one choice to the next (a GRU, Cho et al. 2014), written from
+# the self token's output and read back into it through a link that starts at zero, so a brain given memory acts
+# exactly as it did without until training finds a use for the notes. Each creature's notes start blank when its
+# life does (a new episode, or a hatchling in its place) and are wiped when it dies.
+#
 # Checkpoints carry their schema and are refused when it doesn't fit (schema.py).
 # A brain from shorter lists loads with every new weight zero, which is what
 # makes the lists safe to grow; new actions start as a fresh brain's do.
@@ -31,9 +36,10 @@ class Shape(TypedDict):
     width: int
     layers: int
     heads: int
+    memory: int
 
 
-SHAPE: Shape = {'width': 64, 'layers': 2, 'heads': 4}
+SHAPE: Shape = {'width': 64, 'layers': 2, 'heads': 4, 'memory': 0}
 # a new action's spread, and where a yes/no one's mean starts: with that spread it's yes on about 5% of samples
 LOG_STD = -0.5
 NO = -1.0
@@ -71,13 +77,15 @@ class Actions:
 
 
 class Brain(nn.Module):
-    def __init__(self, width: int, layers: int, heads: int, lists: dict | None = None, yes_no: str = 'gaussian'):
+    def __init__(self, width: int, layers: int, heads: int, lists: dict | None = None, yes_no: str = 'gaussian',
+                 memory: int = 0):
         super().__init__()
         if yes_no not in YES_NO:
             raise ValueError(f'yes_no is one of {YES_NO}, not {yes_no!r}')
         self.schema = lists or schema.current()
         self.yes_no = yes_no
-        self.shape: Shape = {'width': width, 'layers': layers, 'heads': heads}
+        self.shape: Shape = {'width': width, 'layers': layers, 'heads': heads, 'memory': memory}
+        self.memory = memory
         s = self.schema
         self.me = nn.Linear(len(s['self']), width)
         self.ray = nn.Linear(len(s['ray']), width)
@@ -88,6 +96,11 @@ class Brain(nn.Module):
         self.policy = nn.Linear(width, len(s['actions']))
         self.log_std = nn.Parameter(torch.full((len(s['actions']),), LOG_STD))
         self.value = nn.Linear(width, 1)
+        if memory:
+            self.gru = nn.GRUCell(width, memory)
+            self.recall = nn.Linear(memory, width)
+            nn.init.zeros_(self.recall.weight)
+            nn.init.zeros_(self.recall.bias)
         # small first actions, so training starts from gentle wandering rather than saturated turns
         nn.init.normal_(self.policy.weight, std=0.01)
         nn.init.zeros_(self.policy.bias)
@@ -134,22 +147,52 @@ class Brain(nn.Module):
                     self.policy.bias[i] *= scale
         self.yes_no = 'bernoulli'
 
-    def forward(self, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Mean action and value per sample."""
+    def with_memory(self, size: int) -> 'Brain':
+        """This brain with blank memory of `size` notes added; it acts exactly as before until it's trained."""
+        if self.memory:
+            raise ValueError(f'this brain already has memory ({self.memory} notes)')
+        shape = self.shape
+        new = Brain(shape['width'], shape['layers'], shape['heads'], self.schema, self.yes_no, size)
+        missing, unexpected = new.load_state_dict(self.state_dict(), strict=False)
+        assert not unexpected and all(k.startswith(('gru.', 'recall.')) for k in missing)
+        return new.to(self.log_std.device)
+
+    def blank(self, n: int) -> torch.Tensor:
+        """Notes for n creatures that remember nothing yet ((n, 0) for a brain without memory)."""
+        return torch.zeros(n, self.memory, device=self.log_std.device)
+
+    def sense(self, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor) -> torch.Tensor:
+        """What the self token makes of this moment, per sample."""
         tokens = torch.cat([self.me(me)[:, None], self.kind(kinds) + self.ray(rays)], 1)
-        out = self.norm(self.encoder(tokens)[:, 0])
+        return self.norm(self.encoder(tokens)[:, 0])
+
+    def remember(self, out: torch.Tensor, notes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Write this moment into the notes, and read them back into what the heads see."""
+        if not self.memory:
+            return out, notes
+        notes = self.gru(out, notes)
+        return out + self.recall(notes), notes
+
+    def heads(self, out: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self.policy(out), self.value(out).squeeze(-1)
+
+    def forward(self, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor,
+                notes: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Mean action, value and the notes after this choice, per sample. Notes left out are blank."""
+        out, notes = self.remember(self.sense(me, kinds, rays), self.blank(len(me)) if notes is None else notes)
+        return *self.heads(out), notes
 
     def dist(self, mean: torch.Tensor) -> Actions:
         return Actions(mean, self.log_std, self.coins())
 
-    def act(self, obs: Observation, sample: bool = True) -> np.ndarray:
-        """Actions for a batch of observations, on the CPU, without gradients: for rollouts and evals. Not
+    def act(self, obs: Observation, sample: bool = True,
+            notes: torch.Tensor | None = None) -> tuple[np.ndarray, torch.Tensor]:
+        """Actions for a batch of observations, on the CPU, without gradients, and the notes after: for evals. Not
         sampled, it's the mean, which for a coin is its odds (yes when above 0)."""
         with torch.no_grad():
-            mean, _ = self(*tensors(obs, next(self.parameters()).device))
+            mean, _, after = self(*tensors(obs, self.log_std.device), notes)
             action = self.dist(mean).sample() if sample else mean
-        return action.cpu().numpy()
+        return action.cpu().numpy(), after
 
 
 def tensors(obs: Observation, device) -> tuple[torch.Tensor, ...]:
@@ -170,7 +213,8 @@ def load(path: Path | str) -> tuple[Brain, dict]:
     if not isinstance(data, dict) or data.get('format') != FORMAT:
         raise schema.SchemaError(f'{path} isn\'t a Terrarium brain')
     schema.check(data['schema'])
-    brain = Brain(**data['shape'], yes_no=data.get('yes_no', 'gaussian'))
+    # brains from before memory have no 'memory' in their shape
+    brain = Brain(**{'memory': 0, **data['shape']}, yes_no=data.get('yes_no', 'gaussian'))
     state = brain.state_dict()
     for name, old in data['weights'].items():
         # anything the lists have gained since is the zeros past the end of the saved tensor
