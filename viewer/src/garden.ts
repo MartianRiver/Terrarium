@@ -1,9 +1,10 @@
 // Everything that depends on the world's layout: the sun's shadow box, the lawn,
-// the hedge on the walls, nests, the glass dome over them on a red plain, and
-// seeded decoration. Decoration is purely visual and stays outside the hedge (or
+// the hedge on the walls, nests and their domes (nestdome.ts), the glass dome over
+// them on a red plain, and seeded decoration. Decoration is purely visual and stays outside the hedge (or
 // flat inside it), so nothing looks like an obstacle the sim ignores.
 
 import * as THREE from 'three';
+import { addNestDome } from './nestdome';
 import { COLONY_COLOURS, GARDEN } from './palette';
 import type { NestInfo, WorldInfo } from './world';
 
@@ -29,6 +30,7 @@ export function buildGarden(info: WorldInfo) {
   addGround(group, info);
   addHedge(group, info, rng);
   for (const nest of info.nests) addNest(group, nest);
+  const domes = info.nests.map((nest) => addNestDome(group, nest));
   const sway = addGrass(group, info, rng);
   addPebbles(group, info, rng);
   addTrees(group, info, rng);
@@ -36,7 +38,13 @@ export function buildGarden(info: WorldInfo) {
   addDome(group, info);
   addRocks(group, info, rng);
   addMesas(group, rng);
-  return { group, tick: (time: number) => (sway.value = time) };
+  return {
+    group,
+    tick(time: number, camera: THREE.Camera) {
+      sway.value = time;
+      for (const fade of domes) fade(camera);
+    },
+  };
 }
 
 // the dome covers the arena's corners with a planted bed to spare
