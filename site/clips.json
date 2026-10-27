@@ -68,5 +68,45 @@
     "width": 480,
     "crop": "1080:1080:0:280",
     "alt": "The RL-only brain after the automated forks: at dusk every Terrikin heads home, they huddle on the nest and spin all night, and at first light they head out again."
+  },
+  "colonies-timelapse": {
+    "from": "0.3/reels/2026-10-27-wrap-up/clips/timelapse.mp4",
+    "start": 0,
+    "seconds": 23.9,
+    "width": 480,
+    "crop": "1080:1140:0:500",
+    "alt": "The 0.3 brain's whole six minutes at 15 times speed: three days and three nights. By day the colonies spread out to forage, at dusk they crowd onto their nests, and new Terrikins hatch in the dark. They start as 18 and end as 19."
+  },
+  "colonies-hatch": {
+    "from": "0.3/reels/2026-10-27-wrap-up/clips/hatch.mp4",
+    "start": 0,
+    "seconds": 12.5,
+    "width": 480,
+    "crop": "1080:1080:0:540",
+    "alt": "Sped up, two eggs sit on a purple colony's nest while its Terrikins come and go. Back at normal speed, an egg cracks and a small Terrikin comes out and grows to full size."
+  },
+  "colonies-flower": {
+    "from": "0.3/reels/2026-10-27-wrap-up/clips/nectar.mp4",
+    "start": 0,
+    "seconds": 9.7,
+    "width": 480,
+    "crop": "1080:1080:0:540",
+    "alt": "A rainbow nectar flower opens on the lawn among a crowd of Terrikins. One sprints at it, kicking up a trail of dust, and eats it whole, in slow motion at the end."
+  },
+  "colonies-turbo": {
+    "from": "0.3/reels/2026-10-27-wrap-up/clips/nectar-turbo.mp4",
+    "start": 0,
+    "seconds": 9.3,
+    "width": 480,
+    "crop": "1080:1080:0:540",
+    "alt": "Turbo mode: the Terrikin that ate the flower runs off sparkling, faster than the others, its face toward the camera, then on past its nest."
+  },
+  "colonies-starve": {
+    "from": "0.3/reels/2026-10-27-wrap-up/clips/death.mp4",
+    "start": 0,
+    "seconds": 8,
+    "width": 480,
+    "crop": "1080:1080:0:540",
+    "alt": "Just after the third dawn, a purple Terrikin out on the lawn slows, greys and starves, and a small tombstone is left where it fell."
   }
 }
