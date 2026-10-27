@@ -41,6 +41,8 @@ export class WorldView {
   private frame: Frame | null = null;
   // the Terrikin picked by clicking it (null: the first one), and where the followed one was last drawn
   chosen: number | null = null;
+  // the ring under a chosen one; a reel's &pick follows without it
+  marked = true;
   focus: Pose | null = null;
   focusId: number | null = null;
   private ring: THREE.Mesh;
@@ -127,7 +129,7 @@ export class WorldView {
       this.blocks.get(b.id)!.update(box);
       boxes.push(box);
     }
-    this.ring.visible = this.chosen !== null;
+    this.ring.visible = this.chosen !== null && this.marked;
     this.grips.update(holders, boxes);
     this.droppings?.render(this.frame.tick, alpha);
     this.tombstones.render(this.frame.tick, alpha);

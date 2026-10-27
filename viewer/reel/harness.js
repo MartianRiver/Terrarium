@@ -51,7 +51,7 @@ function text(ctx, s, x, y, [font, weight, size], fit, box) {
   ctx.fillText(s, x, y);
 }
 
-// first line big, the rest smaller; starts below Instagram's top 14%
+// first line big, the rest smaller; starts below Instagram's top 14%; returns the y below the last line
 function lines(ctx, list, w, y = 360) {
   ctx.textAlign = 'center';
   list.forEach((s, i) => {
@@ -63,6 +63,7 @@ function lines(ctx, list, w, y = 360) {
       y += SUB[2] * 1.5;
     }
   });
+  return y;
 }
 
 function pill(ctx, s, w, y) {
@@ -137,8 +138,9 @@ export async function clip({ name, shots, labels = [], keys = [], hold = 0, end,
   const compose = (time) => {
     ctx.drawImage(base, 0, 0);
     const on = labels.find((l) => t >= (l.from ?? 0) && t < (l.to ?? Infinity));
-    if (on) lines(ctx, on.lines, W);
-    if (clock) pill(ctx, time, W, 1200);
+    // the clock sits with the labels, so all the text is read in one place and the eyes stay on the footage
+    const below = on ? lines(ctx, on.lines, W) + 16 : 360;
+    if (clock) pill(ctx, time, W, below);
     if (tag) {
       ctx.textAlign = 'left';
       text(ctx, tag, 22, 50, [HEAD[0], 700, 34], Infinity, BOX);

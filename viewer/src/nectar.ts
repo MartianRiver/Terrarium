@@ -1,6 +1,6 @@
 // Nectar flowers, from a frame's `flowers`: a stem with a bud that unfolds into
-// lorikeet-coloured petals around a shimmering drop of nectar, and folds shut
-// and sinks away when it's drunk or wilts. Timed in sim ticks like the eggs.
+// lorikeet-coloured petals around a shimmering drop of nectar. Hoovered up whole when
+// it's eaten, folded shut and sunk away when it closes by itself. Timed in sim ticks like the eggs.
 
 import * as THREE from 'three';
 import { LORIKEET, shimmer } from './palette';
@@ -8,10 +8,11 @@ import type { FlowerState, Frame } from './world';
 
 const OPEN = 1.0; // seconds to unfold
 const CLOSE = 0.8; // seconds to fold shut and sink
+const GULP = 0.35; // seconds to be hoovered up
 const HEAD = 0.42;
 const PETALS = 6;
-// drawn bigger than a berry, so it shows from the overview
-const SIZE = 1.5;
+// petals reach 0.34 m, the sim's flower radius, so a Terrikin eats it the moment it touches the petals
+const SIZE = 1.0;
 
 const stemGeo = new THREE.CylinderGeometry(0.018, 0.026, HEAD, 6).translate(0, HEAD / 2, 0);
 const leafGeo = new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.25, 1.9).translate(0, 0, 0.16);
@@ -38,7 +39,7 @@ interface Flower { root: THREE.Group; head: THREE.Group; petals: THREE.Group[]; 
 
 export class Flowers {
   private flowers = new Map<number, Flower>();
-  private closing: { f: Flower; tick: number }[] = [];
+  private closing: { f: Flower; tick: number; from: THREE.Vector3; mouth: THREE.Vector3 | null }[] = [];
   private lastTick = -1;
 
   constructor(private scene: THREE.Scene, private tickHz: number) {}
@@ -51,7 +52,11 @@ export class Flowers {
     for (const [id, f] of this.flowers) {
       if (now.has(id)) continue;
       this.flowers.delete(id);
-      this.closing.push({ f, tick: frame.tick });
+      // a Terrikin beside it that's just got its boost ate it
+      const { x, z } = f.root.position;
+      const eater = frame.creatures.find((c) => c.nectar > 0 && (c.x - x) ** 2 + (c.y - z) ** 2 < 1.5);
+      const mouth = eater ? new THREE.Vector3(eater.x + Math.cos(eater.heading) * 0.3, 0.2, eater.y + Math.sin(eater.heading) * 0.3) : null;
+      this.closing.push({ f, tick: frame.tick, from: f.root.position.clone(), mouth });
     }
   }
 
@@ -61,9 +66,10 @@ export class Flowers {
       this.pose(f, t, time);
       f.root.scale.setScalar(SIZE * Math.min(1, 0.3 + t * 1.5));
     }
-    this.closing = this.closing.filter(({ f, tick: at }) => {
-      const t = Math.min(1, (tick + alpha - at) / this.tickHz / CLOSE);
-      this.wilt(f, t);
+    this.closing = this.closing.filter(({ f, tick: at, from, mouth }) => {
+      const t = Math.min(1, (tick + alpha - at) / this.tickHz / (mouth ? GULP : CLOSE));
+      if (mouth) this.hoover(f, t, from, mouth);
+      else this.wilt(f, t);
       if (t < 1) return true;
       this.drop(f);
       return false;
@@ -91,7 +97,16 @@ export class Flowers {
     f.head.rotation.y = Math.sin(time * 0.8 + f.seed) * 0.15;
   }
 
-  // emptied: the nectar and its glow go at once, the petals droop, and it shrinks into the grass
+  // eaten: hoovered up, sliding and spinning into the Terrikin's mouth as it shrinks away
+  private hoover(f: Flower, t: number, from: THREE.Vector3, mouth: THREE.Vector3) {
+    f.halo.material.opacity = 0;
+    const pull = t * t;
+    f.root.position.lerpVectors(from, mouth, pull);
+    f.root.rotation.y = f.seed + pull * 8;
+    f.root.scale.setScalar(SIZE * Math.max(0.001, 1 - pull));
+  }
+
+  // closed by itself: the nectar and its glow go at once, the petals droop, and it shrinks into the grass
   private wilt(f: Flower, t: number) {
     const fast = Math.min(1, t * 5);
     f.drop.scale.setScalar(Math.max(0.001, 1 - fast));

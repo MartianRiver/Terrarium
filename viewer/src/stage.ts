@@ -28,7 +28,9 @@ const DRIFT_TURN = 0.05;
 const UP = new THREE.Vector3(0, 1, 0);
 
 // lite (&lite) draws for a cool laptop: one pixel per point, no antialiasing, shadows or bloom
-export function createStage(container: HTMLElement, lite = false) {
+// turn (radians) swings the close-up round the blob it follows, so a reel can see a face coming its way
+export function createStage(container: HTMLElement, lite = false, turn = 0) {
+  const closeUp = CLOSE_UP.clone().applyAxisAngle(UP, turn);
   const renderer = new THREE.WebGLRenderer({ antialias: !lite });
   renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
@@ -114,7 +116,7 @@ export function createStage(container: HTMLElement, lite = false) {
       camera.position.z += dz;
       if (swinging <= 0) return;
       swinging -= dt;
-      offset.subVectors(camera.position, controls.target).lerp(close ? CLOSE_UP : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
+      offset.subVectors(camera.position, controls.target).lerp(close ? closeUp : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
       camera.position.addVectors(controls.target, offset);
     },
     // 1 by day, 0 at night

@@ -1,6 +1,7 @@
 # Sound for a reel, placed on the frames its script renders: world sounds from the replays the clips were cut from
-# (food vanishing beside a blob, a store growing, a death), only for what's on screen; a sound when a label appears
-# and before each cut; ambience by day and by night from the replay's light; music under it all.
+# (food vanishing beside a blob, a store growing, a death, an egg hatching, a sip of nectar), only for what's on
+# screen; a sound when a label appears and before each cut; ambience by day and by night from the replay's light;
+# music under it all.
 # ../sim/.venv/bin/python reel/sound.py reel/0.3.json OUT garden --sounds DIR
 #   (a profile in reel/sound.json; sounds are found by file stem under DIR; OUT has build.py's video;
 #   writes OUT/<profile>.wav and OUT/<profile>.mp4 and prints each layer's level, so the balance can be checked)
@@ -72,12 +73,12 @@ def replay_file(url):
     return RUNS / run / 'replays' / f'{Path(checkpoint).stem}-{seed}.jsonl.gz'
 
 
-def events(path):
+def events(path, pick=None):
     """Per tick: the light, where the followed blob is, and (kind, x, y) events."""
     lines = gzip.open(path, 'rt').read().splitlines()
     info = json.loads(lines[0])['info']
     nests = {n['colony']: (n['x'], n['y']) for n in info['nests']}
-    ticks, energy, food, stores = [], {}, {}, {}
+    ticks, energy, food, stores, eggs, nectar = [], {}, {}, {}, {}, {}
     for line in lines[1:]:
         f = json.loads(line)
         ev = []
@@ -92,11 +93,22 @@ def events(path):
             if energy.get(c['id'], 0) > 0 and c['energy'] <= 0:
                 ev.append(('death', c['x'], c['y']))
             energy[c['id']] = c['energy']
+        # an egg gone with its id walking about has hatched
+        now = {e['id']: (e['x'], e['y']) for e in f.get('eggs', [])}
+        ids = {c['id'] for c in alive}
+        for x, y in (p for eid, p in eggs.items() if eid not in now and eid in ids):
+            ev.append(('hatch', x, y))
+        eggs = now
+        for c in f['creatures']:
+            if c.get('nectar', 0) > 0 and nectar.get(c['id'], 0) <= 0:
+                ev.append(('nectar', c['x'], c['y']))
+            nectar[c['id']] = c.get('nectar', 0)
         for s in f.get('stores', []):
             if s['jelly'] > stores.get(s['colony'], s['jelly']):
                 ev.append(('unload', *nests[s['colony']]))
             stores[s['colony']] = s['jelly']
-        first = f['creatures'][0]  # the viewer's follow camera is on the first creature
+        # the viewer's follow camera is on the first creature, or the one &pick names
+        first = next((c for c in f['creatures'] if c['id'] == pick), f['creatures'][0])
         ticks.append((f.get('light', 1.0), (first['x'], first['y']), ev))
     return ticks, info['width']
 
@@ -113,9 +125,12 @@ def timeline(reel):
             frames += [still(section, i == 0) for i in range(grids[section]['frames'])]
             continue
         url, c = clips[section]['url'], clips[section]['clip']
-        ticks, width = events(replay_file(url))
+        query = parse_qs(urlparse(url).query, keep_blank_values=True)
+        ticks, width = events(replay_file(url), int(query['pick'][0]) if 'pick' in query else None)
+        # &look holds the close-up on a spot, so what's on screen is judged from there
+        look = tuple(map(float, query['look'][0].split(',')[:2])) if 'look' in query else None
         labels = c.get('labels', [])
-        follow = 'follow' in parse_qs(urlparse(url).query, keep_blank_values=True)
+        follow = 'follow' in query
         toggles = [k['at'] for k in c.get('keys', []) if k.get('key') in ('f', 'F')]
         shown, t = None, 0.0
         for shot in c['shots']:
@@ -124,7 +139,7 @@ def timeline(reel):
                 t0, t = t, t + shot['speed'] / FPS
                 on = next((i for i, l in enumerate(labels) if l.get('from', 0) <= t < l.get('to', 1e9)), None)
                 frames.append(dict(section=section, ticks=ticks, span=(int(t0 * TICK_HZ), int(t * TICK_HZ)),
-                                   speed=shot['speed'], width=width, label=on is not None and on != shown,
+                                   speed=shot['speed'], width=width, look=look, label=on is not None and on != shown,
                                    close=follow != (sum(k <= t for k in toggles) % 2 == 1)))
                 shown = on
         frames += [still(section) for _ in range(round(c.get('hold', 0) * FPS))]
@@ -163,6 +178,7 @@ def mix(reel, edit, sounds):
             a, b = f['span']
             b = min(b, len(f['ticks']) - 1)
             lit, (cx, cy), _ = f['ticks'][b]
+            cx, cy = f['look'] or (cx, cy)
             light.append(lit)
             for tick in range(a + 1, b + 1):
                 for kind, x, y in f['ticks'][tick][2]:
@@ -185,6 +201,9 @@ def mix(reel, edit, sounds):
             play(edit['cut'], start / FPS - edit['cut'].get('lead', 0.25))
     for where, s in edit.get('stings', {}).items():
         section, frame = where.split('@')
+        # a profile is shared between reels; a sting for a section this one doesn't have stays quiet
+        if section not in reel['order']:
+            continue
         play(s, (starts[reel['order'].index(section)] + int(frame)) / FPS)
     level('effects', fx)
     total = fx.copy()
@@ -197,10 +216,11 @@ def mix(reel, edit, sounds):
         bed = sounds.bed(amb['sound'], seconds, amb.get('start', 0), amb.get('lowpass')) * when * db(amb['db'])
         level(f"ambience ({amb['when']})", bed)
         total += bed
-    m = edit['music']
-    music = sounds.bed(m['track'], seconds, m.get('start', 0)) * (1 - night * m.get('night_dip', 0)) * db(m['db'])
-    level('music', music)
-    total += music
+    # a profile without music leaves room for a track added afterwards (in the Instagram app, say)
+    if m := edit.get('music'):
+        music = sounds.bed(m['track'], seconds, m.get('start', 0)) * (1 - night * m.get('night_dip', 0)) * db(m['db'])
+        level('music', music)
+        total += music
     fade = np.minimum(1, np.minimum(np.arange(len(total)), len(total) - np.arange(len(total))) / (RATE * 1.5))[:, None]
     return (total * fade).astype(np.float32)
 
