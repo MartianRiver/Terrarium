@@ -5,9 +5,18 @@
 name = "rented RTX 3060 12 GB"
 kind = "rented"
 gpu = "RTX 3060 12 GB"
-samples = 2315952128
-hours = 53.27
-runs = 402
+samples = 2714083328
+hours = 66.73
+runs = 452
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented RTX 3080"
+kind = "rented"
+gpu = "RTX 3080"
+samples = 1873870848
+hours = 37.67
+runs = 252
 last_active = "2026-10-26"
 
 [[machine]]
@@ -23,19 +32,10 @@ last_active = "2026-10-25"
 name = "river-m3"
 kind = "mine"
 gpu = "Apple M3"
-samples = 513753088
-hours = 18.09
-runs = 93
-last_active = "2026-10-25"
-
-[[machine]]
-name = "rented RTX 3080"
-kind = "rented"
-gpu = "RTX 3080"
-samples = 504299520
-hours = 10.62
-runs = 80
-last_active = "2026-10-25"
+samples = 609304576
+hours = 27.18
+runs = 105
+last_active = "2026-10-26"
 
 [[machine]]
 name = "rented RTX 4060 Ti"
@@ -44,6 +44,15 @@ gpu = "RTX 4060 Ti"
 samples = 305340416
 hours = 12.86
 runs = 33
+last_active = "2026-10-26"
+
+[[machine]]
+name = "rented RTX A4000 16 GB"
+kind = "rented"
+gpu = "RTX A4000 16 GB"
+samples = 119930880
+hours = 2.16
+runs = 5
 last_active = "2026-10-26"
 
 [[machine]]
