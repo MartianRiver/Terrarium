@@ -31,6 +31,14 @@
 # With [grab] on, a creature can take hold of a block it touches and drag it
 # about, paying a little energy a second while it holds on. A yes grips for a
 # couple of seconds, so a grab is something tried now and then that lasts.
+#
+# With [carry] on, a creature can pick up a berry in its jaws and take it
+# somewhere, as an ant carries a seed: nothing to do with its crop. A yes to
+# carry (after a no) picks up the nearest berry within reach, another puts it
+# down again, still a berry, for anyone to eat. Carrying slows it a little and
+# costs a little energy. The berry keeps its own place among the food: it's off
+# the ground (unseen, unsmelled, not growing back) until it's put down, and one
+# that dies carrying drops it where it falls.
 
 import numpy as np
 
@@ -45,6 +53,8 @@ log = Logger('world')
 PLACE_TRIES = 200
 # a ground-jelly slot with nothing in it; food that grows has a regrow timer instead
 EMPTY = -1
+# a berry in someone's jaws, in place of its regrow timer
+CARRIED = -2
 
 
 def box_gap(points: np.ndarray, b) -> np.ndarray:
@@ -141,6 +151,16 @@ class World:
         # ticks left of each creature's nectar boost, and the flowers each has drunk since its arena started
         self.nectar = np.zeros((arenas, n), int)
         self.drunk = np.zeros((arenas, n), int)
+        # the berry each creature carries (its food slot, -1 for none), whether it said yes to carry last tick, and
+        # since its arena started: berries picked up, put down at its own nest, and put down ones a nestmate ate,
+        # also counted for a hungry nestmate; who put each berry down where it lies, -1 if it grew there
+        self.load = np.full((arenas, n), -1)
+        self.carry_was = np.zeros((arenas, n), bool)
+        self.picked = np.zeros((arenas, n), int)
+        self.put_home = np.zeros((arenas, n), int)
+        self.given = np.zeros((arenas, n), int)
+        self.given_hungry = np.zeros((arenas, n), int)
+        self.food_by = np.full((arenas, slots), -1)
         # blocks one creature can drag (the vault's doors)
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
         self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors) if cfg.smell.on else None
@@ -231,6 +251,13 @@ class World:
         self.flower_due[idx] = self._flower_wait(len(idx))
         self.nectar[idx] = 0
         self.drunk[idx] = 0
+        self.load[idx] = -1
+        self.carry_was[idx] = False
+        self.picked[idx] = 0
+        self.put_home[idx] = 0
+        self.given[idx] = 0
+        self.given_hungry[idx] = 0
+        self.food_by[idx] = -1
         self.creature_id[idx] = np.arange(1, len(self.colony) + 1)
         if self.smell:
             self.smell.reset(idx)
@@ -244,14 +271,14 @@ class World:
         log.debug('arenas reset', tick=self.tick, count=len(idx))
 
     def step(self, actions: np.ndarray):
-        """actions (arenas, creatures, k): thrust and turn, then unload, eat, sprint and grab (yes when above 0), as
-        many of those as k has room for."""
+        """actions (arenas, creatures, k): thrust and turn, then unload, eat, sprint, grab and carry (yes when above
+        0), as many of those as k has room for."""
         cfg, c, s, g = self.cfg, self.cfg.creature, self.cfg.sprint, self.cfg.grab
         # the dead don't move
         actions = np.clip(actions, -1, 1) * self.alive[..., None]
         thrust, turn = actions[..., 0], actions[..., 1]
-        unload, eat, sprint, grab = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k
-                                     else np.zeros_like(self.alive) for k in (2, 3, 4, 5))
+        unload, eat, sprint, grab, carry = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k
+                                            else np.zeros_like(self.alive) for k in (2, 3, 4, 5, 6))
         if s.on:
             go = sprint & (self.sprinting == 0) & (self.resting == 0)
             self.sprinting[go] = round(s.seconds * cfg.tick_hz)
@@ -259,7 +286,9 @@ class World:
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
         self.heading = (self.heading + np.pi) % (2 * np.pi) - np.pi
-        top = c.max_speed * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop)
+        laden = self.load >= 0
+        top = (c.max_speed * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop)
+               * (1 - cfg.carry.slow * laden))
         speed = np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse) * top
         target = np.stack([np.cos(self.heading), np.sin(self.heading)], -1) * speed[..., None]
         # the force that closes this share of the gap to the wanted velocity in one tick, if nothing's in the way
@@ -273,7 +302,7 @@ class World:
         e = cfg.energy
         # a sprint costs by how hard it runs: standing still through one is free
         effort = (e.move * np.abs(thrust) + e.turn * turn * turn + s.energy * bursting * np.maximum(thrust, 0)
-                  + g.energy * self.holding) * cfg.dt
+                  + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt
         self.spent += effort
         self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt, 0, 1)
         self.sprinting[bursting] -= 1
@@ -284,6 +313,8 @@ class World:
         self._regrow()
         if cfg.flowers.on:
             self._bloom()
+        if cfg.carry.on:
+            self._carry(carry)
         # eating on the tick it would have run out still saves it
         self._eat()
         if cfg.flowers.on:
@@ -299,6 +330,8 @@ class World:
             self.nectar[dying] = 0
             self.holding[dying] = False
             self.gripping[dying] = 0
+            for a, i in zip(*np.nonzero(dying & (self.load >= 0))):
+                self._put_down(a, i, self.pos[a, i])
             self.physics.remove(dying)
             log.debug('creatures died', tick=self.tick, count=int(dying.sum()))
         if cfg.hatch.on:
@@ -328,6 +361,7 @@ class World:
         wild = food < self.wild
         eats = hungry[arena, who] | ~wild
         before = self.energy.copy()
+        self._credit(arena, food, who)
         np.add.at(self.energy, (arena[eats], who[eats]), np.where(wild, cfg.energy.food, cfg.jelly.energy)[eats])
         np.clip(self.energy, 0, 1, out=self.energy)
         self.fed += self.energy - before
@@ -340,6 +374,50 @@ class World:
         self.food_regrow[arena, food] = np.where(wild, self.rng.integers(lo, hi + 1, len(arena)), EMPTY)
         self.eaten += len(arena)
         log.trace('food eaten', tick=self.tick, count=len(arena))
+
+    def _carry(self, carry: np.ndarray):
+        """A yes after a no puts down the berry carried, or picks up the nearest one within reach; the lower
+        index first when two reach for the same one."""
+        want = carry & ~self.carry_was
+        self.carry_was = carry
+        if not want.any():
+            return
+        cfg = self.cfg
+        reach = cfg.creature.radius + cfg.food.radius + cfg.carry.reach
+        facing = np.stack([np.cos(self.heading), np.sin(self.heading)], -1)
+        for a, i in zip(*np.nonzero(want)):
+            if self.load[a, i] >= 0:
+                # just in front of it, where an ant sets down what it carries
+                self._put_down(a, i, self.pos[a, i] + facing[a, i] * (cfg.creature.radius + cfg.food.radius))
+                continue
+            d = np.hypot(*(self.food_pos[a, :self.wild] - self.pos[a, i]).T)
+            d[~self.food_present[a, :self.wild]] = np.inf
+            f = int(d.argmin())
+            if d[f] < reach:
+                self.food_regrow[a, f] = CARRIED
+                self.load[a, i] = f
+                self.picked[a, i] += 1
+
+    def _put_down(self, a, i, spot):
+        cfg = self.cfg
+        f = self.load[a, i]
+        room = cfg.arena.size / 2 - cfg.food.radius
+        self.food_pos[a, f] = np.clip(spot, -room, room)
+        self.food_regrow[a, f] = 0
+        self.food_by[a, f] = i
+        self.load[a, i] = -1
+        home = np.hypot(*(self.food_pos[a, f] - self.nests[self.colony[i]]))
+        self.put_home[a, i] += home < cfg.colonies.nest_radius + cfg.food.radius
+
+    def _credit(self, arena, food, who):
+        """A berry someone put down, taken by a nestmate: counted to whoever put it there."""
+        by = self.food_by[arena, food]
+        given = (by >= 0) & (by != who)
+        given[given] &= self.colony[by[given]] == self.colony[who[given]]
+        np.add.at(self.given, (arena[given], by[given]), 1)
+        hungry = given & (self.energy[arena, who] < self.cfg.jelly.hunger)
+        np.add.at(self.given_hungry, (arena[hungry], by[hungry]), 1)
+        self.food_by[arena, food] = -1
 
     def _drink(self):
         """The first to touch an open flower drinks it: its food's worth eaten while hungry, the rest carried while
@@ -528,6 +606,7 @@ class World:
         hz = self.cfg.tick_hz
         lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)
         self.food_regrow[:, :self.wild][standing] = self.rng.integers(lo, hi + 1, int(standing.sum()))
+        self.food_by[:, :self.wild][standing] = -1
         log.debug('night fell', tick=self.tick, arenas=int(fell.sum()), food=int(standing.sum()))
 
     def _regrow(self):
@@ -572,6 +651,17 @@ class World:
             p = pick()
         log.warn('no open ground found, placing food anyway', arena=int(a), tries=PLACE_TRIES)
         return p
+
+    def berry_in_reach(self) -> np.ndarray:
+        """(arenas, creatures): who could pick up a berry now, carrying nothing."""
+        if not self.cfg.carry.on:
+            return np.zeros_like(self.alive)
+        cfg = self.cfg
+        reach = cfg.creature.radius + cfg.food.radius + cfg.carry.reach
+        dx = self.pos[:, :, None, 0] - self.food_pos[:, None, :self.wild, 0]
+        dy = self.pos[:, :, None, 1] - self.food_pos[:, None, :self.wild, 1]
+        near = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None, :self.wild]
+        return near.any(-1) & (self.load < 0) & self.alive
 
     def touching_block(self) -> np.ndarray:
         """(arenas, creatures): who has a block within grab's reach."""

@@ -17,7 +17,7 @@ const thought = (tick: number, x: number) => ({
 const text = (...lines: object[]) => lines.map((l) => JSON.stringify(l)).join('\n');
 
 function frame(tick: number, x: number): Frame {
-  return { tick, creatures: [{ id: 7, colony: 0, x, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0 }],
+  return { tick, creatures: [{ id: 7, colony: 0, x, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0 }],
     food: [], blocks: [], stores: [], light: 1, flowers: [], eggs: [] };
 }
 

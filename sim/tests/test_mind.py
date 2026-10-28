@@ -9,6 +9,7 @@ from terrarium.brain import Brain, save
 from terrarium.config import DEFAULT
 from terrarium.mind import think, track, wiring
 from terrarium.record import record
+from terrarium.schema import ACTIONS, SELF
 
 COLONY = load(DEFAULT.parent / 'colony.toml')
 
@@ -20,7 +21,7 @@ def lines(path):
 
 def test_thinking_step_by_step_is_the_brain_s_own_forward_pass():
     brain = Brain(32, 2, 4).eval()
-    me, kinds, rays = torch.randn(5, 19), torch.randint(0, 6, (5, 16)), torch.randn(5, 16, 6)
+    me, kinds, rays = torch.randn(5, len(SELF)), torch.randint(0, 6, (5, 16)), torch.randn(5, 16, 6)
     attention, units, _, mean, value = think(brain, me, kinds, rays)
     want_mean, want_value, _ = brain(me, kinds, rays)
     assert torch.allclose(mean, want_mean, atol=1e-5) and torch.allclose(value, want_value, atol=1e-5)
@@ -36,7 +37,7 @@ def test_wiring_keeps_the_strongest_connections_into_each_unit():
     to, frm, weight = w['senses'][0]
     assert weight == round(float(me[to, frm]), 4)
     assert abs(weight) == round(float(me[to].abs().max()), 4)
-    assert {t for t, _, _ in w['actions']} == set(range(6)) and len(w['value']) == 9
+    assert {t for t, _, _ in w['actions']} == set(range(len(ACTIONS))) and len(w['value']) == 9
 
 
 def test_a_mind_follows_its_terrikin_through_the_replay(tmp_path):

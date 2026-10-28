@@ -130,6 +130,14 @@ grip = 30.0
 seconds = 2.0
 energy = 0.01
 
+[carry]
+# a creature saying yes to carry (after a no) picks up a berry within reach of its body (metres from its edge to the
+# berry's) and holds it in its jaws, apart from its crop; yes again puts it down, still a berry. While it carries one
+# it's slower by this share of top speed and pays energy a second; reach 0 turns it off
+reach = 0.0
+slow = 0.0
+energy = 0.0
+
 [smell]
 # food gives off a smell that spreads over a grid of `cell`-metre squares: each tick a share `spread` of the difference
 # flows to each neighbouring cell, then it all fades by `fade`. Blocks stop it, but one a creature can drag (a door)

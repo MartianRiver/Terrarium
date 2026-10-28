@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { COLONY_COLOURS, SIGNAL_COLOURS, SIGNAL_OFF_BULB, shimmer } from './palette';
+import { berryGeo, berryMat, leafGeo, leafMat } from './props';
 import { SIGNAL_OFF, type CreatureState } from './world';
 
 // drawn at this scale its widest point (the arms) matches the sim's 0.45 m body
@@ -97,6 +98,9 @@ export class BlobView {
     color: 0xffb03a, emissive: 0xff8a1f, emissiveIntensity: 0.35, roughness: 0.15, clearcoat: 1, transparent: true, opacity: 0.85,
   });
   private crop = 0;
+  // a berry carried in its jaws (carry), held up on top of its head like an ant's seed
+  private berry = new THREE.Group();
+  private carried = 0;
   private mouth: THREE.Mesh;
   private blush: THREE.Mesh[] = [];
   // nectar: a shimmering bulb and belly and a happy face; sprinting: stretched out and quick-footed
@@ -171,6 +175,15 @@ export class BlobView {
     this.stalk.add(mesh(stalkGeo, this.limbs, [0, 0, 0], 1), mesh(ball, this.bulbMat, [0, 0.23, 0], 0.105));
     this.body.add(this.stalk);
 
+    // in front of the antenna, sitting on the crown; sized to match the berries on the ground
+    const held = mesh(berryGeo, berryMat, [0, 0, 0], 1.25);
+    const leaf = mesh(leafGeo, leafMat, [0.04, 0.12, -0.02], 1.1);
+    leaf.rotation.set(0.3, 0.6, 0.2);
+    this.berry.add(held, leaf);
+    this.berry.position.set(0, 0.92, 0.12);
+    this.berry.visible = false;
+    this.body.add(this.berry);
+
     this.root.add(this.body);
   }
 
@@ -196,6 +209,14 @@ export class BlobView {
     this.applySignal(s.signal, dt);
     this.applyCrop(s.carrying, dt);
     this.applyNectar(time);
+    this.applyLoad(s.load, dt);
+  }
+
+  // picked up with a little pop, set down quickly
+  private applyLoad(load: number, dt: number) {
+    this.carried += ((load > 0 ? 1 : 0) - this.carried) * Math.min(1, dt * (load > 0 ? 10 : 18));
+    this.berry.visible = this.carried > 0.02;
+    this.berry.scale.setScalar(this.carried);
   }
 
   get sprinting() {

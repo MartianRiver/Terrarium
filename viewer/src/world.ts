@@ -22,6 +22,7 @@ export interface CreatureState {
   holding: number; // 1 while it grips a block (grab); 0 in replays of worlds without grab
   nectar: number; // seconds left of a nectar boost; 0 in worlds without flowers
   sprinting: number; // 1 mid-sprint; 0 in worlds without sprint and replays from before it
+  load: number; // 1 while it carries a berry in its jaws (carry); 0 in worlds without carry
 }
 
 export interface FoodState {

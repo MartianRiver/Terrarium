@@ -48,6 +48,10 @@ def frame(world: World, a: int) -> dict:
     if cfg.sprint.on:
         for c, burst in zip(creatures, world.sprinting[a][born]):
             c['sprinting'] = int(burst > 0)
+    if cfg.carry.on:
+        # a berry in its jaws
+        for c, load in zip(creatures, world.load[a][born]):
+            c['load'] = int(load >= 0)
     if cfg.flowers.on:
         # seconds of nectar boost left
         for c, boost in zip(creatures, world.nectar[a][born]):
