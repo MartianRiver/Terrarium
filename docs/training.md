@@ -116,6 +116,12 @@ uv run python -m terrarium.mind mind.jsonl.gz --config configs/solo.toml --brain
 
 Open the replay in the viewer.
 
+### Playing as one
+
+Play (or `/?play`, or `/?play=<run id>`) starts a game in a run's world against its newest checkpoint: by default the newest live run, or the newest run if none is training. One Terrikin is yours, with the ring, and every other one is steered by the brain exactly as evals and replays steer it (`terrarium/play.py`, through the runs server's `POST /api/play`). The game moves only when the viewer asks for its next ticks, two at a time with what you're doing in them, so it keeps the viewer's pace and stops when it's paused.
+
+W A S D or the arrows walk and turn; holding the mouse button (or the trackpad) walks you to the spot under the pointer, turning on the spot first if it's behind you. The panel lists only the actions the world has (Shift sprint, Q unload at your nest, E eat, G grab), and right-drag looks around since the left button walks. It scores you the way evals score a brain, food a minute alive and seconds alive, next to the brain's Terrikins. When yours dies its place goes back to the brain (a hatchling there is one of theirs), and you watch to the end; R starts another game. A game plays in the server's own code, so a run whose world or brain that code can't load won't start one.
+
 ## Promoting a brain
 
 When a stage is done, its brain is promoted from a run on `next`:

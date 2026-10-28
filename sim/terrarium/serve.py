@@ -11,10 +11,18 @@
 #   GET /api/runs/<id>/replay/<checkpoint.pt | random>?seed=0[&here]  (here: recorded again on this machine)
 #   GET /api/runs/<id>/mind/<checkpoint.pt>?seed=0&creature=ID  (one Terrikin's mind through that episode, mind.py)
 #   GET /api/runs/<id>/wiring/<checkpoint.pt>  (its strongest connections, for drawing it wired up)
+#   POST /api/play {run, checkpoint, seed}  (a game as one Terrikin among a brain's, play.py; all optional: by default
+#                                           the newest checkpoint of the newest live run)
+#   POST /api/play/<game> {ticks, thrust, turn, yes}  (the next few ticks, with what you're doing in them)
+#
+# Given a built viewer's folder (watch.py does), it serves the viewer's pages beside the API too.
 
 import argparse
 import json
+import math
+import mimetypes
 import re
+import secrets
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -26,6 +34,7 @@ from .config import Config, build, upgrade
 from .log import Logger
 from .brain import load as load_brain
 from .mind import track, wiring
+from .play import Games
 from .record import record
 from .runs import ROOT
 
@@ -36,6 +45,9 @@ PORT = 5190
 STALE = 120
 SECONDS = 180
 NAME = re.compile(r'^[\w.-]+$')
+# what a built viewer is made of; Windows takes types from the registry otherwise, and a .js as text/plain won't run
+KINDS = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+         '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.gz': 'application/gzip'}
 
 
 class NotFound(LookupError):
@@ -74,9 +86,12 @@ class Runs:
             raise NotFound(f'no run {id}')
         return run
 
+    def dirs(self) -> list[Path]:
+        return [p for p in self.root.iterdir() if (p / 'run.json').exists()] if self.root.exists() else []
+
     def list(self) -> list[dict]:
         rentals = compute.sessions()
-        runs = [summary(p, rentals) for p in self.root.iterdir() if (p / 'run.json').exists()] if self.root.exists() else []
+        runs = [summary(p, rentals) for p in self.dirs()]
         # newest first, by start time: a pod names its runs in UTC
         return sorted(runs, key=lambda r: compute.when(r['started']), reverse=True)
 
@@ -86,7 +101,7 @@ class Runs:
         evals = run / 'evals.json'
         return {'run': rec, 'state': state(run, rec), 'metrics': compute.metrics(run), 'checkpoints': checkpoints(run),
                 'evals': json.loads(evals.read_text()) if evals.exists() else None,
-                'compute': compute.behind(self.root, run)}
+                'compute': compute.behind(run.parent, run)}
 
     def replay(self, id: str, checkpoint: str, seed: int, here: bool = False) -> Path:
         """random is generation 0: how a brain trained from scratch starts out. here records it again on this
@@ -104,6 +119,23 @@ class Runs:
                 record(cfg, partial, round(SECONDS * cfg.tick_hz), seed, brain=brain)
                 partial.rename(out)
         return out
+
+    def game(self, id: str | None = None, checkpoint: str | None = None) -> tuple[Config, Path, str]:
+        """A run's world and one of its checkpoints to play against: by default the newest checkpoint of the newest
+        live run (or of the newest run, if none is live)."""
+        if id is None:
+            listed = self.list()
+            pool = [r for r in listed if r['state'] == 'live'] or listed
+            id = next((r['id'] for r in pool if checkpoints(self.find(r['id']))), None)
+            if id is None:
+                raise NotFound('no run with a checkpoint to play against yet')
+        run = self.find(id)
+        files = [c['file'] for c in checkpoints(run)]
+        checkpoint = checkpoint or (files[-1] if files else '')
+        if checkpoint not in files:
+            raise NotFound(f'{id} has no checkpoint {checkpoint}')
+        cfg = build(Config, upgrade(compute.read_run(run)['world']['config']))
+        return cfg, run / 'checkpoints' / checkpoint, f'{id}/{checkpoint}'
 
     def wiring(self, id: str, checkpoint: str) -> dict:
         """A checkpoint's strongest connections (mind.wiring)."""
@@ -129,12 +161,62 @@ class Runs:
         return out
 
 
-def handler(runs: Runs):
+def number(body: dict, key: str, low: float, high: float, default: float) -> float:
+    value = body.get(key, default)
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+        raise ValueError(f'{key} must be a number')
+    return min(max(float(value), low), high)
+
+
+def handler(runs: Runs, static: Path | None = None):
+    games = Games()
+
     class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            parts = urlsplit(self.path).path.strip('/').split('/')
+            try:
+                size = int(self.headers.get('Content-Length') or 0)
+                if size > 4096:
+                    raise ValueError('too much to read')
+                body = json.loads(self.rfile.read(size) or b'{}')
+                if not isinstance(body, dict):
+                    raise ValueError('send a JSON object')
+                match parts:
+                    case ['api', 'play']:
+                        id, checkpoint = body.get('run'), body.get('checkpoint')
+                        if not all(v is None or isinstance(v, str) for v in (id, checkpoint)):
+                            raise ValueError('run and checkpoint are names')
+                        cfg, brain, label = runs.game(id, checkpoint)
+                        seed = int(number(body, 'seed', 0, 2**31 - 1, secrets.randbelow(2**31)))
+                        token, game = games.start(cfg, brain, seed, label)
+                        self.json({'game': token, 'label': label, 'header': game.header, 'frame': game.first,
+                                   'you': game.you, 'controls': game.controls, 'score': game.score()})
+                    case ['api', 'play', token]:
+                        game = games.get(token)
+                        if game is None:
+                            raise NotFound('that game is over (or this server restarted)')
+                        yes = body.get('yes', [])
+                        if not isinstance(yes, list) or len(yes) > 8 or not all(isinstance(y, str) for y in yes):
+                            raise ValueError('yes is a list of action names')
+                        frames = game.step(int(number(body, 'ticks', 1, 10, 1)), number(body, 'thrust', -1, 1, 0),
+                                           number(body, 'turn', -1, 1, 0), yes)
+                        self.json({'frames': frames, 'score': game.score()})
+                    case _:
+                        raise NotFound(f'nothing at {self.path}')
+            except NotFound as e:
+                self.json({'error': str(e)}, 404)
+            except ValueError as e:
+                self.json({'error': str(e)}, 400)
+            except Exception as e:
+                log.error('request failed', path=self.path, error=repr(e))
+                self.json({'error': f'something broke: {e!r}'}, 500)
+
         def do_GET(self):
             url = urlsplit(self.path)
             parts = url.path.strip('/').split('/')
             try:
+                if static and parts[0] != 'api':
+                    return self.page(url.path)
                 match parts:
                     case ['api', 'runs']:
                         self.json(runs.list())
@@ -162,6 +244,14 @@ def handler(runs: Runs):
             except Exception as e:
                 log.error('request failed', path=self.path, error=repr(e))
                 self.json({'error': f'something broke: {e!r}'}, 500)
+
+        def page(self, path: str):
+            assert static
+            file = (static / (path.strip('/') or 'index.html')).resolve()
+            if not file.is_relative_to(static.resolve()) or not file.is_file():
+                raise NotFound(f'nothing at {path}')
+            kind = KINDS.get(file.suffix) or mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
+            self.send(file.read_bytes(), kind)
 
         def json(self, body, status: int = 200):
             self.send(json.dumps(body).encode(), 'application/json', status)

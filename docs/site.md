@@ -15,10 +15,12 @@ terrarium.martianriver.com is a front page, a blog, a gallery of brains at `/bra
 
 ```
 cd viewer
-npm run site        # dist-site/: the viewer in watch/, the pages beside it
+npm run site        # dist-site/: the viewer in watch/, the pages beside it, and at-home/viewer/ (below)
 ```
 
 Deploying is an rsync of `dist-site/` to the web server, leaving out `replays/gallery/` (published on its own, below). Anything unfinished in a page or a published post, like a draft marker or a note of what's still to write (the same list the commit checks refuse), stops `npm run site`, which deletes what it had built so a half-made site can't be deployed. A review build still shows it. Old links like `/?replay=…&follow` are sent on to `/watch/` with their query.
+
+`/at-home/viewer/` is a second build of the viewer, the local kind with the runs page and `?latest`, for `python -m terrarium.watch` on a lent machine to fetch ([compute.md](compute.md)). Its `files.json` lists every file with its sha256, and the watcher refuses a file that doesn't match.
 
 ## Posts
 

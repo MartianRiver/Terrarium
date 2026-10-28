@@ -52,6 +52,18 @@ On a Mac or Linux it's the same four lines (`cd Terrarium/sim`), with [git](http
 
 The first time, it asks for the token. The first job downloads PyTorch, about 2.5 GB with CUDA (130 MB on a Mac), and takes a while to start. Close the window or press Ctrl-C to stop it; a job it was running goes back to the queue. To update it, run `git pull` in the Terrarium folder and start it again.
 
+## Watching what your machine trains
+
+You can watch the Terrikins your GPU is training while it trains them. In a second window, in the same `sim` folder:
+
+```
+uv run python -m terrarium.watch
+```
+
+It opens the viewer in your browser on the brain your machine is working on, and each time a replay ends it moves on to the newest checkpoint, so you see it get better as you watch. The runs page beside it has the charts. It all stays on your machine.
+
+Play puts you in the world as one of the Terrikins, against the brain your machine is training: WASD or the arrows to walk and turn, or hold the mouse (or trackpad) to walk to a spot, and the keys for anything else that world has are on screen. It keeps score the way I score the brains, food a minute and how long you stay alive, so you can see whether you'd beat it. The brain only sees what its rays show it and you can see the whole garden, so it's not quite a fair fight.
+
 ## Versions
 
 - **5** · 26 October 2026 · Checks when it starts that it can verify my signature, using the `ssh-keygen` that comes with Git on Windows (Windows 10's own may be too old).

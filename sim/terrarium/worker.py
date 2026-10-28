@@ -80,6 +80,12 @@ def torch_extra() -> list[str]:
     return ['--extra', 'cuda' if shutil.which('nvidia-smi') else 'cpu']
 
 
+def code_key(spec: dict) -> str:
+    """The folder in code/ a job's checkout is built in: one per commit and overlay."""
+    c = spec['code']
+    return c['commit'][:12] + (f'-{c["overlay"][:12]}' if c['overlay'] else '')
+
+
 def python(sim: Path) -> Path:
     return sim / '.venv' / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
 
@@ -362,8 +368,8 @@ class Worker:
 
     def code(self, spec: dict) -> Path:
         """A checkout of the job's code with its packages synced, built once per commit (and overlay)."""
+        key = code_key(spec)
         c = spec['code']
-        key = c['commit'][:12] + (f'-{c["overlay"][:12]}' if c['overlay'] else '')
         dest, ready = self.home / 'code' / key, self.home / 'code' / f'{key}.ready'
         with self.lock:
             building = self.building.setdefault(key, threading.Lock())
