@@ -2,8 +2,9 @@
 # run's checkpoints exactly as evals and replays steer it, and one, yours, steered by what the viewer sends. The game
 # only moves when the viewer asks for the next few ticks, so it plays at the viewer's pace and pauses with it.
 #
-# Scored the way evals score a brain: food a minute alive and seconds alive, yours beside the brain's Terrikins'.
-# When yours dies, its place is the brain's again (a hatchling there is one of theirs), and you watch to the end.
+# Scored like a game: points for every second alive, every berry picked up and every food brought home to the
+# nest, yours beside the worst, average and best of the brain's Terrikins that started with you. When yours dies,
+# its place is the brain's again (a hatchling there is one of theirs, and isn't scored), and you watch to the end.
 
 import secrets
 import threading
@@ -25,7 +26,10 @@ NEEDS = {
     'eat': lambda c: c.crop.capacity > 0,
     'sprint': lambda c: c.sprint.on,
     'grab': lambda c: c.grab.on,
+    'carry': lambda c: c.carry.on,
 }
+# points for a second alive, a berry picked up, and a food brought home to its own nest
+POINTS = {'second': 1, 'berry': 10, 'home': 20}
 GAMES = 4
 IDLE = 600
 
@@ -38,7 +42,9 @@ class Game:
         starters = np.flatnonzero((w.colony == 0) & ~w.spare)
         self.slot = int(starters[0])
         self.you = int(w.creature_id[0, self.slot])
-        self.lived = np.zeros(len(w.colony), int)
+        # per Terrikin that started: ticks alive, berries picked up, food brought home
+        self.started = [int(i) for i in w.creature_id[0, ~w.spare]]
+        self.tally = {i: np.zeros(3) for i in self.started}
         self.controls = [a for a in ACTIONS[2:] if a in NEEDS and NEEDS[a](cfg)]
         self.used = time.time()
         source = {'seed': seed, 'brain': {'id': brain_id(brain), 'file': brain.name}, 'play': label}
@@ -65,23 +71,36 @@ class Game:
                     if name in self.controls:
                         mine[ACTIONS.index(name)] = 1.0
                 actions[0, self.slot] = mine[:actions.shape[-1]]
-            self.lived += w.alive[0]
+            ids, alive = w.creature_id[0].copy(), w.alive[0].copy()
+            meals, stored = w.meals[0].copy(), w.stored[0].copy()
             w.step(actions)
+            gained = np.stack([alive, np.maximum(w.meals[0] - meals, 0), np.maximum(w.stored[0] - stored, 0)], -1)
+            for slot in np.flatnonzero(alive):
+                if int(ids[slot]) in self.tally:
+                    self.tally[int(ids[slot])] += gained[slot]
             frames.append(replay.frame(w, 0))
         return frames
 
+    def card(self, who: int) -> dict:
+        ticks, berries, home = self.tally[who]
+        seconds = ticks / self.hz
+        points = POINTS['second'] * seconds + POINTS['berry'] * berries + POINTS['home'] * home
+        return {'seconds': round(float(seconds), 1), 'berries': int(berries), 'home': int(home), 'points': round(float(points))}
+
     def score(self) -> dict:
         w = self.world
-        minutes = self.lived / self.hz / 60
-        theirs = ~w.spare & (np.arange(len(w.colony)) != self.slot)
+        you = {**self.card(self.you), 'alive': self.playing, 'energy': round(float(w.energy[0, self.slot]), 3)}
+        theirs = [self.card(i) for i in self.started if i != self.you]
+        # in a world of one there's nobody else to compare with
+        brain = {}
+        if theirs:
+            by = sorted(theirs, key=lambda c: c['points'])
+            brain = {'worst': by[0], 'best': by[-1], 'count': len(theirs),
+                     'average': {k: round(float(np.mean([c[k] for c in theirs])), 1) for k in by[0]}}
         alive = w.alive[0]
         return {
-            'you': {'alive': self.playing, 'seconds': round(float(self.lived[self.slot]) / self.hz, 1),
-                    'meals': int(w.meals[0, self.slot]), 'energy': round(float(w.energy[0, self.slot]), 3),
-                    'per_minute': round(float(w.meals[0, self.slot] / max(minutes[self.slot], 1e-9)), 2)},
-            # in a world of one there's nobody else to compare with
-            'brain': {'seconds': round(float(self.lived[theirs].mean()) / self.hz, 1) if theirs.any() else 0.0,
-                      'per_minute': round(float(w.meals[0, theirs].sum() / max(minutes[theirs].sum(), 1e-9)), 2)},
+            'you': you, 'brain': brain, 'rank': 1 + sum(c['points'] > you['points'] for c in theirs),
+            'points': POINTS,
             'colonies': [int((alive & (w.colony == c)).sum()) for c in range(w.cfg.colonies.count)],
             'seconds': round(float(w.age[0]) / self.hz, 1), 'length': round(float(w.episode_ticks) / self.hz, 1),
             'over': bool(w.ended[0]),

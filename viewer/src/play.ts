@@ -1,15 +1,25 @@
 // Play as one Terrikin (local only, ?play[=run id]): a game on the runs server (sim play.py) in a run's world, the
 // rest steered by its newest brain. Frames come a few ticks at a time, each request carrying what you're doing, so
-// the game runs at the viewer's pace and stops when it pauses. A panel shows the controls this world has and how
-// you're doing next to the brain's Terrikins.
+// the game runs at the viewer's pace and stops when it pauses. A bar along the top shows your energy and points, and a
+// panel the controls this world has and how you're doing next to the brain's worst, average and best Terrikins.
 import * as THREE from 'three';
 import { clock } from './clock';
 import { parseReplay } from './replay';
 import type { Frame, WorldInfo } from './world';
 
+interface Card {
+  seconds: number;
+  berries: number;
+  home: number;
+  points: number;
+}
+
 interface Score {
-  you: { alive: boolean; seconds: number; meals: number; energy: number; per_minute: number };
-  brain: { seconds: number; per_minute: number };
+  you: Card & { alive: boolean; energy: number };
+  // empty in a world of one
+  brain: { worst?: Card; average?: Card; best?: Card; count?: number };
+  rank: number;
+  points: { second: number; berry: number; home: number };
   colonies: number[];
   seconds: number;
   length: number;
@@ -64,6 +74,10 @@ export class Game {
   private pointer: { x: number; y: number } | null = null;
   private caster = new THREE.Raycaster();
   private panel: HTMLElement;
+  private hud: HTMLElement;
+  private before: Card | null = null;
+  // when each counter last went up, so it stays lit a moment (the panel is redrawn every few ticks)
+  private lit: Partial<Record<keyof Card, number>> = {};
   private stop: () => void;
 
   private constructor(private start: Start, private camera: THREE.Camera, private canvas: HTMLCanvasElement) {
@@ -76,7 +90,14 @@ export class Game {
     this.score = start.score;
     this.panel = document.createElement('div');
     this.panel.id = 'play';
-    document.body.append(this.panel);
+    this.hud = document.createElement('div');
+    this.hud.id = 'play-hud';
+    // built once and only updated, so the bar slides and a low one keeps pulsing
+    this.hud.innerHTML = `
+      <div class="hud-energy"><span class="hud-label">Energy</span><span class="hud-bar"><span></span></span><span class="hud-value"></span></div>
+      <div class="hud-points"><span class="hud-label">Score</span><b></b></div>
+      <div class="hud-counts"><span data-k="seconds"></span><span data-k="berries"></span><span data-k="home"></span></div>`;
+    document.body.append(this.panel, this.hud);
     this.stop = this.listen();
     this.show();
   }
@@ -106,6 +127,7 @@ export class Game {
   end() {
     this.stop();
     this.panel.remove();
+    this.hud.remove();
   }
 
   private async ask() {
@@ -123,24 +145,33 @@ export class Game {
     }
   }
 
-  // what you're doing: keys, or walking to the spot under a held mouse button (the keys win)
+  // what you're doing: keys, or walking to the spot under a held mouse button (the keys win). Keys go by the
+  // screen, whichever way the camera faces: W is up the screen, D is right, and two together go between
   private input() {
     const on = (...keys: string[]) => keys.some((k) => this.held.has(k));
-    let thrust = (on('w', 'arrowup') ? 1 : 0) - (on('s', 'arrowdown') ? 1 : 0);
-    // the sim's turn is counterclockwise in its own x, y, which the viewer draws mirrored: on screen it turns right
-    let turn = (on('d', 'arrowright') ? 1 : 0) - (on('a', 'arrowleft') ? 1 : 0);
+    const up = (on('w', 'arrowup') ? 1 : 0) - (on('s', 'arrowdown') ? 1 : 0);
+    const right = (on('d', 'arrowright') ? 1 : 0) - (on('a', 'arrowleft') ? 1 : 0);
     const me = this.last.creatures.find((c) => c.id === this.you);
-    if (!thrust && !turn && this.pointer && me) {
+    let thrust = 0;
+    let turn = 0;
+    // sim x, y are the viewer's x, z: turn to face the way wanted, walking once roughly facing it
+    const towards = (x: number, z: number, far: number) => {
+      if (!me) return;
+      const off = wrap(Math.atan2(z, x) - me.heading);
+      turn = Math.max(-1, Math.min(1, off * 2));
+      thrust = Math.abs(off) < 1.2 ? Math.min(1, far) : 0;
+    };
+    if (up || right) {
+      const ahead = this.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+      const side = new THREE.Vector3(-ahead.z, 0, ahead.x);
+      const way = ahead.multiplyScalar(up).add(side.multiplyScalar(right));
+      towards(way.x, way.z, 1);
+    } else if (this.pointer && me) {
       const box = this.canvas.getBoundingClientRect();
       this.caster.setFromCamera(new THREE.Vector2(((this.pointer.x - box.left) / box.width) * 2 - 1, -((this.pointer.y - box.top) / box.height) * 2 + 1), this.camera);
       const hit = this.caster.ray.intersectPlane(ground, new THREE.Vector3());
-      if (hit) {
-        const off = wrap(Math.atan2(hit.z - me.y, hit.x - me.x) - me.heading);
-        const far = Math.hypot(hit.x - me.x, hit.z - me.y);
-        turn = Math.max(-1, Math.min(1, off * 2));
-        // turn on the spot to face it first, then walk, slowing as it gets there
-        thrust = Math.abs(off) < 1.2 ? Math.min(1, far / 1.5) : 0;
-      }
+      // slowing as it gets there
+      if (hit) towards(hit.x - me.x, hit.z - me.y, Math.hypot(hit.x - me.x, hit.z - me.y) / 1.5);
     }
     const yes = this.start.controls.filter((a) => ACTIONS[a] && on(...ACTIONS[a].keys));
     return { thrust, turn, yes };
@@ -191,23 +222,61 @@ export class Game {
     const extra = this.start.controls.filter((a) => ACTIONS[a]).map((a) => `<b>${ACTIONS[a].label}</b> ${ACTIONS[a].what}`);
     const keys = ['<b>W A S D</b> or <b>arrows</b> walk and turn', '<b>hold the mouse</b> (or trackpad) to walk to a spot',
       ...extra, '<b>right-drag</b> look around', '<b>scroll</b> zoom', '<b>P</b> pause', '<b>R</b> new game'];
+    const { worst, average, best, count } = s.brain;
     let state: string;
     if (this.failed) state = `<p class="play-error">The game stopped: ${esc(this.failed)}. R starts a new one.</p>`;
-    else if (s.over) {
-      const food = you.per_minute > s.brain.per_minute ? 'You ate more a minute than the brain did.' : you.per_minute < s.brain.per_minute ? 'The brain ate more a minute than you.' : 'Level on food.';
-      const lived = you.seconds > s.brain.seconds ? 'and you lived longer.' : you.seconds < s.brain.seconds ? 'and it lived longer.' : 'and you lived as long.';
-      state = `<p class="play-over"><b>Game over.</b> ${food} ${lived} R plays again.</p>`;
-    } else if (!you.alive) state = `<p class="play-over">You starved after ${you.seconds.toFixed(0)} s. Watching the rest; R plays again.</p>`;
-    else state = '';
+    else if (s.over || !you.alive) {
+      const how = !best || !worst || !average ? ''
+        : you.points > best.points ? 'You beat every one of the brain\'s Terrikins!'
+        : you.points >= average.points ? 'Better than the brain\'s average.'
+        : you.points >= worst.points ? 'Below the brain\'s average.'
+        : 'Even the brain\'s worst did better.';
+      const first = s.over ? '<b>Game over.</b>' : `You starved after ${you.seconds.toFixed(0)} s.`;
+      state = `<p class="play-over">${first} ${how} ${s.over ? 'R plays again.' : 'Watching the rest; R plays again.'}</p>`;
+    } else state = '';
+    const row = (name: string, c: Card | undefined, cls = '') => c
+      ? `<tr class="${cls}"><td>${name}</td><td><b>${Math.round(c.points)}</b></td><td>${c.seconds.toFixed(0)} s</td><td>${c.berries.toFixed(c === average ? 1 : 0)}</td><td>${c.home.toFixed(c === average ? 1 : 0)}</td></tr>`
+      : '';
+    const p = s.points;
     this.panel.innerHTML = `
       <table>
-        <tr><th></th><th>food a minute</th><th>alive</th></tr>
-        <tr><td>You</td><td>${you.per_minute.toFixed(2)} <small>(${you.meals})</small></td><td>${you.seconds.toFixed(0)} s</td></tr>
-        <tr><td>The brain</td><td>${s.brain.per_minute.toFixed(2)}</td><td>${s.brain.seconds.toFixed(0)} s <small>each</small></td></tr>
+        <tr><th></th><th>points</th><th>alive</th><th>berries</th><th>home</th></tr>
+        ${row('You', you, 'play-you')}
+        ${row('Brain\'s best', best)}
+        ${row('Brain\'s average', average)}
+        ${row('Brain\'s worst', worst)}
       </table>
-      <div class="play-energy" title="energy"><span style="width:${Math.round((you.alive ? you.energy : 0) * 100)}%"></span></div>
-      <p class="play-meta">${clock(s.seconds)} of ${clock(s.length)} · colonies ${s.colonies.join(' · ')}</p>
+      ${count ? `<p class="play-rank">You're <b>${ordinal(s.rank)}</b> of ${count + 1} that started.</p>` : ''}
+      <p class="play-meta">${p.second} point a second alive · ${p.berry} a berry picked up · ${p.home} a food brought home · ${clock(s.seconds)} of ${clock(s.length)} · colonies ${s.colonies.join(' · ')}</p>
       ${state}
       <p class="play-keys">${keys.join(' · ')}</p>`;
+    // a counter that just went up lights up for a moment
+    const now = performance.now();
+    for (const k of ['berries', 'home', 'points'] as const) {
+      if (this.before && you[k] > this.before[k] + (k === 'points' ? 5 : 0)) this.lit[k] = now;
+    }
+    const bump = (k: keyof Card) => (now - (this.lit[k] ?? -1e9) < 600 ? ' bump' : '');
+    const energy = Math.round((you.alive ? you.energy : 0) * 100);
+    const bar = this.hud.querySelector<HTMLElement>('.hud-energy')!;
+    bar.className = `hud-energy ${energy > 50 ? 'high' : energy > 25 ? 'mid' : 'low'}`;
+    bar.querySelector<HTMLElement>('.hud-bar span')!.style.width = `${energy}%`;
+    bar.querySelector('.hud-value')!.textContent = `${energy}%`;
+    const points = this.hud.querySelector<HTMLElement>('.hud-points')!;
+    points.className = `hud-points${bump('points')}`;
+    points.querySelector('b')!.textContent = String(Math.round(you.points));
+    const counts: Record<string, string> = { seconds: `${clock(you.seconds)} <small>alive</small>`,
+      berries: `${you.berries} <small>berries</small>`, home: `${you.home} <small>brought home</small>` };
+    for (const span of this.hud.querySelectorAll<HTMLElement>('.hud-counts span[data-k]')) {
+      const k = span.dataset.k as keyof Card;
+      span.innerHTML = counts[k];
+      span.className = bump(k).trim();
+    }
+    this.before = { seconds: you.seconds, berries: you.berries, home: you.home, points: you.points };
   }
+}
+
+function ordinal(n: number): string {
+  const tens = n % 100;
+  const end = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${end}`;
 }
