@@ -9,7 +9,7 @@ import pytest
 
 from terrarium.brain import SHAPE, Brain, save
 from terrarium.config import DEFAULT, load
-from terrarium.play import Game
+from terrarium.play import POINTS, Game
 from terrarium.schema import ACTIONS
 from terrarium.serve import Runs, handler
 
@@ -54,7 +54,25 @@ def test_once_yours_dies_the_brain_has_its_place_and_you_watch_to_the_end(brain)
     game.step(2, 0.0, 0.0, [])
     score = game.score()
     assert not game.playing and not score['you']['alive'] and not score['over']
-    assert score['you']['seconds'] <= 0.1 and score['brain']['seconds'] > 0
+    assert score['you']['seconds'] <= 0.1 and score['brain']['average']['seconds'] > 0
+
+
+def test_points_for_living_picking_up_and_bringing_home_against_the_brains_worst_and_best(brain):
+    game = Game(COLONY, brain, 0, 'test')
+    w = game.world
+    # a berry right where yours stands
+    f = int(np.flatnonzero(w.food_present[0, :w.wild])[0])
+    w.food_pos[0, f] = w.pos[0, game.slot]
+    game.step(5, 0.0, 0.0, [])
+    score = game.score()
+    you = score['you']
+    seconds = 5 / COLONY.tick_hz
+    assert you['berries'] == 1 and you['seconds'] == round(seconds, 1)
+    assert you['points'] == round(seconds * POINTS['second'] + POINTS['berry'])
+    brain = score['brain']
+    assert brain['count'] == (~w.spare).sum() - 1
+    assert brain['worst']['points'] <= brain['average']['points'] <= brain['best']['points']
+    assert 1 <= score['rank'] <= brain['count'] + 1
 
 
 def test_the_api_starts_a_game_steps_it_and_refuses_what_it_cant_use(tmp_path):

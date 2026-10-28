@@ -460,20 +460,6 @@ body {
   margin: 6px 0 0;
 }
 
-.play-energy {
-  height: 6px;
-  margin-top: 6px;
-  border-radius: 3px;
-  background: rgb(44 58 51 / 0.15);
-  overflow: hidden;
-}
-
-.play-energy span {
-  display: block;
-  height: 100%;
-  background: #6fae5a;
-}
-
 .play-meta,
 .play-keys {
   opacity: 0.7;
@@ -481,4 +467,117 @@ body {
 
 .play-error {
   color: #8a2a1d;
+}
+
+#play-hud {
+  position: fixed;
+  /* below the replay bar */
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 18px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 18px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.hud-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-right: 8px;
+}
+
+.hud-energy {
+  display: flex;
+  align-items: center;
+}
+
+.hud-bar {
+  width: 200px;
+  height: 16px;
+  border: 2px solid rgb(44 58 51 / 0.35);
+  border-radius: 9px;
+  background: rgb(44 58 51 / 0.12);
+  overflow: hidden;
+}
+
+.hud-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 7px;
+  transition: width 0.2s linear, background-color 0.3s;
+  /* notches, like a game's health bar */
+  background-image: repeating-linear-gradient(90deg, transparent 0 18px, rgb(255 255 255 / 0.35) 18px 20px);
+}
+
+.hud-energy.high .hud-bar span {
+  background-color: #5fae4f;
+}
+
+.hud-energy.mid .hud-bar span {
+  background-color: #e0a93a;
+}
+
+.hud-energy.low .hud-bar span {
+  background-color: #d4553f;
+  animation: hud-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hud-pulse {
+  to {
+    opacity: 0.45;
+  }
+}
+
+.hud-value {
+  width: 3.2em;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.hud-points b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-points b,
+.hud-counts span {
+  display: inline-block;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.hud-counts {
+  display: flex;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-counts small {
+  opacity: 0.6;
+}
+
+.hud-points.bump b,
+.hud-counts .bump {
+  color: #c98a12;
+  transform: scale(1.18);
+}
+
+#play .play-you td {
+  font-weight: 700;
+}
+
+.play-rank b {
+  color: #c98a12;
 }
