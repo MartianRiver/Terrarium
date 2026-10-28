@@ -75,6 +75,22 @@ def test_points_for_living_picking_up_and_bringing_home_against_the_brains_worst
     assert 1 <= score['rank'] <= brain['count'] + 1
 
 
+def test_your_state_says_whats_in_your_crop_your_sprint_and_when_night_comes(brain):
+    game = Game(COLONY, brain, 0, 'test')
+    w = game.world
+    w.crop[0, game.slot] = COLONY.crop.capacity
+    game.step(1, 0.0, 0.0, ['sprint'])
+    state = game.score()['you']['state']
+    assert state['crop'] == state['capacity'] == COLONY.crop.capacity
+    assert 0 < state['sprint']['left'] <= 1 and state['sprint']['rest'] == 0
+    n = COLONY.night
+    assert not state['night']['dark'] and state['night']['in'] == pytest.approx(n.cycle - n.length - 1 / COLONY.tick_hz, abs=0.05)
+    assert state['carrying'] is False and state['turbo'] == 0
+    # after the burst comes the rest, all of it still to go
+    game.step(round(COLONY.sprint.seconds * COLONY.tick_hz), 0.0, 0.0, [])
+    assert game.score()['you']['state']['sprint'] == {'left': 0, 'rest': pytest.approx(1, abs=0.02)}
+
+
 def test_the_api_starts_a_game_steps_it_and_refuses_what_it_cant_use(tmp_path):
     make_run(tmp_path, 'run', '2026-10-28T10:00:00+1100', checkpoints=[32768])
     server = ThreadingHTTPServer(('127.0.0.1', 0), handler(Runs(tmp_path)))

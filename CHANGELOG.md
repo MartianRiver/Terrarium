@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Playing as one says what's hard to see on the body. Under the energy bar: the sprint's meter (draining through a burst, filling through the rest, then ready), the jelly belly as dots that go gold when full, carrying a berry, nectar's turbo with the seconds left, being home with the jelly stored and what Q and E would do there, and nightfall coming or dawn's wait. A word pops up as each changes: belly full, sprint ready, turbo, low energy, night in 15 s, and when you're hungry at home with jelly in the store. The game sends your Terrikin's state with the score (`Game.state`).
+
 Playing as one is more of a game: a bar along the top shows your energy, which turns amber below half and pulses red below a quarter, and your score, a point a second alive, 10 a berry picked up and 20 a food brought home, each counter lighting up as it goes up. The panel puts you beside the worst, average and best of the brain's Terrikins that started with you, and says where you rank. W A S D now go by the screen, whichever way the camera faces (W up the screen, D right), instead of forward and turn, and carry is one of your keys in worlds that have it.
 
 A job's result can't be lost to its size any more. The coordinator takes up to 64 MB (it was 8) and keeps up to 8 GB of results (it was 2), and past that the worker (version 7) leaves out every other checkpoint until the run fits, counting back from the last, which always goes; run.json says how many were left out, and the machine keeps them all. A run of a memory brain saving a checkpoint every 10 updates trained twice for nothing before this.

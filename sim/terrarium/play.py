@@ -87,9 +87,32 @@ class Game:
         points = POINTS['second'] * seconds + POINTS['berry'] * berries + POINTS['home'] * home
         return {'seconds': round(float(seconds), 1), 'berries': int(berries), 'home': int(home), 'points': round(float(points))}
 
+    def state(self) -> dict:
+        """What a player can't easily see on the body: crop, store, sprint, nectar, carry, and when night comes."""
+        w, cfg, i = self.world, self.world.cfg, self.slot
+        home = int(w.colony[i])
+        state = {'crop': int(w.crop[0, i]), 'capacity': cfg.crop.capacity, 'store': int(w.store[0, home]),
+                 'home': bool(w.nest_at()[0, i] == home), 'hungry': bool(w.energy[0, i] < cfg.jelly.hunger),
+                 'turbo': round(float(w.nectar[0, i]) / self.hz, 1)}
+        if cfg.carry.on:
+            state['carrying'] = bool(w.load[0, i] >= 0)
+        s = cfg.sprint
+        if s.on:
+            # shares left of the burst and of the rest after it
+            state['sprint'] = {'left': round(float(w.sprinting[0, i]) / max(round(s.seconds * self.hz), 1), 3),
+                               'rest': round(float(w.resting[0, i]) / max(round(s.cooldown * self.hz), 1), 3)}
+        n = cfg.night
+        if n.on:
+            t = (float(w.age[0]) / self.hz + float(w.clock[0])) % n.cycle
+            day = n.cycle - n.length
+            # seconds to nightfall by day, to dawn by night
+            state['night'] = {'dark': t >= day, 'in': round(day - t if t < day else n.cycle - t, 1)}
+        return state
+
     def score(self) -> dict:
         w = self.world
-        you = {**self.card(self.you), 'alive': self.playing, 'energy': round(float(w.energy[0, self.slot]), 3)}
+        you = {**self.card(self.you), 'alive': self.playing, 'energy': round(float(w.energy[0, self.slot]), 3),
+               'state': self.state()}
         theirs = [self.card(i) for i in self.started if i != self.you]
         # in a world of one there's nobody else to compare with
         brain = {}
