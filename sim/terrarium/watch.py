@@ -3,12 +3,15 @@
 # run and looks again whenever the replay runs out, so a fast GPU's checkpoints in between are skipped.
 #
 # Each replay is recorded by the code of the job that trained it (its checkout, with that checkout's own packages),
-# so a run made on another branch still plays in the world it was trained in. The viewer's files come from the site,
-# checked against the sha256 each one is listed with, and the last good copy is used when the site can't be reached.
+# so a run made on another branch still plays in the world it was trained in. The viewer's files come from the site
+# in one bundle, each checked against the sha256 it's listed with, and the last good copy is used when the site can't
+# be reached.
 #
 #   uv run python -m terrarium.watch [--home DIR] [--port 5196] [--viewer DIR] [--no-open]
 
 import argparse
+import base64
+import gzip
 import hashlib
 import json
 import subprocess
@@ -17,7 +20,6 @@ import urllib.request
 import webbrowser
 from http.server import ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
-from urllib.parse import quote
 
 from . import worker
 from .log import Logger
@@ -85,28 +87,35 @@ def fetch(url: str) -> bytes:
 
 def viewer(home: Path, site: str = SITE) -> Path | None:
     """The viewer's files in home/viewer, brought up to date from the site; None if there are none yet and the site
-    can't be reached."""
+    can't be reached. They come in one bundle, checked against its sha256 and then each file against its own."""
     dest = home / 'viewer'
     try:
-        files: dict[str, str] = json.loads(fetch(site + 'files.json'))['files']
+        listing = json.loads(fetch(site + 'files.json'))
+        files: dict[str, str] = listing['files']
     except (urllib.error.URLError, OSError, ValueError, KeyError) as e:
         log.warn('viewer not checked', site=site, error=str(e))
         return dest if (dest / 'index.html').exists() else None
-    for name, digest in files.items():
+    paths = {}
+    for name in files:
         parts = PurePosixPath(name).parts
         if not parts or name.startswith('/') or any(p in ('..', '.') or not NAME.match(p) for p in parts):
             raise ValueError(f'the viewer lists a file it can\'t have: {name!r}')
-        path = dest.joinpath(*parts)
-        if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == digest:
-            continue
-        data = fetch(site + quote(name))
-        if hashlib.sha256(data).hexdigest() != digest:
-            raise ValueError(f'{name} from the site does not match its sha256')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
+        paths[name] = dest.joinpath(*parts)
+    stale = [n for n, d in files.items() if not paths[n].is_file() or hashlib.sha256(paths[n].read_bytes()).hexdigest() != d]
+    if stale:
+        bundle = fetch(site + 'bundle.json.gz')
+        if hashlib.sha256(bundle).hexdigest() != listing.get('bundle'):
+            raise ValueError('the viewer\'s bundle from the site does not match its sha256')
+        packed = json.loads(gzip.decompress(bundle))['files']
+        for name in stale:
+            data = base64.b64decode(packed.get(name, ''))
+            if hashlib.sha256(data).hexdigest() != files[name]:
+                raise ValueError(f'{name} in the viewer\'s bundle does not match its sha256')
+            paths[name].parent.mkdir(parents=True, exist_ok=True)
+            paths[name].write_bytes(data)
     for old in [p for p in dest.rglob('*') if p.is_file() and p.relative_to(dest).as_posix() not in files]:
         old.unlink()
-    log.info('viewer ready', files=len(files))
+    log.info('viewer ready', files=len(files), fetched=len(stale))
     return dest
 
 

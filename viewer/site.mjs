@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { marked } from 'marked';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -394,19 +395,31 @@ for (const name of used) {
   cpSync(`${cached}.jpg`, join(out, 'media', `${name}.jpg`));
 }
 
-// the viewer a lent machine runs to watch its own runs (sim/terrarium/watch.py), listed with each file's sha256
+// the viewer a lent machine runs to watch its own runs (sim/terrarium/watch.py), listed with each file's sha256 and
+// fetched as one gzipped bundle: Cloudflare adds its analytics script to HTML on the way, so pages fetched one by one
+// never match their sha256
 const viewer = join(out, 'at-home', 'viewer');
+const own = new Set(['files.json', 'bundle.json.gz']);
 if (existsSync(viewer)) {
   const files = {};
+  const data = {};
   const walk = (dir) => {
     for (const f of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, f.name);
+      const name = relative(viewer, path).split(sep).join('/');
       if (f.isDirectory()) walk(path);
-      else if (f.name !== 'files.json') files[relative(viewer, path).split(sep).join('/')] = createHash('sha256').update(readFileSync(path)).digest('hex');
+      else if (!own.has(name)) {
+        const bytes = readFileSync(path);
+        files[name] = createHash('sha256').update(bytes).digest('hex');
+        data[name] = bytes.toString('base64');
+      }
     }
   };
   walk(viewer);
-  writeFileSync(join(viewer, 'files.json'), JSON.stringify({ files }, null, 1) + '\n');
+  const bundle = gzipSync(JSON.stringify({ files: data }), { level: 9 });
+  writeFileSync(join(viewer, 'bundle.json.gz'), bundle);
+  const digest = createHash('sha256').update(bundle).digest('hex');
+  writeFileSync(join(viewer, 'files.json'), JSON.stringify({ files, bundle: digest }, null, 1) + '\n');
 }
 
 console.log(`site: ${notes.length} posts${review ? ` (${notes.filter((n) => n.draft).length} drafts)` : ''}, ${used.size} clips → ${out}`);

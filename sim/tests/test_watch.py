@@ -1,4 +1,6 @@
+import base64
 import functools
+import gzip
 import hashlib
 import json
 import threading
@@ -68,14 +70,18 @@ def site(folder: Path):
     return server, f'http://127.0.0.1:{server.server_port}/'
 
 
-def listed(folder: Path, files: dict[str, bytes], wrong: str = ''):
+def listed(folder: Path, files: dict[str, bytes], wrong: str = '', bundle_sha: str = ''):
+    """What site.mjs publishes: the files, their bundle, and files.json with the sha256 of each and of the bundle."""
+    folder.mkdir(parents=True, exist_ok=True)
     for name, data in files.items():
         (folder / name).parent.mkdir(parents=True, exist_ok=True)
         (folder / name).write_bytes(data)
     digests = {n: hashlib.sha256(d).hexdigest() for n, d in files.items()}
     if wrong:
         digests[wrong] = '0' * 64
-    (folder / 'files.json').write_text(json.dumps({'files': digests}))
+    bundle = gzip.compress(json.dumps({'files': {n: base64.b64encode(d).decode() for n, d in files.items()}}).encode())
+    (folder / 'bundle.json.gz').write_bytes(bundle)
+    (folder / 'files.json').write_text(json.dumps({'files': digests, 'bundle': bundle_sha or hashlib.sha256(bundle).hexdigest()}))
 
 
 def test_the_viewer_comes_from_the_site_checked_and_kept_for_when_its_away(tmp_path):
@@ -89,8 +95,15 @@ def test_the_viewer_comes_from_the_site_checked_and_kept_for_when_its_away(tmp_p
         got = watch.viewer(home, url)
         assert got and sorted(p.relative_to(got).as_posix() for p in got.rglob('*') if p.is_file()) == ['assets/main.js', 'index.html']
         listed(online, {'index.html': b'<p>viewer</p>', 'assets/main.js': b'evil'}, wrong='assets/main.js')
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='main.js'):
             watch.viewer(home, url)
+        listed(online, {'index.html': b'<p>changed</p>', 'assets/main.js': b'let a = 1'}, bundle_sha='0' * 64)
+        with pytest.raises(ValueError, match='bundle'):
+            watch.viewer(home, url)
+        # pages on the site itself can come back with a script added on the way: only the bundle is fetched
+        listed(online, {'index.html': b'<p>changed</p>', 'assets/main.js': b'let a = 1'})
+        (online / 'index.html').write_bytes(b'<p>changed</p><script src="beacon.js"></script>')
+        assert (watch.viewer(home, url) / 'index.html').read_bytes() == b'<p>changed</p>'
     finally:
         server.shutdown()
     # the site can't be reached: the copy it has still plays
