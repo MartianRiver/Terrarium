@@ -20,7 +20,7 @@ npm run site        # dist-site/: the viewer in watch/, the pages beside it, and
 
 Deploying is an rsync of `dist-site/` to the web server, leaving out `replays/gallery/` (published on its own, below). Anything unfinished in a page or a published post, like a draft marker or a note of what's still to write (the same list the commit checks refuse), stops `npm run site`, which deletes what it had built so a half-made site can't be deployed. A review build still shows it. Old links like `/?replay=…&follow` are sent on to `/watch/` with their query.
 
-`/at-home/viewer/` is a second build of the viewer, the local kind with the runs page and `?latest`, for `python -m terrarium.watch` on a lent machine to fetch ([compute.md](compute.md)). Its `files.json` lists every file with its sha256, and the watcher refuses a file that doesn't match.
+`/at-home/viewer/` is a second build of the viewer, the local kind with the runs page and `?latest`, for `python -m terrarium.watch` on a lent machine to fetch ([compute.md](compute.md)). Its `files.json` lists every file with its sha256, and the sha256 of `bundle.json.gz`, which holds them all: the watcher fetches the bundle and refuses it or any file in it that doesn't match. Files fetched one at a time wouldn't do, because Cloudflare adds its analytics script to HTML on the way.
 
 ## Posts
 
