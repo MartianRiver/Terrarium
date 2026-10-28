@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Every run says where its training time goes. Each metrics line has how busy the GPU and the cores were while collecting and while updating (read every 2 seconds by a thread in train, from nvidia-smi or Apple's GPU counters), and `python -m terrarium.usage RUN` says in a sentence what's holding a run back: the GPU itself, collecting, or an update that leaves the GPU waiting on Python. Workers (version 6) send the same with their status while a job trains, and the admin page shows it per machine.
+
 Each nest has a low woven dome over it in its colony's colour, with a frosted cap and an open band at the bottom to walk in under, so the jelly and the huddle stay in view. It fades as the camera comes close. Only the viewer draws it: in the sim a nest is still a flat pad.
 
 Brains can have memory. `train --memory N` gives a brain N notes it carries from one choice to the next (a GRU), read back through a link that starts at zero, so it acts exactly as before until training finds a use for them. Notes start blank with each life and are wiped at death. A brain with memory is trained a whole creature's rollout at a time, replayed in order from the notes it began with, and `evals --wiped` scores it with its notes blanked before every choice, to show whether it uses them.
