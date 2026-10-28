@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-A job's result can't be lost to its size any more. The coordinator takes up to 16 MB (it was 8), and past that the worker (version 7) leaves out every other checkpoint until the run fits, counting back from the last, which always goes; run.json says how many were left out, and the machine keeps them all. A run of a memory brain saving a checkpoint every 10 updates trained twice for nothing before this.
+A job's result can't be lost to its size any more. The coordinator takes up to 64 MB (it was 8) and keeps up to 8 GB of results (it was 2), and past that the worker (version 7) leaves out every other checkpoint until the run fits, counting back from the last, which always goes; run.json says how many were left out, and the machine keeps them all. A run of a memory brain saving a checkpoint every 10 updates trained twice for nothing before this.
 
 Every run says where its training time goes. Each metrics line has how busy the GPU and the cores were while collecting and while updating (read every 2 seconds by a thread in train, from nvidia-smi or Apple's GPU counters), and `python -m terrarium.usage RUN` says in a sentence what's holding a run back: the GPU itself, collecting, or an update that leaves the GPU waiting on Python. Workers (version 6) send the same with their status while a job trains, and the admin page shows it per machine.
 
