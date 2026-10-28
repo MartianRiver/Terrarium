@@ -28,7 +28,7 @@ What it never does:
 
 - run a command, script or path the coordinator sends. The API has four calls: claim a job, fetch a file by hash, renew the claim, upload the result (plus give a job back when stopping).
 - listen on anything but `127.0.0.1`: its status page and pause/resume are for you, on your machine.
-- write outside its home folder (`~/.terrarium/worker`), apart from uv's own cache of the Python and packages it downloads (PyTorch included), or send anything but the run it made. A result is the run folder `train` wrote (`run.json`, `metrics.jsonl`, `evals.json`, checkpoints) plus the signed job: configs, numbers, your OS and CPU, Python and package versions. Paths in it are relative to the job's checkout, so your username isn't in them. The training log stays on your machine.
+- write outside its home folder (`~/.terrarium/worker`), apart from uv's own cache of the Python and packages it downloads (PyTorch included), or send anything but the run it made. A result is the run folder `train` wrote (`run.json`, `metrics.jsonl`, `evals.json`, checkpoints; past the coordinator's 16 MB, every other checkpoint is left out until it fits, never the last, and your copy keeps them all) plus the signed job: configs, numbers, your OS and CPU, Python and package versions. Paths in it are relative to the job's checkout, so your username isn't in them. The training log stays on your machine.
 
 What you're still trusting:
 

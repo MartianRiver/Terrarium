@@ -34,7 +34,7 @@ log = Logger('coordinator')
 
 PORT = 5194
 ROLES = ('admin', *jobs.MACHINES)
-LIMITS = {'blob': 16_000_000, 'result': 8_000_000, 'json': 64_000}
+LIMITS = {'blob': 16_000_000, 'result': jobs.RESULT_LIMIT, 'json': 64_000}
 # requests a minute per machine token, and how many it may make at once; a worker makes a few a minute
 RATE, BURST = 60, 60
 # seconds between writes of workers.json when nothing but the time last seen has changed
