@@ -5,7 +5,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
 
@@ -392,6 +392,21 @@ for (const name of used) {
   mkdirSync(join(out, 'media'), { recursive: true });
   cpSync(`${cached}.mp4`, join(out, 'media', `${name}.mp4`));
   cpSync(`${cached}.jpg`, join(out, 'media', `${name}.jpg`));
+}
+
+// the viewer a lent machine runs to watch its own runs (sim/terrarium/watch.py), listed with each file's sha256
+const viewer = join(out, 'at-home', 'viewer');
+if (existsSync(viewer)) {
+  const files = {};
+  const walk = (dir) => {
+    for (const f of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, f.name);
+      if (f.isDirectory()) walk(path);
+      else if (f.name !== 'files.json') files[relative(viewer, path).split(sep).join('/')] = createHash('sha256').update(readFileSync(path)).digest('hex');
+    }
+  };
+  walk(viewer);
+  writeFileSync(join(viewer, 'files.json'), JSON.stringify({ files }, null, 1) + '\n');
 }
 
 console.log(`site: ${notes.length} posts${review ? ` (${notes.filter((n) => n.draft).length} drafts)` : ''}, ${used.size} clips → ${out}`);

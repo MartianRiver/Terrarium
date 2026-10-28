@@ -423,3 +423,62 @@ body {
   margin: 4px 0 0;
   opacity: 0.75;
 }
+
+#play {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+#play table {
+  border-collapse: collapse;
+}
+
+#play th,
+#play td {
+  padding: 1px 10px 1px 0;
+  text-align: left;
+}
+
+#play th {
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+#play small {
+  opacity: 0.6;
+}
+
+#play p {
+  margin: 6px 0 0;
+}
+
+.play-energy {
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: rgb(44 58 51 / 0.15);
+  overflow: hidden;
+}
+
+.play-energy span {
+  display: block;
+  height: 100%;
+  background: #6fae5a;
+}
+
+.play-meta,
+.play-keys {
+  opacity: 0.7;
+}
+
+.play-error {
+  color: #8a2a1d;
+}

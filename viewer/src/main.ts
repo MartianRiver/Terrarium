@@ -6,6 +6,7 @@ import { createDemo } from './demo';
 import { galleryBar } from './gallery';
 import { createLogger } from './lib/logger';
 import { namesFor } from './names';
+import { Game } from './play';
 import { withNectar } from './preview';
 import { readReplay, ReplayError, type Replay } from './replay';
 import { createStage } from './stage';
@@ -24,6 +25,8 @@ interface Source {
   info: WorldInfo;
   step(): Frame | null;
   label(): string;
+  // a live source (a game) can be waiting on its next frames; a replay always has one
+  ready?(): boolean;
 }
 
 function setStatus(kind: 'loading' | 'empty' | 'error' | 'ok', text = '') {
@@ -90,6 +93,8 @@ function boot() {
   const [lx, ly, lh] = (params.get('look') ?? '').split(',').map(Number);
   const look = params.has('look') ? { x: lx, y: ly, heading: lh || 0 } : null;
   let nameOf = namesFor('demo');
+  // ?play: you're one of the Terrikins (play.ts)
+  let game: Game | null = null;
   // the picked Terrikin's name, above it
   const tag = document.createElement('div');
   tag.className = 'nametag';
@@ -165,6 +170,32 @@ function boot() {
     }
   }
   const openFile = (file: File) => open(file.name, () => file.arrayBuffer());
+
+  // a game in the world of ?play=<run id> (or the newest live run) against its newest brain, you the ringed one
+  async function play() {
+    opening = true;
+    setStatus('loading', 'Starting a game…');
+    try {
+      const next = await Game.begin(params.get('play') || null, stage.camera, stage.renderer.domElement);
+      game?.end();
+      game = next;
+      make = () => next;
+      chosen = next.you;
+      nameOf = namesFor(`play/${next.token}`);
+      stage.lookWithRight();
+      restart(true);
+      follow(true);
+      const hint = document.querySelector('#hud .hint');
+      if (hint) hint.textContent = 'you have the ring · the keys are in the panel';
+      log.info('game started', { you: next.you });
+      setStatus('ok');
+    } catch (err) {
+      log.error('game failed to start', { err });
+      setStatus('error', `Couldn’t start a game: ${err instanceof Error ? err.message : String(err)}. Click or press Esc to close this.`);
+    } finally {
+      opening = false;
+    }
+  }
   // ids only name the same Terrikins in the same episode: a run's replay recorded again here is that
   let playing = '';
   function newReplay(url: URL | null) {
@@ -179,7 +210,7 @@ function boot() {
   const caster = new THREE.Raycaster();
   stage.renderer.domElement.addEventListener('pointerdown', (e) => Object.assign(pointer, { x: e.clientX, y: e.clientY, at: performance.now() }));
   stage.renderer.domElement.addEventListener('pointerup', (e) => {
-    if (!view || Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) > 6 || performance.now() - pointer.at > 400) return;
+    if (!view || game || Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) > 6 || performance.now() - pointer.at > 400) return;
     const box = stage.renderer.domElement.getBoundingClientRect();
     caster.setFromCamera(new THREE.Vector2(((e.clientX - box.left) / box.width) * 2 - 1, -((e.clientY - box.top) / box.height) * 2 + 1), stage.camera);
     const id = view.pick(caster);
@@ -255,7 +286,8 @@ function boot() {
     if (brain && (e.key === 'b' || e.key === 'B')) brain.toggle();
     if (brain && (e.key === 'n' || e.key === 'N')) brain.toggleNet();
     if (e.key === 'r' || e.key === 'R') {
-      restart();
+      if (game) void play();
+      else restart();
       log.info('restarted');
     }
     if (e.key === 'p' || e.key === 'P') {
@@ -301,6 +333,13 @@ function boot() {
   }
   const place = Number(params.get('gallery'));
   if (params.has('gallery') && Number.isInteger(place)) void galleryBar(place);
+  if (!SITE) {
+    const link = document.createElement('a');
+    link.href = '/?play';
+    link.textContent = 'Play';
+    document.querySelector('a[href="/runs.html"]')?.after(' ', link);
+  }
+  if (!SITE && params.has('play')) void play();
   const watching = !SITE && params.has('latest');
   if (watching) void openLatest();
 
@@ -317,6 +356,10 @@ function boot() {
     if (!paused) {
       acc += dt;
       while (acc >= tickSeconds) {
+        if (source.ready && !source.ready()) {
+          acc = Math.min(acc, tickSeconds);
+          break;
+        }
         const next = source.step();
         if (!next) {
           restart();

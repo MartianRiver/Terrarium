@@ -86,6 +86,10 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
 
   return {
     renderer, scene, camera,
+    // in a game the left button walks you somewhere, so looking around moves to the right one
+    lookWithRight() {
+      controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+    },
     setWorld(info: WorldInfo) {
       if (garden) {
         scene.remove(garden.group);
