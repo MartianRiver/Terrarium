@@ -39,7 +39,7 @@ from pathlib import Path
 
 import psutil
 
-from . import jobs, machine, runs, snapshot
+from . import jobs, machine, runs, snapshot, usage
 from .log import Logger
 from .store import sha256
 
@@ -49,7 +49,7 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
-VERSION = 5
+VERSION = 6
 
 
 def cpus() -> int:
@@ -107,15 +107,21 @@ class Task:
     def progress(self) -> dict:
         p = {'state': self.state, 'reason': self.reason, 'samples': 0, 'samples_per_second': None}
         if self.run and (self.run / 'metrics.jsonl').exists():
-            rows = (self.run / 'metrics.jsonl').read_text().splitlines()
-            for line in reversed(rows):
-                try:
-                    row = json.loads(line)
-                    p |= {'samples': row['samples'], 'samples_per_second': row['samples_per_second']}
-                    break
-                except (ValueError, KeyError):
-                    continue
+            rows = [r for r in usage.rows_of(self.run) if 'samples' in r and 'samples_per_second' in r]
+            if rows:
+                p |= {'samples': rows[-1]['samples'], 'samples_per_second': rows[-1]['samples_per_second']}
         return p
+
+    def usage(self) -> dict | None:
+        """Where its training time goes lately, and what holds it back (terrarium.usage)."""
+        if self.state != 'training' or not self.run or not (self.run / 'metrics.jsonl').exists():
+            return None
+        recent = usage.recent(usage.rows_of(self.run))
+        try:
+            record = json.loads((self.run / 'run.json').read_text())
+        except (OSError, ValueError):
+            record = {}
+        return recent | {'held_back': usage.held_back(recent, record)} if recent else None
 
     def summary(self) -> dict:
         return {'id': self.id, 'name': self.spec['name'], 'batch': self.spec['batch'], 'total': self.spec['samples'],
@@ -193,8 +199,9 @@ class Worker:
 
     def info(self) -> dict:
         state, reason = self.state()
+        training = [u for t in list(self.tasks.values()) if (u := t.usage())]
         return {'platform': platform.platform(), 'slots': self.slots, 'trusted': self.trusted, 'version': VERSION,
-                'specs': self.specs, 'state': state, 'reason': reason}
+                'specs': self.specs, 'state': state, 'reason': reason, 'usage': training[0] if training else None}
 
     def report(self):
         # every minute, working or not, so the coordinator knows a waiting machine is still there
@@ -424,7 +431,7 @@ class Worker:
         return {'state': state, 'reason': reason, 'paused': self.paused, 'draining': self.draining,
                 'slots': self.slots, 'trusted': self.trusted, 'rollouts': self.rollouts, 'threads': self.threads,
                 'rules': vars(self.rules), 'machine': seen._asdict() if seen else None,
-                'jobs': [t.summary() for t in self.tasks.values()]}
+                'jobs': [t.summary() | {'usage': t.usage()} for t in self.tasks.values()]}
 
 
 def tail(path: Path, lines: int = 40) -> str:

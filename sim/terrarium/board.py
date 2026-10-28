@@ -14,6 +14,8 @@ from pathlib import Path
 KINDS = {'trusted': 'mine', 'rented': 'rented', 'donor': 'lent'}
 INFO = {'platform': str, 'slots': int, 'trusted': bool, 'version': int, 'state': str, 'reason': str}
 TEXT = 120
+USAGE = ['samples_per_second', 'collect_seconds', 'update_seconds',
+         *(f'{k}_{p}' for k in ('gpu_busy', 'gpu_gb', 'gpu_power', 'cpu_cores', 'machine_cpu') for p in ('collect', 'update'))]
 OUTSIDE = Path(__file__).resolve().parent.parent / 'board.toml'
 
 
@@ -23,6 +25,11 @@ def text(value) -> str | None:
 
 def number(value) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 1_000_000 else None
+
+
+def reading(value) -> float | None:
+    ok = isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value < 10_000_000
+    return round(float(value), 3) if ok else None
 
 
 def clean(info: dict) -> dict:
@@ -44,6 +51,12 @@ def clean(info: dict) -> dict:
                         'cores': number(specs.get('cores')), 'memory_gb': number(specs.get('memory_gb')),
                         'gpus': [{'name': text(g.get('name')), 'memory_gb': number(g.get('memory_gb'))}
                                  for g in gpus[:8] if isinstance(g, dict)]}
+    # how hard it trains lately (terrarium.usage), for the admin page only: summary() never shows it
+    if isinstance(got := info.get('usage'), dict):
+        kept: dict[str, float | str] = {k: v for k in USAGE if (v := reading(got.get(k))) is not None}
+        if isinstance(held := got.get('held_back'), str):
+            kept['held_back'] = held[:300]
+        out['usage'] = kept
     return out
 
 

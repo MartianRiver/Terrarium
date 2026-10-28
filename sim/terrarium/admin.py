@@ -255,14 +255,14 @@ class Desk:
                        '<button name="action" value="revoke">Revoke</button></form>') if role else 'revoked'
             rows.append(f'<tr><td>{esc(name)}</td><td>{esc(role or w.get("role", ""))}</td>'
                         f'<td>{esc(info.get("state", "–"))} <small>{esc(info.get("reason", ""))}</small></td>'
-                        f'<td>{esc(info.get("version", "–"))}</td>'
+                        f'<td>{training(info.get("usage"))}</td><td>{esc(info.get("version", "–"))}</td>'
                         f'<td>{seen}</td><td>{esc(gpus)}</td><td>{esc(cpu)}</td><td>{esc(memory)}</td><td>{n.get("done", 0)}</td><td>{n.get("lost", 0)}</td>'
                         f'<td>{n.get("failed", 0)}</td><td>{n.get("given back", 0)}</td>'
                         f'<td>{d.get("samples", 0) / 1e6:.1f}M</td><td>{buttons}</td></tr>')
         roles = ''.join(f'<option>{r}</option>' for r in ROLES)
         body = ((f'<p class="note">{esc(note)}</p>' if note else '')
                 + (f'<pre class="token">{esc(token)}</pre>' if token else '')
-                + '<h2>Machines</h2><table><tr><th>Handle</th><th>Role</th><th>Now</th><th>Version</th><th>Last seen</th><th>GPU</th><th>CPU</th><th>Memory</th>'
+                + '<h2>Machines</h2><table><tr><th>Handle</th><th>Role</th><th>Now</th><th>Training</th><th>Version</th><th>Last seen</th><th>GPU</th><th>CPU</th><th>Memory</th>'
                   '<th>Done</th><th>Lost</th><th>Failed</th><th>Given back</th><th>Samples</th><th></th></tr>'
                 + ''.join(rows) + '</table>'
                 + f'<h2>New token</h2><form method="post">{form}<input name="name" placeholder="handle" required '
@@ -288,6 +288,17 @@ def ago(seconds: float) -> str:
     # the server's clock is UTC, so no times of day
     m = round(seconds / 60)
     return f'{m} min ago' if m < 120 else f'{m / 60:.0f} h ago' if m < 48 * 60 else f'{m / 1440:.0f} days ago'
+
+
+def training(u: dict | None) -> str:
+    """How hard a machine trains lately: speed, the GPU busy collecting / updating, cores busy, what holds it back."""
+    if not u or 'samples_per_second' not in u:
+        return '–'
+    pct = lambda k: f'{u[k]:.0%}' if k in u else '?'
+    cores = lambda k: f'{u[k]:.1f}' if k in u else '?'
+    return (f'{u["samples_per_second"]:,.0f}/s · GPU {pct("gpu_busy_collect")} / {pct("gpu_busy_update")} · '
+            f'cores {cores("cpu_cores_collect")} / {cores("cpu_cores_update")}'
+            f'<br><small>held back by {esc(u.get("held_back", "?"))}</small>')
 
 
 def parts(specs: dict) -> tuple[str, str, str]:

@@ -96,3 +96,28 @@ def test_a_worker_says_what_it_is_and_what_its_doing(tmp_path):
     assert info['state'] == 'paused' and set(info['specs']) == {'os', 'cpu', 'cores', 'memory_gb', 'gpus'}
     assert board.clean(info)['specs']['cores'] == info['specs']['cores']
     assert info['version'] == worker.VERSION
+
+
+def test_how_hard_a_machine_trains_is_kept_for_river_and_never_on_the_board(server):
+    root, url, c = server
+    lately = {'samples_per_second': 2656, 'update_seconds': 9.06, 'gpu_busy_update': 0.41, 'gpu_busy_collect': True,
+              'cpu_cores_collect': -3, 'whatever': 1, 'held_back': 'the update ' * 40}
+    c['laptop'].json('POST', '/api/status', REPORT | {'usage': lately})
+    kept = c['admin'].json('GET', '/api/workers')['laptop']['info']['usage']
+    assert set(kept) == {'samples_per_second', 'update_seconds', 'gpu_busy_update', 'held_back'}
+    assert len(kept['held_back']) == 300
+    _, shown = get(url)
+    assert 'update' not in json.dumps(shown)
+
+
+def test_a_training_job_says_where_its_time_goes(tmp_path):
+    task = worker.Task({'spec': {'id': 'j', 'name': 'n', 'batch': 'b', 'samples': 10}, 'sig': ''})
+    task.run, task.state = tmp_path, 'training'
+    assert task.usage() is None
+    (tmp_path / 'run.json').write_text(json.dumps({'device': 'cuda', 'workers': 8}))
+    rows = [{'samples': 32768 * i, 'samples_per_second': 2656, 'collect_seconds': 3.3, 'update_seconds': 9.1,
+             'gpu_busy_update': 0.4} for i in range(1, 4)]
+    (tmp_path / 'metrics.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    got = task.usage()
+    assert got and got['update_seconds'] == 9.1 and 'waits on Python' in got['held_back']
+    assert task.progress()['samples'] == 3 * 32768

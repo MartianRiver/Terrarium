@@ -32,6 +32,7 @@ from .log import Logger
 from .ppo import advantages, update
 from .rollouts import Collector, OnDevice
 from .runs import ROOT, Run, cpu_quota
+from .usage import Sampler
 
 log = Logger('train')
 
@@ -103,6 +104,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     metas = [meta] + [{**meta, 'parent': brain_id(r), 'rival': k} for k, r in enumerate(rivals, 1)]
     log.info('training', run=run.id, updates=updates, per_update=per_update, device=device, workers=workers)
 
+    sampler = Sampler(device).start()
     started = time.perf_counter()
     checkpoint = None
     for u in range(1, updates + 1):
@@ -110,10 +112,12 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
             for group in optimizer.param_groups:
                 group['lr'] = lr * (1 - (u - 1) / updates) if ppo.anneal else lr
         tick = time.perf_counter()
+        sampler.into('collect')
         roll, last_value = rollouts.collect([b.state_dict() for b in brains] if rivals else learner.state_dict(),
                                             ppo.steps)
         adv, returns = advantages(roll.rewards, roll.values, roll.dones, last_value, ppo.gamma, ppo.lam)
         collected = time.perf_counter()
+        sampler.into('update')
         if rivals:
             stats = {}
             assert isinstance(rollouts, OnDevice)
@@ -126,11 +130,12 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         else:
             stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast)
         done = time.perf_counter()
+        sampler.into(None)
 
         row = {'update': u, 'samples': u * per_update, 'seconds': round(done - started, 1),
                'samples_per_second': round(per_update / (done - tick)),
                'collect_seconds': round(collected - tick, 2), 'update_seconds': round(done - collected, 2),
-               'reward_per_sample': float(roll.rewards.mean()), **rollouts.episodes.take(), **stats}
+               'reward_per_sample': float(roll.rewards.mean()), **rollouts.episodes.take(), **stats, **sampler.take()}
         run.log_metrics(row)
         if u == 1 or u % 10 == 0 or u == updates:
             log.info('update', u=u, of=updates, sps=row['samples_per_second'],
@@ -143,6 +148,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
                 (run.dir / 'rivals' / str(k)).mkdir(parents=True, exist_ok=True)
                 save(brains[k], run.dir / 'rivals' / str(k) / checkpoint.name, **metas[k], samples=u * per_update)
 
+    sampler.stop()
     rollouts.close()
     assert checkpoint is not None
     if not score:

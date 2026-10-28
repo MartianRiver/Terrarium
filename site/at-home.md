@@ -20,7 +20,7 @@ For a sense of speed: my M3 MacBook Air trains about 8,000 samples a second, and
 - **Not all of it.** At most half the CPU, at low priority, and it pauses if an NVIDIA GPU passes 85 °C (a Mac doesn't say how hot its GPU is, so there it leaves that to macOS).
 - **Awake while it works.** While a job trains, it keeps the computer from going to sleep, so you don't have to change your power settings. The screen still turns off, and sleep works as normal again once the job is done or paused.
 - **Its own folder.** Jobs, their code and their runs live in `~/.terrarium/worker`. The one exception is [uv](https://docs.astral.sh/uv/), which keeps the Python and packages it downloads (PyTorch included) in its own cache. It listens only on your own machine.
-- **What it sends.** The runs it trained, and once a minute what your machine is (OS, CPU, cores, memory, NVIDIA GPU) and whether it's working, waiting or paused. No hostname, user name or files. The board shows your machine's name, its GPU and what it's trained, never whether you're at it.
+- **What it sends.** The runs it trained, and once a minute what your machine is (OS, CPU, cores, memory, NVIDIA GPU) and whether it's working, waiting or paused, plus how busy the GPU and CPU are while it trains, so I can tell when a job isn't using your machine well. No hostname, user name or files. The board shows your machine's name, its GPU and what it's trained, never whether you're at it.
 
 The whole of it, with how to change each rule, is in [docs/compute.md](https://github.com/MartianRiver/Terrarium/blob/HEAD/docs/compute.md).
 

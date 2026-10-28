@@ -34,10 +34,20 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 | file | what |
 |---|---|
 | `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file, id, and the meta saved in it: the run and samples it came from), schema, brain shape, seed, device, GPU, workers, `fast` and `gpu_collect`, torch threads, machine (platform, CPU, memory), python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
-| `metrics.jsonl` | one line per update: samples, speed, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread |
+| `metrics.jsonl` | one line per update: samples, speed, seconds collecting and updating, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread, and how hard the machine worked in each phase (below) |
 | `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
 | `diff.patch`, `untracked.txt` | only for a run from uncommitted code |
+
+### Where the time goes
+
+Each round of training collects (the worlds step, everyone looks and the brain picks what each does) and then updates (PPO on the GPU, or the CPU without one). A thread in train reads the machine every 2 seconds and files each reading under the phase it was in, and every metrics line has the means since the last: `gpu_busy_collect` and `gpu_busy_update` (share of the time the GPU had work: nvidia-smi's `utilization.gpu`, or Apple's `Device Utilization %`), `gpu_gb_*`, `gpu_power_*` (draw against its limit, where the driver says), `cpu_cores_*` (cores busy in train and its rollout processes) and `machine_cpu_*` (the whole machine's CPU). A phase shorter than 2 seconds can go without a reading on some lines; over a few they even out.
+
+```
+uv run python -m terrarium.usage runs/<run> [...]
+```
+
+prints a run's last 40 rounds: speed, seconds a phase, GPU and cores busy in each, and what's holding it back, in a sentence: the GPU itself, collecting (and whether more rollout processes would help, or the CPU is full), or an update that leaves the GPU idle while Python hands it small steps one at a time. GPU and machine CPU count every program, so with several runs on one pod they say how full the pod is, not one run. A GPU busy all the time can still be doing little at once, so busy means it isn't waiting, not that it's full.
 
 Training refuses to start with uncommitted changes unless it's given `--scratch`. A scratch run is for trying things: it keeps the diff so it can be understood later, and can never be promoted.
 
