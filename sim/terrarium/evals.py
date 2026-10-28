@@ -37,7 +37,7 @@ from .runs import cpu_quota
 from .schema import YES_NO
 from .tactics import REASONS, Tactics, flower_in_view
 from .vision import FLOWER, FOOD, NOTHING, look
-from .world import World
+from .world import CARRIED, World
 
 log = Logger('evals')
 
@@ -163,6 +163,9 @@ CONTEXTS = {
     'sprint_ready': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on, 4),
     'grab_block': (lambda w, nest, mine: w.touching_block() & w.cfg.grab.on, 5),
     'sprint_flower': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on & flower_in_view(w), 4),
+    'carry_berry': (lambda w, nest, mine: w.berry_in_reach(), 6),
+    # a yes while carrying puts it down
+    'carry_laden': (lambda w, nest, mine: w.load >= 0, 6),
 }
 
 
@@ -236,6 +239,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     policy = make(world)
     shape = world.alive.shape
     lived, meals, stored, jelly, drunk = (np.zeros(shape, int) for _ in range(5))
+    picked, put_home, given, given_hungry = (np.zeros(shape, int) for _ in range(4))
     # deaths in each slot: with hatching, one slot can die more than once
     died, jelly_at_home, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
@@ -285,7 +289,8 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         world.step(action)
         tactics.after(world, done)
         # food goes at nightfall too; only count it eaten on other ticks
-        eaten = growing & ~world.food_present & ~(world.dark & ~was_dark)[:, None] & ~done[:, None]
+        eaten = (growing & ~world.food_present & (world.food_regrow != CARRIED) & ~(world.dark & ~was_dark)[:, None]
+                 & ~done[:, None])
         from_middle += (eaten & middle).sum(1)
         for a, i in zip(*np.nonzero(eaten)):
             d = np.where(before[a], np.hypot(*(pos[a] - food_pos[a, i]).T), np.inf)
@@ -315,6 +320,10 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         stored[finished] = world.stored[finished]
         jelly[finished] = world.jelly[finished]
         drunk[finished] = world.drunk[finished]
+        picked[finished] = world.picked[finished]
+        put_home[finished] = world.put_home[finished]
+        given[finished] = world.given[finished]
+        given_hungry[finished] = world.given_hungry[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         hatched[finished] = world.hatched[finished]
         size_end[finished] = counts[finished]
@@ -352,6 +361,11 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'blocks_moved': summary((moved > 0.5).sum(1)[:, None]),
         # what sprints and flowers get used for (tactics.py)
         **tactics.result(),
+        # with [carry] on, per creature: berries picked up, put down at its own nest, and put down ones a nestmate took
+        # (also counted for a hungry nestmate)
+        **({'carry': {'picked': summary(picked[:, starters]), 'put_home': summary(put_home[:, starters]),
+                      'given': summary(given[:, starters]), 'given_hungry': summary(given_hungry[:, starters])}}
+           if cfg.carry.on else {}),
     }
 
 
@@ -459,6 +473,12 @@ def main():
             print(f'{name:<{width}}  {fl["opened"]:6}  ' + '  '.join(f'{"–" if v is None else f"{v:.0%}":>{n}}'
                                                              for v, n in ((fl['drunk'], 5), (fl['chased'], 18)))
                   + '  ' + f'{" · ".join("–" if v is None else f"{v:.1f}" for v in r["nectar"].values()):>27}')
+    if cfg.carry.on:
+        print(f'\n{"carrying, each":<{width}}  {"picked up":>9}  {"put down home":>13}  {"to a nestmate":>13}  {"to a hungry one":>15}')
+        for name, r in results.items():
+            ca = r['carry']
+            print(f'{name:<{width}}  ' + '  '.join(f'{ca[k]["mean"]:{n}.2f}' for k, n in
+                                                  (('picked', 9), ('put_home', 13), ('given', 13), ('given_hungry', 15))))
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

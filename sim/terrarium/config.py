@@ -145,6 +145,17 @@ class Grab:
 
 
 @dataclass(frozen=True)
+class Carry:
+    reach: float
+    slow: float
+    energy: float
+
+    @property
+    def on(self) -> bool:
+        return self.reach > 0
+
+
+@dataclass(frozen=True)
 class Smell:
     cell: float
     spread: float
@@ -201,6 +212,7 @@ class Config:
     sprint: Sprint
     flowers: Flowers
     grab: Grab
+    carry: Carry
     smell: Smell
     ground: Ground
     vision: Vision
@@ -314,6 +326,7 @@ SINCE = {'colonies': {'room': 0},
          'flowers': {'count': 0, 'every_min': 0.0, 'every_max': 0.0, 'open': 0.0, 'radius': 0.0, 'food': 0, 'boost': 0.0,
                      'speed': 1.0, 'spots': 0, 'spot_gap': 0.0},
          'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0},
+         'carry': {'reach': 0.0, 'slow': 0.0, 'energy': 0.0},
          'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0}}
 
 

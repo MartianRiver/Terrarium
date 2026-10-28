@@ -741,3 +741,293 @@ started = "2026-10-26T19:06:45+11:00"
 ended = "2026-10-26T19:09:45+11:00"
 dollars = 0.002
 note = "PBT7, lost in setup with no log line; times from the instance's place between u1 and u4"
+
+[[session]]
+provider = "vast"
+instance = 57935571
+gpu = "RTX 3060"
+cpu = "unknown"
+started = "2026-10-27T19:06:10+11:00"
+ended = "2026-10-27T19:16:22+11:00"
+dollars = 0.002
+note = "memory grid 1, never reached running (machine 146697)"
+
+[[session]]
+provider = "vast"
+instance = 57936605
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T19:16:50+11:00"
+ended = "2026-10-27T19:29:47+11:00"
+dollars = 0.041
+note = "memory grid 1, runs died at once (git safe.directory) (machine 33747)"
+
+[[session]]
+provider = "vast"
+instance = 57937878
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T19:30:53+11:00"
+ended = "2026-10-27T21:05:16+11:00"
+dollars = 0.19
+note = "memory grid 1 (spots, base vs 128 notes) (machine 33751)"
+
+[[session]]
+provider = "vast"
+instance = 57943675
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-27T20:31:34+11:00"
+ended = "2026-10-27T21:07:17+11:00"
+dollars = 0.141
+note = "carrying a berry, round 1 (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 57947160
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T21:06:35+11:00"
+ended = "2026-10-27T21:54:36+11:00"
+dollars = 0.103
+note = "memory grid 2 (spots, out of step) (machine 33751)"
+
+[[session]]
+provider = "vast"
+instance = 57947179
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-27T21:06:49+11:00"
+ended = "2026-10-27T21:40:22+11:00"
+dollars = 0.133
+note = "memory grid 2 (lr 2e-4, steps 256) (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 57947194
+gpu = "RTX 3060"
+cpu = "Xeon E5-2682 v4, 16 cores"
+started = "2026-10-27T21:07:05+11:00"
+ended = "2026-10-27T21:19:48+11:00"
+dollars = 0.026
+note = "memory grid 2, never ran (uv sync) (machine 35285)"
+
+[[session]]
+provider = "vast"
+instance = 57947345
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-27T21:08:19+11:00"
+ended = "2026-10-27T22:00:45+11:00"
+dollars = 0.185
+note = "carrying a berry, round 2 (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 57947862
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T21:14:04+11:00"
+ended = "2026-10-27T21:57:43+11:00"
+dollars = 0.102
+note = "memory grid 2 (hidden patch) (machine 33751)"
+
+[[session]]
+provider = "vast"
+instance = 57948609
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T21:20:04+11:00"
+ended = "2026-10-27T22:05:41+11:00"
+dollars = 0.101
+note = "memory grid 2 (rich spots) (machine 33747)"
+
+[[session]]
+provider = "vast"
+instance = 57949458
+gpu = "RTX 3060"
+cpu = "Xeon E5-2697 v4, 18 cores"
+started = "2026-10-27T21:29:31+11:00"
+ended = "2026-10-27T21:36:57+11:00"
+dollars = 0.012
+note = "calls, no ssh (machine 143649)"
+
+[[session]]
+provider = "vast"
+instance = 57949477
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-27T21:29:48+11:00"
+ended = "2026-10-27T22:33:04+11:00"
+dollars = 0.212
+note = "calls grid (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 57949951
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-27T21:34:03+11:00"
+ended = "2026-10-27T23:55:55+11:00"
+dollars = 0.238
+note = "calls grid (machine 34586)"
+
+[[session]]
+provider = "vast"
+instance = 57952012
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-27T21:54:06+11:00"
+ended = "2026-10-27T23:18:20+11:00"
+dollars = 0.143
+note = "droppings grid (machine 34586)"
+
+[[session]]
+provider = "vast"
+instance = 57952036
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-27T21:54:26+11:00"
+ended = "2026-10-27T23:23:06+11:00"
+dollars = 0.153
+note = "droppings grid (machine 34586)"
+
+[[session]]
+provider = "vast"
+instance = 57952478
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T21:59:47+11:00"
+ended = "2026-10-27T23:20:28+11:00"
+dollars = 0.173
+note = "memory: patch at dusk (machine 33747)"
+
+[[session]]
+provider = "vast"
+instance = 57955801
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-27T22:34:25+11:00"
+ended = "2026-10-27T22:34:43+11:00"
+dollars = 0.0
+note = "calls, stopped by hand at once (machine 33751)"
+
+[[session]]
+provider = "vast"
+instance = 57960672
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-27T23:25:46+11:00"
+ended = "2026-10-28T01:01:57+11:00"
+dollars = 0.159
+note = "droppings in the nest (machine 34586)"
+
+[[session]]
+provider = "vast"
+instance = 57960730
+gpu = "RTX 3060"
+cpu = "EPYC 7B12, 21 cores"
+started = "2026-10-27T23:26:06+11:00"
+ended = "2026-10-27T23:44:13+11:00"
+dollars = 0.041
+note = "memory_lr pod, died in uv sync (machine 34586)"
+
+[[session]]
+provider = "vast"
+instance = 57969991
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-28T01:00:46+11:00"
+ended = "2026-10-28T02:12:53+11:00"
+dollars = 0.145
+note = "memory_lr 10-20x (machine 33747)"
+
+[[session]]
+provider = "vast"
+instance = 58018696
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T09:14:51+11:00"
+ended = "2026-10-28T10:14:14+11:00"
+dollars = 0.197
+note = "memory 16M: base vs 128 notes (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58018740
+gpu = "RTX 3060"
+cpu = "Xeon E5-2696 v3, 18 cores"
+started = "2026-10-28T09:15:20+11:00"
+ended = "2026-10-28T09:22:41+11:00"
+dollars = 0.008
+note = "memory 16M, no ssh (machine 140134)"
+
+[[session]]
+provider = "vast"
+instance = 58018758
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T09:15:32+11:00"
+ended = "2026-10-28T10:53:19+11:00"
+dollars = 0.309
+note = "memory 16M: recall started random (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58018795
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-28T09:15:52+11:00"
+ended = "2026-10-28T10:52:29+11:00"
+dollars = 0.154
+note = "memory 16M: patch at dusk, memory_lr 5 (machine 147415)"
+
+[[session]]
+provider = "vast"
+instance = 58019412
+gpu = "RTX 3060"
+cpu = "Xeon E5-2697 v4, 18 cores"
+started = "2026-10-28T09:22:59+11:00"
+ended = "2026-10-28T09:26:36+11:00"
+dollars = 0.004
+note = "memory 16M, no ssh (machine 143649)"
+
+[[session]]
+provider = "vast"
+instance = 58019760
+gpu = "RTX 3070"
+cpu = "EPYC 7402, 16 cores"
+started = "2026-10-28T09:27:04+11:00"
+ended = "2026-10-28T10:51:51+11:00"
+dollars = 0.175
+note = "memory 16M: memory_lr 3 and 5 (machine 19028)"
+
+[[session]]
+provider = "vast"
+instance = 58027788
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T10:59:22+11:00"
+ended = "2026-10-28T11:54:56+11:00"
+dollars = 0.186
+note = "flash world: base vs 128 notes (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58027824
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T10:59:52+11:00"
+ended = "2026-10-28T12:03:49+11:00"
+dollars = 0.218
+note = "flash world: second seed, steps 256 (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58034196
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-28T12:15:27+11:00"
+ended = "2026-10-28T13:46:24+11:00"
+dollars = 0.146
+note = "flash world: side task (hint 1 and 0.2) (machine 147415)"

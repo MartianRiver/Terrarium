@@ -3,10 +3,10 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { dropGeo, jellyMat } from './jelly';
 import type { BlockState, FoodKind, FoodState } from './world';
 
-const berryGeo = new THREE.SphereGeometry(0.11, 20, 14);
-const leafGeo = new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.25, 1.8);
-const berryMat = new THREE.MeshPhysicalMaterial({ color: 0xff5a6e, roughness: 0.5, sheen: 0.5 });
-const leafMat = new THREE.MeshStandardMaterial({ color: 0x5fae4e, roughness: 0.7 });
+export const berryGeo = new THREE.SphereGeometry(0.11, 20, 14);
+export const leafGeo = new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.25, 1.8);
+export const berryMat = new THREE.MeshPhysicalMaterial({ color: 0xff5a6e, roughness: 0.5, sheen: 0.5 });
+export const leafMat = new THREE.MeshStandardMaterial({ color: 0x5fae4e, roughness: 0.7 });
 // a wooden toy block, like the rest of the garden
 const blockMat = new THREE.MeshPhysicalMaterial({ color: 0xe2bf8f, roughness: 0.6, sheen: 0.4, sheenColor: new THREE.Color(0xfff3dd) });
 
