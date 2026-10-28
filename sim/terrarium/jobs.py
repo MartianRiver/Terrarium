@@ -52,6 +52,8 @@ SIGNERS = Path(__file__).resolve().parent.parent / 'allowed_signers'
 HOME = Path.home() / '.terrarium'
 KEY = Path.home() / '.ssh' / 'terrarium_jobs_ed25519'
 SERVER = os.environ.get('TERRARIUM_JOBS', 'http://127.0.0.1:5194')
+# the biggest result the coordinator takes; Atlas's nginx takes 64 MB on that path, Cloudflare 100 MB at most
+RESULT_LIMIT = 64_000_000
 AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')

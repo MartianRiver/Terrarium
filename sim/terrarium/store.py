@@ -65,7 +65,7 @@ def final_checkpoint(result: bytes) -> bytes:
 
 
 class Store:
-    def __init__(self, root: Path, results_cap: int = 2_000_000_000):
+    def __init__(self, root: Path, results_cap: int = 8_000_000_000):
         self.root = Path(root)
         self.blobs = self.root / 'blobs'
         self.jobs = self.root / 'jobs'

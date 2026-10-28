@@ -49,7 +49,7 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
-VERSION = 6
+VERSION = 7
 
 
 def cpus() -> int:
@@ -444,10 +444,12 @@ def tail(path: Path, lines: int = 40) -> str:
     return '\n'.join(path.read_text(errors='replace').splitlines()[-lines:]) if path.exists() else ''
 
 
-def pack(run: Path, instance: int | None = None, paused: float = 0) -> bytes:
+def pack(run: Path, instance: int | None = None, paused: float = 0, limit: int = jobs.RESULT_LIMIT) -> bytes:
     """The run folder as a tar.gz, without the replays serve caches. A rented machine's id goes into
     run.json so compute can tell its runs from another pod's with the same GPU, and the time the job
-    sat paused so it isn't counted as training."""
+    sat paused so it isn't counted as training. Past the coordinator's limit every other checkpoint is
+    left out until it fits, counting back from the last, which always goes (it's the brain); the run
+    kept here has them all, and the run.json sent says how many were left out."""
     if instance is not None or paused:
         record = json.loads((run / 'run.json').read_text())
         if instance is not None:
@@ -455,10 +457,25 @@ def pack(run: Path, instance: int | None = None, paused: float = 0) -> bytes:
         if paused:
             record['paused'] = round(paused)
         (run / 'run.json').write_text(json.dumps(record, indent=2) + '\n')
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode='w:gz') as tar:
-        tar.add(run, arcname=run.name, filter=lambda m: None if '/replays' in m.name else m)
-    return buf.getvalue()
+    checkpoints = sorted((run / 'checkpoints').glob('*.pt'))
+    keep = set(checkpoints)
+    while True:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+            left_out = {f'{run.name}/checkpoints/{c.name}' for c in checkpoints if c not in keep}
+            tar.add(run, arcname=run.name, filter=lambda m: None if '/replays' in m.name or m.name in left_out or
+                    (left_out and m.name == f'{run.name}/run.json') else m)
+            if left_out:
+                record = json.loads((run / 'run.json').read_text()) | {'checkpoints_left_out': len(left_out)}
+                body = (json.dumps(record, indent=2) + '\n').encode()
+                info = tarfile.TarInfo(f'{run.name}/run.json')
+                info.size, info.mtime = len(body), int((run / 'run.json').stat().st_mtime)
+                tar.addfile(info, io.BytesIO(body))
+        if len(buf.getvalue()) <= limit or len(keep) <= 1:
+            if left_out:
+                log.info('checkpoints left out to fit the result', run=run.name, kept=len(keep), of=len(checkpoints))
+            return buf.getvalue()
+        keep = set([c for c in checkpoints if c in keep][::-1][::2])
 
 
 def prune(runs: Path, gb: float):
