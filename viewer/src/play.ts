@@ -1,7 +1,8 @@
 // Play as one Terrikin (local only, ?play[=run id]): a game on the runs server (sim play.py) in a run's world, the
 // rest steered by its newest brain. Frames come a few ticks at a time, each request carrying what you're doing, so
 // the game runs at the viewer's pace and stops when it pauses. A bar along the top shows your energy and points, and a
-// panel the controls this world has and how you're doing next to the brain's worst, average and best Terrikins.
+// panel the controls this world has and how you're doing next to the brain's worst, average and best Terrikins. Under
+// the bar, what's hard to see on the body (a full crop, the sprint's rest, nectar, nightfall), with a word as each changes.
 import * as THREE from 'three';
 import { clock } from './clock';
 import { parseReplay } from './replay';
@@ -14,8 +15,21 @@ interface Card {
   points: number;
 }
 
+// what the world has: no sprint, carry or night in the state means the world hasn't got them
+interface State {
+  crop: number;
+  capacity: number;
+  store: number;
+  home: boolean;
+  hungry: boolean;
+  turbo: number;
+  carrying?: boolean;
+  sprint?: { left: number; rest: number };
+  night?: { dark: boolean; in: number };
+}
+
 interface Score {
-  you: Card & { alive: boolean; energy: number };
+  you: Card & { alive: boolean; energy: number; state: State };
   // empty in a world of one
   brain: { worst?: Card; average?: Card; best?: Card; count?: number };
   rank: number;
@@ -78,6 +92,9 @@ export class Game {
   private before: Card | null = null;
   // when each counter last went up, so it stays lit a moment (the panel is redrawn every few ticks)
   private lit: Partial<Record<keyof Card, number>> = {};
+  private was: State | null = null;
+  private wasEnergy = 1;
+  private toasts: HTMLElement;
   private stop: () => void;
 
   private constructor(private start: Start, private camera: THREE.Camera, private canvas: HTMLCanvasElement) {
@@ -96,8 +113,11 @@ export class Game {
     this.hud.innerHTML = `
       <div class="hud-energy"><span class="hud-label">Energy</span><span class="hud-bar"><span></span></span><span class="hud-value"></span></div>
       <div class="hud-points"><span class="hud-label">Score</span><b></b></div>
-      <div class="hud-counts"><span data-k="seconds"></span><span data-k="berries"></span><span data-k="home"></span></div>`;
-    document.body.append(this.panel, this.hud);
+      <div class="hud-counts"><span data-k="seconds"></span><span data-k="berries"></span><span data-k="home"></span></div>
+      <div class="hud-state"><span class="hud-sprint"><span class="hud-label">Sprint</span><span class="hud-bar"><span></span></span><i></i></span><span class="hud-chips"></span></div>`;
+    this.toasts = document.createElement('div');
+    this.toasts.id = 'play-toasts';
+    document.body.append(this.panel, this.hud, this.toasts);
     this.stop = this.listen();
     this.show();
   }
@@ -128,6 +148,7 @@ export class Game {
     this.stop();
     this.panel.remove();
     this.hud.remove();
+    this.toasts.remove();
   }
 
   private async ask() {
@@ -272,6 +293,68 @@ export class Game {
       span.className = bump(k).trim();
     }
     this.before = { seconds: you.seconds, berries: you.berries, home: you.home, points: you.points };
+    this.assist(you.state, you.alive ? energy : -1);
+  }
+
+  // the state line under the bar, and a word when something changes
+  private assist(st: State, energy: number) {
+    const line = this.hud.querySelector<HTMLElement>('.hud-state')!;
+    line.hidden = energy < 0;
+    if (energy < 0) return;
+    const sprint = this.hud.querySelector<HTMLElement>('.hud-sprint')!;
+    sprint.hidden = !st.sprint;
+    if (st.sprint) {
+      const { left, rest } = st.sprint;
+      const fill = left > 0 ? left : 1 - rest;
+      sprint.className = `hud-sprint ${left > 0 ? 'going' : rest > 0 ? 'resting' : 'ready'}`;
+      sprint.querySelector<HTMLElement>('.hud-bar span')!.style.width = `${Math.round(fill * 100)}%`;
+      sprint.querySelector('i')!.textContent = left > 0 ? 'go!' : rest > 0 ? 'resting' : 'ready';
+    }
+    const chips: string[] = [];
+    if (st.capacity > 0) {
+      const dots = '●'.repeat(st.crop) + '○'.repeat(Math.max(st.capacity - st.crop, 0));
+      chips.push(`<span class="${st.crop >= st.capacity ? 'full' : ''}">Jelly belly ${dots}${st.crop >= st.capacity ? ' full' : ''}</span>`);
+    }
+    if (st.carrying) chips.push('<span>Carrying a berry</span>');
+    if (st.turbo > 0) chips.push(`<span class="turbo">Turbo ${Math.ceil(st.turbo)} s</span>`);
+    if (st.home) {
+      const can = [st.crop > 0 && this.has('unload') ? '<b>Q</b> unload' : '',
+        st.hungry && st.crop === 0 && st.store > 0 && this.has('eat') ? '<b>E</b> eat a jelly' : ''].filter(Boolean);
+      chips.push(`<span class="home">Home · ${st.store} jelly stored${can.length ? ' · ' + can.join(' · ') : ''}</span>`);
+    }
+    if (st.night) chips.push(st.night.dark ? `<span class="night">Night · dawn in ${Math.ceil(st.night.in)} s</span>`
+      : st.night.in <= 15 ? `<span class="dusk">Night in ${Math.ceil(st.night.in)} s</span>` : '');
+    const html = chips.join('');
+    const box = this.hud.querySelector<HTMLElement>('.hud-chips')!;
+    // only when it changes, so the chips don't flicker
+    if (box.innerHTML !== html) box.innerHTML = html;
+    const was = this.was;
+    if (was) {
+      if (st.capacity > 0 && st.crop >= st.capacity && was.crop < st.capacity)
+        this.toast(this.has('unload') ? 'Jelly belly full! Take it home (Q unloads)' : 'Jelly belly full!');
+      if (st.sprint && was.sprint && was.sprint.rest > 0 && st.sprint.rest === 0 && st.sprint.left === 0) this.toast('Sprint ready (Shift)', 'quiet');
+      if (st.turbo > 0 && was.turbo === 0) this.toast('Nectar! Turbo mode', 'turbo');
+      if (st.night && was.night && !st.night.dark && st.night.in <= 15 && was.night.in > 15) this.toast('Night in 15 s: get home, the dark is cold', 'dusk');
+      if (st.night && was.night && st.night.dark && !was.night.dark) this.toast('Night: no food grows till dawn', 'dusk');
+      if (st.home && !was.home && st.hungry && st.crop === 0 && st.store > 0 && this.has('eat')) this.toast('Hungry? E eats a jelly from the store', 'quiet');
+    }
+    if (energy <= 25 && this.wasEnergy > 25) this.toast('Low energy: eat something!', 'low');
+    this.was = st;
+    this.wasEnergy = energy;
+  }
+
+  private has(action: string): boolean {
+    return this.start.controls.includes(action);
+  }
+
+  private toast(text: string, kind = '') {
+    const el = document.createElement('div');
+    el.className = `play-toast ${kind}`;
+    el.textContent = text;
+    this.toasts.append(el);
+    // a few at most, newest at the bottom
+    while (this.toasts.children.length > 3) this.toasts.firstElementChild!.remove();
+    setTimeout(() => el.remove(), 2600);
   }
 }
 
