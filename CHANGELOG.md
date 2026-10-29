@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+The site's channel of training games has a card saying what's on screen: the game, its goal and setup, what to watch for, a line that follows the replay (whether the berry is in sight or hidden), what the brain is, and its score on a bar beside the baselines. The words come with the channel's index.
+
+Young Terrikins look like babies: bigger eyes, rosier cheeks, a shorter antenna and tail, and a toddler's waddle, quicker and wobblier, with their arms held out for balance.
+
 Peekaboo's spin now turns the baby round as the berry turns up as well as when it hides, since a brain without memory learned to run a lap of the arena and meet each berry on it.
 
 The At Home board says what each machine cost or saved. Rented GPUs show what they were actually paid (every rental in `compute.toml`, setup and idle included, now in `sim/board.toml`), and every machine that costs nothing, mine and the ones lent to me, shows what renting its samples would have cost at what rented GPUs have cost per sample so far. Machines are labelled by their token's role, admin, trusted, donor or rented, where trusted ones used to show as mine; my own machine stays admin whatever token it works under. The At Home page has play's points and its new HUD, the brain window (B) and the wired view (N), and worker versions 6 and 7.

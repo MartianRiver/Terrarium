@@ -726,3 +726,88 @@ body {
     transform: translateY(-16px);
   }
 }
+
+/* ?channel: what's on screen (channelcard.ts) */
+#channel {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+}
+
+#channel summary {
+  cursor: pointer;
+  font-size: 15px;
+}
+
+#channel summary span {
+  opacity: 0.6;
+  font-size: 13px;
+}
+
+#channel p {
+  margin: 6px 0;
+}
+
+#channel p > b:first-child {
+  display: inline-block;
+  min-width: 4.6em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+#channel .channel-now {
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgb(95 174 79 / 0.18);
+}
+
+#channel .channel-now[data-hidden='true'] {
+  background: rgb(240 140 170 / 0.25);
+}
+
+#channel .channel-now[hidden] {
+  display: none;
+}
+
+.channel-value {
+  font-weight: 700;
+}
+
+.channel-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: rgb(44 58 51 / 0.1);
+}
+
+.channel-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 5px;
+  background: #5fae4f;
+}
+
+.channel-bar i {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgb(44 58 51 / 0.55);
+}
+
+#channel .channel-marks,
+#channel .channel-foot {
+  font-size: 12px;
+  opacity: 0.65;
+}
