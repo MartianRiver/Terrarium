@@ -81,6 +81,16 @@ cost = 3
 threshold = 10
 seconds = 20.0
 
+[young]
+# a hatchling is young for this long (0 is off): it walks at `speed` of max_speed, everything costs it `energy` of what
+# it costs a grown one, and in its own nest it eats from the store whenever it isn't full, hungry or not, a bite its size:
+# a jelly goes 1 / `energy` times as far, and it takes only what fits
+seconds = 0.0
+speed = 1.0
+energy = 1.0
+# the Terrikins an episode starts with are young too, not only hatchlings
+start = false
+
 [night]
 # a day and its night take this long, the night being the last `length` of it; 0 turns nights off.
 # At nightfall the food standing goes, and none grows back until dawn
@@ -147,6 +157,40 @@ spread = 0.2
 fade = 0.01
 leak = 0.1
 
+[tag]
+# a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
+# new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed
+reach = 0.0
+cooldown = 0.0
+points = 0.0
+speed = 1.0
+
+[seek]
+# a nursery game: colony 0 hides, colony 1 seeks, and seekers can't move for the first `prep` seconds (0 is off); after
+# that each tick any seeker sees a hider pays the seekers `points` a second and costs the hiders the same, and the other
+# way round when every hider is out of sight
+prep = 0.0
+points = 0.0
+
+[flag]
+# a nursery game for two colonies: walking into the other nest picks up their flag, bringing it onto your own captures it
+# for `points` (0 is off) to your colony and as much off theirs; an opponent touching the carrier sends it home, and a
+# pickup or a touch is worth `pickup` of points
+points = 0.0
+pickup = 0.0
+
+[peek]
+# peekaboo, a nursery game for memory: a berry turns up `near`–`far` m in front of someone, in sight for `show` seconds
+# (0 is off), then out of sight where it is; finding it pays `points`, the next turns up `gap` s later, and one not found
+# `timeout` s after hiding moves. `spin` turns everyone round at random as it hides
+show = 0.0
+points = 0.0
+gap = 0.0
+timeout = 0.0
+near = 0.0
+far = 0.0
+spin = false
+
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
 friction = 1.2
@@ -170,6 +214,8 @@ w = 1.3
 h = 1.3
 mass = 4.0
 friction = 0.6
+carry = false
+shut = 0.0
 
 [[block]]
 x = -3.0
@@ -179,3 +225,5 @@ w = 2.4
 h = 1.1
 mass = 12.0
 friction = 0.6
+carry = false
+shut = 0.0

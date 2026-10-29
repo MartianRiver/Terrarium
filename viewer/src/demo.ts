@@ -64,7 +64,7 @@ export function createDemo(seed = 7) {
         id: nextId++, colony: nest.colony,
         x: nest.x + Math.cos(a) * 2.5, y: nest.y + Math.sin(a) * 2.5,
         heading: rng() * Math.PI * 2, speed: 0, size: 1,
-        energy: 0.5 + rng() * 0.5, signal: SIGNAL_OFF, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0,
+        energy: 0.5 + rng() * 0.5, signal: SIGNAL_OFF, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0,
         goal: 'wander', goalTicks: Math.floor(rng() * 60), drift: 0, targetBlock: 0, signalTicks: 0,
       });
     }
@@ -79,12 +79,12 @@ export function createDemo(seed = 7) {
   };
 
   const food: FoodState[] = [];
-  for (let i = 0; i < COMMON_FOOD; i++) food.push({ id: nextId++, kind: 'common', ...randomGroundPoint() });
+  for (let i = 0; i < COMMON_FOOD; i++) food.push({ id: nextId++, kind: 'common', hidden: false, ...randomGroundPoint() });
   let regrow: number[] = [];
 
   const blocks: BlockState[] = [
-    { id: nextId++, x: 3.5, y: 3, angle: 0, w: 1.3, h: 1.3 },
-    { id: nextId++, x: -4, y: -3.5, angle: 0, w: 2.4, h: 1.1 },
+    { id: nextId++, x: 3.5, y: 3, angle: 0, w: 1.3, h: 1.3, carried: 0 },
+    { id: nextId++, x: -4, y: -3.5, angle: 0, w: 2.4, h: 1.1, carried: 0 },
   ];
   // share of overlap the block absorbs when shoved: lighter blocks move more
   const give = new Map([[blocks[0].id, 0.5], [blocks[1].id, 0.2]]);
@@ -211,12 +211,12 @@ export function createDemo(seed = 7) {
 
     const due = regrow.filter((t) => t <= tick).length;
     regrow = regrow.filter((t) => t > tick);
-    for (let i = 0; i < due; i++) food.push({ id: nextId++, kind: 'common', ...randomGroundPoint() });
+    for (let i = 0; i < due; i++) food.push({ id: nextId++, kind: 'common', hidden: false, ...randomGroundPoint() });
 
     return {
       tick,
-      creatures: agents.map(({ id, colony, x, y, heading, speed, size, energy, signal, carrying, holding, nectar, sprinting, load }) =>
-        ({ id, colony, x, y, heading, speed, size, energy, signal, carrying, holding, nectar, sprinting, load })),
+      creatures: agents.map(({ id, colony, x, y, heading, speed, size, energy, signal, carrying, holding, nectar, sprinting, load, young }) =>
+        ({ id, colony, x, y, heading, speed, size, energy, signal, carrying, holding, nectar, sprinting, load, young })),
       food: food.map((f) => ({ ...f })),
       blocks: blocks.map((b) => ({ ...b })),
       stores: [],

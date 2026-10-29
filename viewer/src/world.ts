@@ -23,6 +23,7 @@ export interface CreatureState {
   nectar: number; // seconds left of a nectar boost; 0 in worlds without flowers
   sprinting: number; // 1 mid-sprint; 0 in worlds without sprint and replays from before it
   load: number; // 1 while it carries a berry in its jaws (carry); 0 in worlds without carry
+  young: number; // share of its youth left, 1 just hatched to 0 grown; 0 in worlds without young
 }
 
 export interface FoodState {
@@ -30,6 +31,7 @@ export interface FoodState {
   kind: FoodKind;
   x: number;
   y: number;
+  hidden: boolean; // peekaboo's berry, out of the Terrikins' sight but still there
 }
 
 export interface BlockState {
@@ -39,6 +41,7 @@ export interface BlockState {
   angle: number;
   w: number;
   h: number;
+  carried: number; // 1 while a Terrikin carries it on its head (carry); 0 in replays from before 0.4
 }
 
 export interface NestInfo {

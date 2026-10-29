@@ -6,11 +6,12 @@
 # The number of rays isn't part of it: each ray is its own token, so a brain
 # works with however many the config casts.
 
-VERSION = 9
+VERSION = 11
 SELF = ('energy', 'forward_speed', 'side_speed', 'last_thrust', 'last_turn',
         'home_distance', 'home_sin', 'home_cos', 'carrying', 'at_home', 'store', 'light', 'sprinting', 'rested',
-        'holding', 'smell', 'smell_sin', 'smell_cos', 'nectar', 'load')
-RAY = ('distance', 'sin', 'cos', 'nestmate', 'own_nest', 'other_nest')
+        'holding', 'smell', 'smell_sin', 'smell_cos', 'nectar', 'load', 'young',
+        'it', 'seeker', 'waiting', 'flag', 'flag_distance', 'flag_sin', 'flag_cos', 'flag_taken')
+RAY = ('distance', 'sin', 'cos', 'nestmate', 'own_nest', 'other_nest', 'it', 'carrier')
 # what a ray hit, in vision's order
 KINDS = ('nothing', 'wall', 'creature', 'food', 'block', 'flower')
 ACTIONS = ('thrust', 'turn', 'unload', 'eat', 'sprint', 'grab', 'carry')

@@ -52,6 +52,23 @@ def frame(world: World, a: int) -> dict:
         # a berry in its jaws
         for c, load in zip(creatures, world.load[a][born]):
             c['load'] = int(load >= 0)
+    if world.tag:
+        # it lights its bulb
+        for c, it in zip(creatures, world.tag.mask()[a][born]):
+            c['signal'] = 0 if it else -1
+    if world.flags:
+        # a flag rides on its carrier's head, where a carried berry goes
+        for c, flag in zip(creatures, world.flags.carrying()[a][born]):
+            c['load'] = int(flag)
+    if world.seek:
+        # seekers light their bulbs while they count
+        counting = world.seek.waiting()[a] > 0
+        for c, seeker in zip(creatures, world.seek.seeker[born]):
+            c['signal'] = 2 if seeker and counting else -1
+    if cfg.young.on:
+        # share of its youth left: 1 just hatched, 0 grown
+        for c, left in zip(creatures, world.young[a][born]):
+            c['young'] = _r(left / max(round(cfg.young.seconds * cfg.tick_hz), 1))
     if cfg.flowers.on:
         # seconds of nectar boost left
         for c, boost in zip(creatures, world.nectar[a][born]):
@@ -60,8 +77,15 @@ def frame(world: World, a: int) -> dict:
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
             for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
+    if world.peek and world.peek.hidden[a]:
+        # peekaboo's berry, out of sight
+        food[0]['hidden'] = 1
     blocks = [{'id': int(i), 'x': _r(x), 'y': _r(y), 'angle': _r(t), 'w': b.w, 'h': b.h}
-              for i, b, (x, y), t in zip(world.block_id, cfg.block, world.block_pos[a], world.block_angle[a])]
+              for i, b, (x, y), t in zip(world.block_id, cfg.block, world.physics.block_pos[a], world.block_angle[a])]
+    # a carried block rides on its carrier, crosswise
+    for i in np.flatnonzero(world.block_load[a] >= 0):
+        block = blocks[world.block_load[a, i]]
+        block.update(x=_r(world.pos[a, i, 0]), y=_r(world.pos[a, i, 1]), angle=_r(world.heading[a, i]), carried=1)
     stores = [{'colony': c, 'jelly': int(j)} for c, j in enumerate(world.store[a])]
     out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
     if cfg.night.on:

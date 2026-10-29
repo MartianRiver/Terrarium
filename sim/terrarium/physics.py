@@ -14,6 +14,9 @@ BLOCKS = pymunk.ShapeFilter(mask=BLOCK)
 SOLID = pymunk.ShapeFilter(categories=CREATURE)
 # a dead creature's body touches nothing, so nothing bumps into what's drawn as a tombstone
 GONE = pymunk.ShapeFilter(categories=CREATURE, mask=0)
+GROUNDED = pymunk.ShapeFilter(categories=BLOCK)
+# a block being carried is off the ground: nothing touches it, and queries for blocks pass it by
+LIFTED = pymunk.ShapeFilter(categories=BLOCK, mask=0)
 # walls are thick and sit outside the arena, so nothing squeezed against one can pop through it
 WALL_THICKNESS = 0.5
 # per body: position x, y, angle, velocity x, y, angular velocity
@@ -64,7 +67,7 @@ class Physics:
             body.angle = b.angle
             shape = pymunk.Poly.create_box(body, (b.w, b.h))
             shape.friction = b.friction
-            shape.filter = pymunk.ShapeFilter(categories=BLOCK)
+            shape.filter = GROUNDED
             space.add(body, shape)
             bodies.append(body)
             # top-down ground friction: joints to the ground that resist up to a set force and torque
@@ -121,6 +124,40 @@ class Physics:
             holding[a, c] = True
         return holding
 
+    def nearest_block(self, a, c, reach: float) -> int:
+        """The block on the ground nearest creature c's edge in arena a, if within reach, else -1."""
+        body = self.bodies[a][c]
+        near = self.spaces[a].point_query_nearest(body.position, self.cfg.creature.radius + reach, BLOCKS)
+        return -1 if near is None else self.bodies[a].index(near.shape.body) - self.creatures
+
+    def lift(self, a, k):
+        """Block k off the ground in arena a, until it's set down."""
+        body = self.bodies[a][self.creatures + k]
+        body.velocity = (0, 0)
+        body.angular_velocity = 0
+        for shape in body.shapes:
+            shape.filter = LIFTED
+
+    def set_down(self, a, k, at, angle: float, anyway=False) -> bool:
+        """Block k on the ground at `at` if nothing else is there (or anyway); whether it went there. If not, it's left
+        as it was, carried or on the ground."""
+        body = self.bodies[a][self.creatures + k]
+        before = body.position, body.angle
+        body.position = (float(at[0]), float(at[1]))
+        body.angle = float(angle)
+        space = self.spaces[a]
+        space.reindex_shapes_for_body(body)
+        shape = next(iter(body.shapes))
+        was, shape.filter = shape.filter, GROUNDED
+        out = abs(at[0]) + 0.01 > self.cfg.arena.size / 2 or abs(at[1]) + 0.01 > self.cfg.arena.size / 2
+        if not anyway and (out or any(hit.shape.body is not body for hit in space.shape_query(shape))):
+            body.position, body.angle = before
+            space.reindex_shapes_for_body(body)
+            shape.filter = was
+            return False
+        self.read()
+        return True
+
     def near_block(self, reach: float) -> np.ndarray:
         r = self.cfg.creature.radius + reach
         return np.array([[space.point_query_nearest(body.position, r, BLOCKS) is not None for body in bodies[:self.creatures]]
@@ -158,6 +195,8 @@ class Physics:
                 body.angle = b.angle
                 body.velocity = (0, 0)
                 body.angular_velocity = 0
+                for shape in body.shapes:
+                    shape.filter = GROUNDED
         self.read()
 
     def remove(self, creatures: np.ndarray):

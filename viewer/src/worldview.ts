@@ -20,6 +20,8 @@ const log = createLogger('worldview');
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+// how much smaller a just-hatched young Terrikin is drawn than a grown one ([young] worlds)
+const YOUNG_SMALLER = 0.35;
 
 function nearest(creatures: CreatureState[], at: { x: number; y: number }) {
   let best: CreatureState | undefined;
@@ -47,7 +49,7 @@ export class WorldView {
   focusId: number | null = null;
   private ring: THREE.Mesh;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 };
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;
@@ -108,7 +110,8 @@ export class WorldView {
       s.heading = lerpAngle(p.heading, c.heading, alpha);
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
-      s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha);
+      // the young are drawn smaller, growing up through their youth
+      s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha) * (1 - YOUNG_SMALLER * lerp(p.young, c.young, alpha));
       if (c.id === followed) {
         this.focus = { x: s.x, y: s.y, heading: s.heading };
         this.focusId = c.id;
@@ -209,7 +212,11 @@ export class WorldView {
     const seen = new Set<number>();
     for (const f of frame.food) {
       seen.add(f.id);
-      if (this.food.has(f.id)) continue;
+      const known = this.food.get(f.id);
+      if (known) {
+        known.sync(f);
+        continue;
+      }
       const view = new FoodView(f);
       this.food.set(f.id, view);
       this.scene.add(view.root);

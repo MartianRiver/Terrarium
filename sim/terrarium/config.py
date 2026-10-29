@@ -88,6 +88,18 @@ class Hatch:
 
 
 @dataclass(frozen=True)
+class Young:
+    seconds: float
+    speed: float
+    energy: float
+    start: bool     # the Terrikins an episode starts with are young too, not only hatchlings
+
+    @property
+    def on(self) -> bool:
+        return self.seconds > 0
+
+
+@dataclass(frozen=True)
 class Night:
     cycle: float
     length: float
@@ -181,6 +193,58 @@ class Block:
     h: float
     mass: float
     friction: float
+    # small enough to pick up and carry (with [carry] on), as a berry is
+    carry: bool
+    # seconds after a carried block is put down that it goes back where it started, once that's clear (a door that
+    # swings shut); 0: it stays where it's put
+    shut: float
+
+
+@dataclass(frozen=True)
+class Tag:
+    reach: float
+    cooldown: float
+    points: float
+    speed: float    # it runs at this share of top speed (more than 1 gives the chaser a chance in the open)
+
+    @property
+    def on(self) -> bool:
+        return self.reach > 0
+
+
+@dataclass(frozen=True)
+class Seek:
+    prep: float
+    points: float
+
+    @property
+    def on(self) -> bool:
+        return self.prep > 0
+
+
+@dataclass(frozen=True)
+class Flag:
+    points: float
+    pickup: float
+
+    @property
+    def on(self) -> bool:
+        return self.points > 0
+
+
+@dataclass(frozen=True)
+class Peek:
+    show: float      # seconds the berry is in sight
+    points: float
+    gap: float       # seconds from one found to the next turning up
+    timeout: float   # seconds after hiding that it moves if nobody found it
+    near: float      # it turns up between these distances in front of someone
+    far: float
+    spin: bool       # turn everyone round at random when it hides
+
+    @property
+    def on(self) -> bool:
+        return self.show > 0
 
 
 @dataclass(frozen=True)
@@ -208,12 +272,17 @@ class Config:
     crop: Crop
     jelly: Jelly
     hatch: Hatch
+    young: Young
     night: Night
     sprint: Sprint
     flowers: Flowers
     grab: Grab
     carry: Carry
     smell: Smell
+    tag: Tag
+    seek: Seek
+    flag: Flag
+    peek: Peek
     ground: Ground
     vision: Vision
     episode: Episode
@@ -321,6 +390,11 @@ SINCE = {'colonies': {'room': 0},
          'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
+         'young': {'seconds': 0.0, 'speed': 1.0, 'energy': 1.0, 'start': False},
+         'tag': {'reach': 0.0, 'cooldown': 0.0, 'points': 0.0, 'speed': 1.0},
+         'seek': {'prep': 0.0, 'points': 0.0},
+         'flag': {'points': 0.0, 'pickup': 0.0},
+         'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
          'food': {'middle': 0},
          'flowers': {'count': 0, 'every_min': 0.0, 'every_max': 0.0, 'open': 0.0, 'radius': 0.0, 'food': 0, 'boost': 0.0,
@@ -335,7 +409,7 @@ def upgrade(data: dict) -> dict:
     out = {**data, **{k: {**old, **data.get(k, {})} for k, old in SINCE.items()}}
     if 'block' in data:
         # the vault's hinged doors were taken out again (0.3): those worlds come back with doors that slide
-        out['block'] = [{k: v for k, v in b.items() if k != 'hinge'} for b in data['block']]
+        out['block'] = [{'carry': False, 'shut': 0.0} | {k: v for k, v in b.items() if k != 'hinge'} for b in data['block']]
     return out
 
 

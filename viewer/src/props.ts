@@ -7,6 +7,8 @@ export const berryGeo = new THREE.SphereGeometry(0.11, 20, 14);
 export const leafGeo = new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.25, 1.8);
 export const berryMat = new THREE.MeshPhysicalMaterial({ color: 0xff5a6e, roughness: 0.5, sheen: 0.5 });
 export const leafMat = new THREE.MeshStandardMaterial({ color: 0x5fae4e, roughness: 0.7 });
+// what a hidden berry is drawn in: there for us, not for them
+const ghostMat = new THREE.MeshStandardMaterial({ color: 0xffc2cb, transparent: true, opacity: 0.35, depthWrite: false });
 // a wooden toy block, like the rest of the garden
 const blockMat = new THREE.MeshPhysicalMaterial({ color: 0xe2bf8f, roughness: 0.6, sheen: 0.4, sheenColor: new THREE.Color(0xfff3dd) });
 
@@ -48,16 +50,32 @@ export class FoodView {
   private age = 0;
   private dying = -1;
   private seed = Math.random() * 10;
+  private hidden = false;
+  private looks = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
 
   constructor(readonly state: FoodState) {
     this.root = buildFood(state.kind);
     this.root.position.set(state.x, 0, state.y);
     this.root.rotation.y = this.seed;
     this.root.scale.setScalar(0.001);
+    this.sync(state);
   }
 
   despawn() {
     if (this.dying < 0) this.dying = 0;
+  }
+
+  // peekaboo moves its berry where someone can see it, and hides it a second later
+  sync(s: FoodState) {
+    this.root.position.set(s.x, 0, s.y);
+    if (s.hidden === this.hidden) return;
+    this.hidden = s.hidden;
+    this.root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      if (!this.looks.has(o)) this.looks.set(o, o.material);
+      o.material = s.hidden ? ghostMat : this.looks.get(o)!;
+      o.castShadow = !s.hidden;
+    });
   }
 
   // false once the view has finished despawning and can be removed
@@ -73,6 +91,9 @@ export class FoodView {
   }
 }
 
+// how high a carried block rides: just above a Terrikin's bulb
+const CARRY_HEIGHT = 1.05;
+
 export class BlockView {
   readonly root: THREE.Mesh;
   private height = 0.8;
@@ -85,7 +106,8 @@ export class BlockView {
   }
 
   update(s: BlockState) {
-    this.root.position.set(s.x, this.height / 2, s.y);
+    // a carried one rides on top of its carrier's head
+    this.root.position.set(s.x, this.height / 2 + (s.carried ? CARRY_HEIGHT : 0), s.y);
     this.root.rotation.y = -s.angle;
   }
 

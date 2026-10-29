@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 import { BlobView } from '../src/blob';
 
 const RADIUS = 0.45; // sim/configs/world.toml [creature] radius
-const walking = { id: 1, colony: 0, x: 0, y: 0, heading: 0, speed: 2.4, size: 1, energy: 0.9, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0 };
+const walking = { id: 1, colony: 0, x: 0, y: 0, heading: 0, speed: 2.4, size: 1, energy: 0.9, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 };
 
 // furthest any vertex is drawn from the blob's centre, across the ground
 function reach(blob: BlobView) {

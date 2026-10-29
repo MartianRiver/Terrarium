@@ -95,14 +95,16 @@ function readFrame(o: Obj, where: string): Frame {
         nectar: c.nectar === undefined ? 0 : num(c, 'nectar', w),
         sprinting: c.sprinting === undefined ? 0 : int(c, 'sprinting', w),
         load: c.load === undefined ? 0 : int(c, 'load', w),
+        young: c.young === undefined ? 0 : num(c, 'young', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {
       if (f.kind !== 'common' && f.kind !== 'jelly') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
-      return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w) };
+      return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w), hidden: f.hidden === undefined ? false : int(f, 'hidden', w) > 0 };
     }),
     blocks: list(o, 'blocks', where, (b, w): BlockState => ({
       id: int(b, 'id', w), x: num(b, 'x', w), y: num(b, 'y', w), angle: num(b, 'angle', w), w: num(b, 'w', w), h: num(b, 'h', w),
+      carried: b.carried === undefined ? 0 : int(b, 'carried', w),
     })),
     stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: int(s, 'jelly', w) })),
     light: o.light === undefined ? 1 : num(o, 'light', where),

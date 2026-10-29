@@ -262,6 +262,32 @@ function boot() {
     }
   }
 
+  // ?channel=<index.json>: its replays in turn, each with its title as the label; the list is read again each time
+  // one runs out, so replays added while training (newer checkpoints) come round on the next pass
+  let showing = '';
+  let tuning = false;
+  async function openChannel() {
+    if (tuning) return;
+    tuning = true;
+    try {
+      const index = new URL(params.get('channel')!, location.href);
+      if (index.origin !== location.origin) throw new ReplayError(`won’t read a channel from another site (${index.origin})`);
+      const { items }: { items: { replay: string; title: string }[] } = await (await fetch(index, { cache: 'no-cache' })).json();
+      if (!items.length) throw new ReplayError('nothing on the channel yet');
+      const item = items[(items.findIndex((i) => i.replay === showing) + 1) % items.length];
+      const url = new URL(item.replay, index);
+      if (url.origin !== location.origin) throw new ReplayError(`won’t fetch a replay from another site (${url.origin})`);
+      const bytes = await fetchReplay(url);
+      showing = item.replay;
+      await open(item.title, async () => bytes, url);
+    } catch (err) {
+      log.warn('channel not read', { err: String(err) });
+    } finally {
+      tuning = false;
+      if (!showing) setTimeout(openChannel, 30_000);
+    }
+  }
+
   openButton.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
@@ -324,7 +350,8 @@ function boot() {
     brains.textContent = 'Brains';
     openButton.replaceWith(brains);
   }
-  const wanted = params.get('replay') ?? (SITE ? SITE_REPLAY : null);
+  const channel = params.has('channel');
+  const wanted = params.get('replay') ?? (SITE && !channel ? SITE_REPLAY : null);
   if (wanted) {
     const url = new URL(wanted, location.href);
     const name = params.get('name') ?? url.pathname.split('/').pop()!;
@@ -342,6 +369,7 @@ function boot() {
   if (!SITE && params.has('play')) void play();
   const watching = !SITE && params.has('latest');
   if (watching) void openLatest();
+  if (channel) void openChannel();
 
   // lite draws 30 frames a second at most
   const gap = lite ? 1000 / 30 - 2 : 0;
@@ -364,6 +392,7 @@ function boot() {
         if (!next) {
           restart();
           if (watching) void openLatest();
+          if (channel) void openChannel();
           break;
         }
         view!.push(next);

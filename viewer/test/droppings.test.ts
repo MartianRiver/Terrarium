@@ -7,7 +7,7 @@ import { Droppings } from '../src/droppings';
 import type { Frame } from '../src/world';
 
 const HZ = 20;
-const blob = { id: 7, colony: 0, x: 3, y: 2, heading: 0, speed: 0, size: 1, energy: 0.9, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0 };
+const blob = { id: 7, colony: 0, x: 3, y: 2, heading: 0, speed: 0, size: 1, energy: 0.9, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 };
 const frame = (tick: number): Frame => ({ tick, creatures: [blob], food: [], blocks: [], stores: [], light: 1, eggs: [], flowers: [] });
 
 test('every third meal leaves a dropping behind the blob, which later sinks away', () => {
