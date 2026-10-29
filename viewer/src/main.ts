@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AntStudy } from './ant';
 import { BrainView } from './brainview';
+import { ChannelCard, type Game as ChannelGame, type Item } from './channelcard';
 import { clock } from './clock';
 import { createDemo } from './demo';
 import { galleryBar } from './gallery';
@@ -266,20 +267,23 @@ function boot() {
   // one runs out, so replays added while training (newer checkpoints) come round on the next pass
   let showing = '';
   let tuning = false;
+  const card = new ChannelCard(document.body);
   async function openChannel() {
     if (tuning) return;
     tuning = true;
     try {
       const index = new URL(params.get('channel')!, location.href);
       if (index.origin !== location.origin) throw new ReplayError(`won’t read a channel from another site (${index.origin})`);
-      const { items }: { items: { replay: string; title: string }[] } = await (await fetch(index, { cache: 'no-cache' })).json();
+      const { items, games = {}, note }: { items: Item[]; games?: Record<string, ChannelGame>; note?: string } = await (await fetch(index, { cache: 'no-cache' })).json();
       if (!items.length) throw new ReplayError('nothing on the channel yet');
-      const item = items[(items.findIndex((i) => i.replay === showing) + 1) % items.length];
+      const place = (items.findIndex((i) => i.replay === showing) + 1) % items.length;
+      const item = items[place];
       const url = new URL(item.replay, index);
       if (url.origin !== location.origin) throw new ReplayError(`won’t fetch a replay from another site (${url.origin})`);
       const bytes = await fetchReplay(url);
       showing = item.replay;
       await open(item.title, async () => bytes, url);
+      card.show(item, games, place, items.length, note);
     } catch (err) {
       log.warn('channel not read', { err: String(err) });
     } finally {
@@ -396,6 +400,7 @@ function boot() {
           break;
         }
         view!.push(next);
+        if (channel) card.frame(next);
         tick = next.tick;
         stage.light(next.light);
         acc -= tickSeconds;

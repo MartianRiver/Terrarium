@@ -106,6 +106,8 @@ export class BlobView {
   // nectar: a shimmering bulb and belly and a happy face; sprinting: stretched out and quick-footed
   private joy = 0;
   private dash = 0;
+  // young: big eyes, rosy cheeks, a short antenna and a toddler's wobbly waddle, arms out for balance
+  private baby = 0;
   private sheen = new THREE.Color();
 
   private seed = Math.random() * 100;
@@ -203,6 +205,7 @@ export class BlobView {
     const ease = Math.min(1, dt * 6);
     this.joy += (s.nectar > 0 ? 1 - this.joy : -this.joy) * ease;
     this.dash += (s.sprinting > 0 ? 1 - this.dash : -this.dash) * ease;
+    this.baby += ((s.young > 0 ? 1 : 0) - this.baby) * ease;
     this.applyEnergy(s.energy, dt);
     this.animateWalk(s.speed / maxSpeed, dt, time);
     this.animateEyes(dt, time);
@@ -230,11 +233,11 @@ export class BlobView {
     this.stride += ((moving > 0.08 ? (0.5 + moving * 0.5) * spring : 0) - this.stride) * Math.min(1, dt * 6);
 
     const before = Math.floor(this.phase / Math.PI);
-    if (this.stride > 0.02) this.phase += dt * (7 + 7 * moving) * (1 + 0.7 * this.dash);
+    if (this.stride > 0.02) this.phase += dt * (7 + 7 * moving) * (1 + 0.7 * this.dash) * (1 + 0.3 * this.baby);
     // a little squash on each footfall
     if (Math.floor(this.phase / Math.PI) !== before) this.squashVel -= 0.8 * this.stride;
 
-    const bob = Math.abs(Math.sin(this.phase)) * this.stride * 0.22;
+    const bob = Math.abs(Math.sin(this.phase)) * this.stride * (0.22 + 0.12 * this.baby);
     const breathe = Math.sin(time * 2.2 + this.seed) * 0.025 * (1 - this.stride);
     const hop = this.joy * 0.05 * Math.abs(Math.sin(time * 8 + this.seed));
     const target = bob * 0.12 + breathe + hop;
@@ -245,7 +248,7 @@ export class BlobView {
       this.squash += this.squashVel * h;
     }
 
-    const sy = 1 + this.squash;
+    const sy = (1 + this.squash) * (1 - 0.08 * this.baby);
     const girth = 1 + this.full * 0.08 - this.hunger * 0.12;
     // never wider than the body it's drawn in
     const sxz = Math.min(1.04, girth / Math.sqrt(Math.max(0.5, sy)));
@@ -255,21 +258,24 @@ export class BlobView {
     // waddle: lean into the walk, rock side to side with each step
     this.lean += ((moving * 0.08 + this.dash * 0.16) - this.lean) * Math.min(1, dt * 5);
     this.body.rotation.x = this.lean;
-    const rock = Math.sin(this.phase) * 0.11 * this.stride;
-    this.body.rotation.z = Math.max(-0.15, Math.min(0.15, -this.turn * 0.08 + rock));
+    const rock = Math.sin(this.phase) * (0.11 + 0.13 * this.baby) * this.stride;
+    const most = 0.15 + 0.13 * this.baby;
+    this.body.rotation.z = Math.max(-most, Math.min(most, -this.turn * 0.08 + rock));
 
     this.arms.forEach((arm, i) => {
-      arm.rotation.z = (i ? 1 : -1) * 0.2 * (1 - this.hunger * 0.7);
+      arm.rotation.z = (i ? 1 : -1) * (0.2 + 0.45 * this.baby) * (1 - this.hunger * 0.7);
       // arms swing against the feet
       arm.rotation.x = Math.cos(this.phase + (i + 1) * Math.PI) * 0.6 * this.stride;
     });
     this.feet.forEach((foot, i) => {
-      foot.position.y = 0.065 + Math.max(0, Math.sin(this.phase + i * Math.PI)) * 0.075 * this.stride;
+      foot.position.y = 0.065 + Math.max(0, Math.sin(this.phase + i * Math.PI)) * (0.075 + 0.04 * this.baby) * this.stride;
       foot.position.z = 0.17 + Math.cos(this.phase + i * Math.PI) * 0.11 * this.stride;
     });
 
     this.stalk.rotation.z = Math.sin(time * 3 + this.seed) * 0.08 + this.turn * 0.05;
     this.stalk.rotation.x = 0.3 + this.hunger * 0.9;
+    this.stalk.scale.setScalar(1 - 0.35 * this.baby);
+    this.tail.scale.setScalar(1 - 0.4 * this.baby);
     // the tail wags with the steps, idles slowly and droops when starving
     this.tail.rotation.y = Math.sin(this.phase * 2) * 0.45 * this.stride + Math.sin(time * 1.7 + this.seed) * 0.15;
     this.tail.rotation.x = -0.4 + this.hunger * 0.9;
@@ -290,8 +296,9 @@ export class BlobView {
     // the glints lead into the turn, with a little idle wander
     const lookX = (Math.max(-0.35, Math.min(0.35, -this.turn * 0.15)) + Math.sin(time * 0.7 + this.seed) * 0.08) * 0.15;
     const lookY = Math.sin(time * 0.5 + this.seed * 2) * 0.015;
+    const big = 1 + 0.35 * this.baby;
     for (let i = 0; i < 2; i++) {
-      this.eyes[i].scale.y = eyeHeight;
+      this.eyes[i].scale.set(0.052 * big, eyeHeight * big, 0.035 * big);
       this.glints[i].position.x = 0.3 + lookX;
       this.glints[i].position.y = 0.35 + lookY;
     }
@@ -316,7 +323,8 @@ export class BlobView {
   private applyNectar(time: number) {
     const j = this.joy;
     this.mouth.scale.set(1 + 0.7 * j, 1 + 1.1 * j, 1);
-    for (const b of this.blush) b.scale.set(0.055 * (1 + 0.5 * j), 0.032 * (1 + 0.5 * j), 0.02);
+    const rosy = 1 + 0.5 * j + 0.4 * this.baby;
+    for (const b of this.blush) b.scale.set(0.055 * rosy, 0.032 * rosy, 0.02);
     shimmer(time, this.seed, this.sheen);
     if (j > 0.01) {
       this.bulbMat.color.lerp(this.sheen, j);
