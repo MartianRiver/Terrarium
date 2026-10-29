@@ -7,6 +7,8 @@ slop = 0.01
 
 [arena]
 size = 12.0
+# every block moves up to this far (m) from where it's set and turns any way, anew each episode; 0 keeps them put
+scatter = 0.0
 
 [creature]
 radius = 0.45
@@ -156,7 +158,7 @@ leak = 0.0
 [tag]
 # a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
 # new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed
-reach = 0.1
+reach = 0.02
 cooldown = 2.0
 points = 1.0
 speed = 1.0

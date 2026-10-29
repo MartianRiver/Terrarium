@@ -11,6 +11,8 @@ slop = 0.01
 
 [arena]
 size = 26.0
+# every block moves up to this far (m) from where it's set and turns any way, anew each episode; 0 keeps them put
+scatter = 0.0
 
 [creature]
 radius = 0.45

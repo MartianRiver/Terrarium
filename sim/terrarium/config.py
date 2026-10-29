@@ -14,6 +14,7 @@ TRAIN = DEFAULT.parent / 'train.toml'
 @dataclass(frozen=True)
 class Arena:
     size: float
+    scatter: float
 
 
 @dataclass(frozen=True)
@@ -392,7 +393,8 @@ def convert(kind, value, where):
 
 # keys added after worlds were first recorded, as they were before: off. Only for reading old run
 # records (serve.py), never for configs on disk, which have every key
-SINCE = {'colonies': {'room': 0},
+SINCE = {'arena': {'scatter': 0.0},
+         'colonies': {'room': 0},
          'vision': {'cover': 0.0, 'spread': 1.0, 'side': 1.0},
          'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
          'energy': {'turn': 0.0},
