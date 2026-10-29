@@ -6,10 +6,15 @@
 # turned round at random as it turns up and again the moment it hides, so walking
 # straight on isn't enough, and neither is a lap of the arena that the next berry
 # always turns up ahead on (a brain learned that): it has to remember where it was,
-# from its home bearing or its own turns.
+# from its home bearing or its own turns. Its way of moving turns with it, or the
+# body's own drift would still point at the berry after the spin (a policy with no
+# memory that turned to face its drift found 43%). With `again`, a hidden berry
+# peeks out again at the same spot every so often, each time followed by a spin:
+# more looks at one spot, each one a shorter wait to remember.
 import numpy as np
 
 from .config import ConfigError
+from .vision import angles
 
 TRIES = 50
 
@@ -18,6 +23,9 @@ class Peek:
     def __init__(self, world):
         if world.wild != 1:
             raise ConfigError('peek needs exactly one food, the berry')
+        p = world.cfg.peek
+        if p.again and not 0 < p.flash < p.again:
+            raise ConfigError('[peek] flash must be above 0 and below again')
         self.world = world
         arenas = world.alive.shape[0]
         self.since = np.zeros(arenas, int)      # ticks since the berry turned up
@@ -38,7 +46,21 @@ class Peek:
     @property
     def hidden(self) -> np.ndarray:
         """Whether the berry is out of sight, (arenas,)."""
-        return self.world.food_present[:, 0] & (self.since >= self._ticks(self.world.cfg.peek.show))
+        p = self.world.cfg.peek
+        show, again, flash = self._ticks(p.show), self._ticks(p.again), self._ticks(p.flash)
+        out = self.since >= show
+        if again:
+            out &= ~((self.since >= show + again) & ((self.since - show) % again < flash))
+        return self.world.food_present[:, 0] & out
+
+    def _hides(self) -> np.ndarray:
+        """Whether the berry went out of sight this tick, (arenas,)."""
+        p = self.world.cfg.peek
+        show, again, flash = self._ticks(p.show), self._ticks(p.again), self._ticks(p.flash)
+        out = self.since == show
+        if again:
+            out |= (self.since >= show + again + flash) & ((self.since - show) % again == flash)
+        return out
 
     def step(self):
         w, p = self.world, self.world.cfg.peek
@@ -47,13 +69,13 @@ class Peek:
             self.last[a] = w.food_id[a, 0]
             self.since[a] = 0
             if p.spin:
-                w.heading[a] = w.rng.uniform(-np.pi, np.pi, w.heading.shape[1])
+                self._spin(a)
             self._place(a)
         here = w.food_present[:, 0]
         self.since[here] += 1
         if p.spin:
-            for a in np.flatnonzero(here & (self.since == show)):
-                w.heading[a] = w.rng.uniform(-np.pi, np.pi, w.heading.shape[1])
+            for a in np.flatnonzero(here & self._hides()):
+                self._spin(a)
         reach = w.cfg.creature.radius + w.cfg.food.radius
         gap = np.hypot(*(w.pos - w.food_pos[:, None, 0]).transpose(2, 0, 1))
         touched = here & ((gap < reach) & w.alive).any(1)
@@ -82,7 +104,7 @@ class Peek:
         i = w.rng.choice(alive)
         # the middle of the fan
         v = cfg.vision
-        rays = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+        rays = angles(v)
         rays = rays[np.abs(rays) <= 0.3 * v.fov]
         for _ in range(TRIES):
             t = w.heading[a, i] + w.rng.choice(rays)
@@ -94,6 +116,12 @@ class Peek:
         # facing a wall up close: anywhere, never pulled back inside (a brain learned to park at the
         # wall and have every berry land in front of its face)
         w.food_pos[a, 0] = w._open_ground(a)
+
+    def _spin(self, a):
+        w = self.world
+        turn = w.rng.uniform(-np.pi, np.pi, w.heading.shape[1])
+        w.heading[a] = (w.heading[a] + turn + np.pi) % (2 * np.pi) - np.pi
+        w.physics.turn_velocity(a, turn)
 
     def _ticks(self, seconds: float) -> int:
         return round(seconds * self.world.cfg.tick_hz)

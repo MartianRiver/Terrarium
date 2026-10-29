@@ -46,6 +46,20 @@ def test_a_brain_given_memory_acts_exactly_as_before():
     assert notes.abs().sum() > 0
 
 
+
+def test_recall_starts_reading_the_notes_a_little():
+    old = shaken(Brain(**SHAPE)).eval()
+    new = old.with_memory(16, recall=0.1).eval()
+    assert new.recall.weight.abs().sum() > 0 and not new.recall.bias.any()
+    notes, gaps = new.blank(8), []
+    with torch.no_grad():
+        for me, kinds, rays in moments():
+            mean, _, _ = old(me, kinds, rays)
+            mean2, _, notes = new(me, kinds, rays, notes)
+            gaps.append((mean - mean2).abs().max().item())
+    # the notes are written before they're read, so they nudge it from the first moment, a little
+    assert 0 < min(gaps) and max(gaps) < 0.5
+
 def test_once_the_link_opens_what_it_saw_before_matters_unless_wiped():
     brain = shaken(Brain(**SHAPE).with_memory(16), seed=2).eval()
     a, b = moments(seed=3), moments(seed=4)

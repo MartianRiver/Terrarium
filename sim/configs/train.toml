@@ -68,3 +68,6 @@ fresh = []
 # with nights on, each arena starts at a random time of day instead of dawn, so a batch isn't all
 # day or all night (arenas started together stay in step); evals always start at dawn
 staggered = false
+# each arena starts its first episode part-way through, so episodes end at different times from then on
+# instead of all together (a batch all in seek's freeze, or all at the start of a game)
+spread = false

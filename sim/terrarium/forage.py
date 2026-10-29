@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import night
+from . import night, vision
 from .fun import Fun
 from .config import Config, Reward, Train
 from .vision import directions, look
@@ -37,7 +37,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
     """last is each creature's previous thrust and turn, (arenas, creatures, 2)."""
     cfg, v = world.cfg, world.cfg.vision
     sight = look(world)
-    facing = directions(world.heading, 1, 0.0)[..., 0, :]          # A,N,2
+    facing = directions(world.heading, np.zeros(1))[..., 0, :]      # A,N,2
     vel = world.vel / cfg.creature.max_speed
     forward = (vel * facing).sum(-1)
     side = facing[..., 0] * vel[..., 1] - facing[..., 1] * vel[..., 0]
@@ -63,7 +63,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
                      if world.seek else (np.zeros(store.shape),) * 2),
                    *flag_senses(world, store.shape)], -1)
 
-    angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+    angles = vision.angles(v)
     shape = sight.dist.shape
     rays = np.stack([sight.dist / v.range, *(np.broadcast_to(f(angles), shape) for f in (np.sin, np.cos)),
                      sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range, sight.it, sight.carrier], -1)
@@ -77,6 +77,8 @@ class Forage:
         self.world = World(cfg, arenas, seed)
         self.staggered = train.start.staggered and cfg.night.on
         self._stagger(np.ones(arenas, bool))
+        if train.start.spread:
+            self.world.age[:] = self.world.rng.integers(0, self.world.episode_ticks, arenas)
         self.reward = train.reward
         r = self.reward
         self.fun = Fun(self.world, r.novelty, r.variety) if r.novelty or r.variety else None

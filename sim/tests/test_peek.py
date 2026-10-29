@@ -4,7 +4,7 @@ import numpy as np
 
 from terrarium import load
 from terrarium.config import DEFAULT
-from terrarium.vision import FOOD, look
+from terrarium.vision import FOOD, angles, look
 from terrarium.world import World
 
 PEEK = load(DEFAULT.parent / 'nursery-peek.toml')
@@ -69,3 +69,47 @@ def test_facing_a_wall_up_close_doesnt_bring_the_berry_to_you():
         world.peek._place(a)
     gap = np.hypot(*(world.food_pos[:, 0] - world.pos[:, 0]).T)
     assert (gap > PEEK.peek.near / 2).all()
+
+
+def test_drifting_on_doesnt_find_it_after_the_spin():
+    # with no memory, turn to face the way the body still drifts and walk on: before the drift turned with the
+    # spin, that found 43% of berries
+    cfg = replace(PEEK, peek=replace(PEEK.peek, spin=True))
+    world = World(cfg, 16, 7)
+    fov = angles(cfg.vision)
+    act = np.zeros((16, 1, 7))
+    for t in range(round(30 * cfg.tick_hz)):
+        if t % 2 == 0:
+            sight = look(world)
+            food = np.where(sight.kind == FOOD, sight.dist, np.inf)
+            sees = np.isfinite(food.min(-1))
+            h = world.heading
+            fwd = world.vel[..., 0] * np.cos(h) + world.vel[..., 1] * np.sin(h)
+            side = world.vel[..., 1] * np.cos(h) - world.vel[..., 0] * np.sin(h)
+            drift = np.arctan2(side, fwd)
+            moving = np.hypot(fwd, side) > 1e-6
+            act = np.zeros((16, 1, 7))
+            act[..., 2:] = -1
+            act[..., 0] = np.where(sees | ~moving | (np.abs(drift) < 0.25), 1.0, 0.0)
+            act[..., 1] = np.where(sees, np.clip(fov[food.argmin(-1)] * 3, -1, 1), np.where(moving, np.clip(drift * 3, -1, 1), 0))
+        world.step(act)
+    found, missed = world.peek.found.sum(), world.peek.missed.sum()
+    assert found / (found + missed) < 0.2
+
+
+def test_again_it_peeks_out_at_the_same_spot_then_hides_with_a_spin():
+    cfg = replace(PEEK, peek=replace(PEEK.peek, spin=True, again=3.0, flash=0.5, timeout=20.0))
+    world = World(cfg)
+    world.step(STILL)
+    spot = world.food_pos[0, 0].copy()
+    ticks(world, cfg.peek.show)
+    assert world.peek.hidden[0]
+    ticks(world, cfg.peek.again - 0.1)
+    assert world.peek.hidden[0]
+    ticks(world, 0.1)
+    assert not world.peek.hidden[0] and np.allclose(world.food_pos[0, 0], spot)
+    before = world.heading.copy()
+    ticks(world, cfg.peek.flash)
+    assert world.peek.hidden[0] and not np.allclose(world.heading, before)
+    ticks(world, cfg.peek.again - cfg.peek.flash)
+    assert not world.peek.hidden[0]

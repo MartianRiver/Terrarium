@@ -187,6 +187,8 @@ timeout = 0.0
 near = 0.0
 far = 0.0
 spin = false
+again = 0.0
+flash = 0.0
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
@@ -194,10 +196,17 @@ friction = 1.2
 
 [vision]
 # a fan of rays spread evenly across fov, centred on the heading
-rays = 16
+rays = 17
 # 200°
 fov = 3.49
 range = 8.0
+# how wide each ray is: 0 a thin line; 1 a slice of the fan that meets its neighbours', so nothing
+# small falls between rays or vanishes dead ahead
+cover = 0.5
+# 1 spreads rays evenly; above 1 packs them towards the middle, like the eye's fovea
+spread = 1.0
+# how far the rays at the edges of the fan see, as a share of range (in between, it eases)
+side = 1.0
 
 [episode]
 # a training arena starts over after this long, or once everyone in it is dead

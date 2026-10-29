@@ -174,6 +174,14 @@ class Physics:
                 body.angular_velocity = 0
         self.read()
 
+    def turn_velocity(self, a: int, angles: np.ndarray):
+        """Turn each creature's velocity in arena a by angles (creatures,), as if it had been picked up and turned."""
+        for body, t in zip(self.bodies[a][:self.creatures], angles):
+            vx, vy = body.velocity
+            c, s = np.cos(t), np.sin(t)
+            body.velocity = (float(c * vx - s * vy), float(s * vx + c * vy))
+        self.read()
+
     def let_go(self, a, c):
         joint = self.held.pop((int(a), int(c)), None)
         if joint is not None:

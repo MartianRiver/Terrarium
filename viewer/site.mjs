@@ -196,62 +196,97 @@ write('blog', page({
 }));
 
 // the gallery itself (/replays/gallery/index.json and its replays) is published apart from the site, every 15 min
-// while training runs (python -m terrarium.gallery), so the page reads it when it opens
+// while training runs (python -m terrarium.gallery), and so is the nursery channel (/replays/nursery/index.json), so
+// the page reads both when it opens: what's training now first, then the steps the line took, newest first
 const BRAINS = `<script>
 const box = document.getElementById('gallery');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 90 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
-function brain(b, i, extra = '') {
-  const n = b.numbers, bits = [];
+const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 90 ? Math.max(m, 1) + ' min ago' : m < 2160 ? Math.round(m / 60) + ' h ago' : new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+const pct = (v) => Math.round(v * 100) + '%';
+const get = (url) => fetch(url, { cache: 'no-cache' }).then((r) => r.ok ? r.json() : null).catch(() => null);
+function numbers(b) {
+  const n = b.numbers || {}, bits = [];
   if (n.alive !== undefined) bits.push(n.alive + ' s alive');
   if (n.food_per_minute !== undefined) bits.push(n.food_per_minute + ' food a minute');
   if (n.stored !== undefined) bits.push(n.stored + ' stored');
   if (n.through_first_night) bits.push(n.through_first_night[0] + ' of ' + n.through_first_night[1] + ' colonies through night 1');
   if (n.from_middle !== undefined) bits.push(n.from_middle + ' food from the room, ' + n.blocks_moved + ' doors moved, per episode');
-  const tested = n.episodes ? ' <span class="when">tested over ' + n.episodes + ' episodes</span>' : '';
-  return '<li><a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(b.replay) + '&follow&gallery=' + i + '">Watch</a> <b>' + esc(b.name) + '</b>'
-    + ' <span class="when">' + esc(b.world) + ' · ' + (b.samples / 1e6).toFixed(1) + 'M samples, ' + Math.round(b.total / 1e6) + 'M in all' + extra + '</span>'
-    + (bits.length ? '<span class="nums">' + esc(bits.join(' · ')) + '</span>' + tested : '') + '</li>';
+  return bits.join(' · ');
 }
-fetch('/replays/gallery/index.json', { cache: 'no-cache' }).then((r) => {
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}).then((g) => {
-  let i = 0, html = '';
-  const flat = [];
-  for (const s of g.steps) {
-    html += '<h2>' + esc(s.title) + '</h2>' + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + '<ol class="brains">';
-    for (const b of s.brains) html += brain(b, i++);
-    html += '</ol>';
+function brain(b, i, extra = '') {
+  const nums = numbers(b);
+  return '<li><a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(b.replay) + '&follow&gallery=' + i + '">Watch</a> <b>' + esc(b.name) + '</b>'
+    + ' <span class="when">' + esc(b.world) + ' · ' + Math.round(b.total / 1e6) + 'M samples of training in all' + extra + '</span>'
+    + (nums ? '<span class="nums">' + esc(nums) + (b.numbers && b.numbers.episodes ? ' <span class="when">(tested over ' + b.numbers.episodes + ' episodes)</span>' : '') + '</span>' : '') + '</li>';
+}
+function card(title, tag, text, more, href) {
+  return '<li class="now-card"><a class="play" href="' + href + '">Watch</a><b>' + esc(title) + '</b> <span class="tag">' + esc(tag) + '</span>'
+    + '<p>' + esc(text) + '</p>' + (more ? '<p class="when">' + more + '</p>' : '') + '</li>';
+}
+function nursery(c) {
+  if (!c || !c.items || !c.items.length) return '';
+  // the publisher rewrites the index every 10 min while anything trains
+  const live = Date.now() - new Date(c.updated) < 40 * 60e3;
+  const keys = [...new Set(c.items.map((i) => i.game).filter((k) => k && c.games && c.games[k]))];
+  const cards = keys.map((k) => {
+    const g = c.games[k];
+    const best = c.items.filter((i) => i.game === k).sort((a, b) => (b.samples || 0) - (a.samples || 0))[0];
+    let more = '';
+    if (best.score) {
+      more = 'Newest brain: ' + esc(best.score.label.toLowerCase()) + ' <b>' + pct(best.score.value) + '</b>'
+        + (best.score.marks || []).map((m) => ' · ' + esc(m[0]) + ' ' + pct(m[1])).join('');
+    }
+    return card(g.name, g.kind, g.goal + ' ' + g.setup, more, '/watch/?channel=/replays/nursery/index.json&game=' + encodeURIComponent(k) + '&follow');
+  });
+  return '<h2>In the nursery</h2><p>Small worlds where baby Terrikins can’t go hungry, learning kids’ games. Each one tests one thing a brain needs, like memory, away from the work of staying alive. '
+    + (live ? 'Training now, updated ' + ago(c.updated) + '. ' : c.note ? esc(c.note[0].toUpperCase() + c.note.slice(1)) + ' (updated ' + ago(c.updated) + '). ' : '') + 'Watch shows its newest brains in turn, with a card saying what’s going on.</p><ol class="brains now">' + cards.join('') + '</ol>';
+}
+Promise.all([get('/replays/gallery/index.json'), get('/replays/nursery/index.json')]).then(([g, c]) => {
+  let html = nursery(c);
+  if (!g) {
+    box.innerHTML = (html || '') + '<p>The gallery isn’t up right now. The <a href="/watch/">latest brain</a> still plays.</p>';
+    return;
   }
+  // numbered in the order viewer/src/gallery.ts flattens them, so &gallery=N steps through the same list
+  const at = new Map();
+  let i = 0;
+  for (const s of g.steps) for (const b of s.brains) at.set(b, i++);
   const now = g.training.concat(g.latest);
-  if (now.length) {
-    html = '<h2>Training now</h2><p>The newest brains from the forks training right now, as they come back from the GPUs they train on.</p><ol class="brains">'
-      + now.map((b) => brain(b, i++, b.finished ? ' · finished ' + ago(b.finished) : ' · training')).join('') + '</ol>' + html;
-  }
-  if (g.asides.length) {
-    html += '<h2>On the side</h2><ol class="brains">' + g.asides.map((b) => brain(b, i++).replace('</b>', '</b> <span class="aside">' + esc(b.title) + '</span>')
-      .replace('</li>', '<p>' + esc(b.text) + '</p></li>')).join('') + '</ol>';
-  }
-  // what's being worked on goes first on the page, numbered last so older links still land on the same brain
-  let working = '';
+  for (const b of now) at.set(b, i++);
+  for (const b of g.asides) at.set(b, i++);
+  for (const w of g.working || []) for (const b of w.brains) at.set(b, i++);
+  let main = '';
   for (const w of g.working || []) {
     if (!w.brains.length) continue;
-    working += '<h2>Working on now: ' + esc(w.title) + '</h2><p>' + esc(w.text) + '</p><ol class="brains">'
-      + w.brains.map((b) => brain(b, i++).replace('</li>', '<p>' + esc(b.note) + '</p></li>')).join('') + '</ol>';
+    main += '<h3>Working on: ' + esc(w.title) + '</h3><p>' + esc(w.text) + '</p><ol class="brains">'
+      + w.brains.map((b) => brain(b, at.get(b)).replace('</li>', '<p>' + esc(b.note) + '</p></li>')).join('') + '</ol>';
   }
-  html = working + html;
-  box.innerHTML = html + '<p class="when">Updated ' + ago(g.updated) + '.</p>';
-}).catch(() => {
-  box.innerHTML = '<p>The gallery isn’t up right now. The <a href="/watch/">latest brain</a> still plays.</p>';
+  if (now.length) {
+    main += '<ol class="brains">' + now.map((b) => brain(b, at.get(b), b.finished ? ' · finished ' + ago(b.finished) : ' · training now')).join('') + '</ol>';
+  }
+  html += '<h2>The main line</h2><p>The brain the colonies run on: each new one starts from the last.</p>' + main;
+  html += '<h2>How they got here</h2><p>Every step the main line took, newest first. Open one for what changed and every brain in it.</p>';
+  const steps = g.steps.map((s, n) => [s, n + 1]).reverse();
+  for (const [s, n] of steps) {
+    const last = s.brains[s.brains.length - 1];
+    if (!last) continue;
+    html += '<details class="step"><summary><span class="step-n">' + n + '</span> ' + esc(s.title)
+      + ' <a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(last.replay) + '&follow&gallery=' + at.get(last) + '">Watch</a></summary>'
+      + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + '<ol class="brains">' + s.brains.map((b) => brain(b, at.get(b))).join('') + '</ol></details>';
+  }
+  if (g.asides.length) {
+    html += '<h2>On the side</h2><ol class="brains">' + g.asides.map((b) => brain(b, at.get(b)).replace('</b>', '</b> <span class="aside">' + esc(b.title) + '</span>')
+      .replace('</li>', '<p>' + esc(b.text) + '</p></li>')).join('') + '</ol>';
+  }
+  box.innerHTML = html + '<p class="when">Brains updated ' + ago(g.updated) + '.</p>';
 });
 </script>`;
 write('brains', page({
   title: 'Brains',
-  description: 'Every brain the Terrikins have had, from the first that learned to eat to the ones training now. Watch any of them.',
+  description: 'What the Terrikins are learning right now, and every brain they’ve had, from the first that learned to eat. Watch any of them.',
   path: '/brains/',
   body: `<h1>Brains</h1>
-<p>Every brain the one training now came from, back to the first, and a few side experiments. Watch plays one for three minutes in the world it trained in, in the same garden each time. The numbers are its own test results in that world, and the worlds got harder as they went, so they compare within a step more than across them.</p>
+<p>Each Terrikin has its own copy of the same brain, and a brain is what training makes: a set of numbers that turns what a Terrikin senses into what it does. Here’s what’s training now, then every step that got the colonies’ brain to where it is. Watch plays one in the world it trained in. Numbers are its own test results there, and the worlds got harder as they went, so compare within a step more than across them.</p>
 <div id="gallery"><p>Loading…</p></div>
 ${BRAINS}`,
 }));
