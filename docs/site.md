@@ -18,7 +18,7 @@ cd viewer
 npm run site        # dist-site/: the viewer in watch/, the pages beside it, and at-home/viewer/ (below)
 ```
 
-Deploying is an rsync of `dist-site/` to the web server, leaving out `replays/gallery/` (published on its own, below). Anything unfinished in a page or a published post, like a draft marker or a note of what's still to write (the same list the commit checks refuse), stops `npm run site`, which deletes what it had built so a half-made site can't be deployed. A review build still shows it. Old links like `/?replay=…&follow` are sent on to `/watch/` with their query.
+Deploying is an rsync of `dist-site/` to the web server, leaving out `replays/gallery/` and `replays/nursery/` (each published on its own, below). Anything unfinished in a page or a published post, like a draft marker or a note of what's still to write (the same list the commit checks refuse), stops `npm run site`, which deletes what it had built so a half-made site can't be deployed. A review build still shows it. Old links like `/?replay=…&follow` are sent on to `/watch/` with their query.
 
 `/at-home/viewer/` is a second build of the viewer, the local kind with the runs page and `?latest`, for `python -m terrarium.watch` on a lent machine to fetch ([compute.md](compute.md)). Its `files.json` lists every file with its sha256, and the sha256 of `bundle.json.gz`, which holds them all: the watcher fetches the bundle and refuses it or any file in it that doesn't match. Files fetched one at a time wouldn't do, because Cloudflare adds its analytics script to HTML on the way.
 
@@ -89,3 +89,8 @@ which traces the lineage from the best scored run of the line being trained (`--
 Reviews: each file in `site/reviews/` is one model's review of the worker's code, pasted in whole, with `model`, `date`, `commit` (the code it read), `verdict` (one line for the list) and an optional `link` to the conversation in its front matter. Each gets its own page at `/at-home/reviews/<file>/`. Under them, the prompt a reader can paste into a new chat to check the code themselves. With no reviews, only the prompt shows.
 
 The board is read live from the job queue's public `/api/board` (cached for 30 s) when the page opens. Machines that cost nothing (mine, trusted and donor tokens) show what they saved, priced at what rented GPUs have cost per sample so far (the board's rented dollars over rented samples; `usd_per_billion` in the page's front matter is the fallback and the figure in its first paragraph), and rented GPUs show what they actually cost, from `compute.toml` via `sim/board.toml`. Update the AUD rate and its date in the front matter now and then.
+
+## Watching training as it goes
+
+`/watch/?channel=/replays/nursery/index.json` plays the replays an index lists, one after another, each labelled with its title, and reads the index again whenever one ends, so a replay of a newer checkpoint comes round on the next pass. The index is `{"items": [{"replay": "<file, relative to the index>", "title": "<label>"}, ...]}`, and the viewer only reads indexes and replays from its own site. Whatever trains a line uploads both to `replays/nursery/` (or a folder of its own), outside the site build, so a deploy doesn't remove them.
+

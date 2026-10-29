@@ -164,8 +164,11 @@ CONTEXTS = {
     'grab_block': (lambda w, nest, mine: w.touching_block() & w.cfg.grab.on, 5),
     'sprint_flower': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on & flower_in_view(w), 4),
     'carry_berry': (lambda w, nest, mine: w.berry_in_reach(), 6),
+    'carry_block': (lambda w, nest, mine: w.block_in_reach(), 6),
     # a yes while carrying puts it down
     'carry_laden': (lambda w, nest, mine: w.load >= 0, 6),
+    # the young may eat in the nest whenever they aren't full
+    'eat_young_home': (lambda w, nest, mine: (nest == w.colony) & (w.young > 0) & (w.energy < 1) & (mine > 0), 3),
 }
 
 
@@ -238,8 +241,9 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     world = World(cfg, episodes, seed)
     policy = make(world)
     shape = world.alive.shape
-    lived, meals, stored, jelly, drunk = (np.zeros(shape, int) for _ in range(5))
-    picked, put_home, given, given_hungry = (np.zeros(shape, int) for _ in range(4))
+    lived, meals, stored, drunk = (np.zeros(shape, int) for _ in range(4))
+    jelly = np.zeros(shape)
+    picked, put_home, given, given_hungry, lifted = (np.zeros(shape, int) for _ in range(5))
     # deaths in each slot: with hatching, one slot can die more than once
     died, jelly_at_home, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
@@ -322,6 +326,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         drunk[finished] = world.drunk[finished]
         picked[finished] = world.picked[finished]
         put_home[finished] = world.put_home[finished]
+        lifted[finished] = world.lifted[finished]
         given[finished] = world.given[finished]
         given_hungry[finished] = world.given_hungry[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
@@ -362,9 +367,10 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         # what sprints and flowers get used for (tactics.py)
         **tactics.result(),
         # with [carry] on, per creature: berries picked up, put down at its own nest, and put down ones a nestmate took
-        # (also counted for a hungry nestmate)
+        # (also counted for a hungry nestmate), and blocks lifted
         **({'carry': {'picked': summary(picked[:, starters]), 'put_home': summary(put_home[:, starters]),
-                      'given': summary(given[:, starters]), 'given_hungry': summary(given_hungry[:, starters])}}
+                      'given': summary(given[:, starters]), 'given_hungry': summary(given_hungry[:, starters]),
+                      'lifted': summary(lifted[:, starters])}}
            if cfg.carry.on else {}),
     }
 
@@ -474,11 +480,13 @@ def main():
                                                              for v, n in ((fl['drunk'], 5), (fl['chased'], 18)))
                   + '  ' + f'{" · ".join("–" if v is None else f"{v:.1f}" for v in r["nectar"].values()):>27}')
     if cfg.carry.on:
-        print(f'\n{"carrying, each":<{width}}  {"picked up":>9}  {"put down home":>13}  {"to a nestmate":>13}  {"to a hungry one":>15}')
+        print(f'\n{"carrying, each":<{width}}  {"picked up":>9}  {"put down home":>13}  {"to a nestmate":>13}  {"to a hungry one":>15}'
+              f'  {"blocks lifted":>13}')
         for name, r in results.items():
             ca = r['carry']
             print(f'{name:<{width}}  ' + '  '.join(f'{ca[k]["mean"]:{n}.2f}' for k, n in
-                                                  (('picked', 9), ('put_home', 13), ('given', 13), ('given_hungry', 15))))
+                                                  (('picked', 9), ('put_home', 13), ('given', 13), ('given_hungry', 15),
+                                                   ('lifted', 13))))
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

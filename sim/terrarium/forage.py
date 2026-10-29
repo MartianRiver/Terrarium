@@ -47,7 +47,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
     store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
     # how much of its sprint is left, how far through its rest it is (1: it can sprint now; 0 with sprint off),
-    # holding a block, how much of its grip is left, how much of a nectar boost, and a berry in its jaws
+    # holding a block, how much of its grip is left, how much of a nectar boost, and a berry (or block) in its jaws
     s = cfg.sprint
     sprinting = world.sprinting / max(round(s.seconds * cfg.tick_hz), 1)
     rested = (1 - world.resting / max(round(s.cooldown * cfg.tick_hz), 1)) * (world.sprinting == 0) * s.on
@@ -57,12 +57,16 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    np.broadcast_to(world.light()[:, None], store.shape), sprinting, rested,
                    world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1),
                    *world.smelled(), world.nectar / max(round(cfg.flowers.boost * cfg.tick_hz), 1),
-                   world.load >= 0], -1)
+                   (world.load >= 0) | (world.block_load >= 0), world.young / max(round(cfg.young.seconds * cfg.tick_hz), 1),
+                   world.tag.mask() if world.tag else np.zeros(store.shape),
+                   *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
+                     if world.seek else (np.zeros(store.shape),) * 2),
+                   *flag_senses(world, store.shape)], -1)
 
     angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
     shape = sight.dist.shape
     rays = np.stack([sight.dist / v.range, *(np.broadcast_to(f(angles), shape) for f in (np.sin, np.cos)),
-                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range], -1)
+                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range, sight.it, sight.carrier], -1)
     return Observation(me.reshape(-1, me.shape[-1]).astype(np.float32),
                        sight.kind.reshape(-1, v.rays).astype(np.int64),
                        rays.reshape(-1, v.rays, rays.shape[-1]).astype(np.float32))
@@ -109,10 +113,18 @@ class Forage:
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
         # tick, and an arena where everyone has died only ticks on with nobody in it
-        lived, snug, fun = np.zeros(alive.shape), np.zeros(alive.shape), np.zeros(alive.shape)
+        lived, snug, fun, play = (np.zeros(alive.shape) for _ in range(4))
         for _ in range(self.repeat):
             w.step(actions)
             lived += w.alive
+            if w.tag:
+                play += w.tag.points(w.alive)
+            if w.seek:
+                play += w.seek.points(w.alive)
+            if w.flags:
+                play += w.flags.points(w.alive)
+            if w.peek:
+                play += w.peek.points(w.alive)
             if self.fun:
                 fun += self.fun.step(actions)
             if r.snug or r.warm:
@@ -122,7 +134,7 @@ class Forage:
         own = ((r.food * (w.fed - before['fed']) - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)
-               + w.cfg.dt * (r.alive * lived + snug) + fun)
+               + w.cfg.dt * (r.alive * lived + snug) + fun + play)
         ended = w.ended.copy()
         died = alive & ~w.alive
         done = died | ended[:, None]
@@ -143,6 +155,18 @@ class Forage:
         if self.staggered:
             self.world.clock[arenas] = self.world.rng.uniform(0, self.world.cfg.night.cycle, int(arenas.sum()))
 
+
+
+def flag_senses(world: World, shape) -> tuple:
+    """Carrying their flag, the way to it (how far, which way off the heading), and whether ours is taken."""
+    if not world.flags:
+        return (np.zeros(shape),) * 5
+    flags = world.flags
+    theirs = flags.where()[:, 1 - world.colony]                      # A,N,2
+    to = theirs - world.pos
+    bearing = np.arctan2(to[..., 1], to[..., 0]) - world.heading
+    taken = (flags.carrier >= 0)[:, world.colony]
+    return (flags.carrying(), np.hypot(to[..., 0], to[..., 1]) / world.cfg.vision.range, np.sin(bearing), np.cos(bearing), taken)
 
 def carried_worth(world: World, r: Reward) -> np.ndarray:
     """What the food in each crop is worth where it is: r.home a food at its own nest, falling to nothing an arena's width away."""

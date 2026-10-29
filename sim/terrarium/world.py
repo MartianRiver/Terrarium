@@ -38,12 +38,27 @@
 # down again, still a berry, for anyone to eat. Carrying slows it a little and
 # costs a little energy. The berry keeps its own place among the food: it's off
 # the ground (unseen, unsmelled, not growing back) until it's put down, and one
-# that dies carrying drops it where it falls.
+# that dies carrying drops it where it falls. A block marked `carry` is carried
+# the same way when no berry is in reach: lifted out of the world (nothing
+# bumps into it, sees it or smells round it) and set down in front, crosswise,
+# if the ground there is clear. Blocks too heavy to push can still be carried.
+#
+# With [young] on, a hatchling is young for a while, as a nest's young are fed
+# while they grow: it's slower, everything costs it less, and in its own nest it
+# can eat from the store whenever it isn't full, a bite its size (a jelly goes as
+# much further as its costs are less), not only when it's hungry.
+
+# where a carried block is, for anything that senses blocks: well off the arena
+AWAY = 1e4
 
 import numpy as np
 
 from . import night
 from .smell import Field
+from .flags import Flags
+from .peek import Peek
+from .seek import Seek
+from .tag import Tag
 from .config import Config, ConfigError
 from .log import Logger
 from .physics import Physics
@@ -122,9 +137,10 @@ class World:
         # energy each creature has got from food (not jelly) since its arena started
         self.fed = np.zeros((arenas, n))
         # jelly in each colony's store, food unloaded into it and jelly eaten from it per creature
-        self.store = np.zeros((arenas, len(self.nests)), int)
+        # jelly, in grown Terrikins' bites (the young take smaller ones)
+        self.store = np.zeros((arenas, len(self.nests)))
         self.stored = np.zeros((arenas, n), int)
-        self.jelly = np.zeros((arenas, n), int)
+        self.jelly = np.zeros((arenas, n))
         # ticks left of each creature's sprint, and of its rest before it can sprint again
         self.sprinting = np.zeros((arenas, n), int)
         self.resting = np.zeros((arenas, n), int)
@@ -139,6 +155,8 @@ class World:
         self.egg_pos = np.zeros((arenas, n, 2))
         self.egg_id = np.zeros((arenas, n), int)
         self.hatched = np.zeros((arenas, len(self.nests)), int)
+        # ticks each hatchling has left of being young ([young])
+        self.young = np.zeros((arenas, n), int)
         # open nectar flowers: where, ticks until each closes (0: not open), ids, and ticks until the next opens
         fl = cfg.flowers
         self.flower_pos = np.zeros((arenas, fl.count, 2))
@@ -156,6 +174,12 @@ class World:
         # also counted for a hungry nestmate; who put each berry down where it lies, -1 if it grew there
         self.load = np.full((arenas, n), -1)
         self.carry_was = np.zeros((arenas, n), bool)
+        # the block each creature carries (-1 for none), and how many it has lifted since its arena started
+        self.block_load = np.full((arenas, n), -1)
+        self.lifted = np.zeros((arenas, n), int)
+        self.carryable = np.array([b.carry for b in cfg.block], bool)
+        # ticks a block that swings shut waits on the ground before going back (-1: it isn't waiting)
+        self.shut_in = np.full((arenas, len(cfg.block)), -1)
         self.picked = np.zeros((arenas, n), int)
         self.put_home = np.zeros((arenas, n), int)
         self.given = np.zeros((arenas, n), int)
@@ -164,6 +188,14 @@ class World:
         # blocks one creature can drag (the vault's doors)
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
         self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors) if cfg.smell.on else None
+        self.tag = Tag(self) if cfg.tag.on else None
+        self.seek = Seek(self) if cfg.seek.on else None
+        self.flags = Flags(self) if cfg.flag.on else None
+        self.peek = Peek(self) if cfg.peek.on else None
+        if cfg.young.start:
+            self.young[:] = np.where(self.spare, 0, round(cfg.young.seconds * cfg.tick_hz))
+        if self.tag:
+            self.tag.reset(np.arange(arenas))
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -177,7 +209,19 @@ class World:
 
     @property
     def block_pos(self):
-        return self.physics.block_pos
+        if not self.blocks_carried.any():
+            return self.physics.block_pos
+        p = self.physics.block_pos.copy()
+        p[self.blocks_carried] = AWAY
+        return p
+
+    @property
+    def blocks_carried(self):
+        """(arenas, blocks): which blocks are being carried."""
+        out = np.zeros(self.physics.block_pos.shape[:2], bool)
+        a, i = np.nonzero(self.block_load >= 0)
+        out[a, self.block_load[a, i]] = True
+        return out
 
     @property
     def block_angle(self):
@@ -186,6 +230,11 @@ class World:
     @property
     def food_present(self):
         return self.food_regrow == 0
+
+    @property
+    def food_seen(self):
+        """Food rays can see: all that's there, but peekaboo's berry once it hides."""
+        return self.food_present & ~self.peek.hidden[:, None] if self.peek else self.food_present
 
     @property
     def flowers_open(self):
@@ -247,12 +296,16 @@ class World:
         self.gripping[idx] = 0
         self.egg[idx] = 0
         self.hatched[idx] = 0
+        self.young[idx] = np.where(self.spare, 0, round(self.cfg.young.seconds * self.cfg.tick_hz)) if self.cfg.young.start else 0
         self.flower_left[idx] = 0
         self.flower_due[idx] = self._flower_wait(len(idx))
         self.nectar[idx] = 0
         self.drunk[idx] = 0
         self.load[idx] = -1
         self.carry_was[idx] = False
+        self.block_load[idx] = -1
+        self.shut_in[idx] = -1
+        self.lifted[idx] = 0
         self.picked[idx] = 0
         self.put_home[idx] = 0
         self.given[idx] = 0
@@ -261,6 +314,14 @@ class World:
         self.creature_id[idx] = np.arange(1, len(self.colony) + 1)
         if self.smell:
             self.smell.reset(idx)
+        if self.tag:
+            self.tag.reset(idx)
+        if self.seek:
+            self.seek.reset(idx)
+        if self.flags:
+            self.flags.reset(idx)
+        if self.peek:
+            self.peek.reset(idx)
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -276,6 +337,8 @@ class World:
         cfg, c, s, g = self.cfg, self.cfg.creature, self.cfg.sprint, self.cfg.grab
         # the dead don't move
         actions = np.clip(actions, -1, 1) * self.alive[..., None]
+        if self.seek:
+            actions = self.seek.hold(actions)
         thrust, turn = actions[..., 0], actions[..., 1]
         unload, eat, sprint, grab, carry = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k
                                             else np.zeros_like(self.alive) for k in (2, 3, 4, 5, 6))
@@ -286,9 +349,11 @@ class World:
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
         self.heading = (self.heading + np.pi) % (2 * np.pi) - np.pi
-        laden = self.load >= 0
-        top = (c.max_speed * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop)
-               * (1 - cfg.carry.slow * laden))
+        laden = (self.load >= 0) | (self.block_load >= 0)
+        young = self.young > 0
+        chasing = self.tag.mask() if self.tag else np.zeros_like(young)
+        top = (c.max_speed * np.where(young, cfg.young.speed, 1.0) * np.where(chasing, cfg.tag.speed, 1.0)
+               * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop) * (1 - cfg.carry.slow * laden))
         speed = np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse) * top
         target = np.stack([np.cos(self.heading), np.sin(self.heading)], -1) * speed[..., None]
         # the force that closes this share of the gap to the wanted velocity in one tick, if nothing's in the way
@@ -301,10 +366,13 @@ class World:
 
         e = cfg.energy
         # a sprint costs by how hard it runs: standing still through one is free
+        # the young pay a share of every cost
+        share = np.where(young, cfg.young.energy, 1.0)
         effort = (e.move * np.abs(thrust) + e.turn * turn * turn + s.energy * bursting * np.maximum(thrust, 0)
-                  + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt
+                  + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt * share
         self.spent += effort
-        self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt, 0, 1)
+        self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt * share, 0, 1)
+        np.maximum(self.young - 1, 0, out=self.young)
         self.sprinting[bursting] -= 1
         np.maximum(self.resting - 1, 0, out=self.resting)
         np.maximum(self.nectar - 1, 0, out=self.nectar)
@@ -315,6 +383,16 @@ class World:
             self._bloom()
         if cfg.carry.on:
             self._carry(carry)
+            if (self.shut_in >= 0).any():
+                self._swing_shut()
+        if self.tag:
+            self.tag.step()
+        if self.seek:
+            self.seek.step()
+        if self.flags:
+            self.flags.step()
+        if self.peek:
+            self.peek.step()
         # eating on the tick it would have run out still saves it
         self._eat()
         if cfg.flowers.on:
@@ -330,8 +408,16 @@ class World:
             self.nectar[dying] = 0
             self.holding[dying] = False
             self.gripping[dying] = 0
+            self.young[dying] = 0
             for a, i in zip(*np.nonzero(dying & (self.load >= 0))):
                 self._put_down(a, i, self.pos[a, i])
+            for a, i in zip(*np.nonzero(dying & (self.block_load >= 0))):
+                # where it falls if there's room, else in front, else where it falls anyway
+                if not self._set_block_down(a, i):
+                    k = self.block_load[a, i]
+                    self.physics.set_down(a, k, self.pos[a, i], self.heading[a, i], anyway=True)
+                    self._wait_to_shut(a, k)
+                    self.block_load[a, i] = -1
             self.physics.remove(dying)
             log.debug('creatures died', tick=self.tick, count=int(dying.sum()))
         if cfg.hatch.on:
@@ -390,13 +476,49 @@ class World:
                 # just in front of it, where an ant sets down what it carries
                 self._put_down(a, i, self.pos[a, i] + facing[a, i] * (cfg.creature.radius + cfg.food.radius))
                 continue
+            if self.block_load[a, i] >= 0:
+                self._set_block_down(a, i)
+                continue
             d = np.hypot(*(self.food_pos[a, :self.wild] - self.pos[a, i]).T)
             d[~self.food_present[a, :self.wild]] = np.inf
-            f = int(d.argmin())
-            if d[f] < reach:
+            # argmin of nothing, in a world without food, is an error, not a miss
+            f = int(d.argmin()) if len(d) else -1
+            if f >= 0 and d[f] < reach:
                 self.food_regrow[a, f] = CARRIED
                 self.load[a, i] = f
                 self.picked[a, i] += 1
+            elif self.carryable.any():
+                k = self.physics.nearest_block(a, i, cfg.carry.reach)
+                if k >= 0 and self.carryable[k]:
+                    self.physics.lift(a, k)
+                    self.block_load[a, i] = k
+                    self.shut_in[a, k] = -1
+                    self.lifted[a, i] += 1
+
+    def _set_block_down(self, a, i) -> bool:
+        """The block creature i carries, set down crosswise just in front of it if the ground there is clear."""
+        k = self.block_load[a, i]
+        ahead = self.cfg.creature.radius + self.cfg.block[k].w / 2 + 0.05
+        h = self.heading[a, i]
+        at = self.pos[a, i] + ahead * np.array([np.cos(h), np.sin(h)])
+        if self.physics.set_down(a, k, at, h):
+            self._wait_to_shut(a, k)
+            self.block_load[a, i] = -1
+            return True
+        return False
+
+    def _wait_to_shut(self, a, k):
+        if self.cfg.block[k].shut > 0:
+            self.shut_in[a, k] = round(self.cfg.block[k].shut * self.cfg.tick_hz)
+
+    def _swing_shut(self):
+        """Blocks that swing shut and have waited their time go back where they started, if nothing's in the way."""
+        waiting = self.shut_in > 0
+        self.shut_in[waiting] -= 1
+        for a, k in zip(*np.nonzero(self.shut_in == 0)):
+            b = self.cfg.block[k]
+            if self.physics.set_down(a, k, (b.x, b.y), b.angle):
+                self.shut_in[a, k] = -1
 
     def _put_down(self, a, i, spot):
         cfg = self.cfg
@@ -526,14 +648,24 @@ class World:
         self.energy += cfg.energy.food * own
         self.fed += cfg.energy.food * own
         self.crop[own] -= 1
-        wants = eat & (self.crop == 0) & (self.nest_at() == self.colony) & (self.energy < cfg.jelly.hunger)
+        young = self.young > 0
+        # the young eat from it whenever they aren't full, hungry or not, but a bite their size: everything costs them
+        # [young] energy of what it costs a grown one, so a jelly goes that much further, and they take only what fits
+        hunger = np.where(young, 1.0, cfg.jelly.hunger)
+        wants = eat & (self.crop == 0) & (self.nest_at() == self.colony) & (self.energy < hunger)
+        bite = np.where(young, np.minimum(1.0, (1 - self.energy) / cfg.jelly.energy) * cfg.young.energy, 1.0)
+        gain = np.where(young, np.minimum(1 - self.energy, cfg.jelly.energy), cfg.jelly.energy)
         for c in range(len(self.nests)):
-            # one jelly each, lowest index first, while the store lasts
+            # a bite each, lowest index first, while the store lasts; the last one takes what's left (a young one's
+            # bites can leave part of a jelly)
             mine = wants & (self.colony == c)
-            gets = mine & (np.cumsum(mine, 1) <= self.store[:, c, None])
-            self.store[:, c] -= gets.sum(1)
-            self.energy[gets] += cfg.jelly.energy
-            self.jelly[gets] += 1
+            before = np.cumsum(bite * mine, 1) - bite * mine
+            left = self.store[:, c, None] - before
+            gets = mine & (left > 1e-9)
+            took = np.where(gets, np.minimum(bite, left), 0.0)
+            self.store[:, c] -= took.sum(1)
+            self.energy[gets] += (gain * took / bite)[gets]
+            self.jelly[gets] += took[gets]
         np.clip(self.energy, 0, 1, out=self.energy)
 
     def _hatch(self):
@@ -570,6 +702,7 @@ class World:
         self.unborn[a, i] = False
         self.crop[a, i] = 0
         self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = self.nectar[a, i] = 0
+        self.young[a, i] = round(self.cfg.young.seconds * self.cfg.tick_hz)
         np.add.at(self.hatched, (a, self.colony[i]), 1)
         self.creature_id[a, i] = self.egg_id[a, i]
         log.debug('creatures hatched', tick=self.tick, count=len(a))
@@ -662,6 +795,17 @@ class World:
         dy = self.pos[:, :, None, 1] - self.food_pos[:, None, :self.wild, 1]
         near = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None, :self.wild]
         return near.any(-1) & (self.load < 0) & self.alive
+
+    def block_in_reach(self) -> np.ndarray:
+        """(arenas, creatures): who could lift a block now, carrying nothing and with no berry in reach."""
+        out = np.zeros_like(self.alive)
+        if not (self.cfg.carry.on and self.carryable.any()):
+            return out
+        free = self.alive & (self.load < 0) & (self.block_load < 0) & ~self.berry_in_reach()
+        for a, i in zip(*np.nonzero(free)):
+            k = self.physics.nearest_block(a, i, self.cfg.carry.reach)
+            out[a, i] = k >= 0 and self.carryable[k]
+        return out
 
     def touching_block(self) -> np.ndarray:
         """(arenas, creatures): who has a block within grab's reach."""

@@ -30,6 +30,8 @@ class Sight:
     nestmate: np.ndarray    # it's a creature from the same colony
     own_nest: np.ndarray    # to the edge of its colony's nest, the range when it hit something first
     other_nest: np.ndarray  # the same for any other colony's
+    it: np.ndarray          # it's a creature that's it, in tag
+    carrier: np.ndarray     # it's a creature carrying a flag
 
 
 def look(world: World) -> Sight:
@@ -40,7 +42,7 @@ def look(world: World) -> Sight:
     dirs = directions(world.heading, v.rays, v.fov)
     # the dead are gone from the world
     others = ~np.eye(n, dtype=bool) & world.alive[:, None, :]
-    food = np.broadcast_to(world.food_present[:, None], (arenas, n, world.food_present.shape[1]))
+    food = np.broadcast_to(world.food_seen[:, None], (arenas, n, world.food_present.shape[1]))
     flowers = np.broadcast_to(world.flowers_open[:, None], (arenas, n, world.flowers_open.shape[1]))
     half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2)
     creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start)
@@ -54,15 +56,18 @@ def look(world: World) -> Sight:
     dist = hits.min(-1)
     seen = dist < v.range
     dist, kind = np.where(seen, dist, v.range), np.where(seen, hits.argmin(-1) + WALL, NOTHING)
-    theirs = world.colony[creatures.argmin(-1)]
+    hit = creatures.argmin(-1)
+    theirs = world.colony[hit]
     nestmate = (kind == CREATURE) & (theirs == world.colony[:, None])
+    it = (kind == CREATURE) & world.tag.mask()[np.arange(arenas)[:, None, None], hit] if world.tag else np.zeros_like(nestmate)
+    carrier = (kind == CREATURE) & world.flags.carrying()[np.arange(arenas)[:, None, None], hit] if world.flags else np.zeros_like(nestmate)
 
     nests = np.broadcast_to(world.nests, (arenas, *world.nests.shape))
     every = np.ones((arenas, n, len(world.nests)), bool)
     reach = hit_circles(pos, dirs, nests, cfg.colonies.nest_radius, every, start)
     own = world.colony[:, None, None] == np.arange(len(world.nests))      # N,1,C
     own_nest, other_nest = (np.where(mask, reach, np.inf).min(-1) for mask in (own, ~own))
-    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, v.range) for t in (own_nest, other_nest)))
+    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, v.range) for t in (own_nest, other_nest)), it, carrier)
 
 
 def hit_circles(origin, dirs, centres, radius, valid, start):
