@@ -221,6 +221,12 @@ def everything(root: Path, path: Path = SESSIONS) -> dict:
             'rented_hours': sum(map(rented_hours, rentals)), 'dollars': sum(float(s['dollars']) for s in rentals)}
 
 
+def rented_as(gpu: str, rental: dict, sizes: dict[str, int]) -> tuple[str, str, str]:
+    memory = rental.get('gpu_memory_gb') or sizes.get(gpu)
+    gpu = f'{gpu} {memory} GB' if memory else gpu
+    return f'rented {gpu}', 'rented', gpu
+
+
 def on_board(record: dict, rentals: list[dict], mine: list[dict], sizes: dict[str, int]) -> tuple[str, str, str] | None:
     """The board's name, kind and GPU for a run on one of my machines (one with a handle) or a rented GPU."""
     if record.get('device') == 'cuda':
@@ -228,12 +234,10 @@ def on_board(record: dict, rentals: list[dict], mine: list[dict], sizes: dict[st
         gpu = (record.get('gpu') or rental.get('gpu') or '').removeprefix('NVIDIA ').removeprefix('GeForce ')
         if not gpu:
             return None
-        memory = rental.get('gpu_memory_gb') or sizes.get(gpu)
-        gpu = f'{gpu} {memory} GB' if memory else gpu
-        return f'rented {gpu}', 'rented', gpu
+        return rented_as(gpu, rental, sizes)
     named = hardware(record, rentals, mine)
     own = next((k for k in mine if k['name'] == named and 'handle' in k), None)
-    return (own['handle'], 'mine', own['cpu']) if own else None
+    return (own['handle'], 'admin', own['cpu']) if own else None
 
 
 def board(root: Path = ROOT, path: Path = SESSIONS) -> list[dict]:
@@ -260,7 +264,15 @@ def board(root: Path = ROOT, path: Path = SESSIONS) -> list[dict]:
         row['runs'] += 1
         ended = (when(record['started']) + timedelta(seconds=secs)).astimezone(timezone.utc).date().isoformat()
         row['last_active'] = max(row['last_active'], ended)
-    return sorted(({**r, 'hours': round(r['hours'], 2)} for r in rows.values()), key=lambda r: -r['samples'])
+    # what each rented GPU cost, every rental of it (setup, downloads and idle included, queue jobs too)
+    for rental in rentals:
+        name, kind, gpu = rented_as(rental['gpu'], rental, sizes)
+        row = rows.setdefault(name, {'name': name, 'kind': kind, 'gpu': gpu, 'samples': 0, 'hours': 0.0, 'runs': 0,
+                                     'last_active': ''})
+        row['dollars'] = row.get('dollars', 0.0) + float(rental['dollars'])
+        row['last_active'] = max(row['last_active'], when(rental['ended']).astimezone(timezone.utc).date().isoformat())
+    return sorted(({**r, 'hours': round(r['hours'], 2)} | ({'dollars': round(r['dollars'], 2)} if 'dollars' in r else {})
+                   for r in rows.values()), key=lambda r: -r['samples'])
 
 
 def write_board(rows: list[dict], out: Path):

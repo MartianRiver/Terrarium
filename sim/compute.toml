@@ -1031,3 +1031,253 @@ started = "2026-10-28T12:15:27+11:00"
 ended = "2026-10-28T13:46:24+11:00"
 dollars = 0.146
 note = "flash world: side task (hint 1 and 0.2) (machine 147415)"
+
+[[session]]
+provider = "vast"
+instance = 58045739
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-28T14:40:14+11:00"
+ended = "2026-10-28T16:00:20+11:00"
+dollars = 0.169
+note = "flash: a flower sense, told and guessed (machine 33751)"
+
+[[session]]
+provider = "vast"
+instance = 58049153
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-28T15:25:59+11:00"
+ended = "2026-10-28T17:04:11+11:00"
+dollars = 0.196
+note = "flash: lr ramped, with and without memory (machine 33747)"
+
+[[session]]
+provider = "vast"
+instance = 58049242
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-28T15:27:03+11:00"
+ended = "2026-10-28T15:55:09+11:00"
+dollars = 0.112
+note = "flash-seen: can it learn flowers it can see (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 58051180
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-28T15:55:55+11:00"
+ended = "2026-10-28T16:46:49+11:00"
+dollars = 0.179
+note = "flash-seen: 32M more, and a second seed (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 58051471
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T15:59:10+11:00"
+ended = "2026-10-28T17:50:40+11:00"
+dollars = 0.349
+note = "flash: fresh brains, with and without memory (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58055376
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-28T16:48:40+11:00"
+ended = "2026-10-28T17:46:40+11:00"
+dollars = 0.206
+note = "flash: memory on the flower brain (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 58065716
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T18:52:36+11:00"
+ended = "2026-10-28T20:42:06+11:00"
+dollars = 0.332
+note = "flash: fresh brains, second seed (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58066721
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-28T19:07:07+11:00"
+ended = "2026-10-28T19:56:43+11:00"
+dollars = 0.082
+note = "colony: slack (a body that lasts twice as long) (machine 147415)"
+
+[[session]]
+provider = "vast"
+instance = 58077869
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-28T21:05:51+11:00"
+ended = "2026-10-28T21:39:15+11:00"
+dollars = 0.124
+note = "vault-carry: slack, colony share 0.5 and 1.0 (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 58077873
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-28T21:05:52+11:00"
+ended = "2026-10-28T21:46:46+11:00"
+dollars = 0.09
+note = "vault-carry: second seed, share 0.5 and 1.0 (machine 33747)"
+
+[[session]]
+provider = "vast"
+instance = 58078984
+gpu = "RTX 3070"
+cpu = "EPYC 7402, 16 cores"
+started = "2026-10-28T21:15:33+11:00"
+ended = "2026-10-28T21:52:03+11:00"
+dollars = 0.086
+note = "young: colony vs colony-young (machine 19028)"
+
+[[session]]
+provider = "vast"
+instance = 58084559
+gpu = "RTX 3070"
+cpu = "EPYC 7402, 16 cores"
+started = "2026-10-28T22:03:39+11:00"
+ended = "2026-10-28T22:41:45+11:00"
+dollars = 0.088
+note = "young: bites their size, two seeds (machine 19028)"
+
+[[session]]
+provider = "vast"
+instance = 58084605
+gpu = "RTX 4060 Ti"
+cpu = "Threadripper PRO 3995WX, 32 cores"
+started = "2026-10-28T22:04:00+11:00"
+ended = "2026-10-28T22:45:30+11:00"
+dollars = 0.154
+note = "young: control seed 2, young for 120 s (machine 32736)"
+
+[[session]]
+provider = "vast"
+instance = 58095359
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-28T23:34:09+11:00"
+ended = "2026-10-29T00:01:09+11:00"
+dollars = 0.108
+note = "door gym brains 16M in vault-carry (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58095403
+gpu = "RTX 3070"
+cpu = "Xeon E5-2699 v3, 18 cores"
+started = "2026-10-28T23:34:29+11:00"
+ended = "2026-10-28T23:53:41+11:00"
+dollars = 0.053
+note = "door gym: seeds 3 and 4 (slower than the Mac, stopped) (machine 33751)"
+
+[[session]]
+provider = "vast"
+instance = 58126290
+gpu = "RTX 3070"
+cpu = "Ryzen 9 7900X, 24 cores"
+started = "2026-10-29T04:21:23+11:00"
+ended = "2026-10-29T04:27:23+11:00"
+dollars = 0.02
+note = "never trained: no ssh within 3 min (machine 137857)"
+
+[[session]]
+provider = "vast"
+instance = 58126317
+gpu = "RTX 3070"
+cpu = "Xeon E5-2686 v4, 36 cores"
+started = "2026-10-29T04:21:43+11:00"
+ended = "2026-10-29T04:31:49+11:00"
+dollars = 0.002
+note = "never trained: not running after 10 min (machine 149303)"
+
+[[session]]
+provider = "vast"
+instance = 58126351
+gpu = "RTX 3080"
+cpu = "Xeon E5-2696 v3, 16 cores"
+started = "2026-10-29T04:22:05+11:00"
+ended = "2026-10-29T07:43:11+11:00"
+dollars = 0.572
+note = "flash: fresh pair 48M more (memory one stopped at 40M) (machine 151846)"
+
+[[session]]
+provider = "vast"
+instance = 58127206
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-29T04:30:19+11:00"
+ended = "2026-10-29T06:31:37+11:00"
+dollars = 0.367
+note = "flash: memory curriculum (seen 3 s, 2 s, 1 s), seed 1 (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58127424
+gpu = "RTX 3070"
+cpu = "Xeon Gold 6138, 80 cores"
+started = "2026-10-29T04:32:08+11:00"
+ended = "2026-10-29T07:42:02+11:00"
+dollars = 0.541
+note = "flash: memory curriculum, seed 2 (machine 144782)"
+
+[[session]]
+provider = "vast"
+instance = 58128007
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-29T04:38:44+11:00"
+ended = "2026-10-29T05:07:14+11:00"
+dollars = 0.116
+note = "vault-shut2: 0.3 brain and gym brain 16M (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58131974
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-29T05:17:22+11:00"
+ended = "2026-10-29T05:45:16+11:00"
+dollars = 0.107
+note = "vault-shut2: second seeds (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58136135
+gpu = "RTX 4060 Ti"
+cpu = "EPYC 7702, 16 cores"
+started = "2026-10-29T05:55:48+11:00"
+ended = "2026-10-29T06:26:30+11:00"
+dollars = 0.11
+note = "door gym seeds 3 and 4, 16M in vault-carry (machine 30927)"
+
+[[session]]
+provider = "vast"
+instance = 58136978
+gpu = "RTX 3060"
+cpu = "Xeon E5-2683 v4, 16 cores"
+started = "2026-10-29T06:04:47+11:00"
+ended = "2026-10-29T06:09:59+11:00"
+dollars = 0.002
+note = "never trained: ssh dropped straight after (machine 28139)"
+
+[[session]]
+provider = "vast"
+instance = 58137532
+gpu = "RTX 3060"
+cpu = "EPYC 7662, 16 cores"
+started = "2026-10-29T06:10:17+11:00"
+ended = "2026-10-29T06:50:53+11:00"
+dollars = 0.076
+note = "flash-seen3: first stage without --fast (machine 147415)"

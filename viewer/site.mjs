@@ -258,7 +258,7 @@ ${BRAINS}`,
 // Terrarium at Home: the page, the reviews of the worker's code (site/reviews/, each a model's review pasted in
 // whole, with the commit it read) and the board, read live from the job queue
 const atHome = read(join(SITE, 'at-home.md'));
-for (const key of ['title', 'description', 'usd_per_billion', 'rate_from', 'aud_per_usd', 'aud_date']) {
+for (const key of ['title', 'description', 'usd_per_billion', 'aud_per_usd', 'aud_date']) {
   if (!atHome.meta[key]) throw new Error(`site/at-home.md has no ${key}`);
 }
 const reviews = existsSync(join(SITE, 'reviews')) ? readdirSync(join(SITE, 'reviews')).filter((f) => f.endsWith('.md')).sort().reverse().map((f) => {
@@ -297,11 +297,17 @@ fetch(BOARD_URL).then((r) => {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }).then((b) => {
-  const lent = b.totals.lent;
-  let html = lent.samples
-    ? '<p class="saved">Lent machines have trained <b>' + samples(lent.samples) + ' samples</b> over ' + lent.hours.toFixed(1)
-      + ' hours: about <b>' + money(lent.samples / 1e9 * PER_BILLION) + '</b> of rented GPU time.</p>'
-    : '<p class="saved">No lent machine has finished a job yet.</p>';
+  // every machine but a rented one costs me nothing, so it's worth what renting its samples would have cost
+  const none = { samples: 0, hours: 0, dollars: 0 };
+  const free = ['admin', 'trusted', 'donor'].map((k) => b.totals[k] ?? none).reduce((t, k) => ({ samples: t.samples + k.samples, hours: t.hours + k.hours }), none);
+  const rented = { ...none, ...b.totals.rented };
+  // what rented GPUs have cost a sample so far (the page's own rate until there are any)
+  const perBillion = rented.samples ? rented.dollars / rented.samples * 1e9 : PER_BILLION;
+  const worth = (n) => n / 1e9 * perBillion;
+  let html = '<p class="saved">Machines that cost me nothing, my Mac and the ones lent to me, have trained <b>' + samples(free.samples) + ' samples</b> over '
+    + free.hours.toFixed(1) + ' hours: about <b>' + money(worth(free.samples)) + '</b> saved on rented GPU time.</p>'
+    + '<p class="saved">Rented GPUs have trained <b>' + samples(rented.samples) + ' samples</b> over ' + rented.hours.toFixed(1)
+    + ' hours, for <b>' + money(rented.dollars) + '</b> paid.</p>';
   if (!b.machines.length) {
     box.innerHTML = html + '<p>No machines on it yet.</p>';
     return;
@@ -310,10 +316,14 @@ fetch(BOARD_URL).then((r) => {
   // a rented row is named for its GPU, which has a column of its own; on a phone the GPU goes under the name instead
   const machine = (m) => (m.kind === 'rented' ? 'Rented' : esc(m.name)) + '<span class="gpu-under">' + gpu(m) + '</span>';
   const day = (d) => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '–';
-  html += '<div class="board"><table><thead><tr><th>Machine</th><th class="gpu">GPU</th><th class="n">Samples</th><th class="n">Hours</th><th class="n">Jobs</th><th class="n last">Last active</th></tr></thead><tbody>'
+  const aud = (usd) => 'A$' + (usd * AUD).toFixed(2);
+  const cost = (m) => m.kind === 'rented' ? '<span class="paid">' + aud(m.dollars ?? 0) + ' paid</span>' : '<span class="free">' + aud(worth(m.samples)) + ' saved</span>';
+  html += '<div class="board"><table><thead><tr><th>Machine</th><th class="gpu">GPU</th><th class="n">Samples</th><th class="n hours">Hours</th><th class="n">Jobs</th><th class="n">Paid or saved</th><th class="n last">Last active</th></tr></thead><tbody>'
     + b.machines.map((m) => '<tr><td>' + machine(m) + '</td><td class="gpu">' + gpu(m) + '</td><td class="n">' + samples(m.samples)
-      + '</td><td class="n">' + m.hours.toFixed(1) + '</td><td class="n">' + m.jobs + '</td><td class="n last">' + day(m.last_active) + '</td></tr>').join('')
-    + '</tbody></table></div>';
+      + '</td><td class="n hours">' + m.hours.toFixed(1) + '</td><td class="n">' + m.jobs + '</td><td class="n">' + cost(m) + '</td><td class="n last">' + day(m.last_active) + '</td></tr>').join('')
+    + '</tbody></table></div>'
+    + '<p class="when">Saved is what renting the same samples would have cost, at what my rented GPUs have cost per sample so far: US$' + perBillion.toFixed(2)
+    + ' a billion, at A$' + AUD + ' to the US dollar (the ECB’s rate on ${escape(atHome.meta.aud_date)}). It leaves out the power your machine uses. Paid is every rental, setup and idle time included, so a GPU that never got going still cost something.</p>';
   box.innerHTML = html;
 }).catch(() => {
   box.innerHTML = '<p>The board isn’t answering right now. The queue may be restarting; try again in a minute.</p>';
@@ -322,12 +332,11 @@ fetch(BOARD_URL).then((r) => {
 for (const mark of ['<!-- reviews -->', '<!-- board -->']) {
   if (!atHome.body.includes(mark)) throw new Error(`site/at-home.md has no ${mark}`);
 }
-const rate = `<p class="when">Rented time is what my rented GPUs have cost per sample: US$${escape(atHome.meta.usd_per_billion)} a billion, from ${escape(atHome.meta.rate_from)}, at A$${escape(atHome.meta.aud_per_usd)} to the US dollar (the ECB’s rate on ${escape(atHome.meta.aud_date)}). It leaves out the power your machine uses.</p>`;
 write('at-home', page({
   title: atHome.meta.title,
   description: atHome.meta.description,
   path: '/at-home/',
-  body: `<article>\n<h1>${escape(atHome.meta.title)}</h1>\n${marked(atHome.body).replace('<!-- reviews -->', () => reviewed).replace('<!-- board -->', () => BOARD + rate)}</article>`,
+  body: `<article>\n<h1>${escape(atHome.meta.title)}</h1>\n${marked(atHome.body).replace('<!-- reviews -->', () => reviewed).replace('<!-- board -->', () => BOARD)}</article>`,
 }));
 
 // a review build shows the gallery as built on this machine (SITE_GALLERY)
