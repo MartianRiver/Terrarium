@@ -178,7 +178,7 @@ pickup = 0.0
 [peek]
 # peekaboo, a nursery game for memory: a berry turns up `near`–`far` m in front of someone, in sight for `show` seconds
 # (0 is off), then out of sight where it is; finding it pays `points`, the next turns up `gap` s later, and one not found
-# `timeout` s after hiding moves. `spin` turns everyone round at random as it hides
+# `timeout` s after hiding moves. `spin` turns everyone round at random as it turns up and as it hides
 show = 0.0
 points = 0.0
 gap = 0.0

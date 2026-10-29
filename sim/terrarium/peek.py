@@ -3,8 +3,10 @@
 # stays where it is. Finding it pays `points` to everyone (the first to touch it
 # eats it), and the next one turns up `gap` seconds later. One nobody finds in
 # `timeout` seconds after it hid goes somewhere else. With `spin`, everyone is
-# turned round at random the moment it hides, so walking straight on isn't enough:
-# a brain has to remember where it was, from its home bearing or its own turns.
+# turned round at random as it turns up and again the moment it hides, so walking
+# straight on isn't enough, and neither is a lap of the arena that the next berry
+# always turns up ahead on (a brain learned that): it has to remember where it was,
+# from its home bearing or its own turns.
 import numpy as np
 
 from .config import ConfigError
@@ -44,6 +46,8 @@ class Peek:
         for a in np.flatnonzero(w.food_present[:, 0] & (w.food_id[:, 0] != self.last)):
             self.last[a] = w.food_id[a, 0]
             self.since[a] = 0
+            if p.spin:
+                w.heading[a] = w.rng.uniform(-np.pi, np.pi, w.heading.shape[1])
             self._place(a)
         here = w.food_present[:, 0]
         self.since[here] += 1
