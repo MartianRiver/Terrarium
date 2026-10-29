@@ -4,14 +4,14 @@
 # now (a lent machine "waiting" says someone is at it), so last active is a day.
 # Workers report themselves; what they send is cut down to known fields here
 # before it's kept or shown. What my machines and rented GPUs trained outside the
-# queue comes from board.toml, written from the ledger (compute.py).
+# queue comes from board.toml, written from the ledger (compute.py), with what each rented GPU cost.
 
 import time
 import tomllib
 from pathlib import Path
 
-# trusted machines are River's own
-KINDS = {'trusted': 'mine', 'rented': 'rented', 'donor': 'lent'}
+# shown by the token's role: admin is mine, trusted is someone I know, donor anyone else who asked for one
+KINDS = ('admin', 'trusted', 'donor', 'rented')
 INFO = {'platform': str, 'slots': int, 'trusted': bool, 'version': int, 'state': str, 'reason': str}
 TEXT = 120
 USAGE = ['samples_per_second', 'collect_seconds', 'update_seconds',
@@ -85,7 +85,7 @@ def outside(path: Path | None = None) -> list[dict]:
 
 
 def kind_of(role: str | None) -> str | None:
-    return KINDS.get(role or '')
+    return role if role in KINDS else None
 
 
 def summary(jobs: list[dict], workers: dict[str, dict], roles: dict[str, str], now: float | None = None,
@@ -112,13 +112,20 @@ def summary(jobs: list[dict], workers: dict[str, dict], roles: dict[str, str], n
             m['hours'] = round(m['hours'] + o['hours'], 2)
             m['jobs'] += o['runs']
             m['gpu'] = m['gpu'] or o['gpu']
+            # my own machine is mine whatever token it works under
+            m['kind'] = 'admin' if o['kind'] == 'admin' else m['kind']
             m['last_active'] = max(filter(None, (m['last_active'], o['last_active'])))
+            if 'dollars' in o:
+                m['dollars'] = o['dollars']
     machines += [{'name': o['name'], 'kind': o['kind'], 'gpu': o['gpu'], 'samples': o['samples'], 'hours': o['hours'],
-                  'jobs': o['runs'], 'last_active': o['last_active']} for o in off.values()]
+                  'jobs': o['runs'], 'last_active': o['last_active']} | ({'dollars': o['dollars']} if 'dollars' in o else {})
+                 for o in off.values()]
     machines.sort(key=lambda m: -m['samples'])
     totals = {}
-    for kind in KINDS.values():
-        mine = [m for m in machines if m['kind'] == kind]
-        totals[kind] = {'machines': len(mine), 'samples': sum(m['samples'] for m in mine),
-                        'hours': round(sum(m['hours'] for m in mine), 2)}
+    for kind in KINDS:
+        these = [m for m in machines if m['kind'] == kind]
+        totals[kind] = {'machines': len(these), 'samples': sum(m['samples'] for m in these),
+                        'hours': round(sum(m['hours'] for m in these), 2)}
+    # rented GPUs are the only ones I pay for: what they cost, from compute.toml
+    totals['rented']['dollars'] = round(sum(m.get('dollars', 0.0) for m in machines if m['kind'] == 'rented'), 2)
     return {'at': round(now), 'machines': machines, 'totals': totals}

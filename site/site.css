@@ -396,8 +396,13 @@ figure {
   display: none;
 }
 
+.board .free {
+  color: var(--muted);
+}
+
 @media (max-width: 480px) {
   .board .gpu,
+  .board .hours,
   .board .last {
     display: none;
   }

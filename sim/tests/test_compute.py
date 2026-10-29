@@ -160,9 +160,16 @@ def test_the_board_gets_my_machines_and_rented_gpus_but_not_what_the_queue_count
     (runs / 'lent' / 'job.json').write_text('{}')
     sessions = tmp_path / 'compute.toml'
     sessions.write_text('[[machine]]\ncpu = "Apple M3"\nmemory_gb = 16\nname = "MacBook Air"\nhandle = "river-m3"\n'
-                        '[gpu_memory]\n"RTX 3060" = 12\n')
+                        '[gpu_memory]\n"RTX 3060" = 12\n'
+                        '[[session]]\nprovider = "vast"\ninstance = 1\ngpu = "RTX 3060"\ncpu = "EPYC 7662"\n'
+                        'started = "2026-10-23T23:00:00+00:00"\nended = "2026-10-24T01:00:00+00:00"\ndollars = 0.25\n'
+                        '[[session]]\nprovider = "vast"\ninstance = 2\ngpu = "RTX 3060"\ncpu = "EPYC 7662"\n'
+                        'started = "2026-10-25T23:00:00+00:00"\nended = "2026-10-26T01:00:00+00:00"\ndollars = 0.125\n')
     rows = {r['name']: r for r in board(runs, sessions)}
     assert sorted(rows) == ['rented RTX 3060 12 GB', 'rented RTX 4060 Ti', 'river-m3']
-    assert rows['river-m3'] == {'name': 'river-m3', 'kind': 'mine', 'gpu': 'Apple M3', 'samples': 400, 'hours': 1.5,
+    assert rows['river-m3'] == {'name': 'river-m3', 'kind': 'admin', 'gpu': 'Apple M3', 'samples': 400, 'hours': 1.5,
                                 'runs': 2, 'last_active': '2026-10-24'}
     assert rows['rented RTX 3060 12 GB']['kind'] == 'rented' and rows['rented RTX 3060 12 GB']['samples'] == 200
+    # every rental of it costs, the one that trained nothing here too
+    assert rows['rented RTX 3060 12 GB']['dollars'] == 0.38 and rows['rented RTX 3060 12 GB']['last_active'] == '2026-10-26'
+    assert 'dollars' not in rows['river-m3'] and 'dollars' not in rows['rented RTX 4060 Ti']
