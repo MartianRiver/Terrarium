@@ -21,6 +21,7 @@ from .brain import Brain, brain_id, load as load_brain
 from .config import Config, load
 from .evals import brain_policy
 from .forage import Observation
+from .vision import angles
 from .log import Logger
 from .schema import YES_NO
 from .world import World
@@ -125,7 +126,8 @@ def track(cfg: Config, brain_path: Path | str, path: Path | str, seed: int, crea
     head = {'format': FORMAT, 'version': VERSION, 'creature': creature, 'seed': seed,
             'brain': {'id': brain_id(brain_path), 'file': Path(brain_path).name, 'shape': brain.shape,
                       'yes_no': brain.yes_no, 'repeat': meta.get('repeat', 1), 'schema': brain.schema},
-            'rays': {'count': cfg.vision.rays, 'fov': cfg.vision.fov, 'range': cfg.vision.range},
+            'rays': {'count': cfg.vision.rays, 'fov': cfg.vision.fov, 'range': cfg.vision.range,
+                     'angles': [round(float(a), 4) for a in angles(cfg.vision)]},
             'tickHz': cfg.tick_hz}
     with gzip.GzipFile(path, 'wb', mtime=0) as f:
         for line in (head, *lines):

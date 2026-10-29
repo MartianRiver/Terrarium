@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AntStudy } from './ant';
 import { BrainView } from './brainview';
 import { ChannelCard, type Game as ChannelGame, type Item } from './channelcard';
+import { Picker } from './picker';
 import { clock } from './clock';
 import { createDemo } from './demo';
 import { galleryBar } from './gallery';
@@ -263,7 +264,7 @@ function boot() {
     }
   }
 
-  // ?channel=<index.json>: its replays in turn, each with its title as the label; the list is read again each time
+  // ?channel=<index.json>[&game=<key>]: its replays in turn, each with its title as the label; the list is read again each time
   // one runs out, so replays added while training (newer checkpoints) come round on the next pass
   let showing = '';
   let tuning = false;
@@ -274,7 +275,11 @@ function boot() {
     try {
       const index = new URL(params.get('channel')!, location.href);
       if (index.origin !== location.origin) throw new ReplayError(`won’t read a channel from another site (${index.origin})`);
-      const { items, games = {}, note }: { items: Item[]; games?: Record<string, ChannelGame>; note?: string } = await (await fetch(index, { cache: 'no-cache' })).json();
+      const read: { items: Item[]; games?: Record<string, ChannelGame>; note?: string } = await (await fetch(index, { cache: 'no-cache' })).json();
+      const { games = {}, note } = read;
+      // &game=<key> keeps to one game's replays
+      const game = params.get('game');
+      const items = game ? read.items.filter((i) => i.game === game) : read.items;
       if (!items.length) throw new ReplayError('nothing on the channel yet');
       const place = (items.findIndex((i) => i.replay === showing) + 1) % items.length;
       const item = items[place];
@@ -352,7 +357,14 @@ function boot() {
     const brains = document.createElement('a');
     brains.href = '/brains/';
     brains.textContent = 'Brains';
-    openButton.replaceWith(brains);
+    const picker = new Picker(document.body);
+    const choose = document.createElement('button');
+    choose.textContent = 'Choose';
+    choose.setAttribute('aria-label', 'Choose what to watch');
+    choose.addEventListener('click', () => void picker.open());
+    openButton.replaceWith(choose, ' ', brains);
+    // nothing asked for: say what there is, over the garden playing behind
+    if (!location.search) void picker.open();
   }
   const channel = params.has('channel');
   const wanted = params.get('replay') ?? (SITE && !channel ? SITE_REPLAY : null);

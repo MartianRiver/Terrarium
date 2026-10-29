@@ -7,18 +7,39 @@
 # before reaching one, if that's before whatever it hit.
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .world import World
+if TYPE_CHECKING:
+    from .world import World
 
 NOTHING, WALL, CREATURE, FOOD, BLOCK, FLOWER = range(6)
 # rays start this far outside the body, so a creature never sees itself
 GAP = 0.01
 
 
-def directions(heading, rays, fov):
-    a = heading[..., None] + np.linspace(-fov / 2, fov / 2, rays)
+def angles(v) -> np.ndarray:
+    """Each ray's angle off the heading, (rays,): evenly over the fov, or packed towards the middle."""
+    u = np.linspace(-1, 1, v.rays)
+    return v.fov / 2 * np.sign(u) * np.abs(u) ** v.spread
+
+
+def reach(v) -> np.ndarray:
+    """How far each ray sees, (rays,): the range in the middle of the fan, easing to side × range at its edges."""
+    edge = angles(v) / (v.fov / 2) if v.fov > 0 else np.zeros(v.rays)
+    return v.range * (1 + (v.side - 1) * edge ** 2)
+
+
+def widths(v) -> np.ndarray:
+    """Half the angle each ray covers, (rays,): 0 for thin rays, half the gap to its neighbours at cover 1."""
+    a = angles(v)
+    gap = np.gradient(a) if len(a) > 1 else np.full(1, v.fov)
+    return v.cover * np.abs(gap) / 2
+
+
+def directions(heading, offsets):
+    a = heading[..., None] + offsets
     return np.stack([np.cos(a), np.sin(a)], -1)
 
 
@@ -34,28 +55,31 @@ class Sight:
     carrier: np.ndarray     # it's a creature carrying a flag
 
 
-def look(world: World) -> Sight:
+def look(world: 'World') -> Sight:
     cfg, v = world.cfg, world.cfg.vision
     start = cfg.creature.radius + GAP
     pos = world.pos
     arenas, n = pos.shape[:2]
-    dirs = directions(world.heading, v.rays, v.fov)
+    dirs = directions(world.heading, angles(v))
+    # a wide ray takes in anything within its slice of the fan; tan of each half-width
+    wide = np.tan(widths(v)) if v.cover > 0 else None
+    far = reach(v)
     # the dead are gone from the world
     others = ~np.eye(n, dtype=bool) & world.alive[:, None, :]
     food = np.broadcast_to(world.food_seen[:, None], (arenas, n, world.food_present.shape[1]))
     flowers = np.broadcast_to(world.flowers_open[:, None], (arenas, n, world.flowers_open.shape[1]))
     half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2)
-    creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start)
+    creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start, wide)
     hits = np.stack([
         hit_walls(pos, dirs, cfg.arena.size / 2, start),
         creatures.min(-1),
-        hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start).min(-1, initial=np.inf),
+        hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start, wide).min(-1, initial=np.inf),
         hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start),
-        hit_circles(pos, dirs, world.flower_pos, cfg.flowers.radius, flowers, start).min(-1, initial=np.inf),
+        hit_circles(pos, dirs, world.flower_pos, cfg.flowers.radius, flowers, start, wide).min(-1, initial=np.inf),
     ], -1)
     dist = hits.min(-1)
-    seen = dist < v.range
-    dist, kind = np.where(seen, dist, v.range), np.where(seen, hits.argmin(-1) + WALL, NOTHING)
+    seen = dist < far
+    dist, kind = np.where(seen, dist, far), np.where(seen, hits.argmin(-1) + WALL, NOTHING)
     hit = creatures.argmin(-1)
     theirs = world.colony[hit]
     nestmate = (kind == CREATURE) & (theirs == world.colony[:, None])
@@ -64,15 +88,16 @@ def look(world: World) -> Sight:
 
     nests = np.broadcast_to(world.nests, (arenas, *world.nests.shape))
     every = np.ones((arenas, n, len(world.nests)), bool)
-    reach = hit_circles(pos, dirs, nests, cfg.colonies.nest_radius, every, start)
+    to_nest = hit_circles(pos, dirs, nests, cfg.colonies.nest_radius, every, start)
     own = world.colony[:, None, None] == np.arange(len(world.nests))      # N,1,C
-    own_nest, other_nest = (np.where(mask, reach, np.inf).min(-1) for mask in (own, ~own))
-    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, v.range) for t in (own_nest, other_nest)), it, carrier)
+    own_nest, other_nest = (np.where(mask, to_nest, np.inf).min(-1) for mask in (own, ~own))
+    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, far) for t in (own_nest, other_nest)), it, carrier)
 
 
-def hit_circles(origin, dirs, centres, radius, valid, start):
+def hit_circles(origin, dirs, centres, radius, valid, start, wide=None):
     """origin (A,N,2), dirs (A,N,R,2), centres (A,M,2), valid (A,N,M): where each ray hits each circle,
-    (A,N,R,M), inf for none."""
+    (A,N,R,M), inf for none. With wide (R,), the tan of each ray's half-width, a ray hits a circle anywhere
+    in its slice of the fan; one it only takes in at the side is that far along it."""
     # x and y apart: einsum and sums over a length-2 axis are much slower in numpy
     ox = centres[:, None, :, 0] - origin[:, :, None, 0]             # A,N,M
     oy = centres[:, None, :, 1] - origin[:, :, None, 1]
@@ -80,6 +105,9 @@ def hit_circles(origin, dirs, centres, radius, valid, start):
     miss2 = (ox * ox + oy * oy)[:, :, None] - along * along
     inside = radius * radius - miss2
     root = np.sqrt(np.maximum(inside, 0))
+    if wide is not None:
+        grown = radius + np.maximum(along, 0) * wide[:, None]
+        inside = grown * grown - miss2
     ok = (inside > 0) & (along + root > start) & valid[:, :, None]
     return np.where(ok, np.maximum(along - root, start), np.inf)
 

@@ -811,3 +811,93 @@ body {
   font-size: 12px;
   opacity: 0.65;
 }
+
+/* the site's /watch/ with nothing asked for: what there is to watch (picker.ts) */
+#picker {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  padding: 18px 20px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.94);
+  color: #2c3a33;
+  font: inherit;
+  outline: none;
+}
+
+#picker::backdrop {
+  background: rgb(20 30 25 / 0.35);
+}
+
+#picker h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+#picker ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#picker li a {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+#picker li a:hover,
+#picker li a:focus-visible {
+  background: rgb(95 174 79 / 0.14);
+}
+
+#picker li b {
+  font-size: 15px;
+}
+
+.picker-tag {
+  justify-self: end;
+  align-self: start;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgb(95 174 79 / 0.18);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.picker-text {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.picker-when,
+.picker-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.picker-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+.picker-foot button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #5fae4f;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}

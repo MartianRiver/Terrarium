@@ -241,6 +241,8 @@ class Peek:
     near: float      # it turns up between these distances in front of someone
     far: float
     spin: bool       # turn everyone round at random when it hides
+    again: float     # once hidden, it's back in sight for `flash` s every `again` s at the same spot (0 is never)
+    flash: float
 
     @property
     def on(self) -> bool:
@@ -252,6 +254,9 @@ class Vision:
     rays: int
     fov: float
     range: float
+    cover: float
+    spread: float
+    side: float
 
 
 @dataclass(frozen=True)
@@ -337,6 +342,7 @@ class PPO:
 class Start:
     fresh: tuple[str, ...]
     staggered: bool
+    spread: bool
 
 
 @dataclass(frozen=True)
@@ -387,6 +393,7 @@ def convert(kind, value, where):
 # keys added after worlds were first recorded, as they were before: off. Only for reading old run
 # records (serve.py), never for configs on disk, which have every key
 SINCE = {'colonies': {'room': 0},
+         'vision': {'cover': 0.0, 'spread': 1.0, 'side': 1.0},
          'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
@@ -394,7 +401,7 @@ SINCE = {'colonies': {'room': 0},
          'tag': {'reach': 0.0, 'cooldown': 0.0, 'points': 0.0, 'speed': 1.0},
          'seek': {'prep': 0.0, 'points': 0.0},
          'flag': {'points': 0.0, 'pickup': 0.0},
-         'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False},
+         'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False, 'again': 0.0, 'flash': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
          'food': {'middle': 0},
          'flowers': {'count': 0, 'every_min': 0.0, 'every_max': 0.0, 'open': 0.0, 'radius': 0.0, 'food': 0, 'boost': 0.0,

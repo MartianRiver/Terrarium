@@ -147,14 +147,19 @@ class Brain(nn.Module):
                     self.policy.bias[i] *= scale
         self.yes_no = 'bernoulli'
 
-    def with_memory(self, size: int) -> 'Brain':
-        """This brain with blank memory of `size` notes added; it acts exactly as before until it's trained."""
+    def with_memory(self, size: int, recall: float = 0.0) -> 'Brain':
+        """This brain with blank memory of `size` notes added; it acts exactly as before until it's trained, unless
+        `recall` starts reading the notes back at that share of a fresh layer's weights."""
         if self.memory:
             raise ValueError(f'this brain already has memory ({self.memory} notes)')
         shape = self.shape
         new = Brain(shape['width'], shape['layers'], shape['heads'], self.schema, self.yes_no, size)
         missing, unexpected = new.load_state_dict(self.state_dict(), strict=False)
         assert not unexpected and all(k.startswith(('gru.', 'recall.')) for k in missing)
+        if recall:
+            # at zero the notes get no gradient until reading them pays, which at a few seconds' wait it rarely does
+            with torch.no_grad():
+                new.recall.weight.copy_(nn.Linear(size, shape['width']).weight * recall)
         return new.to(self.log_std.device)
 
     def blank(self, n: int) -> torch.Tensor:

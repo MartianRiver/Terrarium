@@ -6,7 +6,7 @@ import pytest
 
 from terrarium import World, load
 from terrarium.random_actions import RandomActions
-from terrarium.vision import BLOCK, CREATURE, FOOD, GAP, NOTHING, WALL, directions, look
+from terrarium.vision import BLOCK, CREATURE, FOOD, GAP, NOTHING, WALL, angles, directions, look, reach
 
 CFG = load()
 R = CFG.creature.radius
@@ -136,10 +136,10 @@ def test_standing_on_the_nest_sees_it_straight_away():
 
 
 def test_fan_spreads_across_fov():
-    d = directions(np.zeros((1, 1)), CFG.vision.rays, CFG.vision.fov)
-    angles = np.arctan2(d[0, 0, :, 1], d[0, 0, :, 0])
-    assert angles[0] == pytest.approx(-CFG.vision.fov / 2) and angles[-1] == pytest.approx(CFG.vision.fov / 2)
-    assert np.diff(angles) == pytest.approx(np.full(CFG.vision.rays - 1, CFG.vision.fov / (CFG.vision.rays - 1)))
+    d = directions(np.zeros((1, 1)), angles(CFG.vision))
+    fan = np.arctan2(d[0, 0, :, 1], d[0, 0, :, 0])
+    assert fan[0] == pytest.approx(-CFG.vision.fov / 2) and fan[-1] == pytest.approx(CFG.vision.fov / 2)
+    assert np.diff(fan) == pytest.approx(np.full(CFG.vision.rays - 1, CFG.vision.fov / (CFG.vision.rays - 1)))
 
 
 def test_agrees_with_pymunk():
@@ -150,7 +150,7 @@ def test_agrees_with_pymunk():
         world.step(act())
     world.food_regrow[:] = 1
     dist, kind = seen(world)
-    dirs = directions(world.heading, CFG.vision.rays, CFG.vision.fov)
+    dirs = directions(world.heading, angles(CFG.vision))
     start = R + GAP
     for a, space in enumerate(world.physics.spaces):
         for i, (x, y) in enumerate(world.pos[a]):
@@ -160,3 +160,26 @@ def test_agrees_with_pymunk():
                 want = RANGE if hit is None else start + hit.alpha * (RANGE - start)
                 assert dist[a, i, r] == pytest.approx(want, abs=1e-6)
                 assert (kind[a, i, r] == NOTHING) == (hit is None)
+
+
+def ahead(cover, distance):
+    """Whether 16 rays over the fov see a berry dead ahead at distance (an even count has no centre ray)."""
+    world = alone(rays=16)
+    world.cfg = replace(world.cfg, vision=replace(world.cfg.vision, cover=cover))
+    world.food_regrow[0, 0] = 0
+    world.food_pos[0, 0] = (distance, 0.0)
+    return (look(world).kind[0, 0] == FOOD).any()
+
+
+def test_wide_rays_see_a_berry_dead_ahead():
+    assert ahead(0.0, 2.0) and not ahead(0.0, 4.0)
+    assert ahead(1.0, 4.0) and ahead(1.0, 7.5)
+
+
+def test_spread_packs_rays_towards_the_middle_and_side_sees_less_far():
+    v = replace(CFG.vision, spread=2.0, side=0.5)
+    a = angles(v)
+    assert a[0] == pytest.approx(-v.fov / 2) and a[-1] == pytest.approx(v.fov / 2)
+    assert np.abs(np.diff(a))[v.rays // 2 - 1] < np.abs(np.diff(a))[0]
+    r = reach(v)
+    assert r[0] == pytest.approx(v.range / 2) and r.max() < v.range and r.min() == pytest.approx(v.range / 2)

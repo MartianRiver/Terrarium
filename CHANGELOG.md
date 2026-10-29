@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Brains see better: rays can be wider than a line (`[vision] cover`, a share of the gap between rays), and a fan can pack them towards the middle (`spread`) and see less far at the sides (`side`). Every nursery game now has 17 rays at half width, which fixes a blind spot straight ahead where a berry past 3 m slipped between the two middle rays; the worlds the 0.3 line trained in keep their 16 thin ones. `[start] spread` starts each arena at a random point in its episode.
+
+Peekaboo's spin turns the way a baby is sliding as well as the way it faces, since a brain with no memory found 43% of berries by turning to face its own drift. Peekaboo can give second looks (`[peek] again`, `flash`): a hidden berry comes back into sight for a moment every few seconds, with a spin each time it hides again; `configs/nursery-peek-again.toml` trains with 0.3 s looks every 3 s, too short to walk to without remembering.
+
+`train --recall 0.1` starts a new memory's link back into the brain a little open instead of shut, since in a toy test a shut link never learned a 6 s wait and a small one did.
+
+The site's Brains page starts with what's training now (the nursery games, each with what it's for and its newest brain's score, then the main line), then the steps the main line took, newest first and folded shut. Watch with nothing chosen asks what you'd like to watch, newest first, in plain words, over the garden playing behind. A channel can keep to one game (`&game=peek`).
+
 The site's channel of training games has a card saying what's on screen: the game, its goal and setup, what to watch for, a line that follows the replay (whether the berry is in sight or hidden), what the brain is, and its score on a bar beside the baselines. The words come with the channel's index.
 
 Young Terrikins look like babies: bigger eyes, rosier cheeks, a shorter antenna and tail, and a toddler's waddle, quicker and wobblier, with their arms held out for balance.

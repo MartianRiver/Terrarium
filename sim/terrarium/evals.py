@@ -37,6 +37,7 @@ from .runs import cpu_quota
 from .schema import YES_NO
 from .tactics import REASONS, Tactics, flower_in_view
 from .vision import FLOWER, FOOD, NOTHING, look
+from . import vision
 from .world import CARRIED, World
 
 log = Logger('evals')
@@ -59,7 +60,7 @@ def random_policy(world: World) -> Policy:
 
 def greedy_policy(world: World) -> Policy:
     v = world.cfg.vision
-    angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+    angles = vision.angles(v)
     ahead = np.abs(angles) < 0.5
 
     def act(w: World) -> np.ndarray:
@@ -115,7 +116,7 @@ def chaser_policy(world: World) -> Policy:
     """Carrier that runs for any open flower it sees."""
     carrier = carrier_policy(world)
     v = world.cfg.vision
-    angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+    angles = vision.angles(v)
 
     def act(w: World) -> np.ndarray:
         action = carrier(w)

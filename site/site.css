@@ -413,3 +413,69 @@ figure {
     color: var(--muted);
   }
 }
+
+.brains.now .now-card {
+  padding: 10px 12px 10px 88px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.brains.now .play {
+  left: 12px;
+  top: 12px;
+}
+
+.tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(95 174 79 / 0.25);
+  color: var(--text);
+  font-size: 0.75em;
+  white-space: nowrap;
+}
+
+details.step summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+details.step summary .play {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.85em;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.step-n {
+  min-width: 1.6em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+details.step summary::before {
+  content: '▸';
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+details.step[open] summary::before {
+  transform: rotate(90deg);
+}
+
+@media (max-width: 640px) {
+  .brains.now .now-card {
+    padding-left: 12px;
+  }
+
+  .brains.now .play {
+    position: static;
+    display: inline-block;
+    margin: 0 8px 6px 0;
+  }
+}

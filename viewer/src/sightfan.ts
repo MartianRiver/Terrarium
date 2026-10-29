@@ -42,13 +42,13 @@ export class SightFan {
   update(at: Pose | null, t: Thought | null, head: MindHeader) {
     this.mesh.visible = !!(at && t);
     if (!at || !t) return;
-    const { count, fov, range } = head.rays;
+    const { count, fov, range, angles } = head.rays;
     const last = t.attention.at(-1)!;
     const heard = t.kinds.map((_, i) => last.reduce((s, h) => s + h[i + 1], 0) / last.length);
     const most = Math.max(...heard, 1e-6);
     for (let i = 0; i < count; i++) {
       const share = heard[i] / most;
-      const a = at.heading + (count > 1 ? -fov / 2 + (fov * i) / (count - 1) : 0);
+      const a = at.heading + (angles?.[i] ?? (count > 1 ? -fov / 2 + (fov * i) / (count - 1) : 0));
       const [dx, dy] = [Math.cos(a), Math.sin(a)];
       const w = THIN + (WIDE - THIN) * share;
       const d = t.dist[i] * range;
