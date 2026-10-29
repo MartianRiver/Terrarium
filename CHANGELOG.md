@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Tag gets a sprint and places to hide: `configs/nursery-tag-sprint.toml` lets anyone burst at 1.6× top speed for 1.5 s with 5 s to wait for the next, `nursery-tag-blocks.toml` adds eight blocks in a 14 m arena and `nursery-tag-hide.toml` sixteen in 16 m, so whoever's it often can't see who it's after. Blocks can land somewhere new every game (`[arena] scatter`, how far each moves from where it's set, turned any way, never onto another block or a spawn ring), so a game played round them can't be learned as one layout. Tag now passes on only when two bodies actually bump (within 2 cm, from 10 cm), since in the viewer a tag could happen with a gap you could see between them.
+
 Brains see better: rays can be wider than a line (`[vision] cover`, a share of the gap between rays), and a fan can pack them towards the middle (`spread`) and see less far at the sides (`side`). Every nursery game now has 17 rays at half width, which fixes a blind spot straight ahead where a berry past 3 m slipped between the two middle rays; the worlds the 0.3 line trained in keep their 16 thin ones. `[start] spread` starts each arena at a random point in its episode.
 
 Peekaboo's spin turns the way a baby is sliding as well as the way it faces, since a brain with no memory found 43% of berries by turning to face its own drift. Peekaboo can give second looks (`[peek] again`, `flash`): a hidden berry comes back into sight for a moment every few seconds, with a spin each time it hides again; `configs/nursery-peek-again.toml` trains with 0.3 s looks every 3 s, too short to walk to without remembering.

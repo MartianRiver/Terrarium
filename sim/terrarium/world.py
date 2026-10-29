@@ -57,6 +57,7 @@ from . import night
 from .smell import Field
 from .flags import Flags
 from .peek import Peek
+from .scatter import scatter
 from .seek import Seek
 from .tag import Tag
 from .config import Config, ConfigError
@@ -255,6 +256,9 @@ class World:
             gap = box_gap(self.nests, b)
             if (gap <= reach).any():
                 raise ConfigError(f'block[{i}] at ({b.x}, {b.y}) is close enough to a nest for creatures to spawn inside it')
+        # smell's walls and doors that swing shut go by where blocks are set, not where they're scattered to
+        if self.cfg.arena.scatter and (self.cfg.smell.on or any(b.carry or b.shut for b in self.cfg.block)):
+            raise ConfigError('arena.scatter is for blocks that stay put: not with smell, carry or shut')
 
     def _spawn(self, arenas):
         """Each colony on an evenly spaced ring around its nest, turned a random amount per arena."""
@@ -274,6 +278,8 @@ class World:
         pos, heading = self._spawn(len(idx))
         self.heading[idx] = heading
         self.physics.place(idx, pos)
+        if self.cfg.arena.scatter:
+            scatter(self, idx)
         self.energy[idx] = np.where(self.spare, 0.0, self.cfg.energy.start)
         self.alive[idx] = ~self.spare
         self.unborn[idx] = self.spare
