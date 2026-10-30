@@ -56,6 +56,17 @@ function demoSource(): Source {
   return { ...createDemo(), label: () => 'scripted demo' };
 }
 
+// the garden with nobody in it, while the site asks what to watch
+function emptySource(): Source {
+  const { info } = createDemo();
+  let tick = 0;
+  return {
+    info: { ...info, nests: [] },
+    step: () => ({ tick: tick++, creatures: [], food: [], blocks: [], stores: [], light: 1, eggs: [], flowers: [], flags: [] }),
+    label: () => 'choosing what to watch',
+  };
+}
+
 function replaySource(replay: Replay, name: string): Source {
   const hz = replay.info.tickHz;
   const length = clock((replay.frames.length - 1) / hz);
@@ -85,11 +96,20 @@ function boot() {
   const container = document.getElementById('world')!;
   // &turn=degrees: the close-up from another side (a reel's shot of a face)
   const stage = createStage(container, lite, (Number(params.get('turn')) || 0) * Math.PI / 180);
-  let make = demoSource;
+  // the site with nothing asked for opens on an empty garden and asks what to watch
+  const choosing = SITE && !location.search;
+  let make = choosing ? emptySource : demoSource;
   let source!: Source;
   let view: WorldView | undefined;
   let paused = false;
-  let following = false;
+  // the camera: the whole arena (wide), close behind the Terrikin that matters most (follow), or cutting between the
+  // shots that matter like a match on TV (action); &cam= picks one, &follow is follow
+  type Cam = 'wide' | 'follow' | 'action';
+  const CAMS: Cam[] = ['wide', 'follow', 'action'];
+  const CAM_WORDS: Record<Cam, string> = { wide: 'Wide', follow: 'Follow', action: 'Action' };
+  let cam: Cam = 'wide';
+  // &intro circles outside the dome until the first camera change
+  let intro = false;
   // the Terrikin picked by clicking it (or by &pick), kept across restarts; null follows the first one
   let chosen: number | null = params.has('pick') ? Number(params.get('pick')) : null;
   // &look=x,y,heading: the close-up held on one spot instead of a Terrikin (a reel's shot of a nest)
@@ -109,7 +129,7 @@ function boot() {
   const brain = SITE ? null : new BrainView(document.body, stage.scene, (url) => void open(`${url.pathname.split('/').pop()} (recorded here)`, () => fetchReplay(url), url));
   // after a restart the camera jumps to the blob rather than sweeping across the arena after it
   let snap = true;
-  // following in a nursery game watches the action rather than the first Terrikin (&solo turns it off)
+  // in a nursery game, who to follow and where the action is (&solo turns it off)
   const director = params.has('solo') ? null : new Director();
   let opening = false;
   let acc = 0;
@@ -138,10 +158,18 @@ function boot() {
     snap = true;
   }
 
-  function follow(on: boolean) {
-    following = on;
-    stage.view(on);
-    log.info(on ? 'following' : 'overview');
+  const camButton = document.createElement('button');
+  camButton.type = 'button';
+  camButton.addEventListener('click', () => setCam(CAMS[(CAMS.indexOf(cam) + 1) % CAMS.length]));
+  function setCam(next: Cam) {
+    cam = next;
+    intro = false;
+    stage.release();
+    if (cam !== 'wide') stage.view(true);
+    const after = CAMS[(CAMS.indexOf(cam) + 1) % CAMS.length];
+    camButton.textContent = CAM_WORDS[cam];
+    camButton.setAttribute('aria-label', `Camera: ${CAM_WORDS[cam]}. Switch to ${CAM_WORDS[after]}`);
+    log.info('camera', { cam });
   }
 
   // url: where it came from, if it was fetched
@@ -190,7 +218,7 @@ function boot() {
       nameOf = namesFor(`play/${next.token}`);
       stage.lookWithRight();
       restart(true);
-      follow(true);
+      setCam('follow');
       const hint = document.querySelector('#hud .hint');
       if (hint) hint.textContent = 'you have the ring · the keys are in the panel';
       log.info('game started', { you: next.you });
@@ -223,7 +251,7 @@ function boot() {
     if (id === null) return;
     chosen = view.chosen = id;
     log.info('following a Terrikin', { id });
-    if (!following) follow(true);
+    if (cam !== 'follow') setCam('follow');
   });
 
   // ?replay=/api/runs/<id>/replay/<checkpoint> from the runs page; only this server's own urls
@@ -333,7 +361,8 @@ function boot() {
       paused = !paused;
       log.info(paused ? 'paused' : 'resumed');
     }
-    if (e.key === 'f' || e.key === 'F') follow(!following);
+    if (e.key === 'v' || e.key === 'V') setCam(intro ? 'follow' : CAMS[(CAMS.indexOf(cam) + 1) % CAMS.length]);
+    if (e.key === 'f' || e.key === 'F') setCam('follow');
     if (ant && (e.key === 'j' || e.key === 'J')) ant.marked = !ant.marked;
   });
 
@@ -341,7 +370,10 @@ function boot() {
   // &ant: a sketch of a walking ant beside whatever is playing; F follows it
   const ant = params.has('ant') ? new AntStudy(stage.scene) : null;
   if (params.has('intro')) stage.intro();
-  if (params.has('follow') || params.has('channel')) follow(true);
+  const asked = params.get('cam') as Cam | null;
+  setCam(asked && CAMS.includes(asked) ? asked : params.has('follow') ? 'follow' : 'wide');
+  intro = params.has('intro');
+  openButton.before(camButton, ' ');
   // the public site has no runs page; the link goes back to the front page instead
   const runsLink = document.querySelector<HTMLAnchorElement>('a[href="/runs.html"]');
   if (SITE && runsLink) {
@@ -361,7 +393,10 @@ function boot() {
     const brains = document.createElement('a');
     brains.href = '/brains/';
     brains.textContent = 'Brains';
-    const picker = new Picker(document.body);
+    // closing it without a pick plays the newest replay
+    const picker = new Picker(document.body, () => {
+      if (choosing && !playing) void open('the newest replay', () => fetchReplay(new URL(SITE_REPLAY, location.href)), new URL(SITE_REPLAY, location.href));
+    });
     const choose = document.createElement('button');
     choose.textContent = 'Choose';
     choose.setAttribute('aria-label', 'Choose what to watch');
@@ -371,7 +406,7 @@ function boot() {
     if (!location.search) void picker.open();
   }
   const channel = params.has('channel');
-  const wanted = params.get('replay') ?? (SITE && !channel ? SITE_REPLAY : null);
+  const wanted = params.get('replay') ?? (SITE && !channel && !choosing ? SITE_REPLAY : null);
   if (wanted) {
     const url = new URL(wanted, location.href);
     const name = params.get('name') ?? url.pathname.split('/').pop()!;
@@ -432,17 +467,22 @@ function boot() {
       tag.style.transform = `translate(${((above.x + 1) / 2) * innerWidth}px, ${((1 - above.y) / 2) * innerHeight}px) translate(-50%, -100%)`;
       if (tag.textContent !== nameOf(chosen!)) tag.textContent = nameOf(chosen!);
     }
-    const shot = following && chosen === null && !look && !ant && !game && view!.current
-      ? director?.shot(view!.current, paused ? 0 : dt) : null;
-    if (shot) stage.aim(shot, snap ? Infinity : paused ? 0 : dt);
-    else stage.track(following ? (ant?.focus ?? look ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
+    const step = snap ? Infinity : paused ? 0 : dt;
+    const scripted = look || ant || game;
+    const shot = !scripted && view!.current ? director?.shot(view!.current, paused ? 0 : dt) : null;
+    view!.lead = director?.lead ?? null;
+    if (intro) stage.track(null, step);
+    else if (cam === 'action' && shot && chosen === null && !scripted) stage.aim(shot, step);
+    else if (cam === 'wide' && !scripted) stage.wide(step);
+    else stage.track(ant?.focus ?? look ?? view!.focus, step);
     snap = false;
     stage.render(now / 1000);
 
     const label = source.label();
     if (sourceLabel.textContent !== label) sourceLabel.textContent = label;
     const want = view!.creatureCount ? 'ok' : 'empty';
-    if (!opening && status.dataset.kind !== 'error' && status.dataset.kind !== want) setStatus(want, 'No creatures in this world.');
+    if (!opening && status.dataset.kind !== 'error' && status.dataset.kind !== want && make !== emptySource) setStatus(want, 'No creatures in this world.');
+    if (make === emptySource && status.dataset.kind === 'loading' && !opening) setStatus('ok');
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

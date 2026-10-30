@@ -81,9 +81,14 @@ body {
   display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (pointer: coarse) {
   #hud .hint {
     display: none;
+  }
+
+  /* big enough to hit with a thumb */
+  #hud button {
+    padding: 6px 14px;
   }
 }
 
@@ -868,6 +873,45 @@ body {
   background: rgb(95 174 79 / 0.18);
   font-size: 11px;
   white-space: nowrap;
+}
+
+.picker-tag.live {
+  background: rgb(95 174 79 / 0.28);
+  font-weight: 600;
+}
+
+.picker-tag.live::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #3f9a3a;
+  animation: picker-pulse 1.6s ease-in-out infinite;
+}
+
+.picker-tag.held {
+  background: rgb(44 58 51 / 0.1);
+  color: rgb(44 58 51 / 0.75);
+}
+
+@keyframes picker-pulse {
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .picker-tag.live::before { animation: none; }
+}
+
+.picker-key {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.picker-key .picker-tag {
+  margin-right: 2px;
 }
 
 .picker-text {

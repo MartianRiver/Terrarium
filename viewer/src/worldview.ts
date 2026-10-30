@@ -42,6 +42,8 @@ export class WorldView {
   private frame: Frame | null = null;
   // the Terrikin picked by clicking it (null: the first one), and where the followed one was last drawn
   chosen: number | null = null;
+  // who to follow when nobody's chosen (the director's pick in a game; null: the first one)
+  lead: number | null = null;
   // the ring under a chosen one; a reel's &pick follows without it
   marked = true;
   focus: Pose | null = null;
@@ -106,7 +108,7 @@ export class WorldView {
     const poses = new Map<number, Pose>();
     // a chosen Terrikin that has left the world (its place taken by a hatchling) can't be followed
     if (this.chosen !== null && !this.blobs.has(this.chosen)) this.chosen = null;
-    const followed = this.chosen ?? this.frame.creatures[0]?.id;
+    const followed = this.chosen ?? (this.lead !== null && this.blobs.has(this.lead) ? this.lead : this.frame.creatures[0]?.id);
     for (const c of this.frame.creatures) {
       const p = this.prevCreatures.get(c.id) ?? c;
       const s = this.scratch;

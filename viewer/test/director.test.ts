@@ -50,4 +50,13 @@ describe('the action camera', () => {
     expect(shot.spread).toBeCloseTo(2);
     expect(shot.from).toBeCloseTo(0);
   });
+
+  it('in capture the flag, follows the carrier and frames whoever could take it off them', () => {
+    const d = new Director();
+    const f = { ...frame([blob(1, 0, 0), blob(2, 6, 0, { colony: 1 }), blob(3, 2, 0, { colony: 1 })]),
+      flags: [{ colony: 1, x: 0, y: 0, down: false, carrier: 1 }, { colony: 0, x: -8, y: 0, down: false, carrier: -1 }] };
+    const shot = d.shot(f, 0.1)!;
+    expect(d.lead).toBe(1);
+    expect(shot.spread).toBeCloseTo(2);
+  });
 });

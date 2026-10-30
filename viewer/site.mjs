@@ -236,7 +236,7 @@ function nursery(c) {
       more = 'Newest brain: ' + esc(best.score.label.toLowerCase()) + ' <b>' + pct(best.score.value) + '</b>'
         + (best.score.marks || []).map((m) => ' · ' + esc(m[0]) + ' ' + pct(m[1])).join('');
     }
-    return card(g.name, g.kind, g.goal + ' ' + g.setup, more, '/watch/?channel=/replays/nursery/index.json&game=' + encodeURIComponent(k) + '&follow');
+    return card(g.name, g.kind, g.goal + ' ' + g.setup, more, '/watch/?channel=/replays/nursery/index.json&game=' + encodeURIComponent(k));
   });
   return '<h2>In the nursery</h2><p>Small worlds where baby Terrikins can’t go hungry, learning kids’ games. Each one tests one thing a brain needs, like memory, away from the work of staying alive. '
     + (live ? 'Training now, updated ' + ago(c.updated) + '. ' : c.note ? esc(c.note[0].toUpperCase() + c.note.slice(1)) + ' (updated ' + ago(c.updated) + '). ' : '') + 'Watch shows its newest brains in turn, with a card saying what’s going on.</p><ol class="brains now">' + cards.join('') + '</ol>';
