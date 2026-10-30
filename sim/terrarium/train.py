@@ -2,15 +2,16 @@
 #
 #   uv run python -m terrarium.train NAME --world configs/solo.toml [--parent X.pt] [--seed 0] [--scratch]
 #                                         [--device cuda|mps|cpu] [--workers N] [--fast] [--gpu-collect]
-#                                         [--rivals B.pt C.pt [--rival-lr 5e-5 1e-4]] [--memory 128 [--recall 0.1]]
+#                                         [--rivals B.pt C.pt [--rival-lr 5e-5 1e-4] [--fixed-seats]] [--memory 128 [--recall 0.1]]
 #
 # --memory N gives the brain N notes of memory if it has none (brain.py); it acts as before until trained, unless
 # --recall starts it reading them a little (in a toy test of a 6 s wait, 0.1 learned it in
 # 1.6M samples and 0 hadn't in 2.5M).
 #
 # With rivals, each colony is played by one of the brains (the parent's first), every brain taking every seat over
-# the arenas (rollouts.seats), and each learns only from its own colonies' samples. Their checkpoints go in
-# rivals/<k>/; metrics ending _k are brain k's.
+# the arenas (rollouts.seats), and each learns only from its own colonies' samples. --fixed-seats keeps colony k on
+# brain k instead, for a game whose sides differ (hide-and-seek: the parent hides, the rival seeks). Their checkpoints
+# go in rivals/<k>/; metrics ending _k are brain k's.
 #
 # Ends by scoring the last checkpoint on the evals next to random, three ways (evals.MODES: yes/no drawn,
 # all by the mean, all drawn as in training), into the run's evals.json.
@@ -31,7 +32,7 @@ from .brain import SHAPE, Brain, brain_id, save
 from .brain import load as load_brain
 from .config import DEFAULT, TRAIN, load, load_train
 from .log import Logger
-from .ppo import advantages, update
+from .ppo import Side, advantages, update
 from .rollouts import Collector, OnDevice
 from .runs import ROOT, Run, cpu_quota
 from .usage import Sampler
@@ -49,7 +50,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
           seed: int = 0, scratch: bool = False, root: Path = ROOT, device: str | None = None,
           workers: int = 1, score: bool = True, mix: list[tuple[Path | str, int]] | None = None,
           fast: bool = False, gpu_collect: bool = False, rivals: list[Path | str] | None = None,
-          rival_lr: list[float] | None = None, memory: int = 0, recall: float = 0.0) -> Run:
+          rival_lr: list[float] | None = None, memory: int = 0, recall: float = 0.0, fixed_seats: bool = False) -> Run:
     world_cfg, cfg = load(world_path), load_train(train_path)
     mixed = [(Path(w), load(w), n) for w, n in (mix or [])]
     ppo = cfg.ppo
@@ -84,7 +85,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         'parent': parent_record, 'schema': schema.current(), 'shape': learner.shape, 'seed': seed,
         'device': device, 'gpu': torch.cuda.get_device_name() if device == 'cuda' else None,
         'workers': workers, 'threads': torch.get_num_threads(), 'fast': fast, 'gpu_collect': gpu_collect,
-        'recall': recall if memory else None,
+        'recall': recall if memory else None, 'fixed_seats': fixed_seats if rivals else None,
         'rivals': [{'file': str(r), 'id': brain_id(r), 'meta': m, 'shape': b.shape, 'lr': lr}
                    for r, (b, m), lr in zip(rivals, loaded, rates[1:])],
     }, scratch=scratch, root=root)
@@ -92,12 +93,19 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     for b in brains:
         b.to(device)
     optimizers = [torch.optim.Adam(b.parameters(), lr=lr, eps=1e-5) for b, lr in zip(brains, rates)]
+    side = None
+    if ppo.side:
+        if not learner.memory:
+            raise ValueError('[ppo] side is a job for memory: train with --memory')
+        side = Side(learner.memory, learner.shape['width'], ppo.side_back).to(device)
+        optimizers[0].add_param_group({'params': list(side.parameters())})
     # the same weights, compiled for the update; minibatch sizes change with how many are alive, hence dynamic
     models = [cast(Brain, torch.compile(b, dynamic=True)) if fast else b for b in brains]
     worlds = [(c, n) for _, c, n in mixed]
     if gpu_collect:
         actors = [copy.deepcopy(b) for b in brains]
-        rollouts = OnDevice(world_cfg, cfg, ppo.arenas, seed, actors if rivals else actors[0], workers, worlds, device)
+        rollouts = OnDevice(world_cfg, cfg, ppo.arenas, seed, actors if rivals else actors[0], workers, worlds, device,
+                            fixed_seats)
     else:
         rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers, worlds)
     per_update = rollouts.samples * ppo.steps
@@ -131,7 +139,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
                     stats |= got
                 stats |= {f'{key}_{k}': v for key, v in (got | rollouts.by_brain[k].take()).items()}
         else:
-            stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast)
+            stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast, side=side)
         done = time.perf_counter()
         sampler.into(None)
 
@@ -188,6 +196,7 @@ def main():
     parser.add_argument('--rivals', nargs='*', default=[], metavar='BRAIN',
                         help='brains that play the other colonies and learn beside the parent (needs --gpu-collect)')
     parser.add_argument('--rival-lr', nargs='*', type=float, help="each rival's learning rate (default the train config's)")
+    parser.add_argument('--fixed-seats', action='store_true', help='with --rivals, colony k is always brain k')
     parser.add_argument('--memory', type=int, default=0, help='notes of memory to give a brain that has none')
     parser.add_argument('--recall', type=float, default=0.0,
                         help="with --memory, start reading the notes at this share of a fresh layer's weights (0: not at all)")
@@ -195,7 +204,7 @@ def main():
     train(args.name, args.world, args.train, args.parent, args.seed, args.scratch, device=args.device,
           workers=args.workers, score=not args.no_evals, fast=args.fast, gpu_collect=args.gpu_collect,
           mix=[(w, int(n)) for w, n in (m.rsplit(':', 1) for m in args.mix)], rivals=args.rivals,
-          rival_lr=args.rival_lr, memory=args.memory, recall=args.recall)
+          rival_lr=args.rival_lr, memory=args.memory, recall=args.recall, fixed_seats=args.fixed_seats)
 
 
 if __name__ == '__main__':

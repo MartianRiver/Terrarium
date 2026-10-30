@@ -56,6 +56,15 @@ lam = 0.95
 clip = 0.2
 # loss weights: entropy bonus and value error
 entropy = 0.0
+# more entropy bonus on the yes/no coins alone (brains that toss coins), so a coin can't settle on never and stop
+# being tried
+coins = 0.0
+# the coins it's for, by action name; none listed: every coin
+coins_for = []
+# a side job for a brain with memory (ppo.Side): from its notes, say what it made of the moment side_back choices
+# ago, weighted side against the rest of the loss; 0 is off
+side = 0.0
+side_back = 20
 value = 0.5
 max_grad_norm = 0.5
 # save a checkpoint every this many updates, and always at the end

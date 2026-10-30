@@ -334,6 +334,10 @@ class PPO:
     lam: float
     clip: float
     entropy: float
+    coins: float
+    coins_for: tuple[str, ...]
+    side: float
+    side_back: int
     value: float
     max_grad_norm: float
     checkpoint_every: int

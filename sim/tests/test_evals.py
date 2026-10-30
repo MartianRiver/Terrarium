@@ -75,6 +75,18 @@ def test_runs_without_a_brain(monkeypatch, capsys):
     assert 'random' in capsys.readouterr().out
 
 
+def test_two_runs_checkpoints_of_the_same_name_are_both_scored(monkeypatch, tmp_path):
+    import json
+    for run in ('one', 'two'):
+        (tmp_path / run).mkdir()
+        save(Brain(**SHAPE), tmp_path / run / '00000001.pt')
+    brains = [str(tmp_path / run / '00000001.pt') for run in ('one', 'two')]
+    monkeypatch.setattr('sys.argv', ['evals', '--config', str(DEFAULT.parent / 'solo.toml'), '--policy', '--brain', *brains,
+                                     '--episodes', '1', '--out', str(tmp_path / 'out.json')])
+    main()
+    assert sorted(json.loads((tmp_path / 'out.json').read_text())['results']) == sorted(brains)
+
+
 def test_flowers_drunk_and_sprints_toward_them_are_counted():
     colony = load(DEFAULT.parent / 'colony.toml')
     short = replace(colony, episode=replace(colony.episode, seconds=40.0),

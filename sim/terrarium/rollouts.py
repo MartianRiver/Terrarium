@@ -178,12 +178,13 @@ def join(parts: list[Observation]) -> Observation:
     return Observation(*(np.concatenate(x) for x in zip(*((o.me, o.kinds, o.rays) for o in parts))))
 
 
-def seats(parts: list[tuple[Config, int]], brains: int) -> np.ndarray:
-    """Which brain plays each sample: colony (k + arena) mod brains is brain k's, arenas counted over every part."""
+def seats(parts: list[tuple[Config, int]], brains: int, fixed: bool = False) -> np.ndarray:
+    """Which brain plays each sample: colony (k + arena) mod brains is brain k's, arenas counted over every part, so
+    every brain takes every seat; fixed, colony k is always brain k's (mod brains), as when a game's sides differ."""
     out, first = [], 0
     for c, n in parts:
         colony = np.repeat(np.arange(c.colonies.count), c.colonies.slots)
-        arena = np.arange(first, first + n)[:, None]
+        arena = np.arange(first, first + n)[:, None] * (not fixed)
         out.append(((colony[None] - arena) % brains).reshape(-1))
         first += n
     return np.concatenate(out)
@@ -191,7 +192,7 @@ def seats(parts: list[tuple[Config, int]], brains: int) -> np.ndarray:
 
 class OnDevice:
     def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain | list[Brain], workers: int = 1,
-                 mix: list[tuple[Config, int]] | None = None, device: str = 'cpu'):
+                 mix: list[tuple[Config, int]] | None = None, device: str = 'cpu', fixed: bool = False):
         mix = mix or []
         parts = ([(cfg, arenas)] if workers == 1 else
                  [(cfg, len(a)) for a in np.array_split(np.arange(arenas), workers)]) + mix
@@ -205,7 +206,7 @@ class OnDevice:
         if len(self.actors) > 1 and any(a.memory for a in self.actors):
             raise ValueError("rivals with memory aren't written yet")
         self.notes = self.actor.blank(self.samples)
-        self.whose = seats(parts, len(self.actors))
+        self.whose = seats(parts, len(self.actors), fixed)
         self.by_brain = [Episodes(self.samples, cfg.dt * train.ppo.repeat) for _ in self.actors]
         mine = seeds(seed, len(parts), workers)
         if workers == 1:
