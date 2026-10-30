@@ -1,7 +1,8 @@
 # Tag, a nursery game ([tag], reach 0 is off). One Terrikin in each arena is it, and
 # touching another (bodies within `reach` of each other) passes it on. The new one
-# can't tag anyone for `cooldown` seconds, and never the one who just tagged it (no
-# tag-backs: without that, two stuck together pass it back and forth all game).
+# can't tag anyone for `cooldown` seconds, and the one who tagged it for `back` seconds
+# (never, if negative): with only the cooldown, two babies stood together and passed it
+# back and forth all game, so the one who tags gets a longer head start to run.
 # Being it costs `points` a second, shared out among the rest as a gain, so the
 # game sums to nothing and one brain learns both chasing and getting away.
 import numpy as np
@@ -14,6 +15,7 @@ class Tag:
         self.it = np.zeros(arenas, int)
         self.wait = np.zeros(arenas, int)
         self.back = np.full(arenas, -1)     # who passed it on, out of reach of a tag-back
+        self.since = np.zeros(arenas, int)  # ticks since the last tag
         # tags made and ticks spent it, by each creature since its arena started
         self.tags = np.zeros((arenas, n), int)
         self.held = np.zeros((arenas, n), int)
@@ -24,6 +26,7 @@ class Tag:
             self.it[a] = w.rng.choice(np.flatnonzero(w.alive[a]))
         self.wait[idx] = self._cooldown()
         self.back[idx] = -1
+        self.since[idx] = 0
         self.tags[idx] = 0
         self.held[idx] = 0
 
@@ -42,18 +45,21 @@ class Tag:
             self.it[a] = self._nearest(int(a), w.alive[a])
         self.held[rows, self.it] += w.alive[rows, self.it]
         ready = self.wait == 0
+        self.since += 1
+        cover = round(cfg.tag.back * cfg.tick_hz) if cfg.tag.back >= 0 else np.iinfo(int).max
         np.maximum(self.wait - 1, 0, out=self.wait)
         far = 2 * cfg.creature.radius + cfg.tag.reach
         for a in np.flatnonzero(ready):
             others = w.alive[a].copy()
             others[self.it[a]] = False
-            if self.back[a] >= 0:
+            if self.back[a] >= 0 and self.since[a] <= cover:
                 others[self.back[a]] = False
             gap = np.hypot(*(w.pos[a] - w.pos[a, self.it[a]]).T)
             caught = others & (gap < far)
             if caught.any():
                 self.tags[a, self.it[a]] += 1
                 self.back[a] = self.it[a]
+                self.since[a] = 0
                 self.it[a] = np.flatnonzero(caught)[gap[caught].argmin()]
                 self.wait[a] = self._cooldown()
 

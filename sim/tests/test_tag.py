@@ -1,3 +1,4 @@
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -7,11 +8,12 @@ from terrarium.config import DEFAULT
 from terrarium.tag import Tag
 
 TAG = load(DEFAULT.parent / 'nursery-tag.toml')
+NO_BACKS = replace(TAG, tag=replace(TAG.tag, back=-1.0))
 
 
-def game(spots):
+def game(spots, cfg=NO_BACKS):
     """A tag game in one arena with Terrikins standing at spots, the first one it and ready to tag."""
-    world = SimpleNamespace(cfg=TAG, alive=np.ones((1, len(spots)), bool), pos=np.array([spots], float),
+    world = SimpleNamespace(cfg=cfg, alive=np.ones((1, len(spots)), bool), pos=np.array([spots], float),
                             rng=np.random.default_rng(0))
     tag = Tag(world)
     tag.it[0], tag.wait[0] = 0, 0
@@ -42,3 +44,15 @@ def test_someone_else_can_be_tagged_and_then_the_first_is_fair_game():
     world.pos[0, 1] = (5, 5)
     wait_out(tag)
     assert tag.it[0] == 0
+
+
+def test_the_one_who_tagged_can_be_tagged_back_after_its_longer_wait():
+    world, tag = game([(0, 0), (0.9, 0), (5, 5)], TAG)
+    assert TAG.tag.back > TAG.tag.cooldown
+    tag.step()
+    assert tag.it[0] == 1
+    for _ in range(round(TAG.tag.back * TAG.tick_hz)):
+        tag.step()
+    assert tag.it[0] == 1
+    tag.step()
+    assert tag.it[0] == 0 and tag.tags[0, 1] == 1

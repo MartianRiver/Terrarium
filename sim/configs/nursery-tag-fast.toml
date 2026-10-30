@@ -157,11 +157,13 @@ leak = 0.0
 
 [tag]
 # a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
-# new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed
+# new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed;
+# it can tag back the one who tagged it after `back` seconds (negative: never, until someone else has been tagged)
 reach = 0.02
 cooldown = 2.0
 points = 1.0
 speed = 1.3
+back = 4.0
 
 [seek]
 # a nursery game: colony 0 hides, colony 1 seeks, and seekers can't move for the first `prep` seconds (0 is off); after

@@ -207,6 +207,7 @@ class Tag:
     cooldown: float
     points: float
     speed: float    # it runs at this share of top speed (more than 1 gives the chaser a chance in the open)
+    back: float     # seconds before the new it can tag the one who tagged it (negative: never)
 
     @property
     def on(self) -> bool:
@@ -404,7 +405,7 @@ SINCE = {'arena': {'scatter': 0.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
          'young': {'seconds': 0.0, 'speed': 1.0, 'energy': 1.0, 'start': False},
-         'tag': {'reach': 0.0, 'cooldown': 0.0, 'points': 0.0, 'speed': 1.0},
+         'tag': {'reach': 0.0, 'cooldown': 0.0, 'points': 0.0, 'speed': 1.0, 'back': -1.0},
          'seek': {'prep': 0.0, 'points': 0.0},
          'flag': {'points': 0.0, 'pickup': 0.0},
          'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False, 'again': 0.0, 'flash': 0.0},
