@@ -24,6 +24,7 @@ export interface CreatureState {
   sprinting: number; // 1 mid-sprint; 0 in worlds without sprint and replays from before it
   load: number; // 1 while it carries a berry in its jaws (carry); 0 in worlds without carry
   young: number; // share of its youth left, 1 just hatched to 0 grown; 0 in worlds without young
+  stamina: number; // 0..1, how much go it has left before it tires ([tired]); 1 in worlds without it
 }
 
 export interface FoodState {

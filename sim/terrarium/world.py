@@ -53,7 +53,7 @@ AWAY = 1e4
 
 import numpy as np
 
-from . import night
+from . import night, tired
 from .smell import Field
 from .flags import Flags
 from .peek import Peek
@@ -174,6 +174,8 @@ class World:
             self._place_spots(a)
         # ticks left of each creature's nectar boost, and the flowers each has drunk since its arena started
         self.nectar = np.zeros((arenas, n), int)
+        # how much go each has left before it tires ([tired]; always 1 with it off)
+        self.stamina = np.ones((arenas, n))
         self.drunk = np.zeros((arenas, n), int)
         # the berry each creature carries (its food slot, -1 for none), whether it said yes to carry last tick, and
         # since its arena started: berries picked up, put down at its own nest, and put down ones a nestmate ate,
@@ -315,6 +317,7 @@ class World:
         self.flower_left[idx] = 0
         self.flower_due[idx] = self._flower_wait(len(idx))
         self.nectar[idx] = 0
+        self.stamina[idx] = 1
         self.drunk[idx] = 0
         self.load[idx] = -1
         self.carry_was[idx] = False
@@ -368,7 +371,8 @@ class World:
         young = self.young > 0
         chasing = self.tag.mask() if self.tag else np.zeros_like(young)
         top = (c.max_speed * np.where(young, cfg.young.speed, 1.0) * np.where(chasing, cfg.tag.speed, 1.0)
-               * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop) * (1 - cfg.carry.slow * laden))
+               * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop) * (1 - cfg.carry.slow * laden)
+               * tired.speed(self))
         speed = np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse) * top
         target = np.stack([np.cos(self.heading), np.sin(self.heading)], -1) * speed[..., None]
         # the force that closes this share of the gap to the wanted velocity in one tick, if nothing's in the way
@@ -387,6 +391,8 @@ class World:
                   + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt * share
         self.spent += effort
         self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt * share, 0, 1)
+        if cfg.tired.on:
+            tired.tire(self, thrust, bursting)
         np.maximum(self.young - 1, 0, out=self.young)
         self.sprinting[bursting] -= 1
         np.maximum(self.resting - 1, 0, out=self.resting)
@@ -717,6 +723,7 @@ class World:
         self.unborn[a, i] = False
         self.crop[a, i] = 0
         self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = self.nectar[a, i] = 0
+        self.stamina[a, i] = 1
         self.young[a, i] = round(self.cfg.young.seconds * self.cfg.tick_hz)
         np.add.at(self.hatched, (a, self.colony[i]), 1)
         self.creature_id[a, i] = self.egg_id[a, i]

@@ -65,6 +65,9 @@ coins_for = []
 # ago, weighted side against the rest of the loss; 0 is off
 side = 0.0
 side_back = 20
+# a side job for a brain with memory in a maze (ppo.Closure): from its notes, say whether it has been in this room
+# before, weighted against the rest of the loss; 0 is off
+closure = 0.0
 value = 0.5
 max_grad_norm = 0.5
 # save a checkpoint every this many updates, and always at the end

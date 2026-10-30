@@ -42,7 +42,7 @@ describe('reading', () => {
     const plain = await readReplay(new TextEncoder().encode(text));
     const zipped = await readReplay(bytes(gzipSync(text)));
     expect(zipped).toEqual(plain);
-    expect(plain.frames[1].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 });
+    expect(plain.frames[1].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1 });
   });
 
   test('carrying and stores are read when there, and empty in replays from before them', () => {
@@ -75,7 +75,7 @@ describe('reading', () => {
 
   test('fields it doesn\'t know are ignored', () => {
     const replay = parseReplay(lines({ ...header, later: 1 }, { ...frame, weather: 'rain', creatures: [{ ...frame.creatures[0], mood: 2 }] }));
-    expect(replay.frames[0].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 });
+    expect(replay.frames[0].creatures[0]).toEqual({ ...frame.creatures[0], carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1 });
   });
 
   test('refuses a newer format, saying so', () => {

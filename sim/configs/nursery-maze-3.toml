@@ -1,0 +1,284 @@
+# The small maze nursery, the first step up to nursery-maze.toml's 5×5: one baby in a 3×3 maze of 3 m rooms that's
+# carved anew every episode, and one berry somewhere in it. Once eaten, another grows in a new spot a second or two
+# later. A maze is never the same twice, so what pays is a way of searching, not a route learned by heart: wall-following
+# needs no memory, but not going back down a corridor already tried does. Babies here don't starve.
+
+tick_hz = 20
+# pymunk steps per tick, and the overlap it allows before pushing apart (see docs/physics.md)
+substeps = 2
+slop = 0.01
+
+[arena]
+size = 9.0
+# every block moves up to this far (m) from where it's set and turns any way, anew each episode; 0 keeps them put
+scatter = 0.0
+# a maze this many rooms a side, its blocks the inner walls, carved anew each episode (0: no maze)
+maze = 3
+
+[creature]
+radius = 0.45
+mass = 1.0
+max_speed = 2.0
+# backing up, as a share of max_speed
+reverse = 0.3
+turn_rate = 3.5
+# how quickly velocity catches up with what the creature asks for, per second
+accel = 8.0
+friction = 0.2
+
+[energy]
+# half full, and a berry worth a sliver, so a baby is never too full to eat one: each still pays as one food
+start = 0.5
+# per second, just for being alive
+drain = 0.005
+# extra per second at full thrust
+move = 0.0
+# extra per second at full turn, times the square of how hard it turns: steering costs next to nothing,
+# spinning on the spot doesn't
+turn = 0.0
+# from one common food
+food = 0.01
+
+[colonies]
+count = 1
+size = 1
+# places beyond those it starts with, empty until the colony hatches into them
+room = 0
+nest_radius = 1.0
+# nests sit this far from the centre, as a share of half the arena
+nest_distance = 0.0
+# creatures start on a ring this far from their nest's centre
+spawn_ring = 0.0
+
+[food]
+count = 1
+radius = 0.25
+regrow_min = 1.0
+regrow_max = 2.0
+# food never grows closer than this to a nest's edge or a wall
+clearance = 0.8
+# food grows back in this many patches, placed anew each episode, within patch_radius of their centres
+patches = 0
+patch_radius = 1.2
+# of the patches, how many sit in the middle of the arena instead (where a vault of blocks can close them in)
+middle = 0
+
+[crop]
+# food picked up while too full to eat it is carried instead, up to this many, and unloaded in the nest
+capacity = 2
+# share of top speed lost per food carried
+slow = 0.15
+# food in each crop at the start (a training world can start them full)
+start = 0
+
+[jelly]
+# what one food in the store gives back when eaten, against [energy] food fresh
+energy = 0.4
+# only a creature below this energy eats from the store (from its own crop, any with room for it)
+hunger = 0.6
+
+[hatch]
+# a colony with an empty place (someone lost, or [colonies] room to grow) and at least `threshold` jelly in its
+# store pays `cost` of it for an egg in the nest, which hatches a full-grown Terrikin in that place after `seconds`.
+# An egg needs someone left to tend it: a colony with nobody alive loses its eggs. cost 0 is off
+cost = 0
+threshold = 10
+seconds = 20.0
+
+[young]
+# a hatchling is young for this long (0 is off): it walks at `speed` of max_speed, everything costs it `energy` of what
+# it costs a grown one, and in its own nest it eats from the store whenever it isn't full, hungry or not, a bite its size:
+# a jelly goes 1 / `energy` times as far, and it takes only what fits
+seconds = 600.0
+speed = 1.0
+energy = 0.01
+# the Terrikins an episode starts with are young too, not only hatchlings
+start = true
+
+[night]
+# a day and its night take this long, the night being the last `length` of it; 0 turns nights off.
+# At nightfall the food standing goes, and none grows back until dawn
+cycle = 0.0
+length = 60.0
+# the light fades over this long before nightfall, and comes back over this long after dawn
+dusk = 10.0
+# extra energy per second at full dark, for the cold
+cold = 0.02
+# share of the cold kept off in its own nest, and by each nestmate within reach (m, centre to centre)
+nest = 1.0
+huddle = 0.25
+reach = 1.5
+
+[sprint]
+# a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
+# thrust, and none again until `cooldown` seconds after it ends
+speed = 2.0
+seconds = 0.0
+cooldown = 6.0
+energy = 0.04
+
+[tired]
+# stamina (0 to 1) drains by `drain` a second at full thrust (a sprint by its speed up) and comes back by `rest` a second
+# while thrust stays under `still`; below `below`, top speed sinks to `slowest` of itself with none left. drain 0 is off
+drain = 0.0
+rest = 0.0
+still = 0.0
+below = 0.0
+slowest = 1.0
+
+[flowers]
+# now and then by day a nectar flower opens somewhere clear of nests and walls, every every_min to every_max seconds
+# while fewer than `count` are open, and closes after `open` seconds or at nightfall. The first to touch one drinks
+# it all: `food` foods' worth, eaten or carried like food, and `boost` seconds at `speed` times its top speed.
+# count 0 is off
+count = 0
+every_min = 15.0
+every_max = 30.0
+open = 15.0
+radius = 0.35
+food = 3
+boost = 8.0
+speed = 1.25
+# 0: anywhere clear. Else they open only at this many spots, drawn anew each episode at least spot_gap metres
+# apart, so a creature that remembers where one opened knows where to look for the next
+spots = 0
+spot_gap = 0.0
+
+[grab]
+# a creature saying yes to grab takes hold of a block within reach of its body (metres from its edge), or the first
+# to come within reach, for `seconds` from its last yes, and drags it along, up to grip newtons (a creature pushes
+# with about 19 at full thrust from standing), for energy a second while it holds on; grip 0 turns it off
+reach = 0.0
+grip = 0.0
+seconds = 0.0
+energy = 0.0
+
+[carry]
+# a creature saying yes to carry (after a no) picks up a berry within reach of its body (metres from its edge to the
+# berry's) and holds it in its jaws, apart from its crop; yes again puts it down, still a berry. While it carries one
+# it's slower by this share of top speed and pays energy a second; reach 0 turns it off
+reach = 0.0
+slow = 0.1
+energy = 0.002
+
+[smell]
+# food gives off a smell that spreads over a grid of `cell`-metre squares: each tick a share `spread` of the difference
+# flows to each neighbouring cell, then it all fades by `fade`. Blocks stop it, but one a creature can drag (a door)
+# lets `leak` of it through. A creature senses how strong it is and which way it gets stronger; spread 0 turns it off
+cell = 0.0
+spread = 0.0
+fade = 0.0
+leak = 0.0
+
+[tag]
+# a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
+# new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed;
+# it can tag back the one who tagged it after `back` seconds (negative: never, until someone else has been tagged)
+reach = 0.0
+cooldown = 0.0
+points = 0.0
+speed = 1.0
+back = -1.0
+
+[seek]
+# a nursery game: colony 0 hides, colony 1 seeks, and seekers can't move for the first `prep` seconds (0 is off); after
+# that each tick any seeker sees a hider pays the seekers `points` a second and costs the hiders the same, and the other
+# way round when every hider is out of sight
+prep = 0.0
+points = 0.0
+
+[flag]
+# a nursery game for two colonies: walking into the other nest picks up their flag, bringing it onto your own captures it
+# for `points` (0 is off) to your colony and as much off theirs; a pickup from a nest or a touch on the carrier is worth
+# `pickup` of points. With `steal`, a touch from the other side takes the flag (nobody can take it off the new carrier
+# for `guard` seconds), a colony has to carry its own flag home, and a carrier can put it down (unload) for a teammate;
+# one left lying goes home after `lie` seconds. Without, a touch sends it straight home
+points = 0.0
+pickup = 0.0
+steal = false
+guard = 0.0
+lie = 0.0
+
+[peek]
+# peekaboo, a nursery game for memory: a berry turns up `near`–`far` m in front of someone, in sight for `show` seconds
+# (0 is off), then out of sight where it is; finding it pays `points`, the next turns up `gap` s later, and one not found
+# `timeout` s after hiding moves. `spin` turns everyone round at random as it turns up and as it hides
+show = 0.0
+points = 0.0
+gap = 0.0
+timeout = 0.0
+near = 0.0
+far = 0.0
+spin = false
+again = 0.0
+flash = 0.0
+
+[ground]
+# how fast a sliding block slows, m/s² (friction coefficient times g)
+friction = 1.2
+
+[vision]
+# a fan of rays spread evenly across fov, centred on the heading
+rays = 17
+# 200°
+fov = 3.49
+range = 8.0
+# how wide each ray is: 0 a thin line; 1 a slice of the fan that meets its neighbours', so nothing
+# small falls between rays or vanishes dead ahead
+cover = 0.5
+# 1 spreads rays evenly; above 1 packs them towards the middle, like the eye's fovea
+spread = 1.0
+# how far the rays at the edges of the fan see, as a share of range (in between, it eases)
+side = 1.0
+
+[episode]
+# a training arena starts over after this long, or once everyone in it is dead
+seconds = 90.0
+
+# the walls, 0.5 thick around a room 5.2 across; mass enough that nothing a creature does moves them
+
+# one maze's inner walls; the world carves a new maze from them every episode
+
+[[block]]
+x = -3.0
+y = -1.5
+angle = 0.0000
+w = 2.7
+h = 0.3
+mass = 1000.0
+friction = 0.6
+carry = false
+shut = 0.0
+
+[[block]]
+x = 3.0
+y = -1.5
+angle = 0.0000
+w = 2.7
+h = 0.3
+mass = 1000.0
+friction = 0.6
+carry = false
+shut = 0.0
+
+[[block]]
+x = -3.0
+y = 1.5
+angle = 0.0000
+w = 2.7
+h = 0.3
+mass = 1000.0
+friction = 0.6
+carry = false
+shut = 0.0
+
+[[block]]
+x = 3.0
+y = 1.5
+angle = 0.0000
+w = 2.7
+h = 0.3
+mass = 1000.0
+friction = 0.6
+carry = false
+shut = 0.0

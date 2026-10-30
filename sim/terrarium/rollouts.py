@@ -115,12 +115,12 @@ class Collector:
 
 def stepped(env: Forage, actions: np.ndarray) -> tuple:
     obs, reward, done, _ = env.step(actions)
-    return obs, reward, done, env.active, env.final, env.cut
+    return obs, reward, done, env.active, env.final, env.cut, env.hint
 
 
 def simulate(conn, cfg: Config, train: Train, arenas: int, seed: int):
     env = Forage(cfg, train, arenas, seed)
-    conn.send((env.observe(), env.active))
+    conn.send((env.observe(), env.active, env.hint))
     while (actions := conn.recv()) is not None:
         try:
             conn.send(stepped(env, actions))
@@ -137,7 +137,7 @@ class Here:
         self.actions = np.zeros(0)
 
     def first(self):
-        return self.env.observe(), self.env.active
+        return self.env.observe(), self.env.active, self.env.hint
 
     def send(self, actions: np.ndarray):
         self.actions = actions
@@ -216,8 +216,9 @@ class OnDevice:
             ctx = mp.get_context('spawn')
             self.shares = [There(ctx, c, train, n, s) for (c, n), s in zip(parts, mine)]
         first = [s.first() for s in self.shares]
-        self.obs = join([o for o, _ in first])
-        self.active = np.concatenate([a for _, a in first])
+        self.obs = join([f[0] for f in first])
+        self.active = np.concatenate([f[1] for f in first])
+        self.hint = np.concatenate([f[2] for f in first])
 
     def _value(self, obs: Observation, notes: torch.Tensor) -> torch.Tensor:
         if len(self.actors) == 1:
@@ -267,6 +268,7 @@ class OnDevice:
                 keep['logprobs'].append(logps)
                 keep['values'].append(values)
                 keep['active'].append(self.active)
+                keep['hints'].append(self.hint)
                 got = [share.recv() for share in self.shares]
                 reward, done = np.concatenate([g[1] for g in got]), np.concatenate([g[2] for g in got])
                 self.episodes.add(reward, done, self.active)
@@ -283,6 +285,7 @@ class OnDevice:
                 self.notes = kept(self.notes, self.active, done)
                 self.obs = join([g[0] for g in got])
                 self.active = np.concatenate([g[3] for g in got])
+                self.hint = np.concatenate([g[6] for g in got])
             last_value = self._value(self.obs, self.notes).cpu().numpy()
         return Rollout(**{k: np.stack(v) for k, v in keep.items()}, notes=start), last_value
 

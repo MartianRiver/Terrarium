@@ -61,6 +61,10 @@ def frame(world: World, a: int) -> dict:
         counting = world.seek.waiting()[a] > 0
         for c, seeker in zip(creatures, world.seek.seeker[born]):
             c['signal'] = 2 if seeker and counting else -1
+    if cfg.tired.on:
+        # stamina left: drawn sleepy and slow when low, resting when still
+        for c, left in zip(creatures, world.stamina[a][born]):
+            c['stamina'] = _r(left)
     if cfg.young.on:
         # share of its youth left: 1 just hatched, 0 grown
         for c, left in zip(creatures, world.young[a][born]):

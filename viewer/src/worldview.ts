@@ -50,7 +50,7 @@ export class WorldView {
   focusId: number | null = null;
   private ring: THREE.Mesh;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1 };
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;

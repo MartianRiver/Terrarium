@@ -117,6 +117,19 @@ class Night:
 
 
 @dataclass(frozen=True)
+class Tired:
+    drain: float
+    rest: float
+    still: float
+    below: float
+    slowest: float
+
+    @property
+    def on(self) -> bool:
+        return self.drain > 0
+
+
+@dataclass(frozen=True)
 class Sprint:
     speed: float
     seconds: float
@@ -286,6 +299,7 @@ class Config:
     young: Young
     night: Night
     sprint: Sprint
+    tired: Tired
     flowers: Flowers
     grab: Grab
     carry: Carry
@@ -343,6 +357,7 @@ class PPO:
     coins_for: tuple[str, ...]
     side: float
     side_back: int
+    closure: float
     value: float
     max_grad_norm: float
     checkpoint_every: int
@@ -414,6 +429,7 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'flag': {'points': 0.0, 'pickup': 0.0, 'steal': False, 'guard': 0.0, 'lie': 0.0},
          'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False, 'again': 0.0, 'flash': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
+         'tired': {'drain': 0.0, 'rest': 0.0, 'still': 0.0, 'below': 0.0, 'slowest': 1.0},
          'food': {'middle': 0},
          'flowers': {'count': 0, 'every_min': 0.0, 'every_max': 0.0, 'open': 0.0, 'radius': 0.0, 'food': 0, 'boost': 0.0,
                      'speed': 1.0, 'spots': 0, 'spot_gap': 0.0},

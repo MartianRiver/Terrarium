@@ -132,3 +132,31 @@ def wall_policy(world):
         out[..., 0], out[..., 1] = thrust, turn
         return out
     return act
+
+
+class Visits:
+    """Which rooms each creature has been in this episode, for a side job that asks the notes "have I been here
+    before?" (loop closure, Mirowski et al. 2016): 1 once a creature comes back into a room it left, 0 on its first
+    time in. The brain never sees it; it's only a label to learn from."""
+
+    def __init__(self, world):
+        self.world = world
+        n = world.cfg.arena.maze
+        self.entries = np.zeros((*world.alive.shape, n, n), int)
+        self.room = np.full((*world.alive.shape, 2), -1)
+
+    def reset(self, arenas: np.ndarray):
+        self.entries[arenas] = 0
+        self.room[arenas] = -1
+
+    def update(self) -> np.ndarray:
+        """After a step: been here before, (arenas * creatures,)."""
+        w = self.world
+        n, size = w.cfg.arena.maze, w.cfg.arena.size
+        rc = np.clip(((w.pos[..., ::-1] + size / 2) // (size / n)).astype(int), 0, n - 1)
+        moved = (rc != self.room).any(-1)
+        a, c = np.nonzero(moved)
+        self.entries[a, c, rc[a, c, 0], rc[a, c, 1]] += 1
+        self.room = rc
+        here = np.take_along_axis(self.entries.reshape(*rc.shape[:2], -1), (rc[..., 0] * n + rc[..., 1])[..., None], -1)
+        return (here[..., 0] > 1).reshape(-1).astype(np.float32)

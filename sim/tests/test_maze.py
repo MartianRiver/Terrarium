@@ -1,9 +1,13 @@
+import json
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
 from terrarium import load
 from terrarium.config import DEFAULT, ConfigError
-from terrarium.maze import walls
+from terrarium.maze import Visits, walls
+from terrarium.train import train
 from terrarium.world import World
 
 MAZE = load(DEFAULT.parent / 'nursery-maze.toml')
@@ -54,3 +58,31 @@ def test_a_maze_needs_the_right_number_of_walls():
     from dataclasses import replace
     with pytest.raises(ConfigError):
         World(replace(MAZE, block=MAZE.block[:-1]))
+
+
+def test_been_here_before_is_only_for_rooms_left_and_come_back_to():
+    # only where the creature is matters, so a stand-in world it can be put anywhere in
+    world = SimpleNamespace(cfg=load(DEFAULT.parent / 'nursery-maze-3.toml'), alive=np.ones((1, 1), bool), pos=None)
+    visits = Visits(world)
+    # rooms of 3 m from (-4.5, -4.5): (row, col) = the room's centre at x = col * 3 - 3, y = row * 3 - 3
+    at = lambda row, col: np.array([[[col * 3.0 - 3.0, row * 3.0 - 3.0]]])
+    seen = []
+    for row, col in ((1, 1), (1, 1), (1, 2), (1, 2), (1, 1), (0, 1), (1, 1)):
+        world.pos = at(row, col)
+        seen.append(visits.update()[0])
+    assert seen == [0, 0, 0, 0, 1, 0, 1]
+    visits.reset(np.array([True]))
+    world.pos = at(1, 2)
+    assert visits.update()[0] == 0
+
+
+def test_training_asks_the_notes_whether_they_have_been_here(tmp_path):
+    from test_ppo import short
+    world, trainer = short(tmp_path)
+    world.write_text((DEFAULT.parent / 'nursery-maze-3.toml').read_text().replace('seconds = 90.0', 'seconds = 6.0'))
+    trainer.write_text(trainer.read_text().replace('closure = 0.0', 'closure = 1.0'))
+    run = train('closure', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', memory=8, score=False)
+    rows = [json.loads(l) for l in (run.dir / 'metrics.jsonl').read_text().splitlines()]
+    assert all(r['closure_loss'] > 0 and 0 <= r['closure_right'] <= 1 for r in rows)
+    with pytest.raises(ValueError, match='closure'):
+        train('no-memory', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', score=False)

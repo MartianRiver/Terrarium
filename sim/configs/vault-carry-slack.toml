@@ -117,6 +117,15 @@ seconds = 1.5
 cooldown = 6.0
 energy = 0.02
 
+[tired]
+# stamina (0 to 1) drains by `drain` a second at full thrust (a sprint by its speed up) and comes back by `rest` a second
+# while thrust stays under `still`; below `below`, top speed sinks to `slowest` of itself with none left. drain 0 is off
+drain = 0.0
+rest = 0.0
+still = 0.0
+below = 0.0
+slowest = 1.0
+
 [flowers]
 # now and then by day a nectar flower opens somewhere clear of nests and walls, every every_min to every_max seconds
 # while fewer than `count` are open, and closes after `open` seconds or at nightfall. The first to touch one drinks
