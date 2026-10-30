@@ -12,8 +12,9 @@ const LIVE_MS = 40 * 60_000;
 const LIVE = 'training now';
 const HELD = 'on hold';
 
-// training: the publisher's word on whether this game's line is training right now (older indexes don't say)
-interface Game { name: string; kind: string; goal: string; training?: boolean }
+// training: the publisher's word on whether this game's line is training right now (older indexes don't say);
+// family groups setups of the same game under one entry (Peekaboo: one look, tired, …), variant names each one there
+interface Game { name: string; kind: string; goal: string; training?: boolean; family?: string; variant?: string }
 interface Item { game?: string; samples?: number; brain?: string; score?: { label: string; value: number } }
 interface Channel { updated: string; games?: Record<string, Game>; items: Item[] }
 interface Brain {
@@ -26,7 +27,8 @@ interface Gallery {
   working?: { title: string; text: string; brains: Brain[] }[];
 }
 
-interface Choice { when: number; title: string; tag?: string; text: string; href: string }
+interface Variant { label: string; tag: string; href: string }
+interface Choice { when: number; title: string; tag?: string; text: string; href: string; variants?: Variant[] }
 
 function ago(when: number) {
   const m = Math.round((Date.now() - when) / 60000);
@@ -55,15 +57,25 @@ function games(c: Channel): Choice[] {
   const when = new Date(c.updated).getTime();
   const live = Date.now() - when < LIVE_MS;
   const keys = [...new Set(c.items.map((i) => i.game).filter((g): g is string => !!g && !!c.games?.[g]))];
-  const out: Choice[] = keys.map((key) => {
-    const g = c.games![key];
-    const best = c.items.filter((i) => i.game === key).sort((a, b) => (b.samples ?? 0) - (a.samples ?? 0))[0];
+  const tag = (key: string) => (c.games![key].training ?? live) ? LIVE : HELD;
+  const watch = (keys: string[]) => `/watch/?channel=${CHANNEL}&game=${keys.map(encodeURIComponent).join(',')}`;
+  const families = new Map<string, string[]>();
+  for (const key of keys) {
+    const family = c.games![key].family ?? c.games![key].name;
+    families.set(family, [...(families.get(family) ?? []), key]);
+  }
+  const out: Choice[] = [...families].map(([family, members]) => {
+    const g = c.games![members[0]];
+    const best = c.items.filter((i) => i.game === members[0]).sort((a, b) => (b.samples ?? 0) - (a.samples ?? 0))[0];
     const score = best.score ? ` Its newest brain: ${best.score.label.toLowerCase()} ${Math.round(best.score.value * 100)}%.` : '';
-    return {
-      when, title: g.name, tag: g.kind === 'fixed since' ? g.kind : (g.training ?? live) ? LIVE : HELD,
-      text: `${g.goal}${score}`,
-      href: `/watch/?channel=${CHANNEL}&game=${encodeURIComponent(key)}`,
+    const choice: Choice = {
+      when, title: members.length > 1 ? family : g.name, tag: members.some((k) => tag(k) === LIVE) ? LIVE : HELD,
+      text: `${g.goal}${score}`, href: watch(members),
     };
+    if (members.length > 1) {
+      choice.variants = members.map((k) => ({ label: c.games![k].variant ?? c.games![k].name, tag: tag(k), href: watch([k]) }));
+    }
+    return choice;
   });
   if (keys.length > 1) {
     out.unshift({
@@ -127,6 +139,19 @@ export class Picker {
       if (c.tag) a.append(el('span', c.tag, c.tag === LIVE ? 'picker-tag live' : c.tag === HELD ? 'picker-tag held' : 'picker-tag'));
       a.append(el('span', c.text, 'picker-text'), el('span', ago(c.when), 'picker-when'));
       li.append(a);
+      // setups of the same game, each on its own
+      if (c.variants) {
+        const row = el('p', '', 'picker-variants');
+        for (const v of c.variants) {
+          const chip = document.createElement('a');
+          chip.href = v.href;
+          chip.className = v.tag === LIVE ? 'live' : '';
+          chip.textContent = v.label;
+          chip.title = v.tag;
+          row.append(chip);
+        }
+        li.append(row);
+      }
       list.append(li);
     }
     const close = document.createElement('button');
