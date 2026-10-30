@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The action camera glides instead of shaking: it slides, turns and pulls back on springs, zooms out quickly but back in slowly so a chase doesn't breathe in and out, turns to a smoothed angle rather than in bursts, and near the glass no longer flickers between two distances every frame.
+
 Watching a nursery game follows the action: in tag, hide-and-seek and peekaboo the camera watches whoever's it and the one it's after, the hiders during the count and then the nearest seeker and hider, or the berry and whoever's nearest it, from behind the one acting and high enough to see who's behind a block. The site's channel starts that way. `[ppo] coins_for` aims the coin bonus at named coins. `[ppo] side` gives a brain with memory a side job while it trains: from its notes, say what it made of the moment `side_back` choices ago. `configs/nursery-seek-cover.toml` is hide-and-seek with more cover and a longer count. `train --rivals ... --fixed-seats` keeps each colony on its own brain, for a game whose sides differ.
 
 A tag playground (`configs/nursery-tag-playground.toml`): eight babies, 20 m, twenty-four blocks scattered every game and the sprint. `[ppo] coins` adds an entropy bonus on the yes/no coins alone, so a coin can't settle on never and stop being tried (0 in train.toml). `terrarium.evals` tells apart brains whose checkpoint files share a name, where it used to score only the last of them.

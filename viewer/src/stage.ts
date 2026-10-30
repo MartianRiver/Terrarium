@@ -26,11 +26,15 @@ const SWING_RATE = 3;
 const INTRO = new THREE.Vector3(16, 15, 47);
 const DRIFT_TURN = 0.05;
 const UP = new THREE.Vector3(0, 1, 0);
-// the action camera (aim): how quickly it turns and zooms to a shot, how far it lets the shot's angle wander before
-// turning to it, how far to one side of straight behind it looks from, and how long it leaves the view alone after
-// someone moves it by hand
-const AIM_RATE = 1.2;
-const AIM_SLACK = 0.6;
+// the action camera (aim) moves on springs, so a tag or a new pair glides rather than jerks: how stiff its slide to
+// the shot is, its turn and tilt, and its pull-back (out quickly, in slowly, so a chase doesn't breathe in and out)
+const AIM_FOLLOW = 2.5;
+const AIM_TURN = 1;
+const AIM_OUT = 1.2;
+const AIM_IN = 0.4;
+// the shot's angle is smoothed over about this many seconds before the camera turns to it, and it looks from this far
+// to one side of straight behind; it leaves the view alone this long after someone moves it by hand
+const AIM_SETTLE = 2;
 const AIM_SIDE = 0.35;
 const HANDS_OFF_MS = 8000;
 // it looks down more steeply than the close-up, so who's behind a block reads at a glance, and pulls back to fit the
@@ -72,7 +76,9 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
   let drifting = false;
   const offset = new THREE.Vector3();
   let handsOff = 0;
-  let aimYaw: number | null = null;
+  // the action camera's speeds, and its smoothed angle (fx, fz) and arm: null until it aims, and again after a hand
+  let rig: { vx: number; vz: number; fx: number; fz: number } | null = null;
+  let arm: { yaw: number; tilt: number; length: number; vyaw: number; vtilt: number; vlength: number } | null = null;
   controls.addEventListener('start', () => { handsOff = performance.now() + HANDS_OFF_MS; });
 
   const ambient = new THREE.HemisphereLight(GARDEN.skyLight, GARDEN.groundLight, 1.45);
@@ -93,6 +99,19 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
 
   function inside(x: number, y: number, z: number) {
     return Math.hypot(x, Math.max(0, y - WALL), z) < dome;
+  }
+
+  // how far the camera can sit from the target along (ux, uy, uz) and stay inside the dome
+  function room(ux: number, uy: number, uz: number) {
+    const { x, z } = controls.target;
+    if (inside(x + ux * AIM_FAR, uy * AIM_FAR, z + uz * AIM_FAR)) return AIM_FAR;
+    let lo = 0, hi = AIM_FAR;
+    for (let i = 0; i < 12; i++) {
+      const mid = (lo + hi) / 2;
+      if (inside(x + ux * mid, uy * mid, z + uz * mid)) lo = mid;
+      else hi = mid;
+    }
+    return lo;
   }
 
   function resize() {
@@ -128,6 +147,7 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
     // slides the orbit after the blob (or back to the middle with null), keeping whatever angle and
     // zoom it has, except while swinging between views; dt Infinity jumps straight there
     track(at: { x: number; y: number } | null, dt: number) {
+      rig = arm = null;
       if (drifting && Number.isFinite(dt)) {
         offset.subVectors(camera.position, controls.target).applyAxisAngle(UP, dt * DRIFT_TURN);
         camera.position.addVectors(controls.target, offset);
@@ -146,37 +166,56 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
       offset.subVectors(camera.position, controls.target).lerp(close ? closeUp : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
       camera.position.addVectors(controls.target, offset);
     },
-    // the action camera: slides to the shot, then turns to look from behind the one acting and pulls back to fit what
+    // the action camera: glides to the shot, then turns to look from behind the one acting and pulls back to fit what
     // it's after, unless someone has just moved the view by hand
     aim(shot: { x: number; y: number; spread: number; from: number | null }, dt: number) {
       drifting = false;
       swinging = 0;
-      const k = Number.isFinite(dt) ? 1 - Math.exp(-dt * FOLLOW_RATE) : 1;
-      const dx = (shot.x - controls.target.x) * k;
-      const dz = (shot.y - controls.target.z) * k;
-      controls.target.x += dx;
-      controls.target.z += dz;
-      camera.position.x += dx;
-      camera.position.z += dz;
-      if (performance.now() < handsOff) return;
-      offset.subVectors(camera.position, controls.target);
-      const yaw = Math.atan2(offset.z, offset.x);
-      const tilt = Math.atan2(offset.y, Math.hypot(offset.x, offset.z));
-      const length = offset.length();
-      if (shot.from !== null) {
-        const want = shot.from + Math.PI + AIM_SIDE;
-        if (aimYaw === null || Math.abs(wrap(want - aimYaw)) > AIM_SLACK) aimYaw = want;
+      const snap = !Number.isFinite(dt);
+      if (snap || !rig) rig = { vx: 0, vz: 0, fx: 0, fz: 0 };
+      if (snap) arm = null;
+      const t = controls.target;
+      let x, z;
+      if (snap) [x, z] = [shot.x, shot.y];
+      else {
+        [x, rig.vx] = spring(t.x, rig.vx, shot.x, AIM_FOLLOW, dt);
+        [z, rig.vz] = spring(t.z, rig.vz, shot.y, AIM_FOLLOW, dt);
       }
-      const t = Number.isFinite(dt) ? 1 - Math.exp(-dt * AIM_RATE) : 1;
-      const nextYaw = yaw + wrap((aimYaw ?? yaw) - yaw) * t;
-      const nextTilt = tilt + (AIM_TILT - tilt) * t;
+      camera.position.x += x - t.x;
+      camera.position.z += z - t.z;
+      t.x = x;
+      t.z = z;
+      if (shot.from !== null) {
+        const k = snap ? 1 : 1 - Math.exp(-dt / AIM_SETTLE);
+        rig.fx += (Math.cos(shot.from) - rig.fx) * k;
+        rig.fz += (Math.sin(shot.from) - rig.fz) * k;
+      }
+      if (performance.now() < handsOff) {
+        arm = null;
+        return;
+      }
+      if (!arm) {
+        offset.subVectors(camera.position, t);
+        arm = { yaw: Math.atan2(offset.z, offset.x), tilt: Math.atan2(offset.y, Math.hypot(offset.x, offset.z)),
+                length: offset.length(), vyaw: 0, vtilt: 0, vlength: 0 };
+      }
+      // the smoothed angle is too short to trust when the shot keeps changing its mind, so then the camera holds still
+      const yaw = Math.hypot(rig.fx, rig.fz) > 0.3 ? Math.atan2(rig.fz, rig.fx) + Math.PI + AIM_SIDE : arm.yaw;
       const want = Math.min(AIM_FAR, Math.max(AIM_NEAR, shot.spread + 6));
-      const nextLength = length + (want - length) * t;
-      offset.set(Math.cos(nextYaw) * Math.cos(nextTilt), Math.sin(nextTilt), Math.sin(nextYaw) * Math.cos(nextTilt)).multiplyScalar(nextLength);
+      if (snap) Object.assign(arm, { yaw, tilt: AIM_TILT, length: want });
+      else {
+        [arm.yaw, arm.vyaw] = spring(arm.yaw, arm.vyaw, arm.yaw + wrap(yaw - arm.yaw), AIM_TURN, dt);
+        [arm.tilt, arm.vtilt] = spring(arm.tilt, arm.vtilt, AIM_TILT, AIM_TURN, dt);
+        [arm.length, arm.vlength] = spring(arm.length, arm.vlength, want, want > arm.length ? AIM_OUT : AIM_IN, dt);
+      }
+      offset.set(Math.cos(arm.yaw) * Math.cos(arm.tilt), Math.sin(arm.tilt), Math.sin(arm.yaw) * Math.cos(arm.tilt));
       // near the edge, closer in rather than out through the glass
-      let scale = 1;
-      while (scale > 0.4 && !inside(controls.target.x + offset.x * scale, offset.y * scale, controls.target.z + offset.z * scale)) scale -= 0.05;
-      camera.position.copy(controls.target).addScaledVector(offset, scale);
+      const most = Math.max(3.5, room(offset.x, offset.y, offset.z));
+      if (arm.length > most) {
+        arm.length = most;
+        arm.vlength = Math.min(0, arm.vlength);
+      }
+      camera.position.copy(t).addScaledVector(offset, arm.length);
     },
     // 1 by day, 0 at night
     light(level: number) {
@@ -206,6 +245,12 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
       composer.render();
     },
   };
+}
+
+// a critically damped spring from x (speed v) towards goal after dt seconds, exact for any dt; stiffness w per second
+function spring(x: number, v: number, goal: number, w: number, dt: number): [number, number] {
+  const e = x - goal, c = v + w * e, d = Math.exp(-w * dt);
+  return [goal + (e + c * dt) * d, (v - w * c * dt) * d];
 }
 
 function wrap(a: number) {
