@@ -69,6 +69,7 @@ Click a Terrikin to follow it, then press B for its brain window: what each of i
 
 ## Versions
 
+- **8** · 30 October 2026 · Runs code only from `main` and `next`, gives a job only a short list of your environment variables, refuses packages from anywhere but PyPI and PyTorch, pins the keys that may sign jobs the first time it runs, takes your home folder and user name out of a failed job's log, sends times in UTC and no longer says why it's waiting, can't be paused or resumed by a website, deletes old checkouts, reads idle time on Linux desktops and holds a job to its CPU share there. After two models read the worker and said not to run it on an everyday PC.
 - **7** · 28 October 2026 · Sends back a run too big for the queue by leaving out every other checkpoint (the last always goes); your machine keeps them all.
 - **6** · 28 October 2026 · While it trains, says how busy the GPU and CPU are, so I can tell when a job isn't using your machine well.
 - **5** · 26 October 2026 · Checks when it starts that it can verify my signature, using the `ssh-keygen` that comes with Git on Windows (Windows 10's own may be too old).

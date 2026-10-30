@@ -82,10 +82,16 @@ def overlay(repo: Path = REPO, under: str = 'sim') -> bytes | None:
     return buf.getvalue()
 
 
-def public(commit: str, repo: Path, branches: str = 'refs/remotes/origin/') -> bool:
-    """Is commit on a branch pushed to origin? In a mirror the branches are refs/heads/. Only branches count:
-    GitHub also serves pull requests' refs, and a commit someone pushed to a fork can be fetched through those."""
-    found = subprocess.run(['git', 'for-each-ref', '--contains', commit, '--format=%(refname)', branches],
+# the branches a donor runs code from: changes reach them only by a pull request that passed CI, in public
+RELEASED = ('main', 'next')
+
+
+def public(commit: str, repo: Path, branches: str = 'refs/remotes/origin/', only: tuple[str, ...] = ()) -> bool:
+    """Is commit on a branch pushed to origin (one of `only`, if given)? In a mirror the branches are refs/heads/.
+    Only branches count: GitHub also serves pull requests' refs, and a commit someone pushed to a fork can be
+    fetched through those."""
+    refs = [branches + b for b in only] if only else [branches]
+    found = subprocess.run(['git', 'for-each-ref', '--contains', commit, '--format=%(refname)', *refs],
                            cwd=repo, capture_output=True, text=True)
     return found.returncode == 0 and bool(found.stdout.strip())
 
@@ -112,14 +118,19 @@ def from_bundle(dest: Path, data: bytes, commit: str, extra: bytes | None = None
         apply(dest, extra)
 
 
-def from_public(dest: Path, mirror: Path, url: str, commit: str):
-    """A checkout of a commit that's on one of the public repo's branches, fetched from there."""
+def from_public(dest: Path, mirror: Path, url: str, commit: str, only: tuple[str, ...] = RELEASED):
+    """A checkout of a commit that's on main or next of the public repo, fetched from there."""
+    # branches only: a full mirror of GitHub also takes every pull request's commits, forks' included
+    heads = '+refs/heads/*:refs/heads/*'
+    if mirror.exists() and git('config', '--get-all', 'remote.origin.fetch', cwd=mirror, check=False) != heads:
+        remove(mirror)
     if not mirror.exists():
-        git('clone', '-q', '--mirror', url, str(mirror), cwd=mirror.parent)
-    else:
-        git('remote', 'update', '--prune', cwd=mirror)
-    if not public(commit, mirror, 'refs/heads/'):
-        raise PermissionError(f'{commit[:12]} is not on a branch of {url}')
+        git('init', '-q', '--bare', str(mirror), cwd=mirror.parent)
+        git('remote', 'add', 'origin', url, cwd=mirror)
+        git('config', 'remote.origin.fetch', heads, cwd=mirror)
+    git('fetch', '-q', '--prune', 'origin', cwd=mirror)
+    if not public(commit, mirror, 'refs/heads/', only):
+        raise PermissionError(f'{commit[:12]} is not on {" or ".join(only)} of {url}')
     git('clone', '-q', '--no-checkout', '--shared', str(mirror), str(dest), cwd=mirror.parent)
     git('checkout', '-q', '--detach', commit, cwd=dest)
 
