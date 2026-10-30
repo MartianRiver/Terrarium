@@ -225,21 +225,32 @@ function card(title, tag, text, more, href) {
 }
 function nursery(c) {
   if (!c || !c.items || !c.items.length) return '';
-  // the publisher rewrites the index every 10 min while anything trains
+  // the publisher rewrites the index every 10 min while anything trains (older indexes don't say per game)
   const live = Date.now() - new Date(c.updated) < 40 * 60e3;
   const keys = [...new Set(c.items.map((i) => i.game).filter((k) => k && c.games && c.games[k]))];
-  const cards = keys.map((k) => {
-    const g = c.games[k];
-    const best = c.items.filter((i) => i.game === k).sort((a, b) => (b.samples || 0) - (a.samples || 0))[0];
+  const watch = (ks) => '/watch/?channel=/replays/nursery/index.json&game=' + ks.map(encodeURIComponent).join(',');
+  // setups of the same game (family) share a card, each one a link of its own
+  const families = new Map();
+  for (const k of keys) {
+    const f = c.games[k].family || c.games[k].name;
+    families.set(f, (families.get(f) || []).concat(k));
+  }
+  const cards = [...families].map(([family, ks]) => {
+    const g = c.games[ks[0]];
+    const best = c.items.filter((i) => i.game === ks[0]).sort((a, b) => (b.samples || 0) - (a.samples || 0))[0];
     let more = '';
     if (best.score) {
       more = 'Newest brain: ' + esc(best.score.label.toLowerCase()) + ' <b>' + pct(best.score.value) + '</b>'
         + (best.score.marks || []).map((m) => ' · ' + esc(m[0]) + ' ' + pct(m[1])).join('');
     }
-    return card(g.name, g.kind, g.goal + ' ' + g.setup, more, '/watch/?channel=/replays/nursery/index.json&game=' + encodeURIComponent(k));
+    if (ks.length > 1) {
+      more += (more ? '<br>' : '') + 'Setups: ' + ks.map((k) => '<a href="' + watch([k]) + '">' + esc(c.games[k].variant || c.games[k].name) + '</a>'
+        + (c.games[k].training ?? live ? ' (training now)' : '')).join(' · ');
+    }
+    return card(ks.length > 1 ? family : g.name, g.kind, g.goal + ' ' + g.setup, more, watch(ks));
   });
   return '<h2>In the nursery</h2><p>Small worlds where baby Terrikins can’t go hungry, learning kids’ games. Each one tests one thing a brain needs, like memory, away from the work of staying alive. '
-    + (live ? 'Training now, updated ' + ago(c.updated) + '. ' : c.note ? esc(c.note[0].toUpperCase() + c.note.slice(1)) + ' (updated ' + ago(c.updated) + '). ' : '') + 'Watch shows its newest brains in turn, with a card saying what’s going on.</p><ol class="brains now">' + cards.join('') + '</ol>';
+    + (keys.some((k) => c.games[k].training ?? live) ? 'Training now, updated ' + ago(c.updated) + '. ' : c.note ? esc(c.note[0].toUpperCase() + c.note.slice(1)) + ' (updated ' + ago(c.updated) + '). ' : '') + 'Watch shows its newest brains in turn, with a card saying what’s going on.</p><ol class="brains now">' + cards.join('') + '</ol>';
 }
 Promise.all([get('/replays/gallery/index.json'), get('/replays/nursery/index.json')]).then(([g, c]) => {
   let html = nursery(c);

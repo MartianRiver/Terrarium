@@ -96,9 +96,10 @@ function boot() {
   const container = document.getElementById('world')!;
   // &turn=degrees: the close-up from another side (a reel's shot of a face)
   const stage = createStage(container, lite, (Number(params.get('turn')) || 0) * Math.PI / 180);
-  // the site with nothing asked for opens on an empty garden and asks what to watch
+  // the site with nothing asked for opens on an empty garden and asks what to watch; with something asked for, the
+  // garden stays empty until it comes
   const choosing = SITE && !location.search;
-  let make = choosing ? emptySource : demoSource;
+  let make = SITE ? emptySource : demoSource;
   let source!: Source;
   let view: WorldView | undefined;
   let paused = false;
@@ -304,14 +305,18 @@ function boot() {
   async function openChannel() {
     if (tuning) return;
     tuning = true;
+    if (!showing) {
+      opening = true;
+      setStatus('loading', 'Reading the channel…');
+    }
     try {
       const index = new URL(params.get('channel')!, location.href);
       if (index.origin !== location.origin) throw new ReplayError(`won’t read a channel from another site (${index.origin})`);
       const read: { items: Item[]; games?: Record<string, ChannelGame>; note?: string } = await (await fetch(index, { cache: 'no-cache' })).json();
       const { games = {}, note } = read;
-      // &game=<key> keeps to one game's replays
-      const game = params.get('game');
-      const items = game ? read.items.filter((i) => i.game === game) : read.items;
+      // &game=<key>[,<key>…] keeps to those games' replays
+      const game = params.get('game')?.split(',');
+      const items = game ? read.items.filter((i) => game.includes(i.game ?? '')) : read.items;
       if (!items.length) throw new ReplayError('nothing on the channel yet');
       const place = (items.findIndex((i) => i.replay === showing) + 1) % items.length;
       const item = items[place];
@@ -323,6 +328,7 @@ function boot() {
       card.show(item, games, place, items.length, note);
     } catch (err) {
       log.warn('channel not read', { err: String(err) });
+      if (!showing) setStatus('loading', 'The channel isn’t answering. Trying again in 30 s…');
     } finally {
       tuning = false;
       if (!showing) setTimeout(openChannel, 30_000);
