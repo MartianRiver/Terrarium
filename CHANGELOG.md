@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+A maze nursery (`configs/nursery-maze.toml`): one baby in a 5×5 maze carved anew every episode (`[arena] maze`, its blocks moved into a new maze each time, with exactly one way between any two rooms) and a berry somewhere in it, regrowing elsewhere once eaten. evals has two maze baselines: `wall` keeps a wall on its left, and `mapped` knows the maze and takes the shortest way.
+
 The viewer's camera has three modes, on a button (or F): Wide, the new default, shows the whole arena fitted to the screen, phones in landscape included, with the dome's frame faded when it's looked down on from outside; Follow stays close behind the Terrikin that matters most in a game (whoever's it, the seeker closing in, whoever's nearest the berry, the flag carrier) or the one clicked, and keeps inside the dome; Action is the camera that cuts between the shots that matter. V switches between them and F goes straight to Follow, and `&cam=` picks one; the site's channel links open on Wide. On the site, Watch with nothing chosen opens on an empty garden under the list of what to watch, which tags each game training now or on hold.
 
 Capture the flag plays like the games it comes from (`[flag] steal`, `guard`, `lie`): a touch from the other side takes the flag off its carrier rather than sending it home, nobody can take it off the new carrier for 2 s, a colony that gets its own flag back has to carry it home, a carrier can put it down for a teammate, and a flag left lying goes home after 10 s. Schema v12 lets a brain sense its own colony's flag (whether it's carrying it, how far and which way). Replays give each frame its `flags`, drawn as pennants in the colonies' colours on the nests, on the grass, or on a carrier's back.

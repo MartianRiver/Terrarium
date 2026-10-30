@@ -15,6 +15,7 @@ TRAIN = DEFAULT.parent / 'train.toml'
 class Arena:
     size: float
     scatter: float
+    maze: int       # rooms a side of a maze its blocks make anew each episode (0: no maze)
 
 
 @dataclass(frozen=True)
@@ -401,7 +402,7 @@ def convert(kind, value, where):
 
 # keys added after worlds were first recorded, as they were before: off. Only for reading old run
 # records (serve.py), never for configs on disk, which have every key
-SINCE = {'arena': {'scatter': 0.0},
+SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'colonies': {'room': 0},
          'vision': {'cover': 0.0, 'spread': 1.0, 'side': 1.0},
          'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},

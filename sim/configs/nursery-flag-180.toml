@@ -10,6 +10,8 @@ slop = 0.01
 size = 16.0
 # every block moves up to this far (m) from where it's set and turns any way, anew each episode; 0 keeps them put
 scatter = 0.0
+# a maze this many rooms a side, its blocks the inner walls, carved anew each episode (0: no maze)
+maze = 0
 
 [creature]
 radius = 0.45

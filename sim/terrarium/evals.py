@@ -38,6 +38,7 @@ from .schema import YES_NO
 from .tactics import REASONS, Tactics, flower_in_view
 from .vision import FLOWER, FOOD, NOTHING, look
 from . import vision
+from .maze import mapped_policy, wall_policy
 from .world import CARRIED, World
 
 log = Logger('evals')
@@ -151,7 +152,7 @@ def spotter_policy(world: World) -> Policy:
     return act
 
 
-POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'carrier': carrier_policy, 'nester': nester_policy,
+POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'mapped': mapped_policy, 'wall': wall_policy, 'carrier': carrier_policy, 'nester': nester_policy,
             'chaser': chaser_policy, 'spotter': spotter_policy}
 
 # where a yes/no action is worth watching: (who's in that spot, the action's index)
