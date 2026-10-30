@@ -124,6 +124,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     sampler = Sampler(device).start()
     started = time.perf_counter()
     checkpoint = None
+    # samples count every place in every arena, the dead and unborn included; these are the ones that trained
+    live = 0
     for u in range(1, updates + 1):
         for optimizer, lr in zip(optimizers, rates):
             for group in optimizer.param_groups:
@@ -148,8 +150,10 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
             stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast, side=side, closure=closure)
         done = time.perf_counter()
         sampler.into(None)
+        live += int(roll.active.sum())
 
-        row = {'update': u, 'samples': u * per_update, 'seconds': round(done - started, 1),
+        row = {'update': u, 'samples': u * per_update, 'live_samples': live,
+               'live_share': round(float(roll.active.mean()), 3), 'seconds': round(done - started, 1),
                'samples_per_second': round(per_update / (done - tick)),
                'collect_seconds': round(collected - tick, 2), 'update_seconds': round(done - collected, 2),
                'reward_per_sample': float(roll.rewards.mean()), **rollouts.episodes.take(), **stats, **sampler.take()}

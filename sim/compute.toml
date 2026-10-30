@@ -1281,3 +1281,935 @@ started = "2026-10-29T06:10:17+11:00"
 ended = "2026-10-29T06:50:53+11:00"
 dollars = 0.076
 note = "flash-seen3: first stage without --fast (machine 147415)"
+
+[[session]]
+provider = "vast"
+instance = 58184761
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T13:59:36+11:00"
+ended = "2026-10-29T15:03:45+11:00"
+dollars = 0.108
+note = "mem2aa (memgrid2/aa.log, machine 38453, $0.101/h, length from the bill)"
+
+[[session]]
+provider = "vast"
+instance = 58184784
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T13:59:56+11:00"
+ended = "2026-10-29T14:22:26+11:00"
+dollars = 0.039
+note = "mem2ab (memgrid2/ab.log, machine 33751, $0.104/h, length from the bill)"
+
+[[session]]
+provider = "vast"
+instance = 58186950
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-10-29T14:15:55+11:00"
+ended = "2026-10-29T15:20:13+11:00"
+dollars = 0.102
+note = "mem2ac (memgrid2/ac.log, machine 43183, $0.071/h)"
+
+[[session]]
+provider = "vast"
+instance = 58187163
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T14:17:13+11:00"
+ended = "2026-10-29T14:53:43+11:00"
+dollars = 0.075
+note = "mem2ta (memgrid2/ta.log, machine 33752, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58187977
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T14:23:22+11:00"
+ended = "2026-10-29T15:07:04+11:00"
+dollars = 0.100
+note = "mem2sa (memgrid2/sa.log, machine 33751, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58190797
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T14:49:14+11:00"
+ended = "2026-10-29T15:30:14+11:00"
+dollars = 0.093
+note = "mem2fa2 (memgrid2/fa2.log, machine 33747, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58190846
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T14:49:44+11:00"
+ended = "2026-10-29T15:45:56+11:00"
+dollars = 0.098
+note = "mem2fb2 (memgrid2/fb2.log, machine 147415, $0.082/h)"
+
+[[session]]
+provider = "vast"
+instance = 58190924
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T14:50:20+11:00"
+ended = "2026-10-29T15:38:02+11:00"
+dollars = 0.102
+note = "mem2fr (memgrid2/fr.log, machine 33752, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58191026
+gpu = "RTX 3080"
+cpu = "20 cores"
+started = "2026-10-29T14:51:13+11:00"
+ended = "2026-10-29T15:36:01+11:00"
+dollars = 0.105
+note = "mem2fg (memgrid2/fg.log, machine 137672, $0.122/h)"
+
+[[session]]
+provider = "vast"
+instance = 58192076
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T14:59:56+11:00"
+ended = "2026-10-29T17:27:56+11:00"
+dollars = 0.296
+note = "mem2ab2 (memgrid2/ab2.log, machine 33747, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58192793
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T15:06:06+11:00"
+ended = "2026-10-29T15:49:24+11:00"
+dollars = 0.092
+note = "mem2tf (memgrid2/tf.log, machine 33747, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58195694
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T15:26:42+11:00"
+ended = "2026-10-29T17:34:18+11:00"
+dollars = 0.256
+note = "mem2pa (memgrid2/pa.log, machine 33751, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58195980
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T15:29:12+11:00"
+ended = "2026-10-29T17:34:18+11:00"
+dollars = 0.251
+note = "mem2pb (memgrid2/pb.log, machine 33752, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58199315
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T16:01:54+11:00"
+ended = "2026-10-29T16:58:12+11:00"
+dollars = 0.082
+note = "mem2tn (memgrid2/tn.log, machine 147415, $0.082/h)"
+
+[[session]]
+provider = "vast"
+instance = 58215036
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T18:15:53+11:00"
+ended = "2026-10-29T18:55:41+11:00"
+dollars = 0.091
+note = "mem2pc (memgrid2/pc.log, machine 33752, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58215344
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T18:18:24+11:00"
+ended = "2026-10-29T18:55:42+11:00"
+dollars = 0.070
+note = "mem2pd (memgrid2/pd.log, machine 147415, $0.082/h)"
+
+[[session]]
+provider = "vast"
+instance = 58233702
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T21:09:52+11:00"
+ended = "2026-10-29T21:14:58+11:00"
+dollars = 0.024
+note = "a (tonight/a-failed.log, machine 146047, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58233706
+gpu = "RTX 3060"
+cpu = "20 cores"
+started = "2026-10-29T21:09:55+11:00"
+ended = "2026-10-29T21:17:07+11:00"
+dollars = 0.021
+note = "b (tonight/b-failed.log, machine 146146, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58233711
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-10-29T21:09:57+11:00"
+ended = "2026-10-29T21:15:51+11:00"
+dollars = 0.025
+note = "c (tonight/c-failed.log, machine 43183, $0.071/h)"
+
+[[session]]
+provider = "vast"
+instance = 58235317
+gpu = "RTX 3060"
+cpu = "20 cores"
+started = "2026-10-29T21:25:17+11:00"
+ended = "2026-10-29T21:30:53+11:00"
+dollars = 0.025
+note = "a (failed2/a.log, machine 146146, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58235326
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T21:25:20+11:00"
+ended = "2026-10-29T21:32:44+11:00"
+dollars = 0.010
+note = "b (failed2/b.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58235329
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T21:25:21+11:00"
+ended = "2026-10-29T21:32:39+11:00"
+dollars = 0.007
+note = "c (failed2/c.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236163
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-10-29T21:30:19+11:00"
+ended = "2026-10-29T21:32:43+11:00"
+dollars = 0.004
+note = "t1 (failed2/t1.log, machine 43183, $0.071/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236167
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T21:30:22+11:00"
+ended = "2026-10-29T21:32:46+11:00"
+dollars = 0.004
+note = "t2 (failed2/t2.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236511
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-10-29T21:33:15+11:00"
+ended = "2026-10-30T01:04:21+11:00"
+dollars = 0.310
+note = "a (tonight/a.log, machine 43183, $0.071/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236518
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T21:33:18+11:00"
+ended = "2026-10-30T00:42:48+11:00"
+dollars = 0.290
+note = "b (tonight/b.log, machine 147415, $0.082/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236527
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T21:33:21+11:00"
+ended = "2026-10-29T22:55:39+11:00"
+dollars = 0.159
+note = "c (tonight/c.log, machine 38453, $0.101/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236534
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T21:33:25+11:00"
+ended = "2026-10-29T23:09:37+11:00"
+dollars = 0.202
+note = "t1 (tonight/t1.log, machine 33751, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58236539
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T21:33:27+11:00"
+ended = "2026-10-29T23:33:51+11:00"
+dollars = 0.228
+note = "t2 (tonight/t2.log, machine 38453, $0.101/h)"
+
+[[session]]
+provider = "vast"
+instance = 58238930
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T21:57:35+11:00"
+ended = "2026-10-29T23:43:11+11:00"
+dollars = 0.181
+note = "pg1 (tonight/pg1.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58239551
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T22:04:14+11:00"
+ended = "2026-10-29T23:14:14+11:00"
+dollars = 0.103
+note = "cc1 (tonight/cc1.log, machine 146047, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58239559
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-29T22:04:17+11:00"
+ended = "2026-10-29T23:30:11+11:00"
+dollars = 0.163
+note = "cc2 (tonight/cc2.log, machine 38453, $0.101/h)"
+
+[[session]]
+provider = "vast"
+instance = 58246404
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T23:11:28+11:00"
+ended = "2026-10-29T23:13:58+11:00"
+dollars = 0.004
+note = "sl2 (tonight/sl2-failed.log, machine 28139, $0.077/h)"
+
+[[session]]
+provider = "vast"
+instance = 58247131
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-29T23:16:44+11:00"
+ended = "2026-10-30T02:01:08+11:00"
+dollars = 0.320
+note = "sl2 (tonight/sl2.log, machine 33751, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58247201
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-29T23:17:18+11:00"
+ended = "2026-10-29T23:17:42+11:00"
+dollars = 0.001
+note = "sl2 (tonight/sl2-dup.log, machine 35285, $0.083/h)"
+
+[[session]]
+provider = "vast"
+instance = 58247333
+gpu = "RTX 3060"
+cpu = "20 cores"
+started = "2026-10-29T23:18:09+11:00"
+ended = "2026-10-30T01:54:03+11:00"
+dollars = 0.212
+note = "sl3 (tonight/sl3.log, machine 146146, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58329673
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-10-30T11:56:21+11:00"
+ended = "2026-10-30T12:00:33+11:00"
+dollars = 0.008
+note = "cck (tonight/cck-failed.log, machine 140134, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58329919
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-30T11:59:24+11:00"
+ended = "2026-10-30T12:03:24+11:00"
+dollars = 0.006
+note = "ps (tonight/ps-failed.log, machine 35285, $0.083/h)"
+
+[[session]]
+provider = "vast"
+instance = 58330135
+gpu = "RTX 3060"
+cpu = "20 cores"
+started = "2026-10-30T12:01:40+11:00"
+ended = "2026-10-30T12:15:10+11:00"
+dollars = 0.004
+note = "cck (tonight/cck-failed2.log, machine 146146, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58330776
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-10-30T12:10:21+11:00"
+ended = "2026-10-30T12:14:15+11:00"
+dollars = 0.008
+note = "skc (tonight/skc-failed2.log, machine 140134, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58330787
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T12:10:25+11:00"
+ended = "2026-10-30T15:24:25+11:00"
+dollars = 0.316
+note = "ps (tonight/ps.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58331144
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T12:14:30+11:00"
+ended = "2026-10-30T15:16:36+11:00"
+dollars = 0.298
+note = "skc (tonight/skc.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58336363
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-30T13:13:09+11:00"
+ended = "2026-10-30T13:27:15+11:00"
+dollars = 0.043
+note = "cck (tonight/cck-oom.log, machine 33751, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58337824
+gpu = "RTX 3060"
+cpu = "20 cores"
+started = "2026-10-30T13:28:05+11:00"
+ended = "2026-10-30T14:28:53+11:00"
+dollars = 0.096
+note = "cck1 (tonight/cck1.log, machine 146146, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58337936
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T13:29:05+11:00"
+ended = "2026-10-30T14:15:47+11:00"
+dollars = 0.083
+note = "cck1 (tonight/cck1-dup.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58341939
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-30T14:16:15+11:00"
+ended = "2026-10-30T15:18:03+11:00"
+dollars = 0.101
+note = "cck2 (tonight/cck2.log, machine 147415, $0.082/h)"
+
+[[session]]
+provider = "vast"
+instance = 58348408
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T15:22:47+11:00"
+ended = "2026-10-30T17:41:23+11:00"
+dollars = 0.232
+note = "sep (tonight/sep.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58348984
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T15:28:48+11:00"
+ended = "2026-10-30T16:43:12+11:00"
+dollars = 0.126
+note = "ccd1 (tonight/ccd1.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58348994
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T15:28:57+11:00"
+ended = "2026-10-30T16:41:21+11:00"
+dollars = 0.126
+note = "ccd2 (tonight/ccd2.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58349413
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T15:32:36+11:00"
+ended = "2026-10-30T17:50:06+11:00"
+dollars = 0.224
+note = "pm (tonight/pm.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58379715
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T19:53:56+11:00"
+ended = "2026-10-30T21:27:32+11:00"
+dollars = 0.162
+note = "maze2 (tonight/maze2.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58379716
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T19:53:57+11:00"
+ended = "2026-10-30T21:26:15+11:00"
+dollars = 0.162
+note = "maze1 (tonight/maze1.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58379742
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T19:54:17+11:00"
+ended = "2026-10-31T00:44:11+11:00"
+dollars = 0.463
+note = "flag (tonight/flag.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58381792
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T20:13:34+11:00"
+ended = "2026-10-30T21:28:16+11:00"
+dollars = 0.131
+note = "tired (tonight/tired.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393577
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:08:39+11:00"
+ended = "2026-10-30T23:11:27+11:00"
+dollars = 0.108
+note = "peekctl (night/peekctl.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393616
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:09:05+11:00"
+ended = "2026-10-30T22:13:41+11:00"
+dollars = 0.008
+note = "peekmore (night/peekmore.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393659
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:09:30+11:00"
+ended = "2026-10-31T00:16:42+11:00"
+dollars = 0.211
+note = "maze (night/maze.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393690
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-30T22:09:56+11:00"
+ended = "2026-10-30T23:46:56+11:00"
+dollars = 0.169
+note = "colA (night/colA.log, machine 144025, $0.087/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393722
+gpu = "RTX 3090"
+cpu = "16 cores"
+started = "2026-10-30T22:10:20+11:00"
+ended = "2026-10-30T23:30:08+11:00"
+dollars = 0.224
+note = "colB (night/colB.log, machine 68276, $0.149/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393794
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:10:57+11:00"
+ended = "2026-10-30T22:31:51+11:00"
+dollars = 0.042
+note = "b3060 (night/b3060.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393832
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-30T22:11:19+11:00"
+ended = "2026-10-30T22:20:01+11:00"
+dollars = 0.028
+note = "b3070 (night/b3070.log, machine 33752, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393875
+gpu = "RTX 4060 Ti"
+cpu = "32 cores"
+started = "2026-10-30T22:11:41+11:00"
+ended = "2026-10-30T22:21:59+11:00"
+dollars = 0.060
+note = "b4060ti (night/b4060ti.log, machine 32736, $0.189/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393898
+gpu = "RTX A4000"
+cpu = "16 cores"
+started = "2026-10-30T22:12:05+11:00"
+ended = "2026-10-30T22:23:23+11:00"
+dollars = 0.176
+note = "ba4000 (night/ba4000.log, machine 151510, $0.110/h)"
+
+[[session]]
+provider = "vast"
+instance = 58393927
+gpu = "RTX 3080 Ti"
+cpu = "16 cores"
+started = "2026-10-30T22:12:25+11:00"
+ended = "2026-10-30T22:13:49+11:00"
+dollars = 0.001
+note = "b3080ti (night/b3080ti.log, machine 35926, $0.164/h)"
+
+[[session]]
+provider = "vast"
+instance = 58394085
+gpu = "RTX 4090"
+cpu = "18 cores"
+started = "2026-10-30T22:13:37+11:00"
+ended = "2026-10-30T22:30:43+11:00"
+dollars = 0.102
+note = "b4090 (night/b4090.log, machine 19565, $0.402/h)"
+
+[[session]]
+provider = "vast"
+instance = 58394108
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-30T22:13:41+11:00"
+ended = "2026-10-30T23:56:29+11:00"
+dollars = 0.138
+note = "peekmore (night/peekmore.log, machine 146697, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58394132
+gpu = "RTX 3080 Ti"
+cpu = "24 cores"
+started = "2026-10-30T22:13:53+11:00"
+ended = "2026-10-30T22:28:41+11:00"
+dollars = 0.084
+note = "b3080ti (night/b3080ti.log, machine 57056, $0.170/h)"
+
+[[session]]
+provider = "vast"
+instance = 58394639
+gpu = "RTX 3090"
+cpu = "18 cores"
+started = "2026-10-30T22:18:48+11:00"
+ended = "2026-10-30T22:27:48+11:00"
+dollars = 0.059
+note = "b3090 (night/b3090.log, machine 43803, $0.216/h)"
+
+[[session]]
+provider = "vast"
+instance = 58394667
+gpu = "RTX 4080S"
+cpu = "21 cores"
+started = "2026-10-30T22:19:18+11:00"
+ended = "2026-10-30T22:31:12+11:00"
+dollars = 0.048
+note = "b4080s (night/b4080s.log, machine 143795, $0.234/h)"
+
+[[session]]
+provider = "vast"
+instance = 58394953
+gpu = "RTX 3090"
+cpu = "24 cores"
+started = "2026-10-30T22:22:25+11:00"
+ended = "2026-10-30T22:31:43+11:00"
+dollars = 0.033
+note = "colA2 (night/colA2.log, machine 4749, $0.256/h)"
+
+[[session]]
+provider = "vast"
+instance = 58395010
+gpu = "RTX 3090"
+cpu = "18 cores"
+started = "2026-10-30T22:23:05+11:00"
+ended = "2026-10-30T22:36:05+11:00"
+dollars = 0.066
+note = "colA3 (night/colA3.log, machine 43803, $0.216/h)"
+
+[[session]]
+provider = "vast"
+instance = 58396188
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:36:55+11:00"
+ended = "2026-10-31T01:01:49+11:00"
+dollars = 0.238
+note = "colM1 (night/colM1.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58396228
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:37:16+11:00"
+ended = "2026-10-31T00:59:58+11:00"
+dollars = 0.237
+note = "colM2 (night/colM2.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58396916
+gpu = "RTX A4000"
+cpu = "24 cores"
+started = "2026-10-30T22:45:03+11:00"
+ended = "2026-10-31T00:40:09+11:00"
+dollars = 0.356
+note = "colM3 (night/colM3.log, machine 151558, $0.176/h)"
+
+[[session]]
+provider = "vast"
+instance = 58397636
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:51:59+11:00"
+ended = "2026-10-30T23:51:23+11:00"
+dollars = 0.110
+note = "spA (night/spA.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58397661
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:52:14+11:00"
+ended = "2026-10-30T23:56:08+11:00"
+dollars = 0.109
+note = "spB (night/spB.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58397686
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:52:29+11:00"
+ended = "2026-10-30T23:56:11+11:00"
+dollars = 0.108
+note = "spC (night/spC.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58397782
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-30T22:53:23+11:00"
+ended = "2026-10-31T01:31:05+11:00"
+dollars = 0.256
+note = "fsp (night/fsp.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58186040
+gpu = "RTX 3070"
+cpu = "unknown"
+started = "2026-10-29T12:00:00+11:00"
+ended = "2026-10-29T12:10:04+11:00"
+dollars = 0.014
+note = "mem2ta: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58195344
+gpu = "RTX 3070"
+cpu = "unknown"
+started = "2026-10-29T12:00:00+11:00"
+ended = "2026-10-29T12:03:46+11:00"
+dollars = 0.007
+note = "mem2pa: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58211383
+gpu = "RTX 3070"
+cpu = "unknown"
+started = "2026-10-29T12:00:00+11:00"
+ended = "2026-10-29T12:17:45+11:00"
+dollars = 0.035
+note = "mem2pc: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58211697
+gpu = "RTX 3060"
+cpu = "unknown"
+started = "2026-10-29T12:00:00+11:00"
+ended = "2026-10-29T12:26:34+11:00"
+dollars = 0.049
+note = "mem2pd: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58213138
+gpu = "RTX 3070"
+cpu = "unknown"
+started = "2026-10-29T12:00:00+11:00"
+ended = "2026-10-29T12:13:48+11:00"
+dollars = 0.036
+note = "mem2pc: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58393970
+gpu = "RTX 3090"
+cpu = "unknown"
+started = "2026-10-30T12:00:00+11:00"
+ended = "2026-10-30T12:02:38+11:00"
+dollars = 0.000
+note = "b3090: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58394036
+gpu = "RTX 3090"
+cpu = "unknown"
+started = "2026-10-30T12:00:00+11:00"
+ended = "2026-10-30T12:02:20+11:00"
+dollars = 0.000
+note = "b3090: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58394019
+gpu = "RTX 4080S"
+cpu = "unknown"
+started = "2026-10-30T12:00:00+11:00"
+ended = "2026-10-30T12:02:31+11:00"
+dollars = 0.000
+note = "b4080s: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58394111
+gpu = "RTX 4080S"
+cpu = "unknown"
+started = "2026-10-30T12:00:00+11:00"
+ended = "2026-10-30T12:01:58+11:00"
+dollars = 0.000
+note = "b4080s: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58394822
+gpu = "RTX 3090"
+cpu = "unknown"
+started = "2026-10-30T12:00:00+11:00"
+ended = "2026-10-30T12:05:56+11:00"
+dollars = 0.021
+note = "colA2: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+[[session]]
+provider = "vast"
+instance = 58394854
+gpu = "RTX 3090"
+cpu = "unknown"
+started = "2026-10-30T12:00:00+11:00"
+ended = "2026-10-30T12:05:24+11:00"
+dollars = 0.001
+note = "colA3: a try replaced straight away (setup failed, or Vast's 429s); its log was overwritten, so the GPU is from the label and the price, the times are the bill's hours from noon"
+
+
+[[session]]
+provider = "vast"
+instance = 58414115
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-31T01:38:30+11:00"
+ended = "2026-10-31T02:19:42+11:00"
+dollars = 0.076
+note = "chkOld (night/chkOld.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58414156
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-31T01:38:45+11:00"
+ended = "2026-10-31T02:22:21+11:00"
+dollars = 0.083
+note = "chkNew (night/chkNew.log, machine 34586, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58418714
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-31T02:23:29+11:00"
+ended = "2026-10-31T04:25:35+11:00"
+dollars = 0.201
+note = "colZ1 (night/colZ1.log, machine 38453, $0.088/h)"
+
+[[session]]
+provider = "vast"
+instance = 58418750
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-31T02:23:49+11:00"
+ended = "2026-10-31T04:13:49+11:00"
+dollars = 0.185
+note = "colZ2 (night/colZ2.log, machine 34586, $0.088/h)"
+

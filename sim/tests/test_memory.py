@@ -148,6 +148,37 @@ def test_whole_streams_learn_the_same_as_a_tick_at_a_time():
         assert torch.allclose(a, b, atol=1e-4)
 
 
+def test_steps_that_arent_live_are_left_out_and_nothing_live_changes():
+    """The dead and the unborn get no piece of their own, and what the living see, and learn from, stays the same."""
+    brain = shaken(Brain(**SHAPE).with_memory(6), seed=4)
+    torch.manual_seed(1)
+    seen = torch.randn(10, 5, SHAPE['width'], requires_grad=True)
+    start = torch.randn(5, 6)
+    live = torch.ones(10, 5, dtype=torch.bool)
+    live[:, 0] = False                      # never born
+    live[:4, 1] = False                     # born at step 4
+    live[6:, 2] = False                     # died at step 5
+    live[0, 3] = False                      # not there at the start, back from step 1
+    carry = live.float()
+    carry[7, 4] = 0                         # an episode ending, still alive
+    outs, notes = brain.remember_streams(seen, start, carry, live)
+    fast = torch.autograd.grad(outs[live].square().sum() + notes[live].sum(), [seen, brain.gru.weight_hh])
+
+    n, loop_outs, loop_notes = start, [], []
+    for t in range(10):
+        out, n = brain.remember(seen[t], n)
+        loop_outs.append(out)
+        loop_notes.append(n)
+        n = n * carry[t, :, None]
+    slow_outs, slow_notes = torch.stack(loop_outs), torch.stack(loop_notes)
+    slow = torch.autograd.grad(slow_outs[live].square().sum() + slow_notes[live].sum(), [seen, brain.gru.weight_hh])
+    assert torch.allclose(notes[live], slow_notes[live], atol=1e-5)
+    assert torch.allclose(outs[live], slow_outs[live], atol=1e-5)
+    assert (notes[~live] == 0).all()
+    for a, b in zip(fast, slow):
+        assert torch.allclose(a, b, atol=1e-4)
+
+
 def test_evals_carry_notes_and_can_wipe_them(tmp_path):
     cfg = load(DEFAULT.parent / 'solo.toml')
     cfg = replace(cfg, episode=replace(cfg.episode, seconds=3.0))
