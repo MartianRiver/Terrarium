@@ -108,6 +108,7 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
     assert record['samples'] == 256 and record['parent'] is None and 'finished' in record and record['id'] == run.id
     rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
     assert [r['update'] for r in rows] == [1, 2, 3, 4] and all(np.isfinite(r['policy_loss']) for r in rows)
+    assert all(0 < r['live_samples'] <= r['samples'] and 0 < r['live_share'] <= 1 for r in rows)
     assert sorted(p.name for p in (run.dir / 'checkpoints').iterdir()) == ['00000000128.pt', '00000000256.pt']
     evals = json.loads((run.dir / 'evals.json').read_text())
     assert set(evals) == {'checkpoint', 'random', 'brain', 'mean', 'sampled'}

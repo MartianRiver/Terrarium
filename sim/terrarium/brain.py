@@ -193,33 +193,39 @@ class Brain(nn.Module):
         notes = self.gru(out, notes)
         return out + self.recall(notes), notes
 
-    def remember_streams(self, moments: torch.Tensor, start: torch.Tensor,
-                         carry: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def remember_streams(self, moments: torch.Tensor, start: torch.Tensor, carry: torch.Tensor,
+                         live: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """remember() over whole streams (steps, n, width) from their starting notes, wiped after each step where
         carry is 0: what the heads see and the notes after each step, (steps, n, ...). A tick at a time is a few
         small GPU calls a tick, which made the update most of a memory run's time, so each stream is cut at its
-        wipes into pieces that start from blank notes and every piece goes through one GRU call."""
+        wipes into pieces that start from blank notes and every piece goes through one GRU call. Steps that aren't
+        live (the dead and the unborn) are left out and get blank notes, since nothing reads them."""
         steps, n = carry.shape
         if not self.memory:
             return moments, moments.new_zeros(steps, n, 0)
-        breaks = (carry[:-1] == 0).long()
-        counts = 1 + breaks.sum(0)
-        first = torch.cumsum(counts, 0) - counts
-        which = first[None] + torch.cat([breaks.new_zeros(1, n), torch.cumsum(breaks, 0)])
-        t = torch.arange(steps, device=carry.device)[:, None].expand(steps, n)
-        began = t.new_zeros(int(counts.sum()))
-        began.scatter_reduce_(0, which.flatten(), t.flatten(), 'amin', include_self=False)
-        at = t - began[which]
-        g = self.gru
-        with torch.autocast(moments.device.type, enabled=False):
-            x = moments.new_zeros(steps, len(began), moments.shape[-1], dtype=torch.float32)
-            x[at, which] = moments.float()
-            h = moments.new_zeros(1, len(began), self.memory, dtype=torch.float32)
-            h[0, first] = start.float()
-            # what nn.GRU runs, with the GRUCell's own weights (same layout), so the brain's weights don't change
-            out, _ = torch._VF.gru(x, h, [g.weight_ih, g.weight_hh, g.bias_ih, g.bias_hh],
-                                   True, 1, 0.0, self.training, False, False)
-            notes = out[at, which]
+        live = carry.new_ones(steps, n, dtype=torch.bool) if live is None else live.bool()
+        notes = moments.new_zeros(steps, n, self.memory, dtype=torch.float32)
+        if live.any():
+            # a piece starts at the first step and after each wipe; one starting at a step that isn't live would
+            # hold only that step, padded to the longest piece (in colony-young, 44 times the pieces needed)
+            begins = torch.cat([live.new_ones(1, n), carry[:-1] == 0]) & live
+            count = begins.sum(0)
+            piece = (torch.cumsum(count, 0) - count)[None] + torch.cumsum(begins.long(), 0) - 1
+            t = torch.arange(steps, device=carry.device)[:, None].expand(steps, n)
+            began = t.new_zeros(int(count.sum()))
+            began[piece[begins]] = t[begins]
+            which = piece[live]
+            at = t[live] - began[which]
+            g = self.gru
+            with torch.autocast(moments.device.type, enabled=False):
+                x = moments.new_zeros(int(at.max()) + 1, len(began), moments.shape[-1], dtype=torch.float32)
+                x[at, which] = moments[live].float()
+                h = moments.new_zeros(1, len(began), self.memory, dtype=torch.float32)
+                h[0, piece[0][begins[0]]] = start[begins[0]].float()
+                # what nn.GRU runs, with the GRUCell's own weights (same layout), so the brain's weights don't change
+                out, _ = torch._VF.gru(x, h, [g.weight_ih, g.weight_hh, g.bias_ih, g.bias_hh],
+                                       True, 1, 0.0, self.training, False, False)
+                notes[live] = out[at, which]
         return moments + self.recall(notes).to(moments.dtype), notes
 
     def heads(self, out: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

@@ -685,7 +685,8 @@ class World:
             gets = mine & (left > 1e-9)
             took = np.where(gets, np.minimum(bite, left), 0.0)
             self.store[:, c] -= took.sum(1)
-            self.energy[gets] += (gain * took / bite)[gets]
+            # a full young one's bite is 0, but it never gets one; dividing only where they do keeps numpy quiet
+            self.energy[gets] += (gain * np.divide(took, bite, out=np.zeros_like(took), where=gets))[gets]
             self.jelly[gets] += took[gets]
         np.clip(self.energy, 0, 1, out=self.energy)
 

@@ -188,7 +188,7 @@ MODES = ('drawn', 'mean', 'sampled')
 
 def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
                  watch: Callable[[Observation, np.ndarray, torch.Tensor], None] | None = None,
-                 wiped: bool = False) -> Callable[[World], Policy]:
+                 wiped: bool = False, wipe_every: float = 0.0) -> Callable[[World], Policy]:
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
     by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat. watch,
     if given, sees each observation it chose from and the actions it chose (mind.py)."""
@@ -212,13 +212,16 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
         noise = np.random.default_rng(SEED)
         held, ticks = None, 0
         notes = brain.blank(last.shape[0] * last.shape[1])
+        every = max(1, round(wipe_every / (world.cfg.dt * repeat))) if wipe_every else 0
 
         def act(w: World) -> np.ndarray:
             nonlocal last, held, ticks, notes
             if ticks % repeat == 0:
                 obs = observe(w, last)
-                # wiped, a brain with memory forgets everything before each choice: how much it leans on its notes
-                before = brain.blank(len(notes)) if wiped else notes
+                # wiped, a brain with memory forgets everything before each choice, which it never met in training
+                # and which can freeze it; wiped every few seconds, it gets to write its notes again in between
+                blank = wiped or (every and ticks // repeat % every == 0)
+                before = brain.blank(len(notes)) if blank else notes
                 mean, notes = brain.act(obs, sample=False, notes=before)
                 # the dead remember nothing, so a hatchling in their place starts blank
                 notes = notes * torch.from_numpy(w.alive.reshape(-1)).to(notes)[:, None]

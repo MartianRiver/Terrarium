@@ -212,7 +212,7 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
             extra = None
             with torch.autocast(device.type, torch.bfloat16, enabled=bf16):
                 mean, value, kept = replay(learner, me[:, mb], kinds[:, mb], rays[:, mb], start[mb], carry[:, mb],
-                                           keep=side is not None or closure is not None)
+                                           keep=side is not None or closure is not None, live=active[:, mb])
             if side:
                 assert kept is not None
                 lost = side.loss(kept[0], kept[1], carry[:, mb], active[:, mb])
@@ -233,13 +233,21 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
 
 
 def replay(learner: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor, start: torch.Tensor,
-           carry: torch.Tensor, keep: bool = False):
+           carry: torch.Tensor, keep: bool = False, live: torch.Tensor | None = None):
     """Streams (steps, n, ...) played again from their starting notes, kept where carry is 1: mean actions and
-    values, (steps * n, ...), and with keep, the moments and the notes after each step, (steps, n, ...)."""
+    values, (steps * n, ...), and with keep, the moments and the notes after each step, (steps, n, ...). Given
+    live, only those steps are sensed; the rest come back as placeholders."""
     steps, n = carry.shape
     # what each moment looks like doesn't depend on the notes, so that part runs for all steps at once
-    moments = learner.sense(me.flatten(0, 1), kinds.flatten(0, 1), rays.flatten(0, 1)).view(steps, n, -1)
-    outs, written = learner.remember_streams(moments, start, carry)
+    if live is None:
+        moments = learner.sense(me.flatten(0, 1), kinds.flatten(0, 1), rays.flatten(0, 1)).view(steps, n, -1)
+    else:
+        seen = live.flatten()
+        sensed = learner.sense(me.flatten(0, 1)[seen], kinds.flatten(0, 1)[seen], rays.flatten(0, 1)[seen])
+        moments = sensed.new_zeros(steps * n, sensed.shape[-1])
+        moments[seen] = sensed
+        moments = moments.view(steps, n, -1)
+    outs, written = learner.remember_streams(moments, start, carry, live)
     mean, value = learner.heads(outs.flatten(0, 1))
     return mean, value, ((moments, written) if keep else None)
 

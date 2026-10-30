@@ -171,8 +171,9 @@ def still(world: World):
 
 
 def last_seen(world: World):
-    """Peekaboo with a perfect memory and nothing else: walks to where it last had the berry in sight, and waits there
-    until it shows again. Wanders at random until it has seen one."""
+    """Peekaboo with a perfect memory and nothing else: walks to where it last had the berry in sight, and wanders at
+    random until it sees one. Once there it forgets the spot: it has eaten the berry or found it gone (waiting there
+    for good stood still for the rest of a game whenever the next berry landed out of sight)."""
     from .vision import FOOD, look
     spot = np.full((*world.alive.shape, 2), np.nan)
     wander = random_policy(world)
@@ -185,8 +186,9 @@ def last_seen(world: World):
         if out.shape[-1] < len(ACTIONS):
             out = np.concatenate([out, -np.ones((*out.shape[:-1], len(ACTIONS) - out.shape[-1]))], -1)
         d = spot - w.pos
-        known = ~np.isnan(d[..., 0])
         far = np.hypot(d[..., 0], d[..., 1]) > 0.3
+        spot[~far] = np.nan
+        known = ~np.isnan(spot[..., 0])
         want = (np.arctan2(d[..., 1], d[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
         out[..., 0] = np.where(known, np.where(far, np.where(np.abs(want) < 1, 1.0, 0.2), 0.0), out[..., 0])
         out[..., 1] = np.where(known, np.where(far, np.clip(want * 3, -1, 1), 0.0), out[..., 1])
@@ -239,8 +241,16 @@ def against(a: np.ndarray, b: np.ndarray) -> dict:
     return {'difference': float(d.mean()), 'low': lo, 'high': hi, 'apart': bool(lo > 0 or hi < 0)}
 
 
-def policy(name: str, wiped: bool = False) -> Make:
-    return BASELINES[name] if name in BASELINES else brain_policy(name, wiped=wiped)
+def policy(name: str, wiped: float | None = None) -> Make:
+    """wiped: None keeps a memory brain's notes, 0 blanks them before every choice, more blanks them that many
+    seconds apart."""
+    if name in BASELINES:
+        return BASELINES[name]
+    return brain_policy(name, wiped=wiped == 0, wipe_every=wiped or 0.0)
+
+
+def wiped_name(wiped: float | None) -> str:
+    return '' if wiped is None else ' wiped' if wiped == 0 else f' wiped every {wiped:g} s'
 
 
 def score_one(job: tuple) -> dict:
@@ -252,24 +262,41 @@ def score_one(job: tuple) -> dict:
 
 
 def score(game: str, players: list[str], world: str | None = None, episodes: int = EPISODES, seed: int = SEED,
-          wiped: bool = False, processes: int | None = None) -> dict:
+          wiped: bool = False, processes: int | None = None, wipe_every: float = 0.0) -> dict:
     """Every player (a brain's path, or a baseline's name) in every role, each in its own process."""
     default, roles = GAMES[game]
     world = world or str(config.DEFAULT.parent / default)
-    names = [(p, False) for p in players]
+    names: list[tuple[str, float | None]] = [(p, None) for p in players]
+    remembers = [p for p in players if p not in BASELINES and brain_memory(p)]
     if wiped:
-        names += [(p, True) for p in players if p not in BASELINES and brain_memory(p)]
+        names += [(p, 0.0) for p in remembers]
+    if wipe_every:
+        names += [(p, wipe_every) for p in remembers]
     jobs = [(game, role, p, w, world, episodes, seed) for p, w in names for role in roles]
     with mp.get_context('spawn').Pool(processes or min(len(jobs), max(1, (mp.cpu_count() or 2) - 1))) as pool:
         done = pool.map(score_one, jobs)
     out = {'game': game, 'world': world, 'seed': seed, 'episodes': episodes, 'players': {}}
     for (_, role, p, w, *_), values in zip(jobs, done):
-        out['players'].setdefault(p + (' wiped' if w else ''), {})[role] = values
+        out['players'].setdefault(p + wiped_name(w), {})[role] = values
     return out
 
 
 def brain_memory(path: str) -> int:
     return torch.load(path, weights_only=True).get('shape', {}).get('memory', 0)
+
+
+def labels(players: list[str]) -> dict[str, str]:
+    """A short name per player: its file name, or its run's folder where two brains share a file name (every run's
+    last checkpoint is named by its sample count)."""
+    paths = {p: Path(p.split(' wiped')[0]) for p in players}
+    files = [path.name for path in set(paths.values())]
+    out = {}
+    for p, path in paths.items():
+        name = path.name
+        if files.count(name) > 1:
+            name = path.parent.parent.name if path.parent.name == 'checkpoints' else str(path)
+        out[p] = name + p[len(str(path)):] if p.startswith(str(path)) else name
+    return out
 
 
 def report(result: dict) -> str:
@@ -280,20 +307,21 @@ def report(result: dict) -> str:
     head = ''.join(f'{f"{r}: {roles[r][1]} {"↑" if roles[r][2] > 0 else "↓"}":>34}' for r in roles)
     lines.append(f'{"":>32}{head}')
     first = next(iter(players))
+    label = labels(list(players))
     for name, got in players.items():
         cells = ''
         for r, (_, key, _) in roles.items():
             s = summary(np.array(got[r][key]))
             cells += f'{s["mean"]:>14.3f} [{s["low"]:.3f}, {s["high"]:.3f}]'.rjust(34)
-        lines.append(f'{Path(name).name[-32:]:>32}{cells}')
+        lines.append(f'{label[name][-32:]:>32}{cells}')
     for name, got in list(players.items())[1:]:
         cells = ''
         for r, (_, key, way) in roles.items():
             c = against(np.array(players[first][r][key]), np.array(got[r][key]))
             mark = ('better' if c['difference'] * way > 0 else 'worse') if c['apart'] else 'can’t tell'
             cells += f'{c["difference"]:+.3f} [{c["low"]:+.3f}, {c["high"]:+.3f}] {mark}'.rjust(34)
-        lines.append(f'{("vs " + Path(first).name)[-32:]:>32}' if name == list(players)[1] else '')
-        lines.append(f'{Path(name).name[-32:]:>32}{cells}')
+        lines.append(f'{("vs " + label[first])[-32:]:>32}' if name == list(players)[1] else '')
+        lines.append(f'{label[name][-32:]:>32}{cells}')
     return '\n'.join(l for l in lines if l)
 
 
@@ -306,12 +334,15 @@ def main():
     parser.add_argument('--config', help="the game's world (default: its nursery)")
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--held-out', action='store_true', help=f'seed {HELD_OUT} instead of {SEED}')
-    parser.add_argument('--wiped', action='store_true', help='also score brains with memory with their notes wiped')
+    parser.add_argument('--wiped', action='store_true',
+                        help='also score brains with memory with their notes wiped before every choice')
+    parser.add_argument('--wiped-every', type=float, default=0.0, metavar='SECONDS',
+                        help='also score brains with memory with their notes wiped this many seconds apart')
     parser.add_argument('--processes', type=int)
     parser.add_argument('--out', help='every episode\'s numbers as JSON')
     args = parser.parse_args()
     result = score(args.game, args.baseline + args.brain, args.config, args.episodes,
-                   HELD_OUT if args.held_out else SEED, args.wiped, args.processes)
+                   HELD_OUT if args.held_out else SEED, args.wiped, args.processes, args.wiped_every)
     print(report(result))
     if args.out:
         Path(args.out).write_text(json.dumps(result) + '\n')
