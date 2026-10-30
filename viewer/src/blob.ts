@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { COLONY_COLOURS, SIGNAL_COLOURS, SIGNAL_OFF_BULB, shimmer } from './palette';
 import { berryGeo, berryMat, leafGeo, leafMat } from './props';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SIGNAL_OFF, type CreatureState } from './world';
 
 // drawn at this scale its widest point (the arms) matches the sim's 0.45 m body
@@ -65,6 +66,17 @@ const BULB_GLOW = 0.8;
 // energy where starving starts to show, and where full does
 const HUNGRY_BELOW = 0.3;
 const FULL_ABOVE = 0.85;
+// stamina where tired starts to show ([tired]); the z's float up from one bar each
+const SLEEPY_BELOW = 0.35;
+const Z_COLOUR = 0xd9d4ff;
+const zGeo = mergeGeometries([
+  new THREE.BoxGeometry(0.1, 0.018, 0.018).translate(0, 0.05, 0),
+  new THREE.BoxGeometry(0.1, 0.018, 0.018).translate(0, -0.05, 0),
+  new THREE.BoxGeometry(0.13, 0.018, 0.018).rotateZ(Math.PI / 4),
+]);
+const zAt = new THREE.Vector3();
+const zTurn = new THREE.Quaternion();
+const zSize = new THREE.Vector3();
 // a full crop shows as a glowing jelly belly, like a honeypot ant's; this many fills it
 const CROP_FULL = 2;
 const AMBER = new THREE.Color(0xffb03a);
@@ -108,6 +120,10 @@ export class BlobView {
   private dash = 0;
   // young: big eyes, rosy cheeks, a short antenna and a toddler's wobbly waddle, arms out for balance
   private baby = 0;
+  // tired ([tired]): heavy lids, a slow slumped shuffle and a drooping antenna; resting, little z's float up
+  private sleepy = 0;
+  private dozing = 0;
+  private zs: { z: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
   private sheen = new THREE.Color();
 
   private seed = Math.random() * 100;
@@ -186,6 +202,19 @@ export class BlobView {
     this.berry.visible = false;
     this.body.add(this.berry);
 
+    for (let k = 0; k < 3; k++) {
+      const mat = new THREE.MeshBasicMaterial({ color: Z_COLOUR, transparent: true, opacity: 0, depthWrite: false });
+      const z = mesh(zGeo, mat, [0, 0, 0], 1, false);
+      // always faces the camera, or from behind it reads as an S
+      z.onBeforeRender = (_r, _s, camera) => {
+        z.matrixWorld.decompose(zAt, zTurn, zSize);
+        z.matrixWorld.compose(zAt, camera.quaternion, zSize);
+      };
+      z.visible = false;
+      this.zs.push({ z, mat });
+      this.root.add(z);
+    }
+
     this.root.add(this.body);
   }
 
@@ -206,6 +235,7 @@ export class BlobView {
     this.joy += (s.nectar > 0 ? 1 - this.joy : -this.joy) * ease;
     this.dash += (s.sprinting > 0 ? 1 - this.dash : -this.dash) * ease;
     this.baby += ((s.young > 0 ? 1 : 0) - this.baby) * ease;
+    this.sleepy += (Math.min(1, Math.max(0, 1 - s.stamina / SLEEPY_BELOW)) - this.sleepy) * Math.min(1, dt * 2);
     this.applyEnergy(s.energy, dt);
     this.animateWalk(s.speed / maxSpeed, dt, time);
     this.animateEyes(dt, time);
@@ -213,6 +243,7 @@ export class BlobView {
     this.applyCrop(s.carrying, dt);
     this.applyNectar(time);
     this.applyLoad(s.load, dt);
+    this.applyDoze(s.speed / maxSpeed, dt, time);
   }
 
   // picked up with a little pop, set down quickly
@@ -229,11 +260,11 @@ export class BlobView {
   private animateWalk(moving: number, dt: number, time: number) {
     moving = Math.min(1, Math.max(0, moving));
     // a starving blob shuffles
-    const spring = 1 - this.hunger * 0.6;
+    const spring = (1 - this.hunger * 0.6) * (1 - this.sleepy * 0.35);
     this.stride += ((moving > 0.08 ? (0.5 + moving * 0.5) * spring : 0) - this.stride) * Math.min(1, dt * 6);
 
     const before = Math.floor(this.phase / Math.PI);
-    if (this.stride > 0.02) this.phase += dt * (7 + 7 * moving) * (1 + 0.7 * this.dash) * (1 + 0.3 * this.baby);
+    if (this.stride > 0.02) this.phase += dt * (7 + 7 * moving) * (1 + 0.7 * this.dash) * (1 + 0.3 * this.baby) * (1 - 0.35 * this.sleepy);
     // a little squash on each footfall
     if (Math.floor(this.phase / Math.PI) !== before) this.squashVel -= 0.8 * this.stride;
 
@@ -257,13 +288,13 @@ export class BlobView {
 
     // waddle: lean into the walk, rock side to side with each step
     this.lean += ((moving * 0.08 + this.dash * 0.16) - this.lean) * Math.min(1, dt * 5);
-    this.body.rotation.x = this.lean;
+    this.body.rotation.x = this.lean + 0.1 * this.sleepy;
     const rock = Math.sin(this.phase) * (0.11 + 0.13 * this.baby) * this.stride;
     const most = 0.15 + 0.13 * this.baby;
     this.body.rotation.z = Math.max(-most, Math.min(most, -this.turn * 0.08 + rock));
 
     this.arms.forEach((arm, i) => {
-      arm.rotation.z = (i ? 1 : -1) * (0.2 + 0.45 * this.baby) * (1 - this.hunger * 0.7);
+      arm.rotation.z = (i ? 1 : -1) * (0.2 + 0.45 * this.baby) * (1 - this.hunger * 0.7) * (1 - this.sleepy * 0.5);
       // arms swing against the feet
       arm.rotation.x = Math.cos(this.phase + (i + 1) * Math.PI) * 0.6 * this.stride;
     });
@@ -273,7 +304,7 @@ export class BlobView {
     });
 
     this.stalk.rotation.z = Math.sin(time * 3 + this.seed) * 0.08 + this.turn * 0.05;
-    this.stalk.rotation.x = 0.3 + this.hunger * 0.9;
+    this.stalk.rotation.x = 0.3 + this.hunger * 0.9 + this.sleepy * 0.7;
     this.stalk.scale.setScalar(1 - 0.35 * this.baby);
     this.tail.scale.setScalar(1 - 0.4 * this.baby);
     // the tail wags with the steps, idles slowly and droops when starving
@@ -284,14 +315,15 @@ export class BlobView {
   private animateEyes(dt: number, time: number) {
     this.blinkIn -= dt;
     if (this.blinkIn <= 0) {
-      this.blinkLeft = 0.13;
+      // tired blinks are slow ones
+      this.blinkLeft = 0.13 + 0.45 * this.sleepy;
       this.blinkIn = 2 + Math.random() * 4;
     }
     this.blinkLeft = Math.max(0, this.blinkLeft - dt);
     // heavy lids when starving
     const open = 0.085;
     // happy eyes squeeze up into crescents
-    const eyeHeight = (this.blinkLeft > 0 ? open * 0.12 : open * (1 - this.hunger * 0.5)) * (1 - 0.6 * this.joy);
+    const eyeHeight = (this.blinkLeft > 0 ? open * 0.12 : open * (1 - this.hunger * 0.5) * (1 - this.sleepy * 0.6)) * (1 - 0.6 * this.joy);
 
     // the glints lead into the turn, with a little idle wander
     const lookX = (Math.max(-0.35, Math.min(0.35, -this.turn * 0.15)) + Math.sin(time * 0.7 + this.seed) * 0.08) * 0.15;
@@ -312,6 +344,18 @@ export class BlobView {
     // duller as energy falls, grey when starving
     this.skin.color.copy(this.tint).lerp(grey, (1 - e) * 0.3 + this.hunger * 0.45);
     this.limbs.color.copy(this.skin.color);
+  }
+
+  // tired and standing still: z's drift up from the crown, one after another
+  private applyDoze(moving: number, dt: number, time: number) {
+    this.dozing += ((this.sleepy > 0.2 && moving < 0.1 ? this.sleepy : 0) - this.dozing) * Math.min(1, dt * 3);
+    this.zs.forEach(({ z, mat }, k) => {
+      const t = (time * 0.55 + this.seed + k / 3) % 1;
+      z.visible = this.dozing > 0.02;
+      z.position.set(0.18 + 0.16 * t, 0.95 + 0.55 * t, -0.05);
+      z.scale.setScalar(0.5 + 0.7 * t);
+      mat.opacity = this.dozing * Math.sin(Math.PI * t) * 0.9;
+    });
   }
 
   private applyCrop(carrying: number, dt: number) {

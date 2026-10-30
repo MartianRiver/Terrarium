@@ -124,6 +124,30 @@ def test_the_update_replays_each_stream_as_it_was_played():
     assert np.allclose(logp[live], roll.logprobs.reshape(-1)[live], atol=1e-4)
 
 
+def test_whole_streams_learn_the_same_as_a_tick_at_a_time():
+    """One GRU call over the pieces between wipes gives the notes, and the gradients, of stepping a tick at a time."""
+    brain = shaken(Brain(**SHAPE).with_memory(6), seed=3)
+    torch.manual_seed(0)
+    seen = torch.randn(9, 4, SHAPE['width'], requires_grad=True)
+    start = torch.randn(4, 6)
+    carry = torch.ones(9, 4)
+    carry[2, 0] = carry[3, 0] = carry[6, 2] = carry[8, 3] = 0
+    outs, notes = brain.remember_streams(seen, start, carry)
+    fast = torch.autograd.grad(outs.square().sum() + notes.sum(), [seen, brain.gru.weight_hh])
+
+    n, loop_outs, loop_notes = start, [], []
+    for t in range(9):
+        out, n = brain.remember(seen[t], n)
+        loop_outs.append(out)
+        loop_notes.append(n)
+        n = n * carry[t, :, None]
+    slow_outs, slow_notes = torch.stack(loop_outs), torch.stack(loop_notes)
+    slow = torch.autograd.grad(slow_outs.square().sum() + slow_notes.sum(), [seen, brain.gru.weight_hh])
+    assert torch.allclose(notes, slow_notes, atol=1e-5) and torch.allclose(outs, slow_outs, atol=1e-5)
+    for a, b in zip(fast, slow):
+        assert torch.allclose(a, b, atol=1e-4)
+
+
 def test_evals_carry_notes_and_can_wipe_them(tmp_path):
     cfg = load(DEFAULT.parent / 'solo.toml')
     cfg = replace(cfg, episode=replace(cfg.episode, seconds=3.0))

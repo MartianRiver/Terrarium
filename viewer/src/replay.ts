@@ -96,6 +96,7 @@ function readFrame(o: Obj, where: string): Frame {
         sprinting: c.sprinting === undefined ? 0 : int(c, 'sprinting', w),
         load: c.load === undefined ? 0 : int(c, 'load', w),
         young: c.young === undefined ? 0 : num(c, 'young', w),
+        stamina: c.stamina === undefined ? 1 : num(c, 'stamina', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {

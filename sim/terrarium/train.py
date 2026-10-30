@@ -32,7 +32,7 @@ from .brain import SHAPE, Brain, brain_id, save
 from .brain import load as load_brain
 from .config import DEFAULT, TRAIN, load, load_train
 from .log import Logger
-from .ppo import Side, advantages, update
+from .ppo import Closure, Side, advantages, update
 from .rollouts import Collector, OnDevice
 from .runs import ROOT, Run, cpu_quota
 from .usage import Sampler
@@ -99,6 +99,12 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
             raise ValueError('[ppo] side is a job for memory: train with --memory')
         side = Side(learner.memory, learner.shape['width'], ppo.side_back).to(device)
         optimizers[0].add_param_group({'params': list(side.parameters())})
+    closure = None
+    if ppo.closure:
+        if not learner.memory or not world_cfg.arena.maze:
+            raise ValueError('[ppo] closure is a job for memory in a maze: train with --memory in a maze world')
+        closure = Closure(learner.memory).to(device)
+        optimizers[0].add_param_group({'params': list(closure.parameters())})
     # the same weights, compiled for the update; minibatch sizes change with how many are alive, hence dynamic
     models = [cast(Brain, torch.compile(b, dynamic=True)) if fast else b for b in brains]
     worlds = [(c, n) for _, c, n in mixed]
@@ -139,7 +145,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
                     stats |= got
                 stats |= {f'{key}_{k}': v for key, v in (got | rollouts.by_brain[k].take()).items()}
         else:
-            stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast, side=side)
+            stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast, side=side, closure=closure)
         done = time.perf_counter()
         sampler.into(None)
 

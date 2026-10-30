@@ -14,12 +14,15 @@
 # Running out of time is an end like any other unless [ppo] bootstrap is on: then a
 # creature cut off alive is marked in `cut` and its last look kept in `final`, so the
 # learner can carry on its value instead of teaching it that time running out is death.
+#
+# `hint` is a label per sample for a side job, never seen by the brain: in a maze, whether
+# the creature has been in this room before (maze.Visits); 0 in other worlds.
 
 from dataclasses import dataclass
 
 import numpy as np
 
-from . import night, vision
+from . import maze, night, vision
 from .fun import Fun
 from .config import Config, Reward, Train
 from .vision import directions, look
@@ -61,7 +64,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    world.tag.mask() if world.tag else np.zeros(store.shape),
                    *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
                      if world.seek else (np.zeros(store.shape),) * 2),
-                   *flag_senses(world, store.shape)], -1)
+                   *flag_senses(world, store.shape), world.stamina], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape
@@ -92,6 +95,8 @@ class Forage:
         # after a step where arenas ran out of time: which samples were cut off alive, and where they got to
         self.cut = np.zeros(self.samples, bool)
         self.final: Observation | None = None
+        self.visits = maze.Visits(self.world) if cfg.arena.maze else None
+        self.hint = np.zeros(self.samples, np.float32)
 
     @property
     def samples(self) -> int:
@@ -150,6 +155,9 @@ class Forage:
         if self.fun:
             self.fun.reset(ended)
         self.last[ended] = 0
+        if self.visits:
+            self.visits.reset(ended)
+            self.hint = self.visits.update()
         return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
 
     def _stagger(self, arenas: np.ndarray):

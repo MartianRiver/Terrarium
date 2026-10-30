@@ -29,6 +29,7 @@ class Rollout:
     rewards: np.ndarray
     dones: np.ndarray     # this step ended the episode; the next observation is a fresh start
     active: np.ndarray    # the creature was alive to act; the dead wait for their arena to start over
+    hints: np.ndarray     # a side job's label for what was seen (Forage.hint)
     notes: np.ndarray     # (1, samples, memory): each stream's notes at the rollout's start
 
 
@@ -81,6 +82,7 @@ def collect(env: Forage, actor: Brain, steps: int, obs: Observation, episodes: E
             keep['values'].append(value.numpy())
             active = env.active
             keep['active'].append(active)
+            keep['hints'].append(env.hint)
             obs, reward, done, _ = env.step(action.numpy())
             episodes.add(reward, done, active)
             if env.final is not None:
@@ -131,10 +133,29 @@ class Side(nn.Module):
         return err[whole].mean()
 
 
+class Closure(nn.Module):
+    """A side job for a brain with memory in a maze: from its notes, say whether it has been in this room before
+    (loop closure, which helped agents learn mazes in Mirowski et al. 2016). Only memory can answer it, so it pays the
+    notes for keeping where they've been. Like Side, kept out of the brain and thrown away after training."""
+
+    def __init__(self, memory: int):
+        super().__init__()
+        self.guess = nn.Linear(memory, 1)
+
+    def loss(self, notes: torch.Tensor, hints: torch.Tensor, active: torch.Tensor) -> tuple[torch.Tensor, float]:
+        """notes and hints (steps, n, ...): the error over the living, and the share it gets right."""
+        if not active.any():
+            return notes.new_zeros(()), 0.0
+        logit = self.guess(notes[active].float()).squeeze(-1)
+        target = hints[active].float()
+        right = ((logit > 0) == (target > 0.5)).float().mean().item()
+        return nn.functional.binary_cross_entropy_with_logits(logit, target), right
+
+
 def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray, returns: np.ndarray,
-           cfg: PPO, bf16: bool = False, side: Side | None = None) -> dict:
+           cfg: PPO, bf16: bool = False, side: Side | None = None, closure: Closure | None = None) -> dict:
     if learner.memory:
-        return update_streams(learner, optimizer, roll, adv, returns, cfg, bf16, side)
+        return update_streams(learner, optimizer, roll, adv, returns, cfg, bf16, side, closure)
     device = next(learner.parameters()).device
 
     # only what living creatures did; the dead's samples are placeholders
@@ -161,7 +182,8 @@ def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv:
 
 
 def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray,
-                   returns: np.ndarray, cfg: PPO, bf16: bool = False, side: Side | None = None) -> dict:
+                   returns: np.ndarray, cfg: PPO, bf16: bool = False, side: Side | None = None,
+                   closure: Closure | None = None) -> dict:
     """update() for a brain with memory: minibatches of whole streams, each replayed in order from its starting
     notes, the notes kept or wiped as they were while collecting. Only living creatures' choices count."""
     device = next(learner.parameters()).device
@@ -179,6 +201,10 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
     seen: dict[str, list[float]] = {'policy_loss': [], 'value_loss': [], 'entropy': [], 'kl': [], 'clipped': []}
     if side:
         seen['side_loss'] = []
+    if closure:
+        # right against base: how often "been here" is the answer, which always saying the commoner one gets
+        seen['closure_loss'], seen['closure_right'], seen['closure_base'] = [], [], []
+    hints = put(roll.hints) if closure else None
     for _ in range(cfg.epochs):
         order = torch.randperm(streams, device=device)
         for first in range(0, size * cfg.minibatches, size):
@@ -186,11 +212,19 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
             extra = None
             with torch.autocast(device.type, torch.bfloat16, enabled=bf16):
                 mean, value, kept = replay(learner, me[:, mb], kinds[:, mb], rays[:, mb], start[mb], carry[:, mb],
-                                           keep=side is not None)
+                                           keep=side is not None or closure is not None)
             if side:
-                extra = side.loss(*kept, carry[:, mb], active[:, mb])
-                seen['side_loss'].append(extra.item())
-                extra = cfg.side * extra
+                assert kept is not None
+                lost = side.loss(kept[0], kept[1], carry[:, mb], active[:, mb])
+                seen['side_loss'].append(lost.item())
+                extra = cfg.side * lost
+            if closure:
+                assert kept is not None and hints is not None
+                lost, right = closure.loss(kept[1], hints[:, mb], active[:, mb])
+                seen['closure_loss'].append(lost.item())
+                seen['closure_right'].append(right)
+                seen['closure_base'].append(hints[:, mb][active[:, mb]].mean().item())
+                extra = cfg.closure * lost + (extra if extra is not None else 0)
             live = active[:, mb].flatten()
             pick = lambda x: x[:, mb].flatten(0, 1)[live]
             step(learner, optimizer, cfg, seen, mean[live], value[live], pick(actions), pick(old_logp),
@@ -205,14 +239,9 @@ def replay(learner: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Te
     steps, n = carry.shape
     # what each moment looks like doesn't depend on the notes, so that part runs for all steps at once
     moments = learner.sense(me.flatten(0, 1), kinds.flatten(0, 1), rays.flatten(0, 1)).view(steps, n, -1)
-    notes, outs, written = start, [], []
-    for t in range(steps):
-        out, notes = learner.remember(moments[t], notes)
-        outs.append(out)
-        written.append(notes)
-        notes = notes * carry[t, :, None]
-    mean, value = learner.heads(torch.stack(outs).flatten(0, 1))
-    return mean, value, ((moments, torch.stack(written)) if keep else None)
+    outs, written = learner.remember_streams(moments, start, carry)
+    mean, value = learner.heads(outs.flatten(0, 1))
+    return mean, value, ((moments, written) if keep else None)
 
 
 def step(learner: Brain, optimizer: torch.optim.Optimizer, cfg: PPO, seen: dict[str, list[float]],
