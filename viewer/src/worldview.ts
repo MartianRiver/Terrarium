@@ -20,8 +20,6 @@ const log = createLogger('worldview');
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
-// how much smaller a just-hatched young Terrikin is drawn than a grown one ([young] worlds)
-const YOUNG_SMALLER = 0.35;
 
 function nearest(creatures: CreatureState[], at: { x: number; y: number }) {
   let best: CreatureState | undefined;
@@ -114,8 +112,10 @@ export class WorldView {
       s.heading = lerpAngle(p.heading, c.heading, alpha);
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
-      // the young are drawn smaller, growing up through their youth
-      s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha) * (1 - YOUNG_SMALLER * lerp(p.young, c.young, alpha));
+      // a signal changes where the bodies arrive, not as they set off: a tag lights the new it's bulb when they touch
+      s.signal = p.signal;
+      // drawn the size of its body, so bumping and tagging look like touching (the young too: their bodies are full size)
+      s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha);
       if (c.id === followed) {
         this.focus = { x: s.x, y: s.y, heading: s.heading };
         this.focusId = c.id;

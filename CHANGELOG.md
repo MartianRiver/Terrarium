@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+A tag looks like a touch: babies are drawn the size of their bodies (they were drawn a third smaller, so two whose bodies touched stood a hand apart on screen), and a bulb lights when the bodies arrive rather than as they set off. Tag-backs come back after a wait of their own (`[tag] back`, 4 s in the tag worlds, against 2 s for anyone else), so whoever tags gets a head start to run; negative keeps the old rule of never.
+
 The action camera glides instead of shaking: it slides, turns and pulls back on springs, zooms out quickly but back in slowly so a chase doesn't breathe in and out, turns to a smoothed angle rather than in bursts, and near the glass no longer flickers between two distances every frame.
 
 Watching a nursery game follows the action: in tag, hide-and-seek and peekaboo the camera watches whoever's it and the one it's after, the hiders during the count and then the nearest seeker and hider, or the berry and whoever's nearest it, from behind the one acting and high enough to see who's behind a block. The site's channel starts that way. `[ppo] coins_for` aims the coin bonus at named coins. `[ppo] side` gives a brain with memory a side job while it trains: from its notes, say what it made of the moment `side_back` choices ago. `configs/nursery-seek-cover.toml` is hide-and-seek with more cover and a longer count. `train --rivals ... --fixed-seats` keeps each colony on its own brain, for a game whose sides differ.
