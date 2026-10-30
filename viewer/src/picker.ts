@@ -8,8 +8,12 @@ const CHANNEL = '/replays/nursery/index.json';
 const GALLERY = '/replays/gallery/index.json';
 // the channel's publisher rewrites its index every 10 min while anything trains
 const LIVE_MS = 40 * 60_000;
+// training now: newer brains turn up while you watch; on hold: its newest brain plays, but nothing's training it
+const LIVE = 'training now';
+const HELD = 'on hold';
 
-interface Game { name: string; kind: string; goal: string }
+// training: the publisher's word on whether this game's line is training right now (older indexes don't say)
+interface Game { name: string; kind: string; goal: string; training?: boolean }
 interface Item { game?: string; samples?: number; brain?: string; score?: { label: string; value: number } }
 interface Channel { updated: string; games?: Record<string, Game>; items: Item[] }
 interface Brain {
@@ -56,16 +60,16 @@ function games(c: Channel): Choice[] {
     const best = c.items.filter((i) => i.game === key).sort((a, b) => (b.samples ?? 0) - (a.samples ?? 0))[0];
     const score = best.score ? ` Its newest brain: ${best.score.label.toLowerCase()} ${Math.round(best.score.value * 100)}%.` : '';
     return {
-      when, title: g.name, tag: live && g.kind !== 'fixed since' ? 'training now' : g.kind,
+      when, title: g.name, tag: g.kind === 'fixed since' ? g.kind : (g.training ?? live) ? LIVE : HELD,
       text: `${g.goal}${score}`,
-      href: `/watch/?channel=${CHANNEL}&game=${encodeURIComponent(key)}&follow`,
+      href: `/watch/?channel=${CHANNEL}&game=${encodeURIComponent(key)}`,
     };
   });
   if (keys.length > 1) {
     out.unshift({
-      when: when + 1, title: 'All the nursery games, in turn', tag: live ? 'training now' : 'nursery',
+      when: when + 1, title: 'All the nursery games, in turn', tag: keys.some((k) => c.games![k].training ?? live) ? LIVE : HELD,
       text: 'Small worlds where baby Terrikins can’t go hungry, learning kids’ games. One replay after another, newest brains as they come.',
-      href: `/watch/?channel=${CHANNEL}&follow`,
+      href: `/watch/?channel=${CHANNEL}`,
     });
   }
   return out;
@@ -100,8 +104,10 @@ function brains(g: Gallery): Choice[] {
 export class Picker {
   private box = document.createElement('dialog');
 
-  constructor(parent: HTMLElement) {
+  // onDismiss: closed without picking anything
+  constructor(parent: HTMLElement, onDismiss?: () => void) {
     this.box.id = 'picker';
+    if (onDismiss) this.box.addEventListener('close', onDismiss);
     this.box.setAttribute('aria-label', 'What to watch');
     this.box.addEventListener('click', (e) => { if (e.target === this.box) this.box.close(); });
     parent.append(this.box);
@@ -118,7 +124,7 @@ export class Picker {
       const a = document.createElement('a');
       a.href = c.href;
       a.append(el('b', c.title));
-      if (c.tag) a.append(el('span', c.tag, 'picker-tag'));
+      if (c.tag) a.append(el('span', c.tag, c.tag === LIVE ? 'picker-tag live' : c.tag === HELD ? 'picker-tag held' : 'picker-tag'));
       a.append(el('span', c.text, 'picker-text'), el('span', ago(c.when), 'picker-when'));
       li.append(a);
       list.append(li);
@@ -131,7 +137,9 @@ export class Picker {
     more.textContent = 'Every brain, and how they got here';
     const foot = el('p', '', 'picker-foot');
     foot.append(close, more);
-    this.box.replaceChildren(el('h2', 'What do you want to watch?'),
+    const key = el('p', '', 'picker-key');
+    key.append(el('span', LIVE, 'picker-tag live'), ' newer brains turn up while you watch · ', el('span', HELD, 'picker-tag held'), ' its newest brain, not training right now');
+    this.box.replaceChildren(el('h2', 'What do you want to watch?'), key,
       choices.length ? list : el('p', 'Nothing to pick from right now, so here’s the garden.', 'picker-note'), foot);
   }
 }

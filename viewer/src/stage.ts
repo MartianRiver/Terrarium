@@ -26,6 +26,7 @@ const SWING_RATE = 3;
 const INTRO = new THREE.Vector3(16, 15, 47);
 const DRIFT_TURN = 0.05;
 const UP = new THREE.Vector3(0, 1, 0);
+const ORIGIN = new THREE.Vector3();
 // the action camera (aim) moves on springs, so a tag or a new pair glides rather than jerks: how stiff its slide to
 // the shot is, its turn and tilt, and its pull-back (out quickly, in slowly, so a chase doesn't breathe in and out)
 const AIM_FOLLOW = 2.5;
@@ -44,6 +45,12 @@ const AIM_NEAR = 9;
 const AIM_FAR = 15;
 // and it stays this far inside the glass dome, so the dome's frame never cuts across the view
 const AIM_INSIDE = 1.5;
+// the wide shot: the whole arena, its long side across the screen, looking down this steeply, pulled back until every
+// corner (and a margin for the hedges) fits inside this much of the screen; it eases there at WIDE_RATE
+const WIDE_TILT = 0.72;
+const WIDE_MARGIN = 0.8;
+const WIDE_FIT = 0.92;
+const WIDE_RATE = 2;
 
 // lite (&lite) draws for a cool laptop: one pixel per point, no antialiasing, shadows or bloom
 // turn (radians) swings the close-up round the blob it follows, so a reel can see a face coming its way
@@ -80,6 +87,11 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
   let rig: { vx: number; vz: number; fx: number; fz: number } | null = null;
   let arm: { yaw: number; tilt: number; length: number; vyaw: number; vtilt: number; vlength: number } | null = null;
   controls.addEventListener('start', () => { handsOff = performance.now() + HANDS_OFF_MS; });
+  // the wide shot's place for this arena and screen shape, worked out again when either changes
+  let arena = { width: 20, height: 20 };
+  let widePos: THREE.Vector3 | null = null;
+  const probe = new THREE.PerspectiveCamera();
+  const corner = new THREE.Vector3();
 
   const ambient = new THREE.HemisphereLight(GARDEN.skyLight, GARDEN.groundLight, 1.45);
   scene.add(ambient);
@@ -114,8 +126,34 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
     return lo;
   }
 
+  function fitWide() {
+    const hx = arena.width / 2 + WIDE_MARGIN, hz = arena.height / 2 + WIDE_MARGIN;
+    // camera on the +z side puts the arena's width across the screen, on the +x side its height
+    const yaw = (arena.width >= arena.height) === (camera.aspect >= 1) ? Math.PI / 2 : 0;
+    const dir = new THREE.Vector3(Math.cos(yaw) * Math.cos(WIDE_TILT), Math.sin(WIDE_TILT), Math.sin(yaw) * Math.cos(WIDE_TILT));
+    probe.copy(camera);
+    const fits = (d: number) => {
+      probe.position.copy(dir).multiplyScalar(d);
+      probe.lookAt(0, 0, 0);
+      probe.updateMatrixWorld();
+      for (const x of [-hx, hx]) for (const y of [0, WALL]) for (const z of [-hz, hz]) {
+        corner.set(x, y, z).project(probe);
+        if (Math.abs(corner.x) > WIDE_FIT || Math.abs(corner.y) > WIDE_FIT) return false;
+      }
+      return true;
+    };
+    let lo = 4, hi = 150;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    return dir.multiplyScalar(hi);
+  }
+
   function resize() {
     const w = container.clientWidth, h = container.clientHeight;
+    widePos = null;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
@@ -138,6 +176,8 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
       }
       garden = buildGarden(info);
       dome = domeRadius(info) - AIM_INSIDE;
+      arena = { width: info.width, height: info.height };
+      widePos = null;
       scene.add(garden.group);
       sun = null;
       garden.group.traverse((o) => { if (o instanceof THREE.DirectionalLight) sun = o; });
@@ -161,10 +201,18 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
       controls.target.z += dz;
       camera.position.x += dx;
       camera.position.z += dz;
-      if (swinging <= 0) return;
-      swinging -= dt;
-      offset.subVectors(camera.position, controls.target).lerp(close ? closeUp : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
-      camera.position.addVectors(controls.target, offset);
+      if (swinging > 0) {
+        swinging -= dt;
+        offset.subVectors(camera.position, controls.target).lerp(close ? closeUp : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
+        camera.position.addVectors(controls.target, offset);
+      }
+      // close behind a Terrikin by the edge, closer in rather than out through the glass
+      if (!at || !close) return;
+      offset.subVectors(camera.position, controls.target);
+      const length = offset.length();
+      offset.divideScalar(length);
+      const most = Math.max(3.5, room(offset.x, offset.y, offset.z));
+      if (length > most) camera.position.copy(controls.target).addScaledVector(offset, most);
     },
     // the action camera: glides to the shot, then turns to look from behind the one acting and pulls back to fit what
     // it's after, unless someone has just moved the view by hand
@@ -216,6 +264,21 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
         arm.vlength = Math.min(0, arm.vlength);
       }
       camera.position.copy(t).addScaledVector(offset, arm.length);
+    },
+    // the wide shot: eases to the whole arena on screen, unless someone has just moved the view by hand
+    wide(dt: number) {
+      drifting = false;
+      swinging = 0;
+      rig = arm = null;
+      if (performance.now() < handsOff) return;
+      widePos ??= fitWide();
+      const k = Number.isFinite(dt) ? 1 - Math.exp(-dt * WIDE_RATE) : 1;
+      controls.target.lerp(ORIGIN, k);
+      camera.position.lerp(widePos, k);
+    },
+    // a new camera mode takes over at once, whoever last touched the view
+    release() {
+      handsOff = 0;
     },
     // 1 by day, 0 at night
     light(level: number) {
