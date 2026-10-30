@@ -396,7 +396,7 @@ class World:
         if self.seek:
             self.seek.step()
         if self.flags:
-            self.flags.step()
+            self.flags.step(unload)
         if self.peek:
             self.peek.step()
         # eating on the tick it would have run out still saves it

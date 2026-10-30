@@ -10,7 +10,7 @@ const HZ = 20;
 const egg: EggState = { id: 40, colony: 1, x: 2, y: -1, progress: 0.5 };
 const blob: CreatureState = { id: 40, colony: 1, x: 2, y: -1, heading: 0, speed: 0, size: 1, energy: 0.8, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0 };
 const frame = (tick: number, eggs: EggState[], creatures: CreatureState[] = []): Frame =>
-  ({ tick, creatures, food: [], blocks: [], stores: [], light: 1, eggs, flowers: [] });
+  ({ tick, creatures, food: [], blocks: [], stores: [], light: 1, eggs, flowers: [], flags: [] });
 
 test('an egg hatches into the Terrikin with its id, which grows to full size', () => {
   const scene = new THREE.Scene();

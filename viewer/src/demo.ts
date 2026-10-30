@@ -223,6 +223,7 @@ export function createDemo(seed = 7) {
       light: 1,
       eggs: [],
       flowers: [],
+      flags: [],
     };
   }
 

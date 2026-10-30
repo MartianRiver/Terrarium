@@ -56,10 +56,6 @@ def frame(world: World, a: int) -> dict:
         # it lights its bulb
         for c, it in zip(creatures, world.tag.mask()[a][born]):
             c['signal'] = 0 if it else -1
-    if world.flags:
-        # a flag rides on its carrier's head, where a carried berry goes
-        for c, flag in zip(creatures, world.flags.carrying()[a][born]):
-            c['load'] = int(flag)
     if world.seek:
         # seekers light their bulbs while they count
         counting = world.seek.waiting()[a] > 0
@@ -90,6 +86,11 @@ def frame(world: World, a: int) -> dict:
     out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
     if cfg.night.on:
         out['light'] = _r(world.light()[a])
+    if world.flags:
+        where = world.flags.where()[a]
+        out['flags'] = [{'colony': t, 'x': _r(where[t, 0]), 'y': _r(where[t, 1]), 'down': int(world.flags.down[a, t]),
+                         'carrier': int(world.creature_id[a, c]) if (c := world.flags.carrier[a, t]) >= 0 else -1}
+                        for t in range(2)]
     if cfg.flowers.on:
         out['flowers'] = [{'id': int(world.flower_id[a, f]), 'x': _r(world.flower_pos[a, f, 0]), 'y': _r(world.flower_pos[a, f, 1])}
                           for f in np.flatnonzero(world.flowers_open[a])]

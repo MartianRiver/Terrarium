@@ -228,6 +228,9 @@ class Seek:
 class Flag:
     points: float
     pickup: float
+    steal: bool     # a touch takes the flag off its carrier, rather than sending it home
+    guard: float    # seconds a new carrier can't be robbed
+    lie: float      # seconds a flag that's been put down waits before going home
 
     @property
     def on(self) -> bool:
@@ -407,7 +410,7 @@ SINCE = {'arena': {'scatter': 0.0},
          'young': {'seconds': 0.0, 'speed': 1.0, 'energy': 1.0, 'start': False},
          'tag': {'reach': 0.0, 'cooldown': 0.0, 'points': 0.0, 'speed': 1.0, 'back': -1.0},
          'seek': {'prep': 0.0, 'points': 0.0},
-         'flag': {'points': 0.0, 'pickup': 0.0},
+         'flag': {'points': 0.0, 'pickup': 0.0, 'steal': False, 'guard': 0.0, 'lie': 0.0},
          'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False, 'again': 0.0, 'flash': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
          'food': {'middle': 0},

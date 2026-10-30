@@ -9,6 +9,7 @@ import { Eggs } from './eggs';
 import { type Box, Grips, type Holder } from './grips';
 import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
+import { Flags } from './flags';
 import { Flowers } from './nectar';
 import { BlockView, FoodView } from './props';
 import type { Pose } from './sightfan';
@@ -53,6 +54,7 @@ export class WorldView {
   private grips: Grips;
   private eggs: Eggs;
   private flowers: Flowers;
+  private flags: Flags;
   private dust: Dust;
 
   constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
@@ -61,6 +63,7 @@ export class WorldView {
     this.grips = new Grips(scene);
     this.eggs = new Eggs(scene, info.tickHz);
     this.flowers = new Flowers(scene, info.tickHz);
+    this.flags = new Flags(scene);
     this.dust = new Dust(scene);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
@@ -100,6 +103,7 @@ export class WorldView {
     if (!this.frame) return;
     this.eggs.render(this.frame.tick, alpha, time);
     const holders: Holder[] = [];
+    const poses = new Map<number, Pose>();
     // a chosen Terrikin that has left the world (its place taken by a hatchling) can't be followed
     if (this.chosen !== null && !this.blobs.has(this.chosen)) this.chosen = null;
     const followed = this.chosen ?? this.frame.creatures[0]?.id;
@@ -128,6 +132,7 @@ export class WorldView {
       if (blob.root.visible) blob.update(s, this.info.maxSpeed, dt, time);
       if (blob.root.visible && blob.sprinting) this.dust.kick(c.id, s.x, s.y, s.heading, dt, time, c.nectar > 0);
       if (c.holding && blob.root.visible) holders.push({ x: s.x, y: s.y, colony: c.colony });
+      poses.set(c.id, { x: s.x, y: s.y, heading: s.heading });
     }
     const boxes: Box[] = [];
     for (const b of this.frame.blocks) {
@@ -141,6 +146,7 @@ export class WorldView {
     this.droppings?.render(this.frame.tick, alpha);
     this.tombstones.render(this.frame.tick, alpha);
     this.flowers.render(this.frame.tick, alpha, time);
+    this.flags.render(this.frame.flags, poses, time);
     this.dust.render(dt);
     for (const f of this.food.values()) f.update(dt);
     this.dyingFood = this.dyingFood.filter((f) => {
@@ -174,6 +180,7 @@ export class WorldView {
     this.tombstones.clear();
     this.eggs.clear();
     this.flowers.clear();
+    this.flags.clear();
     this.dust.clear();
     this.grips.clear();
     this.scene.remove(this.ring);
