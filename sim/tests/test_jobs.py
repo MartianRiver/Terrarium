@@ -243,32 +243,42 @@ def commit_on(repo, branch: str, text: str) -> str:
     return snapshot.commit(repo)
 
 
-def test_public_code_is_what_a_branch_of_the_repo_holds_and_not_a_pull_request(repo, tmp_path):
+def test_public_code_is_what_main_or_next_holds_and_not_another_branch_or_a_pull_request(repo, tmp_path):
     # repo stands in for GitHub: its branches are what was pushed, refs/pull/ what forks offer
     mirror = tmp_path / 'home' / 'mirror.git'
     mirror.parent.mkdir()
     snapshot.from_public(tmp_path / 'ok', mirror, str(repo), snapshot.commit(repo))
     assert (tmp_path / 'ok' / 'sim' / 'a.py').exists()
     pushed = commit_on(repo, 'jelly', 'a = 3\n')
-    snapshot.from_public(tmp_path / 'jelly', mirror, str(repo), pushed)
-    assert (tmp_path / 'jelly' / 'sim' / 'a.py').read_text() == 'a = 3\n'
+    with pytest.raises(PermissionError, match='main or next'):
+        snapshot.from_public(tmp_path / 'jelly', mirror, str(repo), pushed)
     fork = commit_on(repo, 'fork', 'a = 4\n')
     git(repo, 'update-ref', 'refs/pull/1/head', fork)
     git(repo, 'switch', '-q', 'next')
     git(repo, 'branch', '-q', '-D', 'fork')
     with pytest.raises(PermissionError):
         snapshot.from_public(tmp_path / 'no', mirror, str(repo), fork)
-    assert (mirror / 'refs' / 'pull').exists() or 'refs/pull/1/head' in (mirror / 'packed-refs').read_text()
+    # the mirror holds branches only, so a fork's commits never even land here
+    assert not (mirror / 'refs' / 'pull').exists()
     with pytest.raises(PermissionError):
         snapshot.from_public(tmp_path / 'no', mirror, str(repo), 'f' * 40)
 
 
-def test_a_job_is_trusted_unless_its_commit_is_on_an_origin_branch(repo):
+def test_an_old_full_mirror_is_replaced_by_one_of_branches_only(repo, tmp_path):
+    mirror = tmp_path / 'mirror.git'
+    git(tmp_path, 'clone', '-q', '--mirror', str(repo), str(mirror))
+    snapshot.from_public(tmp_path / 'ok', mirror, str(repo), snapshot.commit(repo))
+    fetch = subprocess.run(['git', 'config', '--get-all', 'remote.origin.fetch'], cwd=mirror, capture_output=True, text=True)
+    assert fetch.stdout.strip() == '+refs/heads/*:refs/heads/*'
+
+
+def test_a_job_is_trusted_unless_its_commit_is_on_main_or_next_of_origin(repo):
     assert snapshot.public(snapshot.commit(repo), repo)
     local = commit_on(repo, 'local', 'a = 5\n')
     assert not snapshot.public(local, repo)
     git(repo, 'update-ref', 'refs/remotes/origin/local', 'HEAD')
     assert snapshot.public(local, repo)
+    assert not snapshot.public(local, repo, only=snapshot.RELEASED)
 
 
 def test_a_batch_file_becomes_specs_with_every_input_named_by_hash(repo, tmp_path):
@@ -415,6 +425,7 @@ def test_a_trusted_worker_runs_a_signed_job_on_uncommitted_code(server, repo, ke
     batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n[[job]]\nname = "one"\n')
     [s] = jobs.add(c['admin'], batch, k, tmp_path / 'runs', repo)
     monkeypatch.setattr(worker, 'sync', lambda sim: None)
+    monkeypatch.setattr(worker, 'check_lock', lambda lock: None)
 
     def command(spec, inputs, sim):
         return [sys.executable, '-c', FAKE_TRAIN, jobs.run_name(spec), str(inputs['world'])]

@@ -205,7 +205,8 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
     commit = snapshot.commit(repo)
     extra = snapshot.overlay(repo)
     code = {'commit': commit, 'bundle': blob(snapshot.bundle(repo)), 'overlay': extra and blob(extra)}
-    trusted = extra is not None or not snapshot.public(commit, repo)
+    # donors only run what's on main or next; anything else is for my own machines
+    trusted = extra is not None or not snapshot.public(commit, repo, only=snapshot.RELEASED)
     ids, out = {}, []
     for job in load_batch(path):
         world, train = path.parent / job['world'], path.parent / job['train']

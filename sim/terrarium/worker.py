@@ -34,6 +34,7 @@ import tarfile
 import threading
 import time
 import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -42,6 +43,7 @@ import psutil
 from . import jobs, machine, runs, snapshot, usage
 from .log import Logger
 from .store import sha256
+from .trust import KEEP_CODE, Refused, capped, check_lock, job_env, pin_signers, scrub, utc
 
 log = Logger('worker')
 
@@ -49,7 +51,7 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
-VERSION = 7
+VERSION = 8
 
 
 def cpus() -> int:
@@ -91,11 +93,8 @@ def python(sim: Path) -> Path:
 
 
 def sync(sim: Path):
-    subprocess.run(['uv', 'sync', '-q', '--locked', *torch_extra()], cwd=sim, check=True, capture_output=True)
-
-
-class Refused(Exception):
-    pass
+    subprocess.run(['uv', 'sync', '-q', '--locked', *torch_extra()], cwd=sim, check=True, capture_output=True,
+                   env=job_env())
 
 
 class Task:
@@ -205,6 +204,9 @@ class Worker:
 
     def info(self) -> dict:
         state, reason = self.state()
+        if not self.trusted and self.instance is None:
+            # why a lent machine is waiting (someone at it, a game on) stays on it
+            reason = ''
         training = [u for t in list(self.tasks.values()) if (u := t.usage())]
         return {'platform': platform.platform(), 'slots': self.slots, 'trusted': self.trusted, 'version': VERSION,
                 'specs': self.specs, 'state': state, 'reason': reason, 'usage': training[0] if training else None}
@@ -307,8 +309,7 @@ class Worker:
             for old in (code / 'runs').glob(f'*-{jobs.run_name(task.spec)}'):
                 shutil.rmtree(old)
             with open(dir / 'train.log', 'wb') as out:
-                env = {k: v for k, v in os.environ.items() if k != 'VIRTUAL_ENV'}
-                env |= {'OMP_NUM_THREADS': str(self.threads), 'PYTHONUNBUFFERED': '1'}
+                env = job_env(OMP_NUM_THREADS=str(self.threads), PYTHONUNBUFFERED='1')
                 # relative, so the paths run.json records don't carry this machine's home folder
                 rel = {k: Path(os.path.relpath(v, code / 'sim')) for k, v in inputs.items()}
                 task.proc = subprocess.Popen(self.command(task.spec, rel, code / 'sim'), cwd=code / 'sim',
@@ -326,7 +327,7 @@ class Worker:
             if task.spec['code']['overlay']:
                 # diff.patch has tracked changes and untracked.txt only names; this is the code itself
                 (task.run / 'overlay.tar.gz').write_bytes(self.blob(task.spec['code']['overlay']))
-            self.upload(task, pack(task.run, self.instance, task.paused))
+            self.upload(task, pack(task.run, self.instance, task.paused, lent=not self.trusted and self.instance is None))
             # kept, so the owner can see what their machine made
             shutil.move(task.run, self.home / 'runs' / task.run.name)
             prune(self.home / 'runs', self.rules.keep_gb)
@@ -337,7 +338,7 @@ class Worker:
             task.state = 'failed'
             if not self.stopping.is_set() and not task.gone.is_set():
                 try:
-                    self.client.json('POST', f'/api/jobs/{task.id}/fail', {'error': str(e)})
+                    self.client.json('POST', f'/api/jobs/{task.id}/fail', {'error': scrub(str(e))})
                 except (urllib.error.URLError, OSError, RuntimeError):
                     pass
         finally:
@@ -382,6 +383,7 @@ class Worker:
             building = self.building.setdefault(key, threading.Lock())
         with building:
             if ready.exists():
+                ready.touch()
                 return dest
             if dest.exists():
                 snapshot.remove(dest)
@@ -391,9 +393,22 @@ class Worker:
                 if c['overlay']:
                     raise Refused('uncommitted code is only for --trusted workers')
                 snapshot.from_public(dest, self.home / 'mirror.git', self.repo, c['commit'])
+            check_lock(dest / 'sim' / 'uv.lock')
             sync(dest / 'sim')
             ready.touch()
+            self.prune_code(keep=key)
             return dest
+
+    def prune_code(self, keep: str):
+        """Past commits' checkouts beyond the newest KEEP_CODE used, never one a job is using."""
+        busy = {code_key(t.spec) for t in list(self.tasks.values())} | {keep}
+        done = sorted((r for r in (self.home / 'code').glob('*.ready')), key=lambda r: r.stat().st_mtime, reverse=True)
+        for ready in done[KEEP_CODE:]:
+            key = ready.name.removesuffix('.ready')
+            if key not in busy:
+                ready.unlink()
+                snapshot.remove(self.home / 'code' / key)
+                log.info('old checkout removed', code=key)
 
     def train_command(self, spec: dict, inputs: dict[str, Path], sim: Path) -> list[str]:
         # the checkout's own python, not uv run: stopping it then stops training, and not just uv
@@ -404,7 +419,7 @@ class Worker:
             cmd += ['--parent', str(inputs['parent'])]
         if spec['code']['overlay']:
             cmd.append('--scratch')
-        return cmd
+        return capped(cmd, cpus() * self.rules.cpu / self.slots, cpus())
 
     def upload(self, task: Task, data: bytes):
         wait = 5
@@ -444,18 +459,23 @@ def tail(path: Path, lines: int = 40) -> str:
     return '\n'.join(path.read_text(errors='replace').splitlines()[-lines:]) if path.exists() else ''
 
 
-def pack(run: Path, instance: int | None = None, paused: float = 0, limit: int = jobs.RESULT_LIMIT) -> bytes:
+def pack(run: Path, instance: int | None = None, paused: float = 0, limit: int = jobs.RESULT_LIMIT,
+         lent: bool = False) -> bytes:
     """The run folder as a tar.gz, without the replays serve caches. A rented machine's id goes into
     run.json so compute can tell its runs from another pod's with the same GPU, and the time the job
     sat paused so it isn't counted as training. Past the coordinator's limit every other checkpoint is
     left out until it fits, counting back from the last, which always goes (it's the brain); the run
     kept here has them all, and the run.json sent says how many were left out."""
-    if instance is not None or paused:
+    if instance is not None or paused or lent:
         record = json.loads((run / 'run.json').read_text())
         if instance is not None:
             record.setdefault('machine', {})['instance'] = instance
         if paused:
             record['paused'] = round(paused)
+        if lent:
+            for key in ('started', 'finished'):
+                if key in record:
+                    record[key] = utc(record[key])
         (run / 'run.json').write_text(json.dumps(record, indent=2) + '\n')
     checkpoints = sorted((run / 'checkpoints').glob('*.pt'))
     keep = set(checkpoints)
@@ -488,12 +508,27 @@ def prune(runs: Path, gb: float):
         shutil.rmtree(kept.pop(0))
 
 
+# the status page's pause/resume/drain need this header, which a web page can't send to another site without asking
+# first (CORS preflight, which this server never answers), so a site you visit can't flip your worker
+LOCAL = 'X-Terrarium-Worker'
+
+
 def status_server(worker: Worker, port: int) -> ThreadingHTTPServer:
+    hosts: set[str] = set()
+
     class Handler(BaseHTTPRequestHandler):
+        def local(self) -> bool:
+            # a name some website points at 127.0.0.1 (DNS rebinding) arrives with that name as its Host
+            return self.headers.get('Host') in hosts
+
         def do_GET(self):
+            if not self.local():
+                return self.reply(None, 403)
             self.reply(worker.status() if self.path == '/status' else None)
 
         def do_POST(self):
+            if not self.local() or self.headers.get(LOCAL) != '1':
+                return self.reply(None, 403)
             match self.path:
                 case '/pause':
                     worker.paused = True
@@ -506,9 +541,9 @@ def status_server(worker: Worker, port: int) -> ThreadingHTTPServer:
             log.info('worker set', paused=worker.paused, draining=worker.draining)
             self.reply(worker.status())
 
-        def reply(self, body):
-            data = json.dumps(body if body is not None else {'error': 'not found'}).encode()
-            self.send_response(200 if body is not None else 404)
+        def reply(self, body, status: int = 404):
+            data = json.dumps(body if body is not None else {'error': 'not found' if status == 404 else 'not allowed'}).encode()
+            self.send_response(200 if body is not None else status)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
@@ -518,6 +553,8 @@ def status_server(worker: Worker, port: int) -> ThreadingHTTPServer:
             pass
 
     server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
+    bound = server.server_address[1]
+    hosts.update({f'127.0.0.1:{bound}', f'localhost:{bound}'})
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -570,11 +607,16 @@ def main():
                        help='keep training while other programs use the GPU')
     parser.add_argument('--repo', default=origin(), help='where public code is fetched from (default: origin)')
     parser.add_argument('--signers', type=Path, default=jobs.SIGNERS, help='keys jobs must be signed with')
+    parser.add_argument('--trust-new-signers', action='store_true',
+                        help='allowed_signers changed since the first run, and you have checked the change')
     parser.add_argument('--port', type=int, default=PORT)
     args = parser.parse_args()
     if args.command != 'run':
-        client = jobs.Client(f'http://127.0.0.1:{args.port}', '')
-        print(json.dumps(client.json('GET' if args.command == 'status' else 'POST', f'/{args.command}'), indent=1))
+        method = 'GET' if args.command == 'status' else 'POST'
+        req = urllib.request.Request(f'http://127.0.0.1:{args.port}/{args.command}', method=method, headers={LOCAL: '1'},
+                                     data=b'' if method == 'POST' else None)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            print(json.dumps(json.loads(r.read()), indent=1))
         return
     if args.anytime or args.instance is not None:
         rules = machine.Rules.anytime()
@@ -583,6 +625,8 @@ def main():
                              cpu=args.cpu, gpu_temp=args.gpu_temp, share_gpu=args.share_gpu)
     if why := jobs.can_verify(args.signers):
         sys.exit(f'{why}\nSee "Running a worker" in docs/compute.md.')
+    if why := pin_signers(args.signers, args.home, args.trust_new_signers):
+        sys.exit(why)
     machine.limit(rules)
     client = jobs.Client(args.server, token(args.token_file or args.home / 'token'))
     worker = Worker(client, args.home, args.slots, args.trusted, args.paused, args.rollouts, args.max_load,
