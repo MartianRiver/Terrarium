@@ -82,6 +82,15 @@ export interface FlowerState {
   y: number;
 }
 
+// a capture-the-flag flag: on its nest, lying where it was put down, or with its carrier (an id, -1 for none)
+export interface FlagState {
+  colony: number;
+  x: number;
+  y: number;
+  down: boolean;
+  carrier: number;
+}
+
 export interface Frame {
   tick: number;
   creatures: CreatureState[];
@@ -91,4 +100,5 @@ export interface Frame {
   light: number; // 1 by day, 0 at night; always 1 in worlds without nights
   eggs: EggState[]; // empty in worlds without hatching and replays from before it
   flowers: FlowerState[]; // empty in worlds without flowers
+  flags: FlagState[]; // empty in worlds without capture the flag and replays from before 0.4's flags
 }

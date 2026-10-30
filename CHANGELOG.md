@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Capture the flag plays like the games it comes from (`[flag] steal`, `guard`, `lie`): a touch from the other side takes the flag off its carrier rather than sending it home, nobody can take it off the new carrier for 2 s, a colony that gets its own flag back has to carry it home, a carrier can put it down for a teammate, and a flag left lying goes home after 10 s. Schema v12 lets a brain sense its own colony's flag (whether it's carrying it, how far and which way). Replays give each frame its `flags`, drawn as pennants in the colonies' colours on the nests, on the grass, or on a carrier's back.
+
 A tag looks like a touch: babies are drawn the size of their bodies (they were drawn a third smaller, so two whose bodies touched stood a hand apart on screen), and a bulb lights when the bodies arrive rather than as they set off. Tag-backs come back after a wait of their own (`[tag] back`, 4 s in the tag worlds, against 2 s for anyone else), so whoever tags gets a head start to run; negative keeps the old rule of never.
 
 The action camera glides instead of shaking: it slides, turns and pulls back on springs, zooms out quickly but back in slowly so a chase doesn't breathe in and out, turns to a smoothed angle rather than in bursts, and near the glass no longer flickers between two distances every frame.

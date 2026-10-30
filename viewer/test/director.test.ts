@@ -8,7 +8,7 @@ function blob(id: number, x: number, y: number, extra: Partial<CreatureState> = 
 }
 
 function frame(creatures: CreatureState[], food: Frame['food'] = []): Frame {
-  return { tick: 0, creatures, food, blocks: [], stores: [], light: 1, eggs: [], flowers: [] };
+  return { tick: 0, creatures, food, blocks: [], stores: [], light: 1, eggs: [], flowers: [], flags: [] };
 }
 
 describe('the action camera', () => {

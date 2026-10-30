@@ -1,3 +1,4 @@
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -8,36 +9,82 @@ from terrarium.flags import Flags
 from terrarium.world import World
 
 FLAG = load(DEFAULT.parent / 'nursery-flag.toml')
+SENT_HOME = replace(FLAG, flag=replace(FLAG.flag, steal=False, guard=0.0, lie=0.0))
 SEEK = load(DEFAULT.parent / 'nursery-seek.toml')
 NESTS = np.array([[0.0, -6.0], [0.0, 6.0]])
+NONE = np.zeros((1, 4), bool)
 
 
-def flag_game(spots):
+def flag_game(spots, cfg=FLAG):
     """Capture the flag in one arena: colonies 0, 0, 1, 1 standing at spots, nests at either end."""
-    world = SimpleNamespace(cfg=FLAG, alive=np.ones((1, 4), bool), pos=np.array([spots], float),
+    world = SimpleNamespace(cfg=cfg, alive=np.ones((1, 4), bool), pos=np.array([spots], float),
                             colony=np.array([0, 0, 1, 1]), nests=NESTS)
     return world, Flags(world)
 
 
 def test_walking_into_their_base_takes_their_flag_and_home_captures_it():
     world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)])
-    flags.step()
+    flags.step(NONE)
     assert flags.carrier[0, 1] == 0 and flags.pickups[0, 0] == 1
     world.pos[0, 0] = (0, -6)
-    flags.step()
+    flags.step(NONE)
     assert flags.carrier[0, 1] == -1 and flags.captures[0, 0] == 1
     # zero-sum: what colony 0 won, colony 1 lost
     gain = flags.points(world.alive)[0]
     assert gain[0] == gain[1] > 0 and gain[2] == gain[3] == -gain[0]
 
 
-def test_a_touch_on_the_carrier_sends_their_flag_home():
-    world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)])
-    flags.step()
+def test_without_steal_a_touch_on_the_carrier_sends_their_flag_home():
+    world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)], SENT_HOME)
+    flags.step(NONE)
     world.pos[0, 0] = (0, 2)
     world.pos[0, 2] = (0.5, 2)
-    flags.step()
+    flags.step(NONE)
     assert flags.carrier[0, 1] == -1 and flags.saves[0, 1] == 1 and flags.captures.sum() == 0
+
+
+def wait(flags, seconds):
+    for _ in range(round(seconds * FLAG.tick_hz)):
+        flags.step(NONE)
+
+
+def test_a_touch_takes_the_flag_and_its_own_side_has_to_carry_it_home():
+    world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)])
+    flags.step(NONE)
+    world.pos[0, 0] = (0, 2)
+    wait(flags, FLAG.flag.guard)
+    world.pos[0, 2] = (0.5, 2)
+    flags.step(NONE)
+    assert flags.carrier[0, 1] == 2 and flags.saves[0, 1] == 1
+    # colony 0 can't take it straight back
+    flags.step(NONE)
+    assert flags.carrier[0, 1] == 2
+    world.pos[0, 2] = (0, 6)
+    flags.step(NONE)
+    assert flags.carrier[0, 1] == -1 and not flags.down[0, 1] and flags.captures.sum() == 0
+
+
+def test_a_flag_put_down_is_picked_up_by_a_teammate_and_goes_home_if_left():
+    world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)])
+    flags.step(NONE)
+    world.pos[0, 0] = (0, 0)
+    drop = NONE.copy()
+    drop[0, 0] = True
+    flags.step(drop)
+    assert flags.down[0, 1] and flags.carrier[0, 1] == -1
+    # the one who put it down can't pick it straight back up; a teammate can
+    flags.step(NONE)
+    assert flags.carrier[0, 1] == -1
+    world.pos[0, 1] = (0.3, 0)
+    flags.step(NONE)
+    assert flags.carrier[0, 1] == 1 and not flags.down[0, 1]
+    world.pos[0, 1] = (0, 0)
+    drop[0, 0], drop[0, 1] = False, True
+    flags.step(drop)
+    world.pos[0, 0] = world.pos[0, 1] = (3, -3)
+    wait(flags, FLAG.flag.lie)
+    assert not flags.down[0, 1] and flags.carrier[0, 1] == -1
+    assert (flags.where()[0, 1] == NESTS[1]).all()
 
 
 def test_seekers_stand_still_while_the_hiders_get_away():

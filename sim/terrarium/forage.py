@@ -160,15 +160,19 @@ class Forage:
 
 
 def flag_senses(world: World, shape) -> tuple:
-    """Carrying their flag, the way to it (how far, which way off the heading), and whether ours is taken."""
+    """Carrying their flag, the way to it (how far, which way off the heading), whether ours is off its nest, then
+    carrying ours and the way to it."""
     if not world.flags:
-        return (np.zeros(shape),) * 5
+        return (np.zeros(shape),) * 9
     flags = world.flags
-    theirs = flags.where()[:, 1 - world.colony]                      # A,N,2
-    to = theirs - world.pos
-    bearing = np.arctan2(to[..., 1], to[..., 0]) - world.heading
-    taken = (flags.carrier >= 0)[:, world.colony]
-    return (flags.carrying(), np.hypot(to[..., 0], to[..., 1]) / world.cfg.vision.range, np.sin(bearing), np.cos(bearing), taken)
+    where, held = flags.where(), flags.held()
+    out = []
+    for side in (1 - world.colony, world.colony):
+        to = where[:, side] - world.pos                              # A,N,2
+        bearing = np.arctan2(to[..., 1], to[..., 0]) - world.heading
+        out.append((held == side, np.hypot(to[..., 0], to[..., 1]) / world.cfg.vision.range, np.sin(bearing), np.cos(bearing)))
+    taken = ((flags.carrier >= 0) | flags.down)[:, world.colony]
+    return (*out[0], taken, *out[1])
 
 def carried_worth(world: World, r: Reward) -> np.ndarray:
     """What the food in each crop is worth where it is: r.home a food at its own nest, falling to nothing an arena's width away."""
