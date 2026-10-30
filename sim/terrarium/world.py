@@ -57,6 +57,7 @@ from . import night
 from .smell import Field
 from .flags import Flags
 from .peek import Peek
+from .maze import carve, check as check_maze
 from .scatter import scatter
 from .seek import Seek
 from .tag import Tag
@@ -124,6 +125,10 @@ class World:
         self.wild = cfg.food.count
         slots = self.wild + n * cfg.crop.capacity
         self.food_pos = np.zeros((arenas, slots, 2))
+        # the ways between rooms in each arena's maze ([arena] maze)
+        self.maze_open: list[set] = [set() for _ in range(arenas)]
+        if cfg.arena.maze:
+            carve(self, np.arange(arenas))
         self.food_id = np.zeros((arenas, slots), int)
         # ticks until a food grows back; 0 means it's there
         self.food_regrow = np.zeros((arenas, slots), int)
@@ -259,6 +264,8 @@ class World:
         # smell's walls and doors that swing shut go by where blocks are set, not where they're scattered to
         if self.cfg.arena.scatter and (self.cfg.smell.on or any(b.carry or b.shut for b in self.cfg.block)):
             raise ConfigError('arena.scatter is for blocks that stay put: not with smell, carry or shut')
+        if self.cfg.arena.maze:
+            check_maze(self.cfg)
 
     def _spawn(self, arenas):
         """Each colony on an evenly spaced ring around its nest, turned a random amount per arena."""
@@ -280,6 +287,8 @@ class World:
         self.physics.place(idx, pos)
         if self.cfg.arena.scatter:
             scatter(self, idx)
+        if self.cfg.arena.maze:
+            carve(self, idx)
         self.energy[idx] = np.where(self.spare, 0.0, self.cfg.energy.start)
         self.alive[idx] = ~self.spare
         self.unborn[idx] = self.spare
