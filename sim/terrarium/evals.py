@@ -433,9 +433,11 @@ def main():
     seed = HELD_OUT if args.held_out else SEED
 
     jobs: dict[str, dict] = {name: {'policy': name} for name in args.policy}
+    names = [Path(b).name for b in args.brain]
     for b in args.brain:
         for mode in args.modes:
-            name = Path(b).name + ('' if mode == 'drawn' else f' {mode}')
+            # runs' checkpoints share file names, so where two do, the whole path tells them apart
+            name = (Path(b).name if names.count(Path(b).name) == 1 else b) + ('' if mode == 'drawn' else f' {mode}')
             jobs[name] = {'brain': b, 'mode': mode}
             if args.wiped:
                 jobs[f'{name} wiped'] = {'brain': b, 'mode': mode, 'wiped': True}

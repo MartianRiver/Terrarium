@@ -77,6 +77,10 @@ export class WorldView {
   }
 
   // call once per sim tick
+  get current(): Frame | null {
+    return this.frame;
+  }
+
   push(frame: Frame) {
     if (this.frame) {
       this.prevCreatures = new Map(this.frame.creatures.map((c) => [c.id, c]));

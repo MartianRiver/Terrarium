@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from dataclasses import replace
 
 import numpy as np
@@ -115,7 +116,7 @@ def test_the_update_replays_each_stream_as_it_was_played():
     assert roll.dones.any() and np.abs(roll.notes).sum() > 0
     t = lambda x: torch.from_numpy(np.ascontiguousarray(x))
     with torch.no_grad():
-        mean, value = replay(actor, t(roll.me), t(roll.kinds), t(roll.rays), t(roll.notes[0]),
+        mean, value, _ = replay(actor, t(roll.me), t(roll.kinds), t(roll.rays), t(roll.notes[0]),
                              t(roll.active & ~roll.dones).float())
         logp = actor.dist(mean).log_prob(t(roll.actions).flatten(0, 1)).sum(-1).numpy()
     live = roll.active.reshape(-1)
@@ -141,3 +142,30 @@ def test_training_with_memory(tmp_path):
     assert record['shape']['memory'] == 8
     trained, _ = load_brain(run_.dir / 'checkpoints' / '00000000256.pt')
     assert trained.memory == 8 and trained.recall.weight.abs().sum() > 0
+
+
+def test_the_side_job_asks_the_notes_for_the_past_only_within_a_stream():
+    from terrarium.ppo import Side
+    side = Side(4, 3, back=2)
+    with torch.no_grad():
+        side.guess.weight.zero_()
+        side.guess.bias.zero_()
+    moments = torch.zeros(5, 2, 3)
+    moments[0, 1] = 1.0   # stream 1 saw something at step 0
+    notes = torch.zeros(5, 2, 4)
+    alive = torch.ones(5, 2, dtype=torch.bool)
+    carry = torch.ones(5, 2)
+    # guessing nothing: wrong only where stream 1's step 0 is asked about (from step 2), 1 of 6 pairs
+    assert side.loss(moments, notes, carry, alive).item() == pytest.approx(1 / 6)
+    # with a restart in stream 1 after step 0, that pair is left out
+    carry[0, 1] = 0
+    assert side.loss(moments, notes, carry, alive).item() == 0
+
+
+def test_training_with_a_side_job(tmp_path):
+    world, trainer = short(tmp_path)
+    text = Path(trainer).read_text().replace('side = 0.0', 'side = 1.0').replace('side_back = 20', 'side_back = 3')
+    Path(trainer).write_text(text)
+    run_ = train('side', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', memory=8, score=False)
+    rows = [json.loads(l) for l in (run_.dir / 'metrics.jsonl').read_text().splitlines()]
+    assert all(r['side_loss'] > 0 for r in rows)

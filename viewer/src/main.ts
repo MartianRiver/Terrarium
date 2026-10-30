@@ -5,6 +5,7 @@ import { ChannelCard, type Game as ChannelGame, type Item } from './channelcard'
 import { Picker } from './picker';
 import { clock } from './clock';
 import { createDemo } from './demo';
+import { Director } from './director';
 import { galleryBar } from './gallery';
 import { createLogger } from './lib/logger';
 import { namesFor } from './names';
@@ -108,6 +109,8 @@ function boot() {
   const brain = SITE ? null : new BrainView(document.body, stage.scene, (url) => void open(`${url.pathname.split('/').pop()} (recorded here)`, () => fetchReplay(url), url));
   // after a restart the camera jumps to the blob rather than sweeping across the arena after it
   let snap = true;
+  // following in a nursery game watches the action rather than the first Terrikin (&solo turns it off)
+  const director = params.has('solo') ? null : new Director();
   let opening = false;
   let acc = 0;
   let last = performance.now();
@@ -126,6 +129,7 @@ function boot() {
     view = new WorldView(stage.scene, source.info, !params.has('nodroppings'));
     view.chosen = chosen;
     view.marked = !params.has('pick');
+    director?.reset();
     const first = source.step()!;
     view.push(first);
     tick = first.tick;
@@ -337,7 +341,7 @@ function boot() {
   // &ant: a sketch of a walking ant beside whatever is playing; F follows it
   const ant = params.has('ant') ? new AntStudy(stage.scene) : null;
   if (params.has('intro')) stage.intro();
-  if (params.has('follow')) follow(true);
+  if (params.has('follow') || params.has('channel')) follow(true);
   // the public site has no runs page; the link goes back to the front page instead
   const runsLink = document.querySelector<HTMLAnchorElement>('a[href="/runs.html"]');
   if (SITE && runsLink) {
@@ -428,7 +432,10 @@ function boot() {
       tag.style.transform = `translate(${((above.x + 1) / 2) * innerWidth}px, ${((1 - above.y) / 2) * innerHeight}px) translate(-50%, -100%)`;
       if (tag.textContent !== nameOf(chosen!)) tag.textContent = nameOf(chosen!);
     }
-    stage.track(following ? (ant?.focus ?? look ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
+    const shot = following && chosen === null && !look && !ant && !game && view!.current
+      ? director?.shot(view!.current, paused ? 0 : dt) : null;
+    if (shot) stage.aim(shot, snap ? Infinity : paused ? 0 : dt);
+    else stage.track(following ? (ant?.focus ?? look ?? view!.focus) : null, snap ? Infinity : paused ? 0 : dt);
     snap = false;
     stage.render(now / 1000);
 

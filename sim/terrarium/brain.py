@@ -75,6 +75,13 @@ class Actions:
         h = self.normal.entropy()
         return torch.where(self.coins, self.coin.entropy(), h) if self.coins is not None else h
 
+    def coin_entropy(self, only: torch.Tensor | None = None) -> torch.Tensor:
+        """Entropy of the coins alone (or of those in only), summed over them (zero for a brain without coins)."""
+        if self.coins is None:
+            return torch.zeros(self.normal.mean.shape[:-1], device=self.normal.mean.device)
+        which = self.coins if only is None else self.coins & only
+        return torch.where(which, self.coin.entropy(), 0.0).sum(-1)
+
 
 class Brain(nn.Module):
     def __init__(self, width: int, layers: int, heads: int, lists: dict | None = None, yes_no: str = 'gaussian',
@@ -133,6 +140,14 @@ class Brain(nn.Module):
         if self.yes_no != 'bernoulli':
             return None
         return torch.tensor([a in schema.YES_NO for a in self.schema['actions']], device=self.log_std.device)
+
+    def named(self, names: tuple[str, ...]) -> torch.Tensor | None:
+        """Which actions are these, or None (all of them) when names is empty."""
+        if not names:
+            return None
+        if unknown := sorted(set(names) - set(self.schema['actions'])):
+            raise ValueError(f'no such action: {", ".join(unknown)}')
+        return torch.tensor([a in names for a in self.schema['actions']], device=self.log_std.device)
 
     def to_bernoulli(self):
         """Gaussian yes/no actions as coins with about the odds they had: a draw above 0 is Φ(mean / spread),

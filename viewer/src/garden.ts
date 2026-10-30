@@ -11,7 +11,7 @@ import type { NestInfo, WorldInfo } from './world';
 // how far rocks reach past the dome, metres
 const REACH = 45;
 // the glass wall's height; the dome rises from its top
-const WALL = 1.1;
+export const WALL = 1.1;
 
 function seeded(seed: number) {
   return () => {
@@ -48,7 +48,7 @@ export function buildGarden(info: WorldInfo) {
 }
 
 // the dome covers the arena's corners with a planted bed to spare
-const domeRadius = (info: WorldInfo) => Math.hypot(info.width, info.height) / 2 + 2.5;
+export const domeRadius = (info: WorldInfo) => Math.hypot(info.width, info.height) / 2 + 2.5;
 
 // a random spot in the bed: under the dome, outside the hedge (plus margin)
 function inBed(rng: () => number, info: WorldInfo, margin: number) {

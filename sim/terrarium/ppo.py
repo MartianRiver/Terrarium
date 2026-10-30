@@ -4,7 +4,8 @@
 #
 # A brain with memory learns from whole streams instead of shuffled samples: each pass replays a stream's choices in
 # order from the notes it had at the rollout's start, so what it learns to write down is paid for by what that does
-# for its choices later in the rollout (backpropagation through time, as CleanRL's LSTM PPO does it).
+# for its choices later in the rollout (backpropagation through time, as CleanRL's LSTM PPO does it). With
+# [ppo] side it also gets a side job (Side) that pays the notes for holding the past before anything else does.
 
 from dataclasses import dataclass
 
@@ -105,10 +106,35 @@ def advantages(rewards, values, dones, last_value, gamma: float, lam: float) -> 
     return adv, adv + values
 
 
+class Side(nn.Module):
+    """A side job for a brain with memory: from its notes, say what it made of the moment `back` choices ago. In a
+    toy test the notes learned a 10 s wait only with this, since nothing else pays for holding the past until reading
+    it already pays. Kept out of the brain and thrown away after training."""
+
+    def __init__(self, memory: int, width: int, back: int):
+        super().__init__()
+        self.back = back
+        self.guess = nn.Linear(memory, width)
+
+    def loss(self, moments: torch.Tensor, notes: torch.Tensor, carry: torch.Tensor, active: torch.Tensor) -> torch.Tensor:
+        """moments and notes (steps, n, ...); only pairs with no restart between them count."""
+        k = self.back
+        steps = len(moments)
+        if k >= steps:
+            return moments.new_zeros(())
+        # breaks before each step: a stretch t-k..t is one stream when none fall inside it
+        before = torch.cat([carry.new_zeros(1, carry.shape[1]), torch.cumsum(1 - carry, 0)])[:steps]
+        whole = (before[k:] == before[:-k]) & active[k:] & active[:-k]
+        if not whole.any():
+            return moments.new_zeros(())
+        err = ((self.guess(notes[k:].float()) - moments[:-k].detach().float()) ** 2).mean(-1)
+        return err[whole].mean()
+
+
 def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray, returns: np.ndarray,
-           cfg: PPO, bf16: bool = False) -> dict:
+           cfg: PPO, bf16: bool = False, side: Side | None = None) -> dict:
     if learner.memory:
-        return update_streams(learner, optimizer, roll, adv, returns, cfg, bf16)
+        return update_streams(learner, optimizer, roll, adv, returns, cfg, bf16, side)
     device = next(learner.parameters()).device
 
     # only what living creatures did; the dead's samples are placeholders
@@ -135,7 +161,7 @@ def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv:
 
 
 def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray,
-                   returns: np.ndarray, cfg: PPO, bf16: bool = False) -> dict:
+                   returns: np.ndarray, cfg: PPO, bf16: bool = False, side: Side | None = None) -> dict:
     """update() for a brain with memory: minibatches of whole streams, each replayed in order from its starting
     notes, the notes kept or wiped as they were while collecting. Only living creatures' choices count."""
     device = next(learner.parameters()).device
@@ -151,38 +177,48 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
     carry = put(roll.active & ~roll.dones).float()
     size = streams // cfg.minibatches
     seen: dict[str, list[float]] = {'policy_loss': [], 'value_loss': [], 'entropy': [], 'kl': [], 'clipped': []}
+    if side:
+        seen['side_loss'] = []
     for _ in range(cfg.epochs):
         order = torch.randperm(streams, device=device)
         for first in range(0, size * cfg.minibatches, size):
             mb = order[first:first + size]
+            extra = None
             with torch.autocast(device.type, torch.bfloat16, enabled=bf16):
-                mean, value = replay(learner, me[:, mb], kinds[:, mb], rays[:, mb], start[mb], carry[:, mb])
+                mean, value, kept = replay(learner, me[:, mb], kinds[:, mb], rays[:, mb], start[mb], carry[:, mb],
+                                           keep=side is not None)
+            if side:
+                extra = side.loss(*kept, carry[:, mb], active[:, mb])
+                seen['side_loss'].append(extra.item())
+                extra = cfg.side * extra
             live = active[:, mb].flatten()
             pick = lambda x: x[:, mb].flatten(0, 1)[live]
             step(learner, optimizer, cfg, seen, mean[live], value[live], pick(actions), pick(old_logp),
-                 pick(adv_t), pick(ret_t))
+                 pick(adv_t), pick(ret_t), extra)
     return summed(learner, roll, returns, seen)
 
 
 def replay(learner: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor, start: torch.Tensor,
-           carry: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+           carry: torch.Tensor, keep: bool = False):
     """Streams (steps, n, ...) played again from their starting notes, kept where carry is 1: mean actions and
-    values, (steps * n, ...)."""
+    values, (steps * n, ...), and with keep, the moments and the notes after each step, (steps, n, ...)."""
     steps, n = carry.shape
     # what each moment looks like doesn't depend on the notes, so that part runs for all steps at once
     moments = learner.sense(me.flatten(0, 1), kinds.flatten(0, 1), rays.flatten(0, 1)).view(steps, n, -1)
-    notes, outs = start, []
+    notes, outs, written = start, [], []
     for t in range(steps):
         out, notes = learner.remember(moments[t], notes)
         outs.append(out)
+        written.append(notes)
         notes = notes * carry[t, :, None]
-    return learner.heads(torch.stack(outs).flatten(0, 1))
+    mean, value = learner.heads(torch.stack(outs).flatten(0, 1))
+    return mean, value, ((moments, torch.stack(written)) if keep else None)
 
 
 def step(learner: Brain, optimizer: torch.optim.Optimizer, cfg: PPO, seen: dict[str, list[float]],
          mean: torch.Tensor, value: torch.Tensor, actions: torch.Tensor, old_logp: torch.Tensor,
-         adv: torch.Tensor, ret: torch.Tensor):
-    """One clipped PPO step on a minibatch, the losses in float32."""
+         adv: torch.Tensor, ret: torch.Tensor, extra: torch.Tensor | None = None):
+    """One clipped PPO step on a minibatch, the losses in float32, plus any extra loss (a side job's)."""
     mean, value = mean.float(), value.float()
     dist = learner.dist(mean)
     log_ratio = dist.log_prob(actions).sum(-1) - old_logp
@@ -192,6 +228,10 @@ def step(learner: Brain, optimizer: torch.optim.Optimizer, cfg: PPO, seen: dict[
     value_loss = 0.5 * ((value - ret) ** 2).mean()
     entropy = dist.entropy().sum(-1).mean()
     loss = policy_loss - cfg.entropy * entropy + cfg.value * value_loss
+    if cfg.coins:
+        loss = loss - cfg.coins * dist.coin_entropy(learner.named(cfg.coins_for)).mean()
+    if extra is not None:
+        loss = loss + extra
     optimizer.zero_grad()
     loss.backward()
     nn.utils.clip_grad_norm_(learner.parameters(), cfg.max_grad_norm)

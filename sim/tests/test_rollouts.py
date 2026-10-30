@@ -86,6 +86,12 @@ def test_worlds_in_workers_join_up_in_order():
 COLONY = load(DEFAULT.parent / 'colony.toml')
 
 
+def test_fixed_seats_keep_each_colony_on_its_brain():
+    whose = seats([(COLONY, 4), (COLONY, 2)], 3, fixed=True).reshape(6, -1)
+    colony = np.repeat(np.arange(COLONY.colonies.count), COLONY.colonies.slots)
+    assert (whose == colony % 3).all()
+
+
 def test_every_brain_takes_every_seat():
     whose = seats([(COLONY, 4), (COLONY, 2)], 3).reshape(6, -1)
     colony = np.repeat(np.arange(COLONY.colonies.count), COLONY.colonies.slots)

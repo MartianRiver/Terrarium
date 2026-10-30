@@ -286,3 +286,29 @@ def test_evals_take_a_brain(tmp_path):
     short = replace(SOLO, episode=replace(SOLO.episode, seconds=5.0))
     r = run(short, brain_policy(tmp_path / 'b.pt'), 2)
     assert 0 < r['seconds_alive']['mean'] <= 5.0
+
+
+def test_the_coin_bonus_keeps_a_coin_from_settling_on_never():
+    from terrarium import ppo
+    torch.manual_seed(0)
+    brain = Brain(32, 1, 2, yes_no='bernoulli')
+    eat = schema.ACTIONS.index('eat')
+    with torch.no_grad():
+        brain.policy.bias[eat] = -3.0
+    me, kinds, rays = torch.zeros(64, len(schema.SELF)), torch.zeros(64, 4, dtype=torch.long), torch.zeros(64, 4, len(schema.RAY))
+    mean, value, _ = brain(me, kinds, rays)
+    dist = brain.dist(mean)
+    coins = brain.coins()
+    assert torch.allclose(dist.coin_entropy(), torch.where(coins, dist.coin.entropy(), 0.0).sum(-1))
+    actions = dist.sample().detach()
+    old = dist.log_prob(actions).sum(-1).detach()
+    zero = torch.zeros(64)
+    opt = torch.optim.Adam(brain.parameters(), lr=1e-2)
+    for _ in range(20):
+        mean, value, _ = brain(me, kinds, rays)
+        ppo.step(brain, opt, replace(TRAIN.ppo, coins=0.1), {k: [] for k in ('policy_loss', 'value_loss', 'entropy', 'kl', 'clipped')},
+                 mean, value.squeeze(-1), actions, old, zero, zero)
+    assert brain.policy.bias[eat] > -2.9
+    # aimed at one coin, the bonus leaves the others alone
+    sprint = schema.ACTIONS.index('sprint')
+    assert torch.allclose(dist.coin_entropy(brain.named(('sprint',))), dist.coin.entropy()[..., sprint])
