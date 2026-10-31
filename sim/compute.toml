@@ -2233,3 +2233,70 @@ started = "2026-10-31T09:34:35+11:00"
 ended = "2026-10-31T10:21:17+11:00"
 dollars = 0.148
 note = "peek ladder pl-ladder-s1/s2, pl-control-s1/s2 (peekladder/pl.log, machine 151558, $0.176/h)"
+
+# RunPod's per-pod bills (GET rest.runpod.io/v1/billing/pods, grouping podId), times from the pod drivers' logs
+[[session]]
+provider = "runpod"
+instance = "12iu15qz2qh8mf"
+gpu = "RTX 3090"
+cpu = "5 cores"
+started = "2026-10-29T19:00:00+11:00"
+ended = "2026-10-29T19:00:38+11:00"
+dollars = 0.005
+note = "smoke test, Secure cloud (38 s billed; the hour from the bill, no log kept)"
+
+[[session]]
+provider = "runpod"
+instance = "e84sifcvc3digs"
+gpu = "RTX 3070"
+started = "2026-10-29T21:57:35+11:00"
+ended = "2026-10-29T21:58:16+11:00"
+dollars = 0.001
+note = "pg2, failed at setup (tonight/pg2-failed.log, $0.13/h)"
+
+[[session]]
+provider = "runpod"
+instance = "9nb6eh7tdbmxgh"
+gpu = "RTX 3070"
+started = "2026-10-29T21:58:41+11:00"
+ended = "2026-10-29T23:10:10+11:00"
+dollars = 0.160
+note = "pg2 (tonight/pg2.log, $0.13/h)"
+
+[[session]]
+provider = "runpod"
+instance = "g07u4pay9u5e5y"
+gpu = "RTX 3070"
+started = "2026-10-30T11:56:17+11:00"
+ended = "2026-10-30T12:09:53+11:00"
+dollars = 0.030
+note = "skc, failed (tonight/skc-failed.log, $0.13/h)"
+
+[[session]]
+provider = "runpod"
+instance = "39pujibmflc934"
+gpu = "RTX 3070"
+started = "2026-10-30T22:13:53+11:00"
+ended = "2026-10-30T22:25:56+11:00"
+dollars = 0.027
+note = "rrtx3070 (night/rrtx3070.log, $0.13/h)"
+
+[[session]]
+provider = "vast"
+instance = 58471544
+gpu = "RTX 3080"
+cpu = "20 cores"
+started = "2026-10-31T11:37:35+11:00"
+ended = "2026-10-31T12:34:35+11:00"
+dollars = 0.114
+note = "hearing th-hear-s1/s2, th-deaf-s1 (tonight/hear.log, machine 137647, $0.109/h)"
+
+[[session]]
+provider = "vast"
+instance = 58473307
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-31T11:57:49+11:00"
+ended = "2026-10-31T13:58:26+11:00"
+dollars = 0.185
+note = "hearing th-hear-s3 (stopped at 13.9M by the time cap), th-deaf-s2/s3 (tonight/hear2.log, machine 38453, $0.081/h)"

@@ -14,6 +14,7 @@ import { Flowers } from './nectar';
 import { BlockView, FoodView } from './props';
 import type { Pose } from './sightfan';
 import { Dust } from './sprint';
+import { TagPops } from './tagpop';
 import { Tombstones } from './tombstones';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
@@ -58,8 +59,9 @@ export class WorldView {
   private flowers: Flowers;
   private flags: Flags;
   private dust: Dust;
+  private pops: TagPops;
 
-  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
+  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true, cone = 0) {
     this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
     this.tombstones = new Tombstones(scene, info.tickHz);
     this.grips = new Grips(scene);
@@ -67,6 +69,7 @@ export class WorldView {
     this.flowers = new Flowers(scene, info.tickHz);
     this.flags = new Flags(scene);
     this.dust = new Dust(scene);
+    this.pops = new TagPops(scene, cone);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
     this.ring.position.y = 0.02;
@@ -97,6 +100,7 @@ export class WorldView {
     this.tombstones.push(frame);
     this.eggs.push(frame);
     this.flowers.push(frame);
+    this.pops.push(frame, !this.prevCreatures.size, this.info.tickHz);
     for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
@@ -106,6 +110,7 @@ export class WorldView {
     this.eggs.render(this.frame.tick, alpha, time);
     const holders: Holder[] = [];
     const poses = new Map<number, Pose>();
+    let shownIt = -1;
     // a chosen Terrikin that has left the world (its place taken by a hatchling) can't be followed
     if (this.chosen !== null && !this.blobs.has(this.chosen)) this.chosen = null;
     const followed = this.chosen ?? (this.lead !== null && this.blobs.has(this.lead) ? this.lead : this.frame.creatures[0]?.id);
@@ -120,6 +125,7 @@ export class WorldView {
       s.energy = lerp(p.energy, c.energy, alpha);
       // a signal changes where the bodies arrive, not as they set off: a tag lights the new it's bulb when they touch
       s.signal = p.signal;
+      if (s.signal === 0) shownIt = c.id;
       // drawn the size of its body, so bumping and tagging look like touching (the young too: their bodies are full size)
       s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha);
       if (c.id === followed) {
@@ -150,6 +156,7 @@ export class WorldView {
     this.flowers.render(this.frame.tick, alpha, time);
     this.flags.render(this.frame.flags, poses, time);
     this.dust.render(dt);
+    this.pops.render(dt, poses, shownIt, time);
     for (const f of this.food.values()) f.update(dt);
     this.dyingFood = this.dyingFood.filter((f) => {
       const alive = f.update(dt);
@@ -184,6 +191,7 @@ export class WorldView {
     this.flowers.clear();
     this.flags.clear();
     this.dust.clear();
+    this.pops.dispose();
     this.grips.clear();
     this.scene.remove(this.ring);
     this.ring.geometry.dispose();

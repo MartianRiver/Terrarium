@@ -1,6 +1,6 @@
 # Sound for a reel, placed on the frames its script renders: world sounds from the replays the clips were cut from
-# (food vanishing beside a blob, a store growing, a death, an egg hatching, a sip of nectar), only for what's on
-# screen; a sound when a label appears and before each cut; ambience by day and by night from the replay's light;
+# (food vanishing beside a blob, a store growing, a death, an egg hatching, a sip of nectar; in the nursery a tag, a
+# sprint, peekaboo's hidden berry found), only for what's on screen; a sound when a label appears and before each cut; ambience by day and by night from the replay's light;
 # music under it all.
 # ../sim/.venv/bin/python reel/sound.py reel/0.3.json OUT garden --sounds DIR
 #   (a profile in reel/sound.json; sounds are found by file stem under DIR; OUT has build.py's video;
@@ -78,17 +78,29 @@ def events(path, pick=None):
     lines = gzip.open(path, 'rt').read().splitlines()
     info = json.loads(lines[0])['info']
     nests = {n['colony']: (n['x'], n['y']) for n in info['nests']}
-    ticks, energy, food, stores, eggs, nectar = [], {}, {}, {}, {}, {}
+    ticks, energy, food, stores, eggs, nectar, sprint, it = [], {}, {}, {}, {}, {}, {}, None
+    hidden = set()
     for line in lines[1:]:
         f = json.loads(line)
         ev = []
         alive = [c for c in f['creatures'] if c['energy'] > 0]
         now = {x['id']: (x['x'], x['y']) for x in f['food']}
         # a bite is what the eye sees: food gone from beside a blob, picked up or eaten alike
-        for x, y in (p for fid, p in food.items() if fid not in now):
-            if alive and min((c['x'] - x) ** 2 + (c['y'] - y) ** 2 for c in alive) < 1.0:
-                ev.append(('bite', x, y))
+        for fid, (x, y) in food.items():
+            if fid not in now and alive and min((c['x'] - x) ** 2 + (c['y'] - y) ** 2 for c in alive) < 1.0:
+                ev.append(('found' if fid in hidden else 'bite', x, y))
         food = now
+        hidden = {x['id'] for x in f['food'] if x.get('hidden')}
+        # tag: the it's bulb (signal 0) moving to a Terrikin it touched
+        now_it = next((c for c in f['creatures'] if c['signal'] == 0), None)
+        was = next((c for c in f['creatures'] if it and c['id'] == it), None)
+        if now_it and was and now_it['id'] != it and (now_it['x'] - was['x']) ** 2 + (now_it['y'] - was['y']) ** 2 < 1.44:
+            ev.append(('tag', (now_it['x'] + was['x']) / 2, (now_it['y'] + was['y']) / 2))
+        it = now_it['id'] if now_it else None
+        for c in f['creatures']:
+            if c.get('sprinting') and not sprint.get(c['id']):
+                ev.append(('sprint', c['x'], c['y']))
+            sprint[c['id']] = c.get('sprinting', 0)
         for c in f['creatures']:
             if energy.get(c['id'], 0) > 0 and c['energy'] <= 0:
                 ev.append(('death', c['x'], c['y']))

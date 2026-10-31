@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import maze, night, vision
+from . import hearing, maze, night, vision
 from .fun import Fun
 from .config import Config, Reward, Train
 from .vision import directions, look
@@ -64,7 +64,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    world.tag.mask() if world.tag else np.zeros(store.shape),
                    *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
                      if world.seek else (np.zeros(store.shape),) * 2),
-                   *flag_senses(world, store.shape), world.stamina], -1)
+                   *flag_senses(world, store.shape), world.stamina, *hearing.heard(world)], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape
