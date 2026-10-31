@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The viewer has sound: the Sound button (or M) plays the reel's nursery mix live, a bite, a tag, a sprint, a hidden berry found, a hatch, nectar, an unload and a death for whatever's on screen, wind, birds by day and crickets at night, and music under it with ♪ to turn it off, all CC0 and fetched only once sound is on, on the site, the local viewer and Terrarium at Home's. What to play is found frame by frame the way `reel/sound.py` finds it in a replay, checked against it on every sample replay, and neither now hears a sprint or a sip at the very first frame.
+
 The site's list of what to watch is in three parts, Colonies, The nursery and Experiments, each with a line on what it is, so the main world, the kids' games and the side experiments no longer run together in one long list; the part with something training now comes first.
 
 `[ppo] stuck` and `stuck_seconds` end a run whose episodes are still short by a given update, as one of two young-colony memory seeds was all the way to 64M (its episodes about 50 s against the other's 140 s by update 200), marked `stuck` in run.json. Run.json's `machine` names a rented pod's provider and instance. 0.4 notes: the rival brains' huge first KL was a fresh optimizer's first step at a high learning rate, not mixed-up samples.

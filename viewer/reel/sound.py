@@ -121,7 +121,8 @@ def events(path, pick=None):
             stores[s['colony']] = s['jelly']
         # the viewer's follow camera is on the first creature, or the one &pick names
         first = next((c for c in f['creatures'] if c['id'] == pick), f['creatures'][0])
-        ticks.append((f.get('light', 1.0), (first['x'], first['y']), ev))
+        # whoever starts out sprinting or sipping isn't news (cues.ts does the same)
+        ticks.append((f.get('light', 1.0), (first['x'], first['y']), ev if ticks else []))
     return ticks, info['width']
 
 
