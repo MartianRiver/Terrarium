@@ -7,7 +7,9 @@
 # for its choices later in the rollout (backpropagation through time, as CleanRL's LSTM PPO does it). With
 # [ppo] side it also gets a side job (Side) that pays the notes for holding the past before anything else does.
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 import torch
@@ -152,10 +154,22 @@ class Closure(nn.Module):
         return nn.functional.binary_cross_entropy_with_logits(logit, target), right
 
 
+class Parts(NamedTuple):
+    """A memory brain's sense and heads, compiled on their own for --fast: torch.compile breaks its graph at a
+    GRU (dynamo's allow_rnn is off), so compiling the whole brain left a memory brain's update uncompiled."""
+    sense: Callable[..., torch.Tensor]
+    heads: Callable[..., tuple[torch.Tensor, torch.Tensor]]
+
+    @classmethod
+    def compiled(cls, brain: Brain) -> 'Parts':
+        return cls(torch.compile(brain.sense, dynamic=True), torch.compile(brain.heads, dynamic=True))
+
+
 def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray, returns: np.ndarray,
-           cfg: PPO, bf16: bool = False, side: Side | None = None, closure: Closure | None = None) -> dict:
+           cfg: PPO, bf16: bool = False, side: Side | None = None, closure: Closure | None = None,
+           parts: Parts | None = None) -> dict:
     if learner.memory:
-        return update_streams(learner, optimizer, roll, adv, returns, cfg, bf16, side, closure)
+        return update_streams(learner, optimizer, roll, adv, returns, cfg, bf16, side, closure, parts)
     device = next(learner.parameters()).device
 
     # only what living creatures did; the dead's samples are placeholders
@@ -177,13 +191,14 @@ def update(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv:
             # bf16 for the brain's own maths only; the losses stay float32
             with torch.autocast(device.type, torch.bfloat16, enabled=bf16):
                 mean, value, _ = learner(me[mb], kinds[mb], rays[mb])
-            step(learner, optimizer, cfg, seen, mean, value, actions[mb], old_logp[mb], adv_t[mb], ret_t[mb])
+            if step(learner, optimizer, cfg, seen, mean, value, actions[mb], old_logp[mb], adv_t[mb], ret_t[mb]):
+                return summed(learner, roll, returns, seen, stopped=True)
     return summed(learner, roll, returns, seen)
 
 
 def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollout, adv: np.ndarray,
                    returns: np.ndarray, cfg: PPO, bf16: bool = False, side: Side | None = None,
-                   closure: Closure | None = None) -> dict:
+                   closure: Closure | None = None, parts: Parts | None = None) -> dict:
     """update() for a brain with memory: minibatches of whole streams, each replayed in order from its starting
     notes, the notes kept or wiped as they were while collecting. Only living creatures' choices count."""
     device = next(learner.parameters()).device
@@ -212,7 +227,8 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
             extra = None
             with torch.autocast(device.type, torch.bfloat16, enabled=bf16):
                 mean, value, kept = replay(learner, me[:, mb], kinds[:, mb], rays[:, mb], start[mb], carry[:, mb],
-                                           keep=side is not None or closure is not None, live=active[:, mb])
+                                           keep=side is not None or closure is not None, live=active[:, mb],
+                                           parts=parts)
             if side:
                 assert kept is not None
                 lost = side.loss(kept[0], kept[1], carry[:, mb], active[:, mb])
@@ -227,35 +243,40 @@ def update_streams(learner: Brain, optimizer: torch.optim.Optimizer, roll: Rollo
                 extra = cfg.closure * lost + (extra if extra is not None else 0)
             live = active[:, mb].flatten()
             pick = lambda x: x[:, mb].flatten(0, 1)[live]
-            step(learner, optimizer, cfg, seen, mean[live], value[live], pick(actions), pick(old_logp),
-                 pick(adv_t), pick(ret_t), extra)
+            if step(learner, optimizer, cfg, seen, mean[live], value[live], pick(actions), pick(old_logp),
+                    pick(adv_t), pick(ret_t), extra):
+                return summed(learner, roll, returns, seen, stopped=True)
     return summed(learner, roll, returns, seen)
 
 
 def replay(learner: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor, start: torch.Tensor,
-           carry: torch.Tensor, keep: bool = False, live: torch.Tensor | None = None):
+           carry: torch.Tensor, keep: bool = False, live: torch.Tensor | None = None, parts: Parts | None = None):
     """Streams (steps, n, ...) played again from their starting notes, kept where carry is 1: mean actions and
     values, (steps * n, ...), and with keep, the moments and the notes after each step, (steps, n, ...). Given
     live, only those steps are sensed; the rest come back as placeholders."""
+    sense, heads = parts or (learner.sense, learner.heads)
     steps, n = carry.shape
     # what each moment looks like doesn't depend on the notes, so that part runs for all steps at once
     if live is None:
-        moments = learner.sense(me.flatten(0, 1), kinds.flatten(0, 1), rays.flatten(0, 1)).view(steps, n, -1)
+        moments = sense(me.flatten(0, 1), kinds.flatten(0, 1), rays.flatten(0, 1)).view(steps, n, -1)
     else:
         seen = live.flatten()
-        sensed = learner.sense(me.flatten(0, 1)[seen], kinds.flatten(0, 1)[seen], rays.flatten(0, 1)[seen])
+        sensed = sense(me.flatten(0, 1)[seen], kinds.flatten(0, 1)[seen], rays.flatten(0, 1)[seen])
         moments = sensed.new_zeros(steps * n, sensed.shape[-1])
         moments[seen] = sensed
         moments = moments.view(steps, n, -1)
     outs, written = learner.remember_streams(moments, start, carry, live)
-    mean, value = learner.heads(outs.flatten(0, 1))
+    mean, value = heads(outs.flatten(0, 1))
     return mean, value, ((moments, written) if keep else None)
 
 
 def step(learner: Brain, optimizer: torch.optim.Optimizer, cfg: PPO, seen: dict[str, list[float]],
          mean: torch.Tensor, value: torch.Tensor, actions: torch.Tensor, old_logp: torch.Tensor,
          adv: torch.Tensor, ret: torch.Tensor, extra: torch.Tensor | None = None):
-    """One clipped PPO step on a minibatch, the losses in float32, plus any extra loss (a side job's)."""
+    """One clipped PPO step on a minibatch, the losses in float32, plus any extra loss (a side job's). True when
+    [ppo] kl_stop says the update has moved the brain far enough (half again over it, as Stable Baselines reads its
+    target_kl), and the step wasn't taken: a brain whose action spread has shrunk, or a fresh optimizer's first
+    steps, can otherwise move it far further than the clip was meant to allow."""
     mean, value = mean.float(), value.float()
     dist = learner.dist(mean)
     log_ratio = dist.log_prob(actions).sum(-1) - old_logp
@@ -269,20 +290,28 @@ def step(learner: Brain, optimizer: torch.optim.Optimizer, cfg: PPO, seen: dict[
         loss = loss - cfg.coins * dist.coin_entropy(learner.named(cfg.coins_for)).mean()
     if extra is not None:
         loss = loss + extra
-    optimizer.zero_grad()
-    loss.backward()
-    nn.utils.clip_grad_norm_(learner.parameters(), cfg.max_grad_norm)
-    optimizer.step()
     with torch.no_grad():
         seen['policy_loss'].append(policy_loss.item())
         seen['value_loss'].append(value_loss.item())
         seen['entropy'].append(entropy.item())
         seen['kl'].append(((ratio - 1) - log_ratio).mean().item())
         seen['clipped'].append(((ratio - 1).abs() > cfg.clip).float().mean().item())
+    # measured before stepping, as Stable Baselines does: the minibatch that shows the brain has moved too far
+    # isn't stepped on
+    if cfg.kl_stop > 0 and seen['kl'][-1] > 1.5 * cfg.kl_stop:
+        return True
+    optimizer.zero_grad()
+    loss.backward()
+    nn.utils.clip_grad_norm_(learner.parameters(), cfg.max_grad_norm)
+    optimizer.step()
+    return False
 
 
-def summed(learner: Brain, roll: Rollout, returns: np.ndarray, seen: dict[str, list[float]]) -> dict:
+def summed(learner: Brain, roll: Rollout, returns: np.ndarray, seen: dict[str, list[float]],
+           stopped: bool = False) -> dict:
     stats: dict[str, float | list[float]] = {k: float(np.mean(v)) for k, v in seen.items()}
+    # minibatch steps taken, out of epochs × minibatches (fewer when kl_stop cut the update short)
+    stats['steps_taken'] = len(seen['kl']) - stopped
     returns, values = returns[roll.active], roll.values[roll.active]
     var = returns.var()
     stats['explained_variance'] = float(1 - (returns - values).var() / var) if var > 0 else 0.0

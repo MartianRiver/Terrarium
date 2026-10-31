@@ -2,7 +2,7 @@
 # from the runs themselves (runs/); this is what each rental cost, setup,
 # downloads and idle time included; `cpu` is the CPU and the cores the rental
 # came with. `ended` decides which stage a session counts towards, and
-# `python -m terrarium.compute vast` checks `dollars` against Vast.
+# `python -m terrarium.compute vast` (or `runpod`) checks `dollars` against the provider's bill.
 # [[machine]] names my own machines by the cpu and memory their runs record (or the
 # platform, for runs from before those were recorded).
 
