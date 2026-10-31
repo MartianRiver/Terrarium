@@ -166,6 +166,11 @@ spread = 0.0
 fade = 0.0
 leak = 0.0
 
+[hearing]
+# each hears the nearest other Terrikin within `range` metres, all the way round and through blocks, as a child hears
+# footsteps behind them: how close (1 touching, 0 at the edge) and which way off its heading. 0 is off
+range = 3.0
+
 [tag]
 # a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
 # new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed;

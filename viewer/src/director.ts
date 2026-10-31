@@ -22,6 +22,8 @@ const HOLD = 2.5;
 const LEAN = 0.6;
 // closer than this (metres), the camera keeps the angle it has
 const TURN_FROM = 2;
+// hiders within this many metres of the one followed share the count's shot, which is never narrower
+const TOGETHER = 5;
 
 export class Director {
   // the one Terrikin most worth following right now (whoever's it, the seeker closing in, the one nearest the berry,
@@ -53,7 +55,12 @@ export class Director {
       // the count: watch where the hiders go, and follow one of them
       const hiders = alive.filter((c) => c.colony === 0);
       if (!hiders.some((c) => c.id === this.lead)) this.lead = hiders[0]?.id ?? null;
-      return hiders.length ? { ...middle(hiders), spread: spreadOf(hiders), from: null } : null;
+      const lead = hiders.find((c) => c.id === this.lead);
+      if (!lead) return null;
+      // hiders off to far corners don't fit one shot (a phone held upright showed the grass between them): keep to
+      // the one followed and whoever's hiding near it
+      const near = hiders.filter((c) => dist(c, lead) < TOGETHER);
+      return { ...middle(near), spread: Math.max(spreadOf(near), TOGETHER), from: null };
     }
     const [subjects, others] = this.sides(alive);
     if (!subjects.length || !others.length) {
