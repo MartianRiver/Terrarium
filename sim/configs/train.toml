@@ -77,6 +77,10 @@ max_grad_norm = 0.5
 kl_stop = 0.0
 # end the run if its reward has been exactly 0 on every update this far in: a seed that died (0 is off)
 give_up = 0
+# end the run at update `stuck` if its episodes have lasted under stuck_seconds on average over the last 10
+# updates: a seed whose Terrikins keep dying young, which give_up misses since they still find a little (0 is off)
+stuck = 0
+stuck_seconds = 0.0
 # save a checkpoint every this many updates, and always at the end
 checkpoint_every = 50
 

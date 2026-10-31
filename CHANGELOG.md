@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+`[ppo] stuck` and `stuck_seconds` end a run whose episodes are still short by a given update, as one of two young-colony memory seeds was all the way to 64M (its episodes about 50 s against the other's 140 s by update 200), marked `stuck` in run.json. Run.json's `machine` names a rented pod's provider and instance. 0.4 notes: the rival brains' huge first KL was a fresh optimizer's first step at a high learning rate, not mixed-up samples.
+
 `python -m terrarium.compute runpod` checks compute.toml against RunPod's per-pod bills. Training gets three guards, each off by default: `[ppo] kl_stop` ends an update's passes at the first minibatch whose KL is past half again the limit, measured before it's stepped on, as Stable Baselines does; `[ppo] warmup` ramps the learning rate up over that many updates, which the 0.4 notes' ramped runs used from scratch trees but never reached the code; `[ppo] give_up` ends a run with its checkpoint, marked `gave_up` in run.json, when its reward has been exactly 0 on every update that far in. Metrics rows count `steps_taken`. `--fast` now compiles a memory brain's update too: torch.compile stops at a GRU, so the part that looks at the moment and the heads are compiled on their own (`ppo.Parts`). `terrarium.games --wiped-on-event` wipes a memory brain's notes as peekaboo's berry hides, or as it walks into a new room of the maze, so a score shows whether it remembers what it saw. uv takes no package released in the last 7 days (`exclude-newer`), and CI's actions are pinned to full commit SHAs.
 
 0.4 notes: peekaboo in steps, where second looks further and further apart taught a fresh memory brain to remember about twice as well in 16M as flashes every 3 s did. compute.toml has the grid's two pods.

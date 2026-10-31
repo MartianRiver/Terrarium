@@ -158,6 +158,17 @@ def test_a_run_with_no_reward_gives_up(tmp_path):
     assert not (run.dir / 'evals.json').exists()
 
 
+def test_a_run_whose_episodes_stay_short_stops_as_stuck(tmp_path):
+    world, trainer = short(tmp_path, stuck=4, stuck_seconds=100.0)
+    run = train('young-deaths', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
+    record = json.loads((run.dir / 'run.json').read_text())
+    assert record['stuck'] == 4 and record['samples'] == 256 and 'gave_up' not in record
+    assert not (run.dir / 'evals.json').exists()
+    world, trainer = short(tmp_path, stuck=4, stuck_seconds=1.0)
+    run = train('lived', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
+    assert 'stuck' not in json.loads((run.dir / 'run.json').read_text())
+
+
 def test_workers_split_the_arenas(tmp_path):
     world, trainer = short(tmp_path)
     run = train('split', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', workers=3)
@@ -238,3 +249,13 @@ def test_rivals_need_gpu_collect(tmp_path):
     with pytest.raises(ValueError, match='gpu-collect'):
         train('x', world, trainer, tmp_path / 'b.pt', scratch=True, root=tmp_path / 'runs', device='cpu',
               rivals=[tmp_path / 'b.pt'])
+
+
+def test_a_rented_pod_is_named_in_the_record(tmp_path):
+    from terrarium.runs import rental
+    first = tmp_path / 'environ'
+    first.write_bytes(b'PATH=/bin\0CONTAINER_ID=58471544\0CONTAINER_API_KEY=secret\0')
+    assert rental(first) == {'provider': 'vast', 'instance': '58471544'}
+    first.write_bytes(b'RUNPOD_POD_ID=12iu15qz2qh8mf\0')
+    assert rental(first) == {'provider': 'runpod', 'instance': '12iu15qz2qh8mf'}
+    assert rental(tmp_path / 'missing') == {}
