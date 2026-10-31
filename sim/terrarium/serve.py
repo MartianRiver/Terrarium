@@ -168,6 +168,21 @@ def number(body: dict, key: str, low: float, high: float, default: float) -> flo
     return min(max(float(value), low), high)
 
 
+def opened(token: str, game, label: str) -> dict:
+    return {'game': token, 'label': label, 'header': game.header, 'frame': game.first,
+            'you': game.you, 'controls': game.controls, 'score': game.score()}
+
+
+def step(game, body: dict) -> dict:
+    """A game's next few ticks, with what the player is doing in them, as the viewer asked."""
+    yes = body.get('yes', [])
+    if not isinstance(yes, list) or len(yes) > 8 or not all(isinstance(y, str) for y in yes):
+        raise ValueError('yes is a list of action names')
+    frames = game.step(int(number(body, 'ticks', 1, 10, 1)), number(body, 'thrust', -1, 1, 0),
+                       number(body, 'turn', -1, 1, 0), yes)
+    return {'frames': frames, 'score': game.score()}
+
+
 def handler(runs: Runs, static: Path | None = None):
     games = Games()
 
@@ -189,18 +204,12 @@ def handler(runs: Runs, static: Path | None = None):
                         cfg, brain, label = runs.game(id, checkpoint)
                         seed = int(number(body, 'seed', 0, 2**31 - 1, secrets.randbelow(2**31)))
                         token, game = games.start(cfg, brain, seed, label)
-                        self.json({'game': token, 'label': label, 'header': game.header, 'frame': game.first,
-                                   'you': game.you, 'controls': game.controls, 'score': game.score()})
+                        self.json(opened(token, game, label))
                     case ['api', 'play', token]:
                         game = games.get(token)
                         if game is None:
                             raise NotFound('that game is over (or this server restarted)')
-                        yes = body.get('yes', [])
-                        if not isinstance(yes, list) or len(yes) > 8 or not all(isinstance(y, str) for y in yes):
-                            raise ValueError('yes is a list of action names')
-                        frames = game.step(int(number(body, 'ticks', 1, 10, 1)), number(body, 'thrust', -1, 1, 0),
-                                           number(body, 'turn', -1, 1, 0), yes)
-                        self.json({'frames': frames, 'score': game.score()})
+                        self.json(step(game, body))
                     case _:
                         raise NotFound(f'nothing at {self.path}')
             except NotFound as e:

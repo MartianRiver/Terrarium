@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Friends can play by invite: `terrarium.playserve` is a play-only server for a hosted brain, and `terrarium.invites make <name>` makes a link, good for 7 days, that the site's viewer opens straight into a game; invites are signed rather than stored, and the server caps games at once and per invite without ending anyone's game to make room. In a game, C walks your Terrikin towards the mouse wherever it is, no button held, as in agar.io.
+
 The viewer has sound: the Sound button (or M) plays the reel's nursery mix live, a bite, a tag, a sprint, a hidden berry found, a hatch, nectar, an unload and a death for whatever's on screen, wind, birds by day and crickets at night, and music under it with ♪ to turn it off, all CC0 and fetched only once sound is on, on the site, the local viewer and Terrarium at Home's. What to play is found frame by frame the way `reel/sound.py` finds it in a replay, checked against it on every sample replay, and neither now hears a sprint or a sip at the very first frame.
 
 The site's list of what to watch is in three parts, Colonies, The nursery and Experiments, each with a line on what it is, so the main world, the kids' games and the side experiments no longer run together in one long list; the part with something training now comes first.
