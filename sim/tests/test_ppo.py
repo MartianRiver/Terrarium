@@ -88,12 +88,13 @@ def test_dirty_tree_needs_scratch(tmp_path, monkeypatch):
     assert (run.dir / 'diff.patch').exists() and set(record['versions']) == {'python', 'numpy', 'pymunk', 'torch'}
 
 
-def short(tmp_path):
+def short(tmp_path, **more):
     """A world with 3 s episodes and a few hundred samples of training on the CPU, so a whole run takes seconds."""
     world = tmp_path / 'world.toml'
     world.write_text((DEFAULT.parent / 'solo.toml').read_text().replace('seconds = 180.0', 'seconds = 3.0'))
     text = TRAIN.read_text()
-    for key, value in (('samples', 256), ('arenas', 4), ('steps', 16), ('minibatches', 2), ('checkpoint_every', 2)):
+    for key, value in (('samples', 256), ('arenas', 4), ('steps', 16), ('minibatches', 2), ('checkpoint_every', 2),
+                       *more.items()):
         text = '\n'.join(f'{key} = {value}' if line.startswith(f'{key} =') else line for line in text.splitlines())
     trainer = tmp_path / 'train.toml'
     trainer.write_text(text + '\n')
@@ -130,6 +131,31 @@ def test_training_changes_the_brain(tmp_path):
     torch.manual_seed(0)
     fresh = Brain(**SHAPE)
     assert not torch.equal(trained.policy.weight, fresh.policy.weight)
+
+
+def test_kl_stop_cuts_an_update_short(tmp_path):
+    world, trainer = short(tmp_path)
+    full = train('full', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', score=False)
+    world, trainer = short(tmp_path, kl_stop=1e-9)
+    cut = train('cut', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', score=False)
+    steps = lambda run: [json.loads(line)['steps_taken'] for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
+    epochs = load_train(trainer).ppo.epochs
+    assert steps(full) == [epochs * 2] * 4
+    # the first minibatch is the brain that collected (KL about 0), so it steps; the next one has moved past
+    assert all(1 <= n < epochs * 2 for n in steps(cut))
+
+
+def test_a_run_with_no_reward_gives_up(tmp_path):
+    world, trainer = short(tmp_path, give_up=2)
+    text, section = [], None
+    for line in trainer.read_text().splitlines():
+        section = line if line.startswith('[') else section
+        text.append(line.split('=')[0] + '= 0.0' if section == '[reward]' and '=' in line and not line.startswith('#') else line)
+    trainer.write_text('\n'.join(text) + '\n')
+    run = train('dead', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
+    record = json.loads((run.dir / 'run.json').read_text())
+    assert record['gave_up'] == 2 and record['samples'] == 128 and record['checkpoint'] == '00000000128.pt'
+    assert not (run.dir / 'evals.json').exists()
 
 
 def test_workers_split_the_arenas(tmp_path):

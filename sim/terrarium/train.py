@@ -32,7 +32,7 @@ from .brain import SHAPE, Brain, brain_id, save
 from .brain import load as load_brain
 from .config import DEFAULT, TRAIN, load, load_train
 from .log import Logger
-from .ppo import Closure, Side, advantages, update
+from .ppo import Closure, Parts, Side, advantages, update
 from .rollouts import Collector, OnDevice
 from .runs import ROOT, Run, cpu_quota
 from .usage import Sampler
@@ -106,7 +106,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         closure = Closure(learner.memory).to(device)
         optimizers[0].add_param_group({'params': list(closure.parameters())})
     # the same weights, compiled for the update; minibatch sizes change with how many are alive, hence dynamic
-    models = [cast(Brain, torch.compile(b, dynamic=True)) if fast else b for b in brains]
+    models = [cast(Brain, torch.compile(b, dynamic=True)) if fast and not b.memory else b for b in brains]
+    parts = Parts.compiled(learner) if fast and learner.memory else None
     worlds = [(c, n) for _, c, n in mixed]
     if gpu_collect:
         actors = [copy.deepcopy(b) for b in brains]
@@ -126,10 +127,12 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     checkpoint = None
     # samples count every place in every arena, the dead and unborn included; these are the ones that trained
     live = 0
+    rewarded = gave_up = False
     for u in range(1, updates + 1):
+        ramp = min(1.0, u / ppo.warmup) if ppo.warmup else 1.0
         for optimizer, lr in zip(optimizers, rates):
             for group in optimizer.param_groups:
-                group['lr'] = lr * (1 - (u - 1) / updates) if ppo.anneal else lr
+                group['lr'] = (lr * (1 - (u - 1) / updates) if ppo.anneal else lr) * ramp
         tick = time.perf_counter()
         sampler.into('collect')
         roll, last_value = rollouts.collect([b.state_dict() for b in brains] if rivals else learner.state_dict(),
@@ -147,10 +150,13 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
                     stats |= got
                 stats |= {f'{key}_{k}': v for key, v in (got | rollouts.by_brain[k].take()).items()}
         else:
-            stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast, side=side, closure=closure)
+            stats = update(models[0], optimizers[0], roll, adv, returns, ppo, bf16=fast, side=side, closure=closure,
+                           parts=parts)
         done = time.perf_counter()
         sampler.into(None)
         live += int(roll.active.sum())
+        rewarded = rewarded or bool((roll.rewards != 0).any())
+        gave_up = ppo.give_up > 0 and u == ppo.give_up and not rewarded
 
         row = {'update': u, 'samples': u * per_update, 'live_samples': live,
                'live_share': round(float(roll.active.mean()), 3), 'seconds': round(done - started, 1),
@@ -162,16 +168,22 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
             log.info('update', u=u, of=updates, sps=row['samples_per_second'],
                      ret=round(row.get('episode_return', np.nan), 2), lived=round(row.get('episode_seconds', np.nan), 1),
                      kl=round(stats['kl'], 4))
-        if u % ppo.checkpoint_every == 0 or u == updates:
+        if u % ppo.checkpoint_every == 0 or u == updates or gave_up:
             checkpoint = run.dir / 'checkpoints' / f'{u * per_update:011d}.pt'
             save(learner, checkpoint, **meta, samples=u * per_update)
             for k in range(1, len(brains)):
                 (run.dir / 'rivals' / str(k)).mkdir(parents=True, exist_ok=True)
                 save(brains[k], run.dir / 'rivals' / str(k) / checkpoint.name, **metas[k], samples=u * per_update)
+        if gave_up:
+            log.warn('gave up: no reward on any update', u=u)
+            break
 
     sampler.stop()
     rollouts.close()
     assert checkpoint is not None
+    if gave_up:
+        run.finish(samples=u * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint), gave_up=u)
+        return run
     if not score:
         run.finish(samples=updates * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint))
         return run

@@ -21,6 +21,8 @@ cuda = [
 ]
 
 [tool.uv]
+# a new release waits a week before uv will take it, so a bad one is usually caught and pulled first
+exclude-newer = "7 days"
 conflicts = [
     [{ extra = "cpu" }, { extra = "cuda" }],
 ]

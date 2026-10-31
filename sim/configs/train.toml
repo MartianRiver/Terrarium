@@ -47,6 +47,9 @@ minibatches = 8
 # lineage, where each piece falling to 0 would make the lineage a chain of warm restarts)
 lr = 3e-4
 anneal = true
+# the learning rate ramps up from 0 over this many updates first: a fresh Adam optimizer's first steps move every
+# weight by about the learning rate at once, which shoved a parent brain far (KL 8–44 on update 1); 0 is off
+warmup = 0
 # discount per choice (0.99 looks about 5 s ahead at 20 Hz, held 1 tick) and the GAE trade-off
 gamma = 0.99
 # at the episode's time limit, carry on the value of where it got to rather than count it as an end:
@@ -70,6 +73,10 @@ side_back = 20
 closure = 0.0
 value = 0.5
 max_grad_norm = 0.5
+# stop an update's passes once a minibatch's KL passes 1.5 times this (0 is off); 0.02 is a usual limit
+kl_stop = 0.0
+# end the run if its reward has been exactly 0 on every update this far in: a seed that died (0 is off)
+give_up = 0
 # save a checkpoint every this many updates, and always at the end
 checkpoint_every = 50
 

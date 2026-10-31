@@ -40,3 +40,62 @@ def test_perfect_memory_moves_on_when_the_berry_it_remembers_is_gone():
     got = score('peek', ['last_seen'], str(DEFAULT.parent / 'nursery-peek.toml'), episodes=4, processes=1)
     find = got['players']['last_seen']['find']
     assert np.mean(find['walked']) > 30 and np.mean(find['found']) > 0.5
+
+
+def test_peekaboo_notes_are_wiped_once_as_the_berry_hides():
+    from terrarium import config
+    from terrarium.games import hides
+    from terrarium.world import World
+    cfg = config.load(config.DEFAULT.parent / 'nursery-peek.toml')
+    w = World(cfg, 2, 0)
+    w.reset(np.ones(2, bool))
+    check = hides(w)
+    fired = []
+    for _ in range(int(3 * cfg.tick_hz)):
+        w.step(np.zeros((*w.alive.shape, 2)))
+        hit = check(w)
+        assert hit.shape == w.alive.shape and (hit.all(1) | ~hit.any(1)).all()
+        fired.append(hit[:, 0])
+    fired = np.array(fired)
+    # in sight for `show` seconds, then hidden: one wipe each, at that tick, and none while it stays hidden
+    assert (fired.sum(0) == 1).all()
+    assert abs(fired.argmax(0) / cfg.tick_hz - cfg.peek.show).max() < 0.1
+
+
+def test_a_maze_wipe_comes_with_each_new_room():
+    from terrarium import config
+    from terrarium.games import new_room
+    from terrarium.world import World
+    cfg = config.load(config.DEFAULT.parent / 'nursery-maze-3.toml')
+    w = World(cfg, 1, 0)
+    w.reset(np.ones(1, bool))
+    check = new_room(w)
+    assert check(w).all()  # nowhere before the first choice
+    assert not check(w).any()
+    size, n = cfg.arena.size, cfg.arena.maze
+    w.pos[0, 0] = w.pos[0, 0] + [size / n, 0]
+    hit = check(w)
+    assert hit[0, 0] and not hit[0, 1:].any()
+
+
+def test_a_wipe_on_every_choice_is_the_same_as_wiped(tmp_path):
+    import json
+    from dataclasses import replace
+    import torch
+    from terrarium import config
+    from terrarium.brain import SHAPE, Brain, save
+    from terrarium.evals import brain_policy, run
+    cfg = config.load(config.DEFAULT.parent / 'solo.toml')
+    cfg = replace(cfg, episode=replace(cfg.episode, seconds=3.0))
+    torch.manual_seed(7)
+    brain = Brain(**SHAPE).with_memory(8)
+    with torch.no_grad():
+        for q in brain.parameters():
+            q.add_(0.3 * torch.randn_like(q))
+    save(brain, tmp_path / 'b.pt')
+    always = lambda world: (lambda w: np.ones(w.alive.shape, bool))
+    on = run(cfg, brain_policy(tmp_path / 'b.pt', wipe_on=always), episodes=2)
+    wiped = run(cfg, brain_policy(tmp_path / 'b.pt', wiped=True), episodes=2)
+    kept = run(cfg, brain_policy(tmp_path / 'b.pt'), episodes=2)
+    assert json.dumps(on, sort_keys=True) == json.dumps(wiped, sort_keys=True)
+    assert json.dumps(on, sort_keys=True) != json.dumps(kept, sort_keys=True)

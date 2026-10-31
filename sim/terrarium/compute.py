@@ -17,7 +17,7 @@ import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 from .runs import ROOT
 
@@ -304,14 +304,14 @@ def report(brains: list[dict], root: Path = ROOT, path: Path = SESSIONS):
           f'${now["dollars"]:.2f}')
 
 
-def vast_key() -> str:
-    if key := os.environ.get('VAST_API_KEY'):
+def api_key(name: str) -> str:
+    if key := os.environ.get(name):
         return key
     env = Path(__file__).resolve().parent.parent.parent / '.env'
     for line in env.read_text().splitlines() if env.exists() else []:
-        if line.startswith('VAST_API_KEY='):
+        if line.startswith(f'{name}='):
             return line.split('=', 1)[1].strip()
-    raise SystemExit('no VAST_API_KEY in the environment or .env')
+    raise SystemExit(f'no {name} in the environment or .env')
 
 
 def vast_charges(days: int = 90) -> dict[int, float]:
@@ -323,7 +323,7 @@ def vast_charges(days: int = 90) -> dict[int, float]:
         args = query | ({'after_token': token} if token else {})
         url = 'https://console.vast.ai/api/v0/charges/?' + '&'.join(
             f'{k}={quote_plus(json.dumps(v))}' for k, v in args.items())
-        request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + vast_key()})
+        request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + api_key('VAST_API_KEY')})
         with urllib.request.urlopen(request, timeout=60) as r:
             page = json.loads(r.read())
         for row in page['results']:
@@ -333,9 +333,26 @@ def vast_charges(days: int = 90) -> dict[int, float]:
             return dict(charges)
 
 
-def check_vast(path: Path = SESSIONS):
-    recorded = {s['instance']: s['dollars'] for s in sessions(path) if s['provider'] == 'vast'}
-    for instance, dollars in sorted(vast_charges().items()):
+def runpod_charges(days: int = 90) -> dict[str, float]:
+    """Dollars per pod over the last `days`, from RunPod's billing (GPU and disk)."""
+    end = datetime.now(timezone.utc)
+    query = urlencode({'bucketSize': 'day', 'grouping': 'podId', 'startTime': f'{end - timedelta(days=days):%Y-%m-%dT%H:%M:%SZ}',
+                       'endTime': f'{end:%Y-%m-%dT%H:%M:%SZ}'})
+    # Cloudflare in front of it turns away urllib's own User-Agent
+    request = urllib.request.Request('https://rest.runpod.io/v1/billing/pods?' + query,
+                                     headers={'Authorization': 'Bearer ' + api_key('RUNPOD_API_KEY'),
+                                              'User-Agent': 'terrarium-compute'})
+    with urllib.request.urlopen(request, timeout=60) as r:
+        rows = json.loads(r.read())
+    charges = defaultdict(float)
+    for row in rows:
+        charges[row['podId']] += row['amount']
+    return dict(charges)
+
+
+def check(provider: str, charges: dict, path: Path = SESSIONS):
+    recorded = {s['instance']: s['dollars'] for s in sessions(path) if s['provider'] == provider}
+    for instance, dollars in sorted(charges.items()):
         note = recorded.get(instance)
         state = 'missing from compute.toml' if note is None else 'ok' if abs(note - dollars) < 0.005 else f'compute.toml says {note}'
         print(f'instance {instance}: ${dollars:.3f}  {state}')
@@ -344,14 +361,16 @@ def check_vast(path: Path = SESSIONS):
 def main():
     from .promote import lineage
     if sys.argv[1:] == ['vast']:
-        check_vast()
+        check('vast', vast_charges())
+    elif sys.argv[1:] == ['runpod']:
+        check('runpod', runpod_charges())
     elif sys.argv[1:] == ['board']:
         write_board(board(), BOARD)
         print(BOARD.read_text())
     elif not sys.argv[1:]:
         report(lineage())
     else:
-        raise SystemExit('usage: python -m terrarium.compute [vast|board]')
+        raise SystemExit('usage: python -m terrarium.compute [vast|runpod|board]')
 
 
 if __name__ == '__main__':

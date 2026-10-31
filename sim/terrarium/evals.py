@@ -188,10 +188,12 @@ MODES = ('drawn', 'mean', 'sampled')
 
 def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
                  watch: Callable[[Observation, np.ndarray, torch.Tensor], None] | None = None,
-                 wiped: bool = False, wipe_every: float = 0.0) -> Callable[[World], Policy]:
+                 wiped: bool = False, wipe_every: float = 0.0,
+                 wipe_on: Callable[[World], Callable[[World], np.ndarray]] | None = None) -> Callable[[World], Policy]:
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
     by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat. watch,
-    if given, sees each observation it chose from and the actions it chose (mind.py)."""
+    if given, sees each observation it chose from and the actions it chose (mind.py). wipe_on(world) makes a check,
+    run at each choice, of whose notes to blank then, (arenas, creatures): an event in a game."""
     brain, meta = load_brain(path)
     brain.eval().to(device)
     # it chooses every `repeat` ticks, as it did in training, and holds its choice in between
@@ -213,6 +215,7 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
         held, ticks = None, 0
         notes = brain.blank(last.shape[0] * last.shape[1])
         every = max(1, round(wipe_every / (world.cfg.dt * repeat))) if wipe_every else 0
+        event = wipe_on(world) if wipe_on else None
 
         def act(w: World) -> np.ndarray:
             nonlocal last, held, ticks, notes
@@ -222,6 +225,8 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
                 # and which can freeze it; wiped every few seconds, it gets to write its notes again in between
                 blank = wiped or (every and ticks // repeat % every == 0)
                 before = brain.blank(len(notes)) if blank else notes
+                if event is not None:
+                    before = before * ~torch.from_numpy(event(w).reshape(-1)).to(before.device)[:, None]
                 mean, notes = brain.act(obs, sample=False, notes=before)
                 # the dead remember nothing, so a hatchling in their place starts blank
                 notes = notes * torch.from_numpy(w.alive.reshape(-1)).to(notes)[:, None]
