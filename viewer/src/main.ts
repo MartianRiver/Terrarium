@@ -4,6 +4,7 @@ import { BrainView } from './brainview';
 import { ChannelCard, type Game as ChannelGame, type Item } from './channelcard';
 import { Picker } from './picker';
 import { clock } from './clock';
+import { Cues } from './cues';
 import { createDemo } from './demo';
 import { Director } from './director';
 import { galleryBar } from './gallery';
@@ -12,6 +13,7 @@ import { namesFor } from './names';
 import { Game } from './play';
 import { withNectar } from './preview';
 import { readReplay, ReplayError, type Replay } from './replay';
+import { Sounds } from './sounds';
 import { createStage } from './stage';
 import type { Frame, WorldInfo } from './world';
 import { WorldView } from './worldview';
@@ -135,6 +137,8 @@ function boot() {
   let opening = false;
   let acc = 0;
   let last = performance.now();
+  const cues = new Cues();
+  const sounds = new Sounds(stage.camera);
 
   stage.renderer.domElement.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
@@ -154,8 +158,11 @@ function boot() {
     director?.reset();
     const first = source.step()!;
     view.push(first);
+    cues.reset(source.info.nests);
+    cues.next(first);
     tick = first.tick;
     stage.light(first.light);
+    sounds.light(first.light, true);
     acc = 0;
     snap = true;
   }
@@ -370,6 +377,7 @@ function boot() {
     }
     if (e.key === 'v' || e.key === 'V') setCam(intro ? 'follow' : CAMS[(CAMS.indexOf(cam) + 1) % CAMS.length]);
     if (e.key === 'f' || e.key === 'F') setCam('follow');
+    if (e.key === 'm' || e.key === 'M') void sounds.toggle();
     if (ant && (e.key === 'j' || e.key === 'J')) ant.marked = !ant.marked;
   });
 
@@ -380,7 +388,8 @@ function boot() {
   const asked = params.get('cam') as Cam | null;
   setCam(asked && CAMS.includes(asked) ? asked : params.has('follow') ? 'follow' : 'wide');
   intro = params.has('intro');
-  openButton.before(camButton, ' ');
+  openButton.before(camButton, ' ', sounds.button, ' ', sounds.musicButton, ' ');
+  document.querySelector('#hud .hint')?.append(' · M sound');
   // the public site has no runs page; the link goes back to the front page instead
   const runsLink = document.querySelector<HTMLAnchorElement>('a[href="/runs.html"]');
   if (SITE && runsLink) {
@@ -461,6 +470,8 @@ function boot() {
         if (channel) card.frame(next);
         tick = next.tick;
         stage.light(next.light);
+        sounds.light(next.light);
+        sounds.hear(cues.next(next));
         acc -= tickSeconds;
       }
     }

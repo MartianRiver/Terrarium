@@ -60,6 +60,22 @@
   "nursery": {
     "music": {"track": "holizna-a-small-town-on-pluto", "db": -13, "night_dip": 0.85},
     "ambience": [
+      {"sound": "fs181252-a-gentle-breeze-wind-3", "when": "always", "db": -40, "lowpass": 3000},
+      {"sound": "fs344966-forest-birds-02", "when": "day", "db": -38, "lowpass": 6000}
+    ],
+    "world": {
+      "bite": {"sounds": ["fs221091-cartoon-pop-or-drip", "fs47498-mouthpop-02-wav"], "db": -30, "rate": [0.85, 1.0], "lowpass": 3500},
+      "found": {"sounds": ["fs399289-nom"], "db": -27, "rate": [1.0, 1.1], "lowpass": 8000},
+      "tag": {"sounds": ["fs452379-small-bell-2"], "db": -30, "rate": [1.0, 1.15], "lowpass": 7000},
+      "sprint": {"sounds": ["fs683101-quick-woosh"], "db": -38, "rate": [1.1, 1.3], "fast": 0.3, "lowpass": 5000},
+      "hatch": {"sounds": ["fs150479-egg-crack"], "db": -30, "rate": [0.85, 0.95], "lowpass": 3000}
+    },
+    "label": {"sounds": ["fs169867-swoosh"], "db": -36, "lead": 0.1, "lowpass": 5000},
+    "cut": {"sounds": ["fs60013-whoosh"], "db": -32, "lead": 0.3, "lowpass": 6000}
+  },
+  "nursery-pixabay": {
+    "music": {"track": "holizna-a-small-town-on-pluto", "db": -13, "night_dip": 0.85},
+    "ambience": [
       {"sound": "dragon-studio-gentle-wind-sounds-584728", "when": "always", "db": -40, "lowpass": 3000},
       {"sound": "freesound_community-birds-in-the-morning-24147", "when": "day", "db": -36, "lowpass": 6000}
     ],

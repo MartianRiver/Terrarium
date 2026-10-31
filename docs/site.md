@@ -90,6 +90,10 @@ Reviews: each file in `site/reviews/` is one model's review of the worker's code
 
 The board is read live from the job queue's public `/api/board` (cached for 30 s) when the page opens. Machines that cost nothing (mine, trusted and donor tokens) show what they saved, priced at what rented GPUs have cost per sample so far (the board's rented dollars over rented samples; `usd_per_billion` in the page's front matter is the fallback and the figure in its first paragraph), and rented GPUs show what they actually cost, from `compute.toml` via `sim/board.toml`. Update the AUD rate and its date in the front matter now and then.
 
+## Sound
+
+The viewer has sound, off until the Sound button (or M) turns it on, since a browser only starts audio after a click or a key, and it's remembered for next time in that browser. It's the reel's nursery mix, played live (`viewer/src/sounds.ts`): a bite, a tag, a sprint, peekaboo's hidden berry found, a hatch, a sip of nectar, jelly unloaded and a death, each only when it's on screen and 4 dB down from the overview, wind all the time, birds by day and crickets by night from the replay's light, and music under it, turned down at night, with ♪ to turn the music off on its own. Every file is CC0 (`viewer/public/sounds/SOURCES.md`), about 1.5 MB, fetched only when sound is first turned on. The site, a local viewer and the Terrarium at Home viewer all have it.
+
 ## Watching training as it goes
 
 `/watch/?channel=/replays/nursery/index.json` plays the replays an index lists, one after another, each labelled with its title, and reads the index again whenever one ends, so a replay of a newer checkpoint comes round on the next pass. The index is `{"items": [{"replay": "<file, relative to the index>", "title": "<label>"}, ...]}`, and the viewer only reads indexes and replays from its own site. Whatever trains a line uploads both to `replays/nursery/` (or a folder of its own), outside the site build, so a deploy doesn't remove them.

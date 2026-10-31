@@ -26,6 +26,8 @@ Render the backdrop's source clip (`backdrop.from`) before building. Frames aren
 - A sound when each label appears and just before each cut, the music under it all, and ambience by day and by night from the replay's light (crickets at night, birds by day).
 - The levels are a profile in `reel/sound.json` (`garden` for the 0.3 reel): the music sets the mood, the effects stay soft (peaks a few dB under the music, low-passed), so it doesn't sound harsh.
 
+The viewer plays the same sounds live (`viewer/src/sounds.ts`, files and sources in `viewer/public/sounds/`), with what to play found by `viewer/src/cues.ts` the same way `events()` finds it: keep the two in step (`test/cues.test.ts` checks the viewer finds what sound.py finds in every sample replay).
+
 Run it with the sim's Python (it needs numpy): `../sim/.venv/bin/python reel/sound.py reel/0.3.json OUT garden --sounds DIR`. It prints each layer's level, so the balance can be checked without listening. The sound files aren't in the repo: they're Kenney's CC0 packs, CC0 files from Freesound and the Free Music Archive, and Pixabay effects, whose licence doesn't allow passing them on as files. No Pixabay music: a track that showed no Content ID shield when it was downloaded got the 0.3 wrap-up drafts blocked on YouTube two days later, and reel 2 had used it. `garden-quiet` is the garden profile without music, and `garden-pluto` (the 0.3 wrap-up's) puts "A Small Town On Pluto" by HoliznaCC0 under it, a CC0 track from the Free Music Archive.
 
 ## Instagram's limits (checked 2026-10-23)
