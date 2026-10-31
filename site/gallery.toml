@@ -2,6 +2,8 @@
 # brains took from the first one to the one training now, matched to runs by name (a run no step matches joins
 # the step before it), what's being worked on beside the line (its best runs so far), and side experiments worth
 # watching. Every number on the page comes from the runs' own evals, in the world each one trained in.
+# On /watch/'s list, steps and the newest brains go under Colonies, a [[working]] block too and an [[aside]] under
+# Experiments, unless it says group = "colonies", "nursery" or "experiments".
 
 [[bridge]]
 # the 0.2 brain with unload and eat added as new actions, before it trained in a colony

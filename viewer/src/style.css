@@ -846,6 +846,26 @@ body {
   list-style: none;
 }
 
+#picker section + section {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(44 58 51 / 0.12);
+}
+
+#picker h3 {
+  margin: 4px 10px 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3f7a38;
+}
+
+.picker-about {
+  margin: 2px 10px 4px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 #picker li a {
   display: grid;
   grid-template-columns: 1fr auto;
