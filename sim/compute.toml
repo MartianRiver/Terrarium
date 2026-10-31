@@ -2213,3 +2213,23 @@ ended = "2026-10-31T04:13:49+11:00"
 dollars = 0.185
 note = "colZ2 (night/colZ2.log, machine 34586, $0.088/h)"
 
+
+[[session]]
+provider = "vast"
+instance = 58459212
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-10-31T09:23:03+11:00"
+ended = "2026-10-31T09:34:32+11:00"
+dollars = 0.020
+note = "peek ladder, setup hung in uv sync (peekladder/pl.log, machine 35285, $0.076/h)"
+
+[[session]]
+provider = "vast"
+instance = 58460456
+gpu = "RTX A4000"
+cpu = "24 cores"
+started = "2026-10-31T09:34:35+11:00"
+ended = "2026-10-31T10:21:17+11:00"
+dollars = 0.148
+note = "peek ladder pl-ladder-s1/s2, pl-control-s1/s2 (peekladder/pl.log, machine 151558, $0.176/h)"
