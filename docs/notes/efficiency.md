@@ -36,6 +36,8 @@ Samples a US$ on Vast, 2026-10-30, the same bench on each card (two memory peeka
 
 The dearest card is the worst buy by far, and the same colony run went 3× faster on one 3060's host than another's: the host's CPU matters as much as the card. Picking hosts by measured samples a dollar rather than by price is still to build.
 
+It happened again on 2026-10-31 with three tag runs side by side (no memory, `--gpu-collect`, 4 workers each): a 3080 with 20 cores at US$0.109/h made 17.4k samples/s, 575M a US$; a 3060 at US$0.081/h made 8.6k, 382M a US$, about half the 3060 above. The cheaper pod cost half as much again per sample, and its runs didn't finish in the time it was rented for.
+
 ## Assumptions that cost us
 
 - **A new action padded to mean 0, std 1** fired the unload action on half of all training ticks, so crops never survived the walk home. Eight runs stored nothing before it was found (0.3).

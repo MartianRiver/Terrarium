@@ -195,6 +195,15 @@ class Smell:
 
 
 @dataclass(frozen=True)
+class Hearing:
+    range: float
+
+    @property
+    def on(self) -> bool:
+        return self.range > 0
+
+
+@dataclass(frozen=True)
 class Ground:
     friction: float
 
@@ -304,6 +313,7 @@ class Config:
     grab: Grab
     carry: Carry
     smell: Smell
+    hearing: Hearing
     tag: Tag
     seek: Seek
     flag: Flag
@@ -435,7 +445,8 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
                      'speed': 1.0, 'spots': 0, 'spot_gap': 0.0},
          'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0},
          'carry': {'reach': 0.0, 'slow': 0.0, 'energy': 0.0},
-         'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0}}
+         'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0},
+         'hearing': {'range': 0.0}}
 
 
 def upgrade(data: dict) -> dict:
