@@ -243,6 +243,21 @@ def test_rivals_learn_beside_the_parent(tmp_path):
     assert all(np.isfinite(row[f'policy_loss_{k}']) for k in range(3)) and row['policy_loss'] == row['policy_loss_0']
 
 
+def test_a_pool_plays_the_brain_against_its_own_past_checkpoints(tmp_path):
+    world, trainer = short(tmp_path, samples=1536 * 6)
+    world.write_text((DEFAULT.parent / 'colony.toml').read_text().replace('seconds = 360.0', 'seconds = 3.0'))
+    save(Brain(**SHAPE), tmp_path / 'parent.pt')
+    run = train('pool', world, trainer, tmp_path / 'parent.pt', scratch=True, root=tmp_path / 'runs', device='cpu',
+                gpu_collect=True, pool=2)
+    assert json.loads((run.dir / 'run.json').read_text())['pool'] == 2 and not (run.dir / 'rivals').exists()
+    rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
+    assert len(rows) == 6 and rows[0]['opponent'] == 0
+    # drawn from the parent or the last two checkpoints before it, and never learning itself
+    for row in rows:
+        assert row['opponent'] in {0, *(r['samples'] for r in rows if r['update'] % 2 == 0)}
+        assert row['opponent'] < row['samples'] and 'policy_loss_1' not in row and 'episodes_1' in row
+
+
 def test_rivals_need_gpu_collect(tmp_path):
     world, trainer = short(tmp_path)
     save(Brain(**SHAPE), tmp_path / 'b.pt')
