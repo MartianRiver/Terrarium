@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+0.4 notes: peekaboo in steps, where second looks further and further apart taught a fresh memory brain to remember about twice as well in 16M as flashes every 3 s did. compute.toml has the grid's two pods.
+
 On the site, the viewer stays on an empty garden until what you chose to watch has loaded, where a pick from the list used to show the scripted demo colonies first, and a channel says it is being read. Setups of the same nursery game share one entry in the list of what to watch and one card on the Brains page, with a link for each setup marked training now or on hold (a game's `family` and `variant` in the channel's index; `&game=` takes several games), and the Brains page says the nursery is training only when one of its games is.
 
 A 4×4 maze nursery (`configs/nursery-maze-4.toml`) as the step between the 3×3 and the 5×5. `terrarium.games` names a brain by its run where two brains share a checkpoint file name, and has tests for its intervals and paired comparisons. A memory brain's update leaves out the dead and the unborn, which gave each step of theirs a GRU piece of its own as long as the rollout: in the young colony world that halves an update's time and memory, and memory runs there no longer run out of GPU memory. The `last_seen` baseline moves on once it reaches the spot where it last saw a berry, where it used to wait there for good, and `terrarium.games --wiped-every SECONDS` wipes a brain's notes that many seconds apart as well as before every choice. Every metrics row says how many of its samples were living Terrikins (`live_samples`, `live_share`), since a colony with room to grow counts its empty places as samples too.
