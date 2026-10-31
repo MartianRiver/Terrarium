@@ -358,6 +358,7 @@ class PPO:
     minibatches: int
     lr: float
     anneal: bool
+    warmup: int
     gamma: float
     bootstrap: bool
     lam: float
@@ -370,6 +371,8 @@ class PPO:
     closure: float
     value: float
     max_grad_norm: float
+    kl_stop: float
+    give_up: int
     checkpoint_every: int
 
 

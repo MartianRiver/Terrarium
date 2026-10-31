@@ -241,15 +241,49 @@ def against(a: np.ndarray, b: np.ndarray) -> dict:
     return {'difference': float(d.mean()), 'low': lo, 'high': hi, 'apart': bool(lo > 0 or hi < 0)}
 
 
-def policy(name: str, wiped: float | None = None) -> Make:
+def hides(world):
+    """Peekaboo's berry going out of sight since the last choice: wiped then, a brain can't know where it was."""
+    was = np.zeros(world.arenas, bool)
+
+    def now(w):
+        nonlocal was
+        hidden = w.peek.hidden
+        out, was = hidden & ~was, hidden
+        return np.repeat(out[:, None], w.alive.shape[1], 1)
+    return now
+
+
+def new_room(world):
+    """A Terrikin walking into another room of the maze since the last choice: wiped then, it has no map but
+    what it can see."""
+    n, size = world.cfg.arena.maze, world.cfg.arena.size
+    was = np.full((*world.alive.shape, 2), -1)
+
+    def now(w):
+        nonlocal was
+        room = np.clip(((w.pos[..., ::-1] + size / 2) // (size / n)).astype(int), 0, n - 1)
+        out, was = (room != was).any(-1), room
+        return out
+    return now
+
+
+# the event a game's notes are wiped on with --wiped-on-event, and what to call it
+EVENTS = {'peek': (hides, 'as it hides'), 'maze': (new_room, 'in each new room')}
+
+
+def policy(name: str, wiped: float | str | None = None) -> Make:
     """wiped: None keeps a memory brain's notes, 0 blanks them before every choice, more blanks them that many
-    seconds apart."""
+    seconds apart, and a game's name blanks them on that game's event."""
     if name in BASELINES:
         return BASELINES[name]
+    if isinstance(wiped, str):
+        return brain_policy(name, wipe_on=EVENTS[wiped][0])
     return brain_policy(name, wiped=wiped == 0, wipe_every=wiped or 0.0)
 
 
-def wiped_name(wiped: float | None) -> str:
+def wiped_name(wiped: float | str | None) -> str:
+    if isinstance(wiped, str):
+        return ' wiped ' + EVENTS[wiped][1]
     return '' if wiped is None else ' wiped' if wiped == 0 else f' wiped every {wiped:g} s'
 
 
@@ -262,16 +296,20 @@ def score_one(job: tuple) -> dict:
 
 
 def score(game: str, players: list[str], world: str | None = None, episodes: int = EPISODES, seed: int = SEED,
-          wiped: bool = False, processes: int | None = None, wipe_every: float = 0.0) -> dict:
+          wiped: bool = False, processes: int | None = None, wipe_every: float = 0.0, on_event: bool = False) -> dict:
     """Every player (a brain's path, or a baseline's name) in every role, each in its own process."""
     default, roles = GAMES[game]
     world = world or str(config.DEFAULT.parent / default)
-    names: list[tuple[str, float | None]] = [(p, None) for p in players]
+    names: list[tuple[str, float | str | None]] = [(p, None) for p in players]
     remembers = [p for p in players if p not in BASELINES and brain_memory(p)]
     if wiped:
         names += [(p, 0.0) for p in remembers]
     if wipe_every:
         names += [(p, wipe_every) for p in remembers]
+    if on_event:
+        if game not in EVENTS:
+            raise SystemExit(f'{game} has no event to wipe the notes on (only {", ".join(EVENTS)})')
+        names += [(p, game) for p in remembers]
     jobs = [(game, role, p, w, world, episodes, seed) for p, w in names for role in roles]
     with mp.get_context('spawn').Pool(processes or min(len(jobs), max(1, (mp.cpu_count() or 2) - 1))) as pool:
         done = pool.map(score_one, jobs)
@@ -338,11 +376,15 @@ def main():
                         help='also score brains with memory with their notes wiped before every choice')
     parser.add_argument('--wiped-every', type=float, default=0.0, metavar='SECONDS',
                         help='also score brains with memory with their notes wiped this many seconds apart')
+    parser.add_argument('--wiped-on-event', action='store_true',
+                        help="also score brains with memory with their notes wiped on the game's event: peekaboo's "
+                             'berry hiding, a new room of the maze')
     parser.add_argument('--processes', type=int)
     parser.add_argument('--out', help='every episode\'s numbers as JSON')
     args = parser.parse_args()
     result = score(args.game, args.baseline + args.brain, args.config, args.episodes,
-                   HELD_OUT if args.held_out else SEED, args.wiped, args.processes, args.wiped_every)
+                   HELD_OUT if args.held_out else SEED, args.wiped, args.processes, args.wiped_every,
+                   args.wiped_on_event)
     print(report(result))
     if args.out:
         Path(args.out).write_text(json.dumps(result) + '\n')
