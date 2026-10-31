@@ -50,6 +50,15 @@ interface Start {
   score: Score;
 }
 
+const CHASE = 'terrarium.play.chase';
+const remembered = () => {
+  try {
+    return localStorage.getItem(CHASE) === '1';
+  } catch {
+    return false;
+  }
+};
+
 // yes/no actions by key, held down for as long as you want a yes
 const ACTIONS: Record<string, { keys: string[]; label: string; what: string }> = {
   sprint: { keys: ['shift'], label: 'Shift', what: 'sprint' },
@@ -86,6 +95,10 @@ export class Game {
   private failed = '';
   private held = new Set<string>();
   private pointer: { x: number; y: number } | null = null;
+  // C: walk towards the mouse wherever it is, no button held, as in agar.io
+  private chase = remembered();
+  private hover: { x: number; y: number } | null = null;
+  private chaseButton = document.createElement('button');
   private caster = new THREE.Raycaster();
   private panel: HTMLElement;
   private hud: HTMLElement;
@@ -115,6 +128,11 @@ export class Game {
       <div class="hud-points"><span class="hud-label">Score</span><b></b></div>
       <div class="hud-counts"><span data-k="seconds"></span><span data-k="berries"></span><span data-k="home"></span></div>
       <div class="hud-state"><span class="hud-sprint"><span class="hud-label">Sprint</span><span class="hud-bar"><span></span></span><i></i></span><span class="hud-chips"></span></div>`;
+    this.chaseButton.type = 'button';
+    this.chaseButton.className = 'hud-chase';
+    this.chaseButton.addEventListener('click', () => this.setChase(!this.chase));
+    this.hud.querySelector('.hud-state')!.append(this.chaseButton);
+    this.setChase(this.chase);
     this.toasts = document.createElement('div');
     this.toasts.id = 'play-toasts';
     document.body.append(this.panel, this.hud, this.toasts);
@@ -122,8 +140,9 @@ export class Game {
     this.show();
   }
 
-  static async begin(run: string | null, camera: THREE.Camera, canvas: HTMLCanvasElement): Promise<Game> {
-    return new Game(await post('/api/play', run ? { run } : {}), camera, canvas);
+  // invite: the hosted play server's (playserve.py), which plays one brain and wants no run
+  static async begin(run: string | null, camera: THREE.Camera, canvas: HTMLCanvasElement, invite: string | null = null): Promise<Game> {
+    return new Game(await post('/api/play', invite ? { invite } : run ? { run } : {}), camera, canvas);
   }
 
   // the viewer's Source
@@ -166,7 +185,7 @@ export class Game {
     }
   }
 
-  // what you're doing: keys, or walking to the spot under a held mouse button (the keys win). Keys go by the
+  // what you're doing: keys, or walking to the spot under a held mouse button, or under the mouse with C on (the keys win). Keys go by the
   // screen, whichever way the camera faces: W is up the screen, D is right, and two together go between
   private input() {
     const on = (...keys: string[]) => keys.some((k) => this.held.has(k));
@@ -187,9 +206,10 @@ export class Game {
       const side = new THREE.Vector3(-ahead.z, 0, ahead.x);
       const way = ahead.multiplyScalar(up).add(side.multiplyScalar(right));
       towards(way.x, way.z, 1);
-    } else if (this.pointer && me) {
+    } else if ((this.pointer || (this.chase && this.hover)) && me) {
+      const at = (this.pointer ?? this.hover)!;
       const box = this.canvas.getBoundingClientRect();
-      this.caster.setFromCamera(new THREE.Vector2(((this.pointer.x - box.left) / box.width) * 2 - 1, -((this.pointer.y - box.top) / box.height) * 2 + 1), this.camera);
+      this.caster.setFromCamera(new THREE.Vector2(((at.x - box.left) / box.width) * 2 - 1, -((at.y - box.top) / box.height) * 2 + 1), this.camera);
       const hit = this.caster.ray.intersectPlane(ground, new THREE.Vector3());
       // slowing as it gets there
       if (hit) towards(hit.x - me.x, hit.z - me.y, Math.hypot(hit.x - me.x, hit.z - me.y) / 1.5);
@@ -201,6 +221,7 @@ export class Game {
   private listen(): () => void {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
+      if (key === 'c' && !e.repeat) this.setChase(!this.chase);
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift', 'e', 'q', 'g', ' '].includes(key)) {
         this.held.add(key);
         if (key.startsWith('arrow') || key === ' ') e.preventDefault();
@@ -214,6 +235,8 @@ export class Game {
     };
     const move = (e: PointerEvent) => {
       if (this.pointer) this.pointer = { x: e.clientX, y: e.clientY };
+      // a mouse only: a finger lifted is no place to walk to
+      if (e.pointerType === 'mouse') this.hover = { x: e.clientX, y: e.clientY };
     };
     const release = (e: PointerEvent) => {
       if (e.button === 0) this.pointer = null;
@@ -237,11 +260,24 @@ export class Game {
     };
   }
 
+  private setChase(on: boolean) {
+    this.chase = on;
+    this.chaseButton.textContent = on ? 'Following the mouse' : 'Follow the mouse';
+    this.chaseButton.setAttribute('aria-pressed', String(on));
+    this.chaseButton.title = 'C turns it on and off';
+    try {
+      localStorage.setItem(CHASE, on ? '1' : '0');
+    } catch {
+      // not remembered in a private window
+    }
+  }
+
   private show() {
     const s = this.score;
     const you = s.you;
     const extra = this.start.controls.filter((a) => ACTIONS[a]).map((a) => `<b>${ACTIONS[a].label}</b> ${ACTIONS[a].what}`);
     const keys = ['<b>W A S D</b> or <b>arrows</b> walk and turn', '<b>hold the mouse</b> (or trackpad) to walk to a spot',
+      '<b>C</b> follow the mouse without holding',
       ...extra, '<b>right-drag</b> look around', '<b>scroll</b> zoom', '<b>P</b> pause', '<b>R</b> new game'];
     const { worst, average, best, count } = s.brain;
     let state: string;
