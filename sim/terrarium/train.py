@@ -20,6 +20,7 @@ import argparse
 import copy
 import json
 import time
+from collections import deque
 from dataclasses import replace
 from pathlib import Path
 from typing import cast
@@ -127,7 +128,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     checkpoint = None
     # samples count every place in every arena, the dead and unborn included; these are the ones that trained
     live = 0
-    rewarded = gave_up = False
+    rewarded = gave_up = stuck = False
+    lived = deque(maxlen=10)
     for u in range(1, updates + 1):
         ramp = min(1.0, u / ppo.warmup) if ppo.warmup else 1.0
         for optimizer, lr in zip(optimizers, rates):
@@ -164,11 +166,14 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
                'collect_seconds': round(collected - tick, 2), 'update_seconds': round(done - collected, 2),
                'reward_per_sample': float(roll.rewards.mean()), **rollouts.episodes.take(), **stats, **sampler.take()}
         run.log_metrics(row)
+        if np.isfinite(row.get('episode_seconds', np.nan)):
+            lived.append(row['episode_seconds'])
+        stuck = ppo.stuck > 0 and u == ppo.stuck and bool(lived) and float(np.mean(lived)) < ppo.stuck_seconds
         if u == 1 or u % 10 == 0 or u == updates:
             log.info('update', u=u, of=updates, sps=row['samples_per_second'],
                      ret=round(row.get('episode_return', np.nan), 2), lived=round(row.get('episode_seconds', np.nan), 1),
                      kl=round(stats['kl'], 4))
-        if u % ppo.checkpoint_every == 0 or u == updates or gave_up:
+        if u % ppo.checkpoint_every == 0 or u == updates or gave_up or stuck:
             checkpoint = run.dir / 'checkpoints' / f'{u * per_update:011d}.pt'
             save(learner, checkpoint, **meta, samples=u * per_update)
             for k in range(1, len(brains)):
@@ -177,12 +182,16 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         if gave_up:
             log.warn('gave up: no reward on any update', u=u)
             break
+        if stuck:
+            log.warn('stuck: episodes too short', u=u, lived=round(float(np.mean(lived)), 1))
+            break
 
     sampler.stop()
     rollouts.close()
     assert checkpoint is not None
-    if gave_up:
-        run.finish(samples=u * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint), gave_up=u)
+    if gave_up or stuck:
+        run.finish(samples=u * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint),
+                   **{'gave_up' if gave_up else 'stuck': u})
         return run
     if not score:
         run.finish(samples=updates * per_update, checkpoint=checkpoint.name, brain=brain_id(checkpoint))

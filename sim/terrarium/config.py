@@ -373,6 +373,8 @@ class PPO:
     max_grad_norm: float
     kl_stop: float
     give_up: int
+    stuck: int
+    stuck_seconds: float
     checkpoint_every: int
 
 
