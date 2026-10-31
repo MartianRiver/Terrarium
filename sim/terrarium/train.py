@@ -3,6 +3,7 @@
 #   uv run python -m terrarium.train NAME --world configs/solo.toml [--parent X.pt] [--seed 0] [--scratch]
 #                                         [--device cuda|mps|cpu] [--workers N] [--fast] [--gpu-collect]
 #                                         [--rivals B.pt C.pt [--rival-lr 5e-5 1e-4] [--fixed-seats]] [--memory 128 [--recall 0.1]]
+#                                         [--pool 10]
 #
 # --memory N gives the brain N notes of memory if it has none (brain.py); it acts as before until trained, unless
 # --recall starts it reading them a little (in a toy test of a 6 s wait, 0.1 learned it in
@@ -12,6 +13,10 @@
 # the arenas (rollouts.seats), and each learns only from its own colonies' samples. --fixed-seats keeps colony k on
 # brain k instead, for a game whose sides differ (hide-and-seek: the parent hides, the rival seeks). Their checkpoints
 # go in rivals/<k>/; metrics ending _k are brain k's.
+#
+# --pool N plays the brain against its own past instead: one rival that doesn't learn, a copy of the parent at first,
+# then at every checkpoint one of the last N checkpoints drawn at random (the parent among them until it's pushed
+# out), so self-play can't settle into what only works against itself. Metric `opponent` is the samples it had.
 #
 # Ends by scoring the last checkpoint on the evals next to random, three ways (evals.MODES: yes/no drawn,
 # all by the mean, all drawn as in training), into the run's evals.json.
@@ -51,7 +56,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
           seed: int = 0, scratch: bool = False, root: Path = ROOT, device: str | None = None,
           workers: int = 1, score: bool = True, mix: list[tuple[Path | str, int]] | None = None,
           fast: bool = False, gpu_collect: bool = False, rivals: list[Path | str] | None = None,
-          rival_lr: list[float] | None = None, memory: int = 0, recall: float = 0.0, fixed_seats: bool = False) -> Run:
+          rival_lr: list[float] | None = None, memory: int = 0, recall: float = 0.0, fixed_seats: bool = False,
+          pool: int = 0) -> Run:
     world_cfg, cfg = load(world_path), load_train(train_path)
     mixed = [(Path(w), load(w), n) for w, n in (mix or [])]
     ppo = cfg.ppo
@@ -70,15 +76,20 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     if memory and learner.memory != memory:
         learner = learner.with_memory(memory, recall)
     rivals = rivals or []
-    if rivals and not gpu_collect:
+    if pool and rivals:
+        raise ValueError('--pool plays the brain against its own past, not against --rivals')
+    if (rivals or pool) and not gpu_collect:
         raise ValueError('rivals play with --gpu-collect only')
     if rival_lr and len(rival_lr) != len(rivals):
         raise ValueError(f'{len(rival_lr)} learning rates for {len(rivals)} rivals')
     loaded = [load_brain(r) for r in rivals]
-    brains = [learner] + [b for b, _ in loaded]
-    rates = [ppo.lr] + (rival_lr or [ppo.lr] * len(rivals))
+    brains = [learner] + [b for b, _ in loaded] + [copy.deepcopy(learner) for _ in range(bool(pool))]
+    rates = [ppo.lr] + (rival_lr or [ppo.lr] * len(rivals)) + [0.0] * bool(pool)
     for b in brains:
         b.restart(cfg.start.fresh)
+    # (samples, weights) of the checkpoints the pool's opponent is drawn from
+    past = [(0, copy.deepcopy(learner.state_dict()))] if pool else []
+    draw = np.random.default_rng(seed)
     run = Run(name, {
         'world': {'file': Path(world_path).name, 'config': world_cfg.to_dict()},
         'mix': [{'file': w.name, 'arenas': n, 'config': c.to_dict()} for w, c, n in mixed],
@@ -86,7 +97,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         'parent': parent_record, 'schema': schema.current(), 'shape': learner.shape, 'seed': seed,
         'device': device, 'gpu': torch.cuda.get_device_name() if device == 'cuda' else None,
         'workers': workers, 'threads': torch.get_num_threads(), 'fast': fast, 'gpu_collect': gpu_collect,
-        'recall': recall if memory else None, 'fixed_seats': fixed_seats if rivals else None,
+        'recall': recall if memory else None, 'fixed_seats': fixed_seats if rivals else None, 'pool': pool or None,
         'rivals': [{'file': str(r), 'id': brain_id(r), 'meta': m, 'shape': b.shape, 'lr': lr}
                    for r, (b, m), lr in zip(rivals, loaded, rates[1:])],
     }, scratch=scratch, root=root)
@@ -112,8 +123,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     worlds = [(c, n) for _, c, n in mixed]
     if gpu_collect:
         actors = [copy.deepcopy(b) for b in brains]
-        rollouts = OnDevice(world_cfg, cfg, ppo.arenas, seed, actors if rivals else actors[0], workers, worlds, device,
-                            fixed_seats)
+        rollouts = OnDevice(world_cfg, cfg, ppo.arenas, seed, actors if len(brains) > 1 else actors[0], workers, worlds,
+                            device, fixed_seats)
     else:
         rollouts = Collector(world_cfg, cfg, ppo.arenas, seed, copy.deepcopy(learner).cpu(), workers, worlds)
     per_update = rollouts.samples * ppo.steps
@@ -130,6 +141,7 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     live = 0
     rewarded = gave_up = stuck = False
     lived = deque(maxlen=10)
+    opponent = 0
     for u in range(1, updates + 1):
         ramp = min(1.0, u / ppo.warmup) if ppo.warmup else 1.0
         for optimizer, lr in zip(optimizers, rates):
@@ -137,15 +149,18 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
                 group['lr'] = (lr * (1 - (u - 1) / updates) if ppo.anneal else lr) * ramp
         tick = time.perf_counter()
         sampler.into('collect')
-        roll, last_value = rollouts.collect([b.state_dict() for b in brains] if rivals else learner.state_dict(),
+        roll, last_value = rollouts.collect([b.state_dict() for b in brains] if len(brains) > 1 else learner.state_dict(),
                                             ppo.steps)
         adv, returns = advantages(roll.rewards, roll.values, roll.dones, last_value, ppo.gamma, ppo.lam)
         collected = time.perf_counter()
         sampler.into('update')
-        if rivals:
-            stats = {}
+        if len(brains) > 1:
+            stats = {'opponent': opponent} if pool else {}
             assert isinstance(rollouts, OnDevice)
             for k, (model, optimizer) in enumerate(zip(models, optimizers)):
+                if not rates[k]:
+                    stats |= {f'{key}_{k}': v for key, v in rollouts.by_brain[k].take().items()}
+                    continue
                 own = replace(roll, active=roll.active & (rollouts.whose == k))
                 got = update(model, optimizer, own, adv, returns, ppo, bf16=fast)
                 if k == 0:
@@ -176,9 +191,13 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
         if u % ppo.checkpoint_every == 0 or u == updates or gave_up or stuck:
             checkpoint = run.dir / 'checkpoints' / f'{u * per_update:011d}.pt'
             save(learner, checkpoint, **meta, samples=u * per_update)
-            for k in range(1, len(brains)):
+            for k in range(1, len(rivals) + 1):
                 (run.dir / 'rivals' / str(k)).mkdir(parents=True, exist_ok=True)
                 save(brains[k], run.dir / 'rivals' / str(k) / checkpoint.name, **metas[k], samples=u * per_update)
+            if pool:
+                past = (past + [(u * per_update, copy.deepcopy(learner.state_dict()))])[-pool:]
+                opponent, weights = past[draw.integers(len(past))]
+                brains[1].load_state_dict(weights)
         if gave_up:
             log.warn('gave up: no reward on any update', u=u)
             break
@@ -228,6 +247,8 @@ def main():
                         help='brains that play the other colonies and learn beside the parent (needs --gpu-collect)')
     parser.add_argument('--rival-lr', nargs='*', type=float, help="each rival's learning rate (default the train config's)")
     parser.add_argument('--fixed-seats', action='store_true', help='with --rivals, colony k is always brain k')
+    parser.add_argument('--pool', type=int, default=0,
+                        help='play against one of the last N checkpoints of itself, drawn anew at every checkpoint')
     parser.add_argument('--memory', type=int, default=0, help='notes of memory to give a brain that has none')
     parser.add_argument('--recall', type=float, default=0.0,
                         help="with --memory, start reading the notes at this share of a fresh layer's weights (0: not at all)")
@@ -235,7 +256,8 @@ def main():
     train(args.name, args.world, args.train, args.parent, args.seed, args.scratch, device=args.device,
           workers=args.workers, score=not args.no_evals, fast=args.fast, gpu_collect=args.gpu_collect,
           mix=[(w, int(n)) for w, n in (m.rsplit(':', 1) for m in args.mix)], rivals=args.rivals,
-          rival_lr=args.rival_lr, memory=args.memory, recall=args.recall, fixed_seats=args.fixed_seats)
+          rival_lr=args.rival_lr, memory=args.memory, recall=args.recall, fixed_seats=args.fixed_seats,
+          pool=args.pool)
 
 
 if __name__ == '__main__':

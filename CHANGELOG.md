@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Capture the flag's pickups can pay the side that makes them without costing the other side (`[flag] charge`, the share of a pickup's points the other side loses, 1 everywhere as before, 0 in `configs/nursery-flag-fair.toml`): in self-play a pickup that cost the other side what it paid was worth exactly nothing to the one brain playing both sides, and 300M samples learned never to touch a flag. `[flag] home` pays a side for each metre its carrier brings the other side's flag nearer its own nest (`configs/nursery-flag-home.toml`), as `[reward] home` does for food. `train --pool N` plays a brain against one of its own last N checkpoints, drawn anew at every checkpoint and never learning itself, instead of against a copy of itself as it is.
+
 Friends can play by invite: `terrarium.playserve` is a play-only server for a hosted brain, and `terrarium.invites make <name>` makes a link, good for 7 days, that the site's viewer opens straight into a game; invites are signed rather than stored, and the server caps games at once and per invite without ending anyone's game to make room. In a game, C walks your Terrikin towards the mouse wherever it is, no button held, as in agar.io.
 
 The viewer has sound: the Sound button (or M) plays the reel's nursery mix live, a bite, a tag, a sprint, a hidden berry found, a hatch, nectar, an unload and a death for whatever's on screen, wind, birds by day and crickets at night, and music under it with ♪ to turn it off, all CC0 and fetched only once sound is on, on the site, the local viewer and Terrarium at Home's. What to play is found frame by frame the way `reel/sound.py` finds it in a replay, checked against it on every sample replay, and neither now hears a sprint or a sip at the very first frame.

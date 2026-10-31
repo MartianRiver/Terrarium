@@ -11,7 +11,11 @@
 # Without it, an opponent touching the carrier sends the flag straight home.
 #
 # Picking a flag up from a nest and taking one off a carrier are each worth
-# `pickup` of points, so the first steps pay before the first capture.
+# `pickup` of points, so the first steps pay before the first capture, and
+# cost the other side `charge` of that (1: as much as it pays). Each metre a
+# carrier brings the other side's flag nearer its own nest is worth `home` to its
+# side (and as much back for each metre further), so the way home pays before
+# the first capture does.
 import numpy as np
 
 from .config import ConfigError
@@ -35,6 +39,9 @@ class Flags:
         self.pickups = np.zeros((arenas, 2), int)
         self.saves = np.zeros((arenas, 2), int)
         self.gain = np.zeros(world.alive.shape)
+        # who carried each flag last tick and how far from their own nest, for `home`
+        self.was = np.full((arenas, 2), -1)
+        self.gap = np.zeros((arenas, 2))
 
     def reset(self, idx: np.ndarray):
         self.carrier[idx] = -1
@@ -45,6 +52,7 @@ class Flags:
         self.pickups[idx] = 0
         self.saves[idx] = 0
         self.gain[idx] = 0
+        self.was[idx] = -1
 
     def held(self) -> np.ndarray:
         """Whose flag each creature carries, -1 for none, (arenas, creatures)."""
@@ -75,6 +83,8 @@ class Flags:
         for t in range(2):
             for a in range(len(self.carrier)):
                 c = self.carrier[a, t]
+                if c < 0:
+                    self.was[a, t] = -1
                 if c >= 0 and not w.alive[a, c]:
                     if f.steal:
                         self._put_down(a, t, -1)
@@ -100,7 +110,8 @@ class Flags:
             self.carrier[a, t] = taker[0]
             self.guard[a, t] = self._ticks(cfg.flag.guard)
             self.pickups[a, 1 - t] += 1
-            self._pay(a, 1 - t, cfg.flag.points * cfg.flag.pickup)
+            self._pay(a, 1 - t, cfg.flag.points * cfg.flag.pickup, cfg.flag.charge)
+            self.was[a, t], self.gap[a, t] = taker[0], np.hypot(*(w.pos[a, taker[0]] - w.nests[1 - t]))
 
     def _carried(self, a: int, t: int, c: int, drop: bool):
         w, cfg = self.world, self.world.cfg
@@ -118,6 +129,8 @@ class Flags:
         if f.steal and drop:
             self._put_down(a, t, c)
             return
+        if f.home and side != t:
+            self._homeward(a, t, c, side)
         gap = np.hypot(*(w.pos[a] - w.pos[a, c]).T)
         robbers = (w.colony != side) & w.alive[a] & (gap < 2 * cfg.creature.radius + 0.1)
         if not robbers.any() or self.guard[a, t]:
@@ -131,7 +144,14 @@ class Flags:
         robber = 1 - side
         if robber == t:
             self.saves[a, t] += 1
-        self._pay(a, robber, f.points * f.pickup)
+        self._pay(a, robber, f.points * f.pickup, f.charge)
+
+    def _homeward(self, a: int, t: int, c: int, side: int):
+        w = self.world
+        gap = float(np.hypot(*(w.pos[a, c] - w.nests[side])))
+        if self.was[a, t] == c:
+            self._pay(a, side, w.cfg.flag.home * (self.gap[a, t] - gap), 0.0)
+        self.was[a, t], self.gap[a, t] = c, gap
 
     def _put_down(self, a: int, t: int, by: int):
         w = self.world
@@ -160,6 +180,6 @@ class Flags:
     def _ticks(self, seconds: float) -> int:
         return round(seconds * self.world.cfg.tick_hz)
 
-    def _pay(self, a: int, team: int, amount: float):
+    def _pay(self, a: int, team: int, amount: float, charge: float = 1.0):
         w = self.world
-        self.gain[a] += np.where(w.colony == team, amount, -amount)
+        self.gain[a] += np.where(w.colony == team, amount, -amount * charge)

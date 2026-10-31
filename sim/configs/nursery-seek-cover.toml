@@ -192,11 +192,14 @@ points = 1.0
 [flag]
 # a nursery game for two colonies: walking into the other nest picks up their flag, bringing it onto your own captures it
 # for `points` (0 is off) to your colony and as much off theirs; a pickup from a nest or a touch on the carrier is worth
-# `pickup` of points. With `steal`, a touch from the other side takes the flag (nobody can take it off the new carrier
-# for `guard` seconds), a colony has to carry its own flag home, and a carrier can put it down (unload) for a teammate;
-# one left lying goes home after `lie` seconds. Without, a touch sends it straight home
+# `pickup` of points, and costs the other side `charge` of that; each metre a carrier brings their flag nearer its own
+# nest is worth `home`. With `steal`, a touch from the other side takes the flag (nobody can take it off the new
+# carrier for `guard` seconds), a colony has to carry its own flag home, and a carrier can put it down (unload) for a
+# teammate; one left lying goes home after `lie` seconds. Without, a touch sends it straight home
 points = 0.0
 pickup = 0.0
+charge = 1.0
+home = 0.0
 steal = false
 guard = 0.0
 lie = 0.0
