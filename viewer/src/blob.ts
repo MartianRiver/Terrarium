@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { COLONY_COLOURS, SIGNAL_COLOURS, SIGNAL_OFF_BULB, shimmer } from './palette';
+import { pellets } from './droppings';
 import { berryGeo, berryMat, leafGeo, leafMat } from './props';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SIGNAL_OFF, type CreatureState } from './world';
@@ -119,6 +120,9 @@ export class BlobView {
   // a berry carried in its jaws (carry), held up on top of its head like an ant's seed
   private berry = new THREE.Group();
   private carried = 0;
+  // or a dropping ([dung]), taken somewhere out of the way
+  private poop = pellets();
+  private carriedDung = 0;
   private mouth: THREE.Mesh;
   private blush: THREE.Mesh[] = [];
   // nectar: a shimmering bulb and belly and a happy face; sprinting: stretched out and quick-footed
@@ -207,6 +211,9 @@ export class BlobView {
     this.berry.position.set(0, 0.92, 0.12);
     this.berry.visible = false;
     this.body.add(this.berry);
+    this.poop.position.set(0, 0.86, 0.12);
+    this.poop.visible = false;
+    this.body.add(this.poop);
 
     for (let k = 0; k < 3; k++) {
       const mat = new THREE.MeshBasicMaterial({ color: Z_COLOUR, transparent: true, opacity: 0, depthWrite: false });
@@ -292,6 +299,7 @@ export class BlobView {
     this.applyCrop(s.carrying, dt);
     this.applyNectar(time);
     this.applyLoad(s.load, dt);
+    this.applyDung(s.dung, dt);
     this.applyDoze(s.speed / maxSpeed, dt, time);
   }
 
@@ -301,6 +309,13 @@ export class BlobView {
     this.berry.visible = this.carried > 0.02;
     this.berry.scale.setScalar(this.carried);
   }
+
+  private applyDung(dung: number, dt: number) {
+    this.carriedDung += ((dung > 0 ? 1 : 0) - this.carriedDung) * Math.min(1, dt * (dung > 0 ? 10 : 18));
+    this.poop.visible = this.carriedDung > 0.02;
+    this.poop.scale.setScalar(this.carriedDung * 1.6);
+  }
+
 
   get sprinting() {
     return this.dash > 0.5;

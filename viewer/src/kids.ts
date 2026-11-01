@@ -20,7 +20,7 @@ const log = createLogger('kids');
 const NEARER: Record<string, number> = { little: 1, big: 0.62 };
 // the end screen's buttons wait this long, so a click meant for the game doesn't start the next one
 const SETTLE = 1500;
-const EMPTY: WorldInfo = { width: 12, height: 12, tickHz: 20, maxSpeed: 2, nests: [] };
+const EMPTY: WorldInfo = { width: 12, height: 12, tickHz: 20, maxSpeed: 2, nests: [], midden: 0 };
 const TURN = 1.6; // radians a second at full stick
 const ZOOM = 0.8; // share a second
 const CLOSEST = 0.45;

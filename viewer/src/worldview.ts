@@ -53,7 +53,7 @@ export class WorldView {
   focusId: number | null = null;
   private ring: THREE.Mesh;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1, dung: 0 };
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;
@@ -81,6 +81,7 @@ export class WorldView {
       const pile = new JellyPile(nest);
       this.piles.set(nest.colony, pile);
       scene.add(pile.root);
+      if (info.midden > 0) scene.add(middenLine(nest.x, nest.y, nest.radius + info.midden));
     }
   }
 
@@ -249,7 +250,7 @@ export class WorldView {
       if (seen.has(id)) continue;
       // food only goes when it's eaten, so the nearest creature had it
       const eater = nearest(frame.creatures, view.state);
-      if (eater) this.droppings?.meal(eater.id, frame.tick);
+      if (eater && !frame.dung) this.droppings?.meal(eater.id, frame.tick);
       view.despawn();
       this.dyingFood.push(view);
       this.food.delete(id);
@@ -265,4 +266,17 @@ export class WorldView {
     }
     // blocks don't get destroyed in any stage yet
   }
+}
+
+// the tidy nursery's line: a dropping put down past it counts as taken out
+function middenLine(x: number, y: number, r: number): THREE.Group {
+  const root = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0x6b4a2f, transparent: true, opacity: 0.55, depthWrite: false });
+  const dashes = Math.max(12, Math.round(r * 6));
+  for (let k = 0; k < dashes; k++) {
+    const dash = new THREE.Mesh(new THREE.RingGeometry(r - 0.04, r + 0.04, 6, 1, (k / dashes) * Math.PI * 2, (Math.PI / dashes)).rotateX(-Math.PI / 2), mat);
+    root.add(dash);
+  }
+  root.position.set(x, 0.015, y);
+  return root;
 }

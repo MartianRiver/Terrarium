@@ -169,6 +169,9 @@ CONTEXTS = {
     'carry_block': (lambda w, nest, mine: w.block_in_reach(), 6),
     # a yes while carrying puts it down
     'carry_laden': (lambda w, nest, mine: w.load >= 0, 6),
+    # a dropping in reach, and a yes while carrying one (puts it down)
+    'carry_dung': (lambda w, nest, mine: w.dung.in_reach() if w.dung else np.zeros_like(w.alive), 6),
+    'carry_dung_laden': (lambda w, nest, mine: w.dung.load >= 0 if w.dung else np.zeros_like(w.alive), 6),
     # the young may eat in the nest whenever they aren't full
     'eat_young_home': (lambda w, nest, mine: (nest == w.colony) & (w.young > 0) & (w.energy < 1) & (mine > 0), 3),
 }
@@ -254,6 +257,11 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     lived, meals, stored, drunk = (np.zeros(shape, int) for _ in range(4))
     jelly = np.zeros(shape)
     picked, put_home, given, given_hungry, lifted = (np.zeros(shape, int) for _ in range(5))
+    # with [dung] on: droppings made, picked up, taken out past the midden, metres moved further from home, and how
+    # many lie near each living one (a pile as one) and within 3 m of a nest, summed over ticks
+    made, dung_picked, taken = (np.zeros(shape, int) for _ in range(3))
+    tidied = np.zeros(shape)
+    dirt, lived_ticks, nest_dung, all_dung = 0.0, 0, 0, 0
     # deaths in each slot: with hatching, one slot can die more than once
     died, jelly_at_home, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
@@ -301,6 +309,13 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         growing = world.food_present & (f < world.wild)
         pos, food_pos = world.pos.copy(), world.food_pos.copy()
         world.step(action)
+        if world.dung:
+            dirt += (world.dung.dirt() * before).sum()
+            lived_ticks += before.sum()
+            lying = world.dung.lying() & ~done[:, None]
+            gap = world.dung.pos[:, :, None] - world.nests[None, None]
+            nest_dung += (lying & (np.hypot(gap[..., 0], gap[..., 1]) < 3.0).any(-1)).sum()
+            all_dung += lying.sum()
         tactics.after(world, done)
         # food goes at nightfall too; only count it eaten on other ticks
         eaten = (growing & ~world.food_present & (world.food_regrow != CARRIED) & ~(world.dark & ~was_dark)[:, None]
@@ -339,6 +354,11 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         lifted[finished] = world.lifted[finished]
         given[finished] = world.given[finished]
         given_hungry[finished] = world.given_hungry[finished]
+        if world.dung:
+            made[finished] = world.dung.made[finished]
+            dung_picked[finished] = world.dung.picked[finished]
+            taken[finished] = world.dung.taken[finished]
+            tidied[finished] = world.dung.tidied[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         hatched[finished] = world.hatched[finished]
         size_end[finished] = counts[finished]
@@ -382,6 +402,10 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
                       'given': summary(given[:, starters]), 'given_hungry': summary(given_hungry[:, starters]),
                       'lifted': summary(lifted[:, starters])}}
            if cfg.carry.on else {}),
+        **({'dung': {'made': summary(made[:, starters]), 'picked': summary(dung_picked[:, starters]),
+                     'taken_out': summary(taken[:, starters]), 'moved_away': summary(tidied[:, starters]),
+                     'near_each': dirt / max(lived_ticks, 1), 'near_nest_share': nest_dung / max(all_dung, 1)}}
+           if cfg.dung.on else {}),
     }
 
 
@@ -499,6 +523,14 @@ def main():
             print(f'{name:<{width}}  ' + '  '.join(f'{ca[k]["mean"]:{n}.2f}' for k, n in
                                                   (('picked', 9), ('put_home', 13), ('given', 13), ('given_hungry', 15),
                                                    ('lifted', 13))))
+    if cfg.dung.on:
+        print(f'\n{"droppings, each":<{width}}  {"made":>5}  {"picked up":>9}  {"taken out":>9}  {"m moved away":>12}'
+              f'  {"lying near":>10}  {"by a nest":>9}')
+        for name, r in results.items():
+            du = r['dung']
+            print(f'{name:<{width}}  ' + '  '.join(f'{du[k]["mean"]:{n}.2f}' for k, n in
+                                                  (('made', 5), ('picked', 9), ('taken_out', 9), ('moved_away', 12)))
+                  + f'  {du["near_each"]:10.2f}  {du["near_nest_share"]:9.0%}')
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

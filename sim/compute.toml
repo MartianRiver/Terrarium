@@ -2300,3 +2300,263 @@ started = "2026-10-31T11:57:49+11:00"
 ended = "2026-10-31T13:58:26+11:00"
 dollars = 0.185
 note = "hearing th-hear-s3 (stopped at 13.9M by the time cap), th-deaf-s2/s3 (tonight/hear2.log, machine 38453, $0.081/h)"
+
+[[session]]
+provider = "runpod"
+instance = "2fmwoawx9zc4r7"
+gpu = "RTX 3080"
+started = "2026-10-31T23:25:39+11:00"
+ended = "2026-10-31T23:42:46+11:00"
+dollars = 0.048
+note = "night CTF ctf-pool-s1/s2 from fresh, stopped at 25M (lab 2026-11-01-night/runpod-ctf.log, $0.17/h)"
+
+[[session]]
+provider = "vast"
+instance = 58531482
+gpu = "RTX 3080"
+cpu = "32 cores"
+started = "2026-10-31T23:17:43+11:00"
+ended = "2026-11-01T00:28:31+11:00"
+dollars = 0.145
+note = "night lineages lin-s2/s3 (lin-s1, feast, feastfun OOM on 10 GB) (lab 2026-11-01-night/vast-a.log, machine 142471, $0.115/h)"
+
+[[session]]
+provider = "vast"
+instance = 58531521
+gpu = "RTX 3070"
+cpu = "32 cores"
+started = "2026-10-31T23:18:04+11:00"
+ended = "2026-10-31T23:28:11+11:00"
+dollars = 0.000
+note = "night poop colonies, stuck loading, destroyed at 10 min (lab 2026-11-01-night/vast-b.log, machine 147194, $0.095/h)"
+
+[[session]]
+provider = "vast"
+instance = 58532741
+gpu = "RTX 3090"
+cpu = "40 cores"
+started = "2026-10-31T23:30:39+11:00"
+ended = "2026-10-31T23:36:29+11:00"
+dollars = 0.044
+note = "night poop colonies, no ssh within 3 min (lab 2026-11-01-night/vast-b2.log, machine 55178, $0.405/h)"
+
+[[session]]
+provider = "vast"
+instance = 58533575
+gpu = "RTX 4070"
+cpu = "28 cores"
+started = "2026-10-31T23:39:09+11:00"
+ended = "2026-10-31T23:43:07+11:00"
+dollars = 0.012
+note = "night poop colonies, no ssh within 3 min (lab 2026-11-01-night/vast-b3.log, machine 100803, $0.148/h)"
+
+[[session]]
+provider = "vast"
+instance = 58533581
+gpu = "RTX 3060"
+cpu = "21 cores"
+started = "2026-10-31T23:39:18+11:00"
+ended = "2026-11-01T02:15:29+11:00"
+dollars = 0.234
+note = "night lin-s1, feast-s1, feastfun-s1 (lab 2026-11-01-night/vast-b4.log, machine 38453, $0.081/h)"
+
+[[session]]
+provider = "vast"
+instance = 58533944
+gpu = "RTX 4070"
+cpu = "24 cores"
+started = "2026-10-31T23:43:43+11:00"
+ended = "2026-11-01T00:55:43+11:00"
+dollars = 0.205
+note = "night dung03-s1/s2, ctl03-s1 (ctl03-s2 OOM) (lab 2026-11-01-night/vast-b5.log, machine 154240, $0.176/h)"
+
+[[session]]
+provider = "vast"
+instance = 58533892
+gpu = "RTX 3070"
+cpu = "32 cores"
+started = "2026-10-31T23:42:55+11:00"
+ended = "2026-10-31T23:50:34+11:00"
+dollars = 0.014
+note = "night CTF round 2, no ssh within 3 min (lab 2026-11-01-night/vast-ctf2-fail.log, machine 147194, $0.097/h)"
+
+[[session]]
+provider = "vast"
+instance = 58534602
+gpu = "RTX 3070"
+cpu = "18 cores"
+started = "2026-10-31T23:51:21+11:00"
+ended = "2026-10-31T23:56:03+11:00"
+dollars = 0.018
+note = "night CTF round 2, all 4 OOM on 8 GB (lab 2026-11-01-night/vast-ctf2-oom.log, machine 33752, $0.104/h)"
+
+[[session]]
+provider = "vast"
+instance = 58534990
+gpu = "RTX 4060 Ti"
+cpu = "20 cores"
+started = "2026-10-31T23:56:46+11:00"
+ended = "2026-11-01T00:06:12+11:00"
+dollars = 0.018
+note = "night CTF round 2, all 4 OOM on 16 GB (lab 2026-11-01-night/vast-ctf2-oom16.log, machine 28725, $0.189/h)"
+
+[[session]]
+provider = "vast"
+instance = 58535850
+gpu = "A10"
+cpu = "24 cores"
+started = "2026-11-01T00:06:49+11:00"
+ended = "2026-11-01T00:14:18+11:00"
+dollars = 0.051
+note = "night CTF round 2, 3 of 4 OOM on 24 GB, stopped (lab 2026-11-01-night/vast-ctf2-oom24.log, machine 37444, $0.243/h)"
+
+[[session]]
+provider = "vast"
+instance = 58536593
+gpu = "A10"
+cpu = "24 cores"
+started = "2026-11-01T00:14:22+11:00"
+ended = "2026-11-01T01:44:37+11:00"
+dollars = 0.391
+note = "night CTF round 2 ctf-pool03-s1/s2, ctf-fair03-s1, ctf-old03-s1 (lab 2026-11-01-night/vast-ctf2.log, machine 37444, $0.243/h)"
+
+[[session]]
+provider = "vast"
+instance = 58548978
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T02:17:40+11:00"
+ended = "2026-11-01T02:27:47+11:00"
+dollars = 0.003
+note = "night CTF round 3, never left loading (lab 2026-11-01-night/vast-ctf3-fail.log, machine 38778, $0.117/h)"
+
+[[session]]
+provider = "vast"
+instance = 58550077
+gpu = "RTX A4000"
+cpu = "16 cores"
+started = "2026-11-01T02:28:25+11:00"
+ended = "2026-11-01T03:15:30+11:00"
+dollars = 0.137
+note = "night CTF round 3 ctf-home03-s1, ctf-homepool-s1 (lab 2026-11-01-night/vast-ctf3.log, machine 116794, $0.161/h)"
+
+[[session]]
+provider = "vast"
+instance = 58540876
+gpu = "RTX 3070"
+cpu = "24 cores"
+started = "2026-11-01T00:56:43+11:00"
+ended = "2026-11-01T01:00:52+11:00"
+dollars = 0.009
+note = "night ctl03-s2, no ssh within 3 min (lab 2026-11-01-night/vast-ctl2-fail.log, machine 137857, $0.102/h)"
+
+[[session]]
+provider = "vast"
+instance = 58541386
+gpu = "RTX 3080"
+cpu = "32 cores"
+started = "2026-11-01T01:01:16+11:00"
+ended = "2026-11-01T01:31:14+11:00"
+dollars = 0.076
+note = "night ctl03-s2 (lab 2026-11-01-night/vast-ctl2.log, machine 142471, $0.115/h)"
+
+[[session]]
+provider = "vast"
+instance = 58543208
+gpu = "RTX 3080"
+cpu = "24 cores"
+started = "2026-11-01T01:18:44+11:00"
+ended = "2026-11-01T02:02:05+11:00"
+dollars = 0.118
+note = "night lineage round 2 lin2-s2/s3 (lab 2026-11-01-night/vast-lin2.log, machine 144567, $0.136/h)"
+
+[[session]]
+provider = "vast"
+instance = 58543979
+gpu = "RTX 3070"
+cpu = "32 cores"
+started = "2026-11-01T01:26:33+11:00"
+ended = "2026-11-01T01:29:58+11:00"
+dollars = 0.005
+note = "night dungmix, no ssh within 3 min (lab 2026-11-01-night/vast-mix-fail.log, machine 147194, $0.099/h)"
+
+[[session]]
+provider = "vast"
+instance = 58544305
+gpu = "RTX 3070"
+cpu = "36 cores"
+started = "2026-11-01T01:30:14+11:00"
+ended = "2026-11-01T01:40:21+11:00"
+dollars = 0.001
+note = "night dungmix, never left loading (lab 2026-11-01-night/vast-mix-fail2.log, machine 149303, $0.109/h)"
+
+[[session]]
+provider = "vast"
+instance = 58545296
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-11-01T01:41:55+11:00"
+ended = "2026-11-01T02:53:05+11:00"
+dollars = 0.114
+note = "night dungmix-s1/s2 (lab 2026-11-01-night/vast-mix.log, machine 43183, $0.071/h)"
+
+[[session]]
+provider = "vast"
+instance = 58547461
+gpu = "RTX 3060"
+cpu = "20 cores"
+started = "2026-11-01T02:03:30+11:00"
+ended = "2026-11-01T05:24:22+11:00"
+dollars = 0.266
+note = "night hide-and-seek sep128-s31 (lab 2026-11-01-night/vast-seek.log, machine 146146, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58535084
+gpu = "RTX 3080"
+cpu = "24 cores"
+started = "2026-10-31T23:58:00+11:00"
+ended = "2026-11-01T01:16:57+11:00"
+dollars = 0.197
+note = "night dungtidy-s1, dungfresh-s1 (lab 2026-11-01-night/vast-tidyarm.log, machine 144567, $0.136/h)"
+
+[[session]]
+provider = "vast"
+instance = 58552602
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-11-01T02:55:29+11:00"
+ended = "2026-11-01T03:46:14+11:00"
+dollars = 0.080
+note = "night toys-s1, toysfun-s1 (the fun hole) (lab 2026-11-01-night/vast-toys.log, machine 146047, $0.069/h)"
+
+[[session]]
+provider = "vast"
+instance = 58554668
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-11-01T03:18:11+11:00"
+ended = "2026-11-01T03:28:18+11:00"
+dollars = 0.003
+note = "night toysfun2, never left loading (lab 2026-11-01-night/vast-toysfun2-fail.log, machine 28139, $0.077/h)"
+
+[[session]]
+provider = "vast"
+instance = 58555495
+gpu = "RTX 3060"
+cpu = "18 cores"
+started = "2026-11-01T03:28:56+11:00"
+ended = "2026-11-01T03:34:24+11:00"
+dollars = 0.026
+note = "night toysfun2, driver lost ssh copying selfstop.sh (lab 2026-11-01-night/vast-toysfun2-fail2.log, machine 43183, $0.071/h)"
+
+[[session]]
+provider = "vast"
+instance = 58555959
+gpu = "RTX 3080"
+cpu = "24 cores"
+started = "2026-11-01T03:35:19+11:00"
+ended = "2026-11-01T04:11:09+11:00"
+dollars = 0.121
+note = "night toysfun2-s1 (lab 2026-11-01-night/vast-toysfun2.log, machine 144567, $0.149/h)"
+

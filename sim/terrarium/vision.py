@@ -14,7 +14,7 @@ import numpy as np
 if TYPE_CHECKING:
     from .world import World
 
-NOTHING, WALL, CREATURE, FOOD, BLOCK, FLOWER = range(6)
+NOTHING, WALL, CREATURE, FOOD, BLOCK, FLOWER, DUNG = range(7)
 # rays start this far outside the body, so a creature never sees itself
 GAP = 0.01
 
@@ -76,6 +76,8 @@ def look(world: 'World') -> Sight:
         hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start, wide).min(-1, initial=np.inf),
         hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start),
         hit_circles(pos, dirs, world.flower_pos, cfg.flowers.radius, flowers, start, wide).min(-1, initial=np.inf),
+        *([hit_circles(pos, dirs, world.dung.pos, cfg.dung.radius, np.broadcast_to(world.dung.lying()[:, None], (arenas, n, cfg.dung.slots)),
+                       start, wide).min(-1, initial=np.inf)] if world.dung else []),
     ], -1)
     dist = hits.min(-1)
     seen = dist < far
