@@ -56,6 +56,9 @@ const tailGeo = new THREE.SphereGeometry(1, 12, 10).translate(0, 0.9, 0);
 const stalkGeo = new THREE.CylinderGeometry(0.016, 0.026, 0.18, 6).translate(0, 0.09, 0);
 const mouthGeo = new THREE.TorusGeometry(0.035, 0.011, 6, 14, Math.PI);
 const dark = new THREE.MeshStandardMaterial({ color: 0x15151d, roughness: 0.2 });
+const PANDA_BLACK = 0x2a2930;
+const DRAGON = { skin: 0x6cc35a, belly: 0xf6e27a, horn: 0xf7a440, wing: 0xf7c95a, feet: 0x4f9a40 };
+const hornGeo = new THREE.ConeGeometry(0.05, 0.14, 10).translate(0, 0.06, 0);
 const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 const blushMat = new THREE.MeshStandardMaterial({ color: 0xff8ea0, roughness: 0.6, transparent: true, opacity: 0.75 });
 const grey = new THREE.Color(0x8a8a90);
@@ -104,6 +107,9 @@ export class BlobView {
   private arms: THREE.Mesh[] = [];
   private feet: THREE.Mesh[] = [];
   private stalk = new THREE.Group();
+  private wings: THREE.Mesh[] = [];
+  // limbs that keep their own colour (a costume) instead of following the skin's
+  private dark = false;
   private tail = new THREE.Group();
   private belly: THREE.Mesh;
   private bellyMat = new THREE.MeshPhysicalMaterial({
@@ -218,6 +224,49 @@ export class BlobView {
     this.root.add(this.body);
   }
 
+  // dressed as a panda (the kids' game): white, with black ears, arms, feet and antenna, and black patches a little
+  // below and outside the eyes, so the eyes and their glints still show
+  panda() {
+    this.tint.set(0xf4f1ea);
+    this.dark = true;
+    this.limbs.color.set(PANDA_BLACK);
+    const black = new THREE.MeshPhysicalMaterial({ color: PANDA_BLACK, roughness: 0.8, sheen: 0.6, sheenColor: new THREE.Color(0xffffff) });
+    for (const foot of this.feet) foot.material = black;
+    for (const side of [-1, 1]) {
+      this.body.add(mesh(ball, black, [side * 0.27, 0.74, -0.04], [0.11, 0.11, 0.07]));
+      this.body.add(seat(mesh(ball, black, [0, 0, 0], [0.09, 0.11, 0.025], false), side * 0.17, 0.49, 0.002, side * 0.5));
+    }
+  }
+
+  // dressed as a baby dragon (the kids' game): green, a pale belly, two nubby horns, spikes down its back, an orange
+  // tail tip and little wings that flap as it walks
+  dragon() {
+    this.tint.set(DRAGON.skin);
+    const belly = new THREE.MeshPhysicalMaterial({ color: DRAGON.belly, roughness: 0.75, sheen: 0.6, sheenColor: new THREE.Color(0xffffff) });
+    const horn = new THREE.MeshStandardMaterial({ color: DRAGON.horn, roughness: 0.5 });
+    const wing = new THREE.MeshPhysicalMaterial({ color: DRAGON.wing, roughness: 0.6, side: THREE.DoubleSide });
+    this.body.add(seat(mesh(ball, belly, [0, 0, 0], [0.24, 0.2, 0.04], false), 0, 0.24, -0.01));
+    for (const foot of this.feet) foot.material = new THREE.MeshPhysicalMaterial({ color: DRAGON.feet, roughness: 0.78 });
+    for (const side of [-1, 1]) {
+      const h = mesh(hornGeo, horn, [side * 0.13, 0.8, -0.02], 1);
+      h.rotation.set(-0.35, 0, -side * 0.35);
+      this.body.add(h);
+      // on its shoulders, out past the body's sides, swept back
+      const w = mesh(ball, wing, [side * 0.46, 0.55, -0.16], [0.03, 0.2, 0.27]);
+      w.rotation.set(0.35, side * 0.8, 0);
+      this.wings.push(w);
+      this.body.add(w);
+    }
+    for (const [y, z, tilt] of [[0.74, -0.25, -0.5], [0.58, -0.4, -0.9], [0.4, -0.46, -1.3]]) {
+      const spike = mesh(hornGeo, horn, [0, y, z], 0.8);
+      spike.rotation.x = tilt;
+      this.body.add(spike);
+    }
+    this.tail.traverse((o) => {
+      if (o instanceof THREE.Mesh) (o.material as THREE.MeshStandardMaterial).color.set(DRAGON.horn);
+    });
+  }
+
   update(s: CreatureState, maxSpeed: number, dt: number, time: number) {
     const yaw = Math.PI / 2 - s.heading;
     this.root.position.set(s.x, 0, s.y);
@@ -297,6 +346,8 @@ export class BlobView {
       arm.rotation.z = (i ? 1 : -1) * (0.2 + 0.45 * this.baby) * (1 - this.hunger * 0.7) * (1 - this.sleepy * 0.5);
       // arms swing against the feet
       arm.rotation.x = Math.cos(this.phase + (i + 1) * Math.PI) * 0.6 * this.stride;
+      const wing = this.wings[i];
+      if (wing) wing.rotation.z = (i ? -1 : 1) * (0.25 + Math.sin(time * (6 + 8 * this.stride)) * (0.15 + 0.35 * this.stride));
     });
     this.feet.forEach((foot, i) => {
       foot.position.y = 0.065 + Math.max(0, Math.sin(this.phase + i * Math.PI)) * (0.075 + 0.04 * this.baby) * this.stride;
@@ -343,7 +394,7 @@ export class BlobView {
     this.full = Math.min(1, Math.max(0, (e - FULL_ABOVE) / (1 - FULL_ABOVE)));
     // duller as energy falls, grey when starving
     this.skin.color.copy(this.tint).lerp(grey, (1 - e) * 0.3 + this.hunger * 0.45);
-    this.limbs.color.copy(this.skin.color);
+    if (!this.dark) this.limbs.color.copy(this.skin.color);
   }
 
   // tired and standing still: z's drift up from the crown, one after another

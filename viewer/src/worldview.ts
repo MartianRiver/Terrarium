@@ -47,6 +47,8 @@ export class WorldView {
   lead: number | null = null;
   // the ring under a chosen one; a reel's &pick follows without it
   marked = true;
+  // a costume for some Terrikins, put on as each is first drawn (the kids' game's panda)
+  dress: ((id: number, blob: BlobView) => void) | null = null;
   focus: Pose | null = null;
   focusId: number | null = null;
   private ring: THREE.Mesh;
@@ -216,6 +218,7 @@ export class WorldView {
       seen.add(c.id);
       if (this.blobs.has(c.id)) continue;
       const blob = new BlobView(c.colony);
+      this.dress?.(c.id, blob);
       this.blobs.set(c.id, blob);
       this.scene.add(blob.root);
       log.trace('creature added', { id: c.id, colony: c.colony });
