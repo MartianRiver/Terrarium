@@ -151,6 +151,15 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
     return dir.multiplyScalar(hi);
   }
 
+  const overAt = new THREE.Vector3();
+  const overPos = new THREE.Vector3();
+  const LENS = camera.fov;
+  function lens(fov: number, k: number) {
+    if (Math.abs(camera.fov - fov) < 0.01) return;
+    camera.fov += (fov - camera.fov) * k;
+    camera.updateProjectionMatrix();
+  }
+
   function resize() {
     const w = container.clientWidth, h = container.clientHeight;
     widePos = null;
@@ -168,6 +177,10 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
     // in a game the left button walks you somewhere, so looking around moves to the right one
     lookWithRight() {
       controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+    },
+    // the kids' game: nothing a small hand does moves the camera
+    holdStill() {
+      controls.enabled = false;
     },
     setWorld(info: WorldInfo) {
       if (garden) {
@@ -275,6 +288,22 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
       const k = Number.isFinite(dt) ? 1 - Math.exp(-dt * WIDE_RATE) : 1;
       controls.target.lerp(ORIGIN, k);
       camera.position.lerp(widePos, k);
+      lens(LENS, k);
+    },
+    // the wide view from where it stands, panned to a spot and zoomed in (a narrower lens, so the camera stays high
+    // outside the dome, whose frame fades from there), never looking past the arena's edges; yaw turns the view
+    // round the arena from there (radians)
+    over(at: { x: number; y: number }, nearer: number, dt: number, yaw = 0) {
+      drifting = false;
+      swinging = 0;
+      rig = arm = null;
+      widePos ??= fitWide();
+      const k = Number.isFinite(dt) ? 1 - Math.exp(-dt * WIDE_RATE) : 1;
+      const hx = (arena.width / 2) * (1 - nearer), hz = (arena.height / 2) * (1 - nearer);
+      overAt.set(Math.max(-hx, Math.min(hx, at.x)), 0, Math.max(-hz, Math.min(hz, at.y)));
+      controls.target.lerp(overAt, k);
+      camera.position.lerp(overPos.copy(widePos).applyAxisAngle(UP, yaw).add(overAt), k);
+      lens(LENS * nearer, k);
     },
     // a new camera mode takes over at once, whoever last touched the view
     release() {
