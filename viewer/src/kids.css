@@ -1,0 +1,496 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #cfe8f2;
+  font: 16px/1.3 ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, sans-serif;
+  color: #2c3a33;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#world {
+  position: fixed;
+  inset: 0;
+}
+
+#world canvas {
+  display: block;
+}
+
+body[data-phase='playing'] #world {
+  cursor: crosshair;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.star {
+  color: #ffc21a;
+  text-shadow: 0 2px 0 #d98c00;
+}
+
+/* the picture screen */
+
+#pick {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.2vh;
+  padding: 16px;
+  background: rgb(207 232 242 / 0.55);
+  backdrop-filter: blur(3px);
+}
+
+#pick h1 {
+  margin: 0;
+  font-size: clamp(36px, 8vw, 84px);
+  color: #fff;
+  text-shadow: 0 4px 0 #e0734f, 0 8px 18px rgb(0 0 0 / 0.2);
+  letter-spacing: 0.02em;
+}
+
+.modes {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4vw;
+}
+
+.modes [data-mode] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(38vw, 360px);
+  padding: 14px 14px 10px;
+  border: 0;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 8px 0 #c9dfe6, 0 14px 30px rgb(0 0 0 / 0.15);
+  font-size: clamp(22px, 3.5vw, 36px);
+  font-weight: 800;
+  transition: transform 0.15s;
+}
+
+.modes [data-mode] svg {
+  width: 100%;
+  height: auto;
+}
+
+.modes [data-mode]:hover,
+.modes [data-mode]:focus-visible,
+.modes [data-mode].chosen {
+  transform: translateY(-6px) scale(1.04);
+  outline: 6px solid #ffc21a;
+}
+
+.modes [data-mode]:hover .runner,
+.modes [data-mode].chosen .runner {
+  animation: hop 0.5s ease-in-out infinite alternate;
+}
+
+.modes [data-mode]:hover .you,
+.modes [data-mode].chosen .you {
+  animation: hop 0.35s ease-in-out infinite alternate;
+}
+
+@keyframes hop {
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+.jar {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 44px);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 3px 0 rgb(0 0 0 / 0.18);
+}
+
+/* while playing */
+
+#kids-hud {
+  position: fixed;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 18px;
+  pointer-events: none;
+}
+
+#count-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 22px 4px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.85);
+  font-size: clamp(36px, 6vw, 64px);
+  font-weight: 900;
+}
+
+#count {
+  min-width: 1.3em;
+  text-align: center;
+  transform-origin: 30% 55%;
+}
+
+#count.bump {
+  animation: bump 0.45s ease-out;
+}
+
+@keyframes bump {
+  30% {
+    transform: scale(1.35);
+    color: #e0734f;
+  }
+}
+
+#time {
+  flex: 1;
+  height: 26px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.7);
+  overflow: hidden;
+}
+
+#time span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(#8fdc6a, #5bb83c);
+  transition: width 0.2s linear;
+}
+
+#kids-hud.hurry #time span {
+  background: linear-gradient(#ffb15c, #f07c2a);
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.6;
+  }
+}
+
+#quit {
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.6);
+  font-size: 18px;
+  opacity: 0.6;
+}
+
+#big {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  translate: -50% -50%;
+  font-size: clamp(90px, 20vw, 220px);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 6px 0 #e0734f, 0 12px 30px rgb(0 0 0 / 0.25);
+  pointer-events: none;
+}
+
+#big.pop {
+  animation: pop 0.7s ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* how you did */
+
+#end {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  background: rgb(207 232 242 / 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.end-star {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: clamp(90px, 18vw, 200px);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 6px 0 #e0734f;
+  animation: pop 0.8s ease-out;
+}
+
+.end-best {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 800;
+  opacity: 0.75;
+}
+
+#end.record .end-best {
+  opacity: 1;
+  animation: bump 0.6s ease-out 0.6s 3;
+}
+
+.end-buttons {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-top: 2vh;
+}
+
+#again {
+  width: clamp(120px, 20vw, 200px);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: #5bb83c;
+  box-shadow: 0 10px 0 #3d8a25, 0 16px 30px rgb(0 0 0 / 0.2);
+  color: #fff;
+  font-size: clamp(64px, 11vw, 120px);
+  font-weight: 900;
+  animation: breathe 1.2s ease-in-out infinite alternate;
+}
+
+#home {
+  width: 76px;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 6px 0 #c9dfe6;
+  font-size: 40px;
+}
+
+#end.settling #again,
+#end.settling #home {
+  opacity: 0.4;
+  animation: none;
+}
+
+@keyframes breathe {
+  to {
+    transform: scale(1.07);
+  }
+}
+
+#sound {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.75);
+  font-size: 24px;
+}
+
+#sound[aria-pressed='false'] span {
+  opacity: 0.35;
+}
+
+#status {
+  position: fixed;
+  left: 50%;
+  bottom: 12%;
+  translate: -50% 0;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.9);
+  text-align: center;
+  font-size: 18px;
+}
+
+#status[data-kind='error'] {
+  background: #fde3df;
+  color: #8a2a1d;
+}
+
+#status[hidden],
+[hidden] {
+  display: none !important;
+}
+
+/* Big's levels, under the pictures */
+
+.big-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.levels {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.levels button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 58px;
+  padding: 6px 0 4px;
+  border: 0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 5px 0 #c9dfe6;
+  transition: transform 0.15s;
+}
+
+.levels button b {
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.levels button span {
+  font-size: 15px;
+  letter-spacing: -1px;
+}
+
+.levels button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.levels button.chosen,
+.levels button:not(:disabled):hover {
+  transform: translateY(-4px);
+  outline: 4px solid #ffc21a;
+}
+
+/* stars: lit or not */
+
+.levels i,
+#goals i,
+.end-stars i {
+  font-style: normal;
+  color: rgb(44 58 51 / 0.2);
+}
+
+.levels i.on,
+#goals i.on,
+.end-stars i.on {
+  color: #ffc21a;
+  text-shadow: 0 2px 0 #d98c00;
+}
+
+/* who you are */
+
+.looks {
+  display: flex;
+  gap: 14px;
+}
+
+.looks button {
+  width: 72px;
+  height: 72px;
+  padding: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: 0 5px 0 #c9dfe6;
+}
+
+.looks button[aria-pressed='true'] {
+  outline: 5px solid #ffc21a;
+  transform: scale(1.08);
+}
+
+/* while playing */
+
+#goals {
+  font-size: clamp(26px, 4vw, 40px);
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.85);
+}
+
+#goals i.on {
+  animation: bump 0.5s ease-out;
+}
+
+#level:not(:empty) {
+  min-width: 40px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 28px;
+  font-weight: 900;
+  text-align: center;
+}
+
+/* the end */
+
+.end-stars {
+  font-size: clamp(48px, 9vw, 96px);
+  letter-spacing: 4px;
+}
+
+.end-stars i.on {
+  display: inline-block;
+  animation: pop 0.6s ease-out backwards;
+}
+
+.end-stars i.on:nth-child(2) {
+  animation-delay: 0.25s;
+}
+
+.end-stars i.on:nth-child(3) {
+  animation-delay: 0.5s;
+}
+
+.end-open {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 900;
+  animation: bump 0.6s ease-out 0.8s 3;
+}
+
+#next {
+  width: 96px;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: #ffc21a;
+  box-shadow: 0 6px 0 #d98c00;
+  color: #fff;
+  font-size: 48px;
+  font-weight: 900;
+}
+
+#end.settling #next {
+  opacity: 0.4;
+}

@@ -34,6 +34,34 @@ def test_walking_into_their_base_takes_their_flag_and_home_captures_it():
     assert gain[0] == gain[1] > 0 and gain[2] == gain[3] == -gain[0]
 
 
+def test_a_pickup_pays_the_takers_and_costs_the_others_only_its_charge():
+    fair = replace(FLAG, flag=replace(FLAG.flag, charge=0.0))
+    world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)], fair)
+    flags.step(NONE)
+    gain = flags.points(world.alive)[0]
+    assert gain[0] == gain[1] == FLAG.flag.points * FLAG.flag.pickup and gain[2] == gain[3] == 0
+    # the capture itself is still zero-sum
+    world.pos[0, 0] = (0, -6)
+    flags.step(NONE)
+    gain = flags.points(world.alive)[0]
+    assert gain[0] == FLAG.flag.points and gain[2] == -FLAG.flag.points
+
+
+def test_carrying_their_flag_home_pays_by_the_metre():
+    homeward = replace(FLAG, flag=replace(FLAG.flag, charge=0.0, home=0.1))
+    world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)], homeward)
+    flags.step(NONE)
+    flags.points(world.alive)
+    world.pos[0, 0] = (0, 4)
+    flags.step(NONE)
+    gain = flags.points(world.alive)[0]
+    # 2 m nearer its own nest at (0, -6), paid to its side only
+    assert np.isclose(gain[0], 0.2) and np.isclose(gain[1], 0.2) and gain[2] == gain[3] == 0
+    world.pos[0, 0] = (0, 5)
+    flags.step(NONE)
+    assert np.isclose(flags.points(world.alive)[0, 0], -0.1)
+
+
 def test_without_steal_a_touch_on_the_carrier_sends_their_flag_home():
     world, flags = flag_game([(0, 6), (3, 0), (-5, -1), (5, 1)], SENT_HOME)
     flags.step(NONE)

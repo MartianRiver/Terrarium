@@ -101,6 +101,8 @@ function boot() {
   // the site with nothing asked for opens on an empty garden and asks what to watch; with something asked for, the
   // garden stays empty until it comes
   const choosing = SITE && !location.search;
+  // the site plays only with an invite to the hosted play server (?play&invite=…)
+  const hosted = SITE && params.has('play') && params.has('invite');
   let make = SITE ? emptySource : demoSource;
   let source!: Source;
   let view: WorldView | undefined;
@@ -219,7 +221,7 @@ function boot() {
     opening = true;
     setStatus('loading', 'Starting a game…');
     try {
-      const next = await Game.begin(params.get('play') || null, stage.camera, stage.renderer.domElement);
+      const next = await Game.begin(params.get('play') || null, stage.camera, stage.renderer.domElement, params.get('invite'));
       game?.end();
       game = next;
       make = () => next;
@@ -422,7 +424,7 @@ function boot() {
     if (!location.search) void picker.open();
   }
   const channel = params.has('channel');
-  const wanted = params.get('replay') ?? (SITE && !channel && !choosing ? SITE_REPLAY : null);
+  const wanted = params.get('replay') ?? (SITE && !channel && !choosing && !hosted ? SITE_REPLAY : null);
   if (wanted) {
     const url = new URL(wanted, location.href);
     const name = params.get('name') ?? url.pathname.split('/').pop()!;
@@ -437,7 +439,7 @@ function boot() {
     link.textContent = 'Play';
     document.querySelector('a[href="/runs.html"]')?.after(' ', link);
   }
-  if (!SITE && params.has('play')) void play();
+  if ((!SITE && params.has('play')) || hosted) void play();
   const watching = !SITE && params.has('latest');
   if (watching) void openLatest();
   if (channel) void openChannel();

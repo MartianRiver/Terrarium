@@ -640,6 +640,23 @@ body {
   opacity: 0.55;
 }
 
+.hud-chase {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid rgb(44 58 51 / 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hud-chase[aria-pressed='true'] {
+  background: #3f7a38;
+  border-color: #3f7a38;
+  color: #fff;
+}
+
 .hud-chips {
   display: flex;
   flex-wrap: wrap;
