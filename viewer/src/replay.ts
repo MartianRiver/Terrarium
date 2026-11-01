@@ -5,7 +5,7 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
+  type BlockState, type CreatureState, type DungState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
@@ -78,6 +78,7 @@ function readInfo(o: Obj): WorldInfo {
     nests: list(o, 'nests', where, (n, w): NestInfo => ({
       colony: int(n, 'colony', w), x: num(n, 'x', w), y: num(n, 'y', w), radius: num(n, 'radius', w),
     })),
+    midden: o.midden === undefined ? 0 : num(o, 'midden', where),
   };
 }
 
@@ -97,6 +98,7 @@ function readFrame(o: Obj, where: string): Frame {
         load: c.load === undefined ? 0 : int(c, 'load', w),
         young: c.young === undefined ? 0 : num(c, 'young', w),
         stamina: c.stamina === undefined ? 1 : num(c, 'stamina', w),
+        dung: c.dung === undefined ? 0 : int(c, 'dung', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {
@@ -116,6 +118,7 @@ function readFrame(o: Obj, where: string): Frame {
     flags: o.flags === undefined ? [] : list(o, 'flags', where, (f, w): FlagState => ({
       colony: int(f, 'colony', w), x: num(f, 'x', w), y: num(f, 'y', w), down: int(f, 'down', w) > 0, carrier: int(f, 'carrier', w),
     })),
+    ...(o.dung === undefined ? {} : { dung: list(o, 'dung', where, (d, w): DungState => ({ id: int(d, 'id', w), x: num(d, 'x', w), y: num(d, 'y', w) })) }),
   };
 }
 

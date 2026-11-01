@@ -25,6 +25,7 @@ export interface CreatureState {
   load: number; // 1 while it carries a berry in its jaws (carry); 0 in worlds without carry
   young: number; // share of its youth left, 1 just hatched to 0 grown; 0 in worlds without young
   stamina: number; // 0..1, how much go it has left before it tires ([tired]); 1 in worlds without it
+  dung: number; // 1 while it carries a dropping in its jaws; 0 in worlds without droppings
 }
 
 export interface FoodState {
@@ -59,6 +60,7 @@ export interface WorldInfo {
   tickHz: number;
   maxSpeed: number;
   nests: NestInfo[];
+  midden: number; // metres past a nest's edge a dropping counts as taken out ([dung] midden); 0 without
 }
 
 // jelly in a colony's store, in food unloaded
@@ -83,6 +85,13 @@ export interface FlowerState {
   y: number;
 }
 
+// a dropping lying on the ground ([dung])
+export interface DungState {
+  id: number;
+  x: number;
+  y: number;
+}
+
 // a capture-the-flag flag: on its nest, lying where it was put down, or with its carrier (an id, -1 for none)
 export interface FlagState {
   colony: number;
@@ -102,4 +111,5 @@ export interface Frame {
   eggs: EggState[]; // empty in worlds without hatching and replays from before it
   flowers: FlowerState[]; // empty in worlds without flowers
   flags: FlagState[]; // empty in worlds without capture the flag and replays from before 0.4's flags
+  dung?: DungState[]; // only in worlds with droppings; without, the viewer makes its own up from meals
 }

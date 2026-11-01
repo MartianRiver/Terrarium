@@ -54,6 +54,7 @@ AWAY = 1e4
 import numpy as np
 
 from . import night, tired
+from .droppings import Droppings
 from .smell import Field
 from .flags import Flags
 from .peek import Peek
@@ -200,6 +201,7 @@ class World:
         self.seek = Seek(self) if cfg.seek.on else None
         self.flags = Flags(self) if cfg.flag.on else None
         self.peek = Peek(self) if cfg.peek.on else None
+        self.dung = Droppings(self) if cfg.dung.on else None
         if cfg.young.start:
             self.young[:] = np.where(self.spare, 0, round(cfg.young.seconds * cfg.tick_hz))
         if self.tag:
@@ -347,6 +349,8 @@ class World:
             self._place_spots(a)
             for f in range(self.wild):
                 self._grow(a, f)
+        if self.dung:
+            self.dung.reset(idx)
         log.debug('arenas reset', tick=self.tick, count=len(idx))
 
     def step(self, actions: np.ndarray):
@@ -367,7 +371,7 @@ class World:
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
         self.heading = (self.heading + np.pi) % (2 * np.pi) - np.pi
-        laden = (self.load >= 0) | (self.block_load >= 0)
+        laden = (self.load >= 0) | (self.block_load >= 0) | (self.dung.load >= 0 if self.dung else False)
         young = self.young > 0
         chasing = self.tag.mask() if self.tag else np.zeros_like(young)
         top = (c.max_speed * np.where(young, cfg.young.speed, 1.0) * np.where(chasing, cfg.tag.speed, 1.0)
@@ -414,12 +418,15 @@ class World:
             self.flags.step(unload)
         if self.peek:
             self.peek.step()
+        ate = self.meals + self.jelly + self.drunk
         # eating on the tick it would have run out still saves it
         self._eat()
         if cfg.flowers.on:
             self._drink()
         self._unload(unload)
         self._feed(eat)
+        if self.dung:
+            self.dung.step(self.meals + self.jelly + self.drunk - ate)
         if self.smell:
             self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
         dying = self.alive & (self.energy <= 0)
@@ -432,6 +439,8 @@ class World:
             self.young[dying] = 0
             for a, i in zip(*np.nonzero(dying & (self.load >= 0))):
                 self._put_down(a, i, self.pos[a, i])
+            if self.dung:
+                self.dung.died(dying)
             for a, i in zip(*np.nonzero(dying & (self.block_load >= 0))):
                 # where it falls if there's room, else in front, else where it falls anyway
                 if not self._set_block_down(a, i):
@@ -500,10 +509,20 @@ class World:
             if self.block_load[a, i] >= 0:
                 self._set_block_down(a, i)
                 continue
+            if self.dung and self.dung.load[a, i] >= 0:
+                self.dung.put(a, i, self.pos[a, i] + facing[a, i] * (cfg.creature.radius + cfg.dung.radius))
+                continue
             d = np.hypot(*(self.food_pos[a, :self.wild] - self.pos[a, i]).T)
             d[~self.food_present[a, :self.wild]] = np.inf
             # argmin of nothing, in a world without food, is an error, not a miss
             f = int(d.argmin()) if len(d) else -1
+            if self.dung:
+                # a dropping nearer than any berry gets picked up instead
+                k, gap = self.dung.nearest(a, i)
+                berry = d[f] - cfg.creature.radius - cfg.food.radius if f >= 0 else np.inf
+                if gap < cfg.carry.reach and gap <= berry:
+                    self.dung.pick(a, i, k)
+                    continue
             if f >= 0 and d[f] < reach:
                 self.food_regrow[a, f] = CARRIED
                 self.load[a, i] = f
@@ -727,6 +746,8 @@ class World:
         self.stamina[a, i] = 1
         self.young[a, i] = round(self.cfg.young.seconds * self.cfg.tick_hz)
         np.add.at(self.hatched, (a, self.colony[i]), 1)
+        if self.dung:
+            self.dung.born(a, i)
         self.creature_id[a, i] = self.egg_id[a, i]
         log.debug('creatures hatched', tick=self.tick, count=len(a))
 

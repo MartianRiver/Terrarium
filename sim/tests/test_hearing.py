@@ -40,8 +40,9 @@ def test_nobody_in_range_or_alive_is_silent():
     assert all(x[0, 1] == 0 for x in heard(gone))
 
 
-def test_off_hears_nothing_and_the_brain_sees_it_last():
+def test_off_hears_nothing_and_the_brain_sees_it():
     world = World(load(DEFAULT.parent / 'nursery-peek-again.toml'), 2, seed=0)
     assert all(np.all(x == 0) for x in heard(world))
     obs = observe(World(TAG, 2, seed=0), np.zeros((2, TAG.colonies.size, 2)))
-    assert obs.me.shape[-1] == len(SELF) and SELF[-3:] == ('heard', 'heard_sin', 'heard_cos')
+    h = SELF.index('heard')
+    assert obs.me.shape[-1] == len(SELF) and SELF[h:h + 3] == ('heard', 'heard_sin', 'heard_cos')

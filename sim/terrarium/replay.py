@@ -29,6 +29,8 @@ def header(world: World, arena: int, source: dict) -> dict:
              for c, (x, y) in enumerate(world.nests)]
     info = {'width': cfg.arena.size, 'height': cfg.arena.size, 'tickHz': cfg.tick_hz,
             'maxSpeed': cfg.creature.max_speed, 'nests': nests}
+    if cfg.dung.midden > 0:
+        info['midden'] = cfg.dung.midden
     return {'format': FORMAT, 'version': VERSION, 'info': info,
             'source': {**source, 'arena': arena, 'config': cfg.to_dict()}}
 
@@ -52,6 +54,10 @@ def frame(world: World, a: int) -> dict:
         # a berry in its jaws
         for c, load in zip(creatures, world.load[a][born]):
             c['load'] = int(load >= 0)
+    if world.dung and cfg.carry.on:
+        # a dropping in its jaws
+        for c, held in zip(creatures, world.dung.load[a][born]):
+            c['dung'] = int(held >= 0)
     if world.tag:
         # it lights its bulb
         for c, it in zip(creatures, world.tag.mask()[a][born]):
@@ -90,6 +96,9 @@ def frame(world: World, a: int) -> dict:
     out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
     if cfg.night.on:
         out['light'] = _r(world.light()[a])
+    if world.dung:
+        out['dung'] = [{'id': int(world.dung.id[a, k]), 'x': _r(world.dung.pos[a, k, 0]), 'y': _r(world.dung.pos[a, k, 1])}
+                       for k in np.flatnonzero(world.dung.lying()[a])]
     if world.flags:
         where = world.flags.where()[a]
         out['flags'] = [{'colony': t, 'x': _r(where[t, 0]), 'y': _r(where[t, 1]), 'down': int(world.flags.down[a, t]),

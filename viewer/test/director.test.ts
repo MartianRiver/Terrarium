@@ -4,7 +4,7 @@ import type { CreatureState, Frame } from '../src/world';
 
 function blob(id: number, x: number, y: number, extra: Partial<CreatureState> = {}): CreatureState {
   return { id, colony: 0, x, y, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0,
-    nectar: 0, sprinting: 0, load: 0, young: 1, stamina: 1, ...extra };
+    nectar: 0, sprinting: 0, load: 0, young: 1, stamina: 1, dung: 0, ...extra };
 }
 
 function frame(creatures: CreatureState[], food: Frame['food'] = []): Frame {

@@ -171,6 +171,25 @@ leak = 0.0
 # footsteps behind them: how close (1 touching, 0 at the edge) and which way off its heading. 0 is off
 range = 3.0
 
+[dung]
+# droppings (terrarium/droppings.py): one every `every` meals (0: none), `after` seconds later, just behind; each lies
+# `lasts` seconds (up to `slots` at once) and costs `sick` energy a second to anyone within `near` of it (from their
+# edge), as `away` of that outside every nest. Droppings within `pile` of each other count as one (0: no piles).
+# `start` lie in each nest at the start; one put down past `midden` from its carrier's nest edge is worth `points`
+# to its colony, and with `start` it goes and a new one turns up in the nest
+every = 0
+after = 0.0
+lasts = 0.0
+slots = 0
+radius = 0.0
+near = 0.0
+sick = 0.0
+away = 1.0
+pile = 0.0
+start = 0
+midden = 0.0
+points = 0.0
+
 [tag]
 # a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
 # new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed;
