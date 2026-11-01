@@ -40,6 +40,7 @@ async function boot() {
   const snacks = new Snacks(stage.scene);
   const turbo = $('#turbo');
   const fuel = $('#turbo div span');
+  const role = $('#role');
   const beeps = new Beeps();
   const pad = new Pad();
   const canvas = stage.renderer.domElement;
@@ -145,6 +146,7 @@ async function boot() {
       view.push(first);
       lastTick = first.tick;
       acc = warned = lit = fueled = 0;
+      role.hidden = true;
       fuel.style.width = '0%';
       count.textContent = '0';
       menu.goals(0, menu.targets(next));
@@ -236,6 +238,19 @@ async function boot() {
     const now = menu.goals(n, menu.targets(choice));
     if (now > lit && now > 1) beeps.fanfare(false);
     lit = now;
+  }
+
+  // tag back: they caught you, so you're it, and the run badge goes
+  function uhOh(at: { x: number; y: number }) {
+    fx.burst(at.x, at.y, 0.45, false);
+    beeps.uhOh();
+    pad.buzz(0.9, 0.4, 220);
+  }
+
+  // sent home: a puff where it was, and one in the nest
+  function puff(h: { x: number; y: number; tx?: number; ty?: number }) {
+    fx.burst(h.x, h.y, 0.35, false);
+    if (h.tx !== undefined && h.ty !== undefined) fx.burst(h.tx, h.ty, 0.35, false);
   }
 
   function honk() {
@@ -378,10 +393,23 @@ async function boot() {
         if (next.tick !== lastTick) {
           view.push(next);
           lastTick = next.tick;
-          for (const c of game.caughtBy(next.tick)) celebrate(c);
+          for (const h of game.happenedBy(next.tick)) {
+            if (h.kind === 'catch') celebrate(h);
+            else if (h.kind === 'tagged') uhOh(h);
+            else puff(h);
+          }
           fill();
         }
         acc -= tickSeconds;
+      }
+      // tag back: run while someone else is it
+      const running = !game.score.it;
+      if (running !== !role.hidden) {
+        role.hidden = !running;
+        if (running) {
+          say('🏃');
+          setTimeout(() => big.textContent === '🏃' && say(''), 800);
+        }
       }
       const left = Math.max(0, game.score.length - game.score.seconds);
       bar.style.width = `${(100 * left) / game.score.length}%`;

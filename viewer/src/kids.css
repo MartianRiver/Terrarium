@@ -343,9 +343,9 @@ body:not(.steering) .modes [data-mode]:hover .you,
   display: none !important;
 }
 
-/* Big's levels, under the pictures */
+/* each game's levels, under its picture */
 
-.big-col {
+.mode-col {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -528,6 +528,18 @@ body:not(.steering) .levels button:not(:disabled):hover {
   padding: 2px 12px;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.85);
+}
+
+#role {
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #ffd23f;
+  font-size: clamp(30px, 5vw, 48px);
+  animation: hop 0.3s ease-in-out infinite alternate;
+}
+
+#role[hidden] {
+  display: none;
 }
 
 #goals i.on {

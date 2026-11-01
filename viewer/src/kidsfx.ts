@@ -197,6 +197,12 @@ export class Beeps {
     this.tone({ from: 660, to: 990, length: 0.12, type: 'triangle', level: 0.4, at: 0.18 });
   }
 
+  // caught yourself: two notes down
+  uhOh() {
+    this.tone({ from: 660, to: 600, length: 0.16, type: 'triangle', level: 0.5 });
+    this.tone({ from: 470, to: 420, length: 0.28, type: 'triangle', level: 0.5, at: 0.17 });
+  }
+
   // turbo starting up
   whoosh() {
     this.tone({ from: 220, to: 660, length: 0.28, type: 'sine', level: 0.35 });

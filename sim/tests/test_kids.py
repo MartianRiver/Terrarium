@@ -174,3 +174,51 @@ def test_big_keeps_its_own_sprint_and_has_no_snacks(brain):
     assert game.snacks == [] and game.world.cfg.sprint.on
     game.step(1, 1.0, 0.0, ['sprint'])
     assert game.world.sprinting[0, game.slot] > 0 and game.boosted == 0
+
+
+def test_sent_home_waits_in_the_nest_which_is_safe(brain):
+    game = Catch('little', brain, 6, level=2)
+    w, hz = game.world, game.hz
+    runner = game.slot + 1
+    touch(game, runner)
+    game.step(round(0.7 * hz), 0.0, 0.0, [])
+    nest = w.nests[w.colony[runner]]
+    assert np.hypot(*(w.pos[0, runner] - nest)) < w.cfg.colonies.nest_radius
+    assert any(e['kind'] == 'home' for e in game.events) or runner in game.dizzy
+    # waiting there and past its safe time, touching it in the nest isn't a catch
+    w.physics.bodies[0][game.slot].position = tuple(float(v) for v in nest)
+    w.physics.read()
+    game.dizzy.clear()
+    game.tag.back[0] = -1
+    for _ in range(10):
+        put(game, runner)
+        game.step(1, 0.0, 0.0, [])
+    assert len(game.catches) == 1 and game.tag.it[0] == game.slot
+
+
+def test_tag_back_hands_it_over_and_only_you_can_be_caught(brain):
+    game = Catch('little', brain, 7, level=3)
+    w = game.world
+    runner = game.slot + 1
+    put(game, runner)
+    game.step(1, 0.0, 0.0, [])
+    assert len(game.catches) == 1 and game.tag.it[0] == runner and not game.score()['it']
+    # it can't pass it on to another runner
+    other = game.slot + 2
+    game.tag.wait[0] = 0
+    x, y = w.pos[0, runner]
+    w.physics.bodies[0][other].position = (float(x + 2 * w.cfg.creature.radius + 0.01), float(y))
+    w.physics.read()
+    game.step(1, 0.0, 0.0, [])
+    assert game.tag.it[0] == runner
+    # but it can catch you, once your cover from a tag-back is over
+    game.tag.back[0], game.tag.wait[0] = -1, 0
+    game.dizzy.clear()
+    for _ in range(40):
+        x, y = w.pos[0, runner]
+        w.physics.bodies[0][game.slot].position = (float(x - 2 * w.cfg.creature.radius - 0.01), float(y))
+        w.physics.read()
+        game.step(1, 0.0, 0.0, [])
+        if game.got:
+            break
+    assert game.tag.it[0] == game.slot and game.got == 1 and game.events[-1]['kind'] == 'tagged'

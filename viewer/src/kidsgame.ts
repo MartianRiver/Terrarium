@@ -18,6 +18,9 @@ export interface Score {
   // on the floor now, and the turbo bar from 0 to 1 (little has them; big has none)
   snacks: Snack[];
   turbo: number;
+  // tag back: whether you're it now, and how often they've caught you
+  it: boolean;
+  got: number;
 }
 
 export interface Snack {
@@ -27,11 +30,15 @@ export interface Snack {
   kind: 'berry' | 'seaweed';
 }
 
-export interface Catch {
+// a catch of yours, you caught (tag back), or a caught one sent home (from x, y to tx, ty)
+export interface Happening {
+  kind: 'catch' | 'tagged' | 'home';
   tick: number;
   id: number;
   x: number;
   y: number;
+  tx?: number;
+  ty?: number;
 }
 
 interface Start {
@@ -77,7 +84,7 @@ export class KidsGame {
   private buffer: Frame[];
   private last: Frame;
   private asking = false;
-  private catches: Catch[] = [];
+  private due: Happening[] = [];
   private held = new Set<string>();
   private point: { x: number; y: number } | null = null;
   private dash = false;
@@ -123,11 +130,11 @@ export class KidsGame {
     return '';
   }
 
-  // the catches made up to this frame, for the page to celebrate as it draws them
-  caughtBy(tick: number): Catch[] {
-    const due = this.catches.filter((c) => c.tick <= tick);
-    this.catches = this.catches.filter((c) => c.tick > tick);
-    return due;
+  // what's happened up to this frame, for the page to show as it draws them
+  happenedBy(tick: number): Happening[] {
+    const now = this.due.filter((c) => c.tick <= tick);
+    this.due = this.due.filter((c) => c.tick > tick);
+    return now;
   }
 
   // why: the page went back to the start, or closed (a beacon, which still gets there as the page goes)
@@ -145,7 +152,7 @@ export class KidsGame {
     try {
       const got = await post(`/api/kids/${this.token}`, { ticks: BATCH, ...this.input() });
       this.buffer.push(...(got.frames.length ? mark(parse(this.start.header, got.frames).frames, this.you, this.colour) : []));
-      this.catches.push(...got.events);
+      this.due.push(...got.events);
       this.score = got.score;
     } catch (err) {
       this.failed = err instanceof Error ? err.message : String(err);

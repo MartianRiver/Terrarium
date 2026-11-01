@@ -6,10 +6,13 @@ It runs on one machine at home, the game and the viewer both, against a brain on
 
 ## The games
 
-- **Little**: the tag nursery's room, 12 m with two pillars, six runners, everyone in sight at once, and snacks on the floor. Made for a five-year-old.
+- **Little**, in three levels: the tag nursery's room, 12 m with two pillars, everyone in sight at once, and snacks on the floor. Made for a five-year-old.
+  1. Six runners; a caught one spins dizzy.
+  2. **Sent home**: eight runners; a caught one tumbles, vanishes in a puff and pops out of the nest, where it waits a second before running again. The nest is a safe base: nobody in it can be caught (without that, waiting beside the nest caught everyone as they came out).
+  3. **Tag back**: four runners, and real tag. One you catch is it and comes after you; once it catches you, you're it again. A 🏃 at the top says when to run. They never tag each other, and whoever's it steers three quarters of the way towards you on top of what the brain wants and runs at full speed, so it really comes for you; the snacks' turbo is how you get away.
 - **Big**, in five levels: the room with sixteen blocks to hide behind (`nursery-tag-hide.toml`), six runners, and a sprint. Each level gives you a little less: less speed over the runners, a smaller reach, runners that slow down less when you're struggling; the fifth is the 20 m playground. The camera follows you a little closer in. For older children.
 
-Every round earns up to three stars: one for any catch, two and three for the level's targets, set at about 45% and 80% of what a sloppy pretend player catches (below). Two stars on a level opens the next. The stars light up along the top as they're earned, and the end screen says when a level opened.
+Every round earns up to three stars: one for any catch, two and three for the level's targets, set at about 45% and 80% of what a sloppy pretend player catches (below), lower in the little room. Two stars on a level opens the next. The stars light up along the top as they're earned, and the end screen says when a level opened.
 
 Every game watches how it's going. A while without a catch (5 s in little, 6–8 in big) slows the runners a little every second, down to the level's floor; quick catches speed them back up. So a round settles where catches keep coming without being free. The settings are `MODES` in `sim/terrarium/kids.py`.
 

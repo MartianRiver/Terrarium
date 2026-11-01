@@ -13,20 +13,23 @@
     <section id="pick" aria-label="Pick a game">
       <h1>Catch them!</h1>
       <div class="modes">
-        <button type="button" data-mode="little" aria-label="Little room: easy">
-          <svg viewBox="0 0 200 150" aria-hidden="true">
-            <rect x="6" y="6" width="188" height="138" rx="22" fill="#a8d672" stroke="#6c9b3c" stroke-width="6" />
-            <rect x="34" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
-            <rect x="144" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
-            <g class="runner"><circle cx="150" cy="30" r="13" fill="#f08a6c" /><circle cx="146" cy="27" r="3" fill="#222" /><circle cx="155" cy="27" r="3" fill="#222" /></g>
-            <g class="runner"><circle cx="160" cy="118" r="13" fill="#f08a6c" /><circle cx="156" cy="115" r="3" fill="#222" /><circle cx="165" cy="115" r="3" fill="#222" /></g>
-            <g class="runner"><circle cx="40" cy="118" r="13" fill="#f08a6c" /><circle cx="36" cy="115" r="3" fill="#222" /><circle cx="45" cy="115" r="3" fill="#222" /></g>
-            <circle cx="100" cy="74" r="28" fill="#fff36b" opacity="0.55" />
-            <g class="you"><circle cx="100" cy="74" r="19" fill="var(--you)" stroke="#fff" stroke-width="4" /><circle cx="94" cy="70" r="4" fill="#222" /><circle cx="106" cy="70" r="4" fill="#222" /><path d="M93 81 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></g>
-          </svg>
-          <span>Little</span>
-        </button>
-        <div class="big-col">
+        <div class="mode-col">
+          <button type="button" data-mode="little" aria-label="Little room: easy">
+            <svg viewBox="0 0 200 150" aria-hidden="true">
+              <rect x="6" y="6" width="188" height="138" rx="22" fill="#a8d672" stroke="#6c9b3c" stroke-width="6" />
+              <rect x="34" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
+              <rect x="144" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
+              <g class="runner"><circle cx="150" cy="30" r="13" fill="#f08a6c" /><circle cx="146" cy="27" r="3" fill="#222" /><circle cx="155" cy="27" r="3" fill="#222" /></g>
+              <g class="runner"><circle cx="160" cy="118" r="13" fill="#f08a6c" /><circle cx="156" cy="115" r="3" fill="#222" /><circle cx="165" cy="115" r="3" fill="#222" /></g>
+              <g class="runner"><circle cx="40" cy="118" r="13" fill="#f08a6c" /><circle cx="36" cy="115" r="3" fill="#222" /><circle cx="45" cy="115" r="3" fill="#222" /></g>
+              <circle cx="100" cy="74" r="28" fill="#fff36b" opacity="0.55" />
+              <g class="you"><circle cx="100" cy="74" r="19" fill="var(--you)" stroke="#fff" stroke-width="4" /><circle cx="94" cy="70" r="4" fill="#222" /><circle cx="106" cy="70" r="4" fill="#222" /><path d="M93 81 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></g>
+            </svg>
+            <span>Little</span>
+          </button>
+          <div class="levels" data-levels="little" aria-label="Little room levels"></div>
+        </div>
+        <div class="mode-col">
           <button type="button" data-mode="big" aria-label="Big room with blocks to hide behind: harder">
             <svg viewBox="0 0 200 150" aria-hidden="true">
               <rect x="6" y="6" width="188" height="138" rx="22" fill="#86c4a8" stroke="#4f8f72" stroke-width="6" />
@@ -44,7 +47,7 @@
             </svg>
             <span>Big</span>
           </button>
-          <div id="levels" class="levels" aria-label="Big room levels"></div>
+          <div class="levels" data-levels="big" aria-label="Big room levels"></div>
         </div>
       </div>
       <div class="who" aria-label="Who you are">
@@ -80,6 +83,7 @@
     <div id="kids-hud" hidden>
       <div id="count-box" aria-label="Caught"><span class="star" aria-hidden="true">★</span><b id="count" aria-live="polite">0</b></div>
       <div id="goals" aria-label="Stars this round"></div>
+      <b id="role" hidden aria-label="Run! They're coming for you">🏃</b>
       <b id="level" aria-label="Level"></b>
       <div id="time" aria-label="Time left"><span></span></div>
       <button id="quit" type="button" aria-label="Stop and go back">✕</button>
