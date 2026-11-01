@@ -514,7 +514,36 @@ body:not(.steering) .levels button:not(:disabled):hover {
 }
 
 #turbo.going {
-  box-shadow: 0 0 0 5px #ffd23f;
+  box-shadow: 0 0 0 6px #ffd23f, 0 0 28px 10px rgb(255 140 0 / 0.7);
+  animation: rumble 0.12s linear infinite alternate;
+}
+
+#turbo.going > span {
+  animation: pulse 0.15s ease-in-out infinite alternate;
+}
+
+#turbo.going div span {
+  background: linear-gradient(90deg, #ff5e3a, #ff9f1c, #ffe066);
+}
+
+@keyframes rumble {
+  from { transform: translateX(-50%) translateY(0); }
+  to { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* on turbo the edges of the screen rush orange */
+body.turbo::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgb(255 140 0 / 0.38) 100%);
+  animation: rush 0.18s ease-in-out infinite alternate;
+}
+
+@keyframes rush {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
 }
 
 #turbo.gulp {

@@ -56,6 +56,7 @@ async function boot() {
   let choice: Choice = { mode: 'little', level: 1 };
   let row: Row = 'game';
   let fueled = 0;
+  let boosting = false;
   let phase: 'pick' | 'starting' | 'counting' | 'playing' | 'paused' | 'end' = 'pick';
   let device: Device = 'mouse';
   let progress = load();
@@ -292,6 +293,7 @@ async function boot() {
     const going = now < fueled - 1e-4;
     if (going && !turbo.classList.contains('going')) beeps.whoosh();
     turbo.classList.toggle('going', going);
+    boosting = going;
     turbo.classList.toggle('full', now >= 0.99);
     fuel.style.width = `${now * 100}%`;
     fueled = now;
@@ -427,6 +429,9 @@ async function boot() {
     const moving = phase === 'playing';
     if (view) view.render(moving ? acc * (game?.info.tickHz ?? 20) : 1, moving ? dt : 0, now / 1000);
     fx.render(dt, now / 1000, view?.current ?? null, moving || phase === 'paused' ? game?.score.dizzy ?? [] : []);
+    const on = boosting && moving && !!game;
+    document.body.classList.toggle('turbo', on);
+    fx.turbo(dt, now / 1000, on ? view?.focus ?? null : null);
     snacks.render(dt, now / 1000);
     const near = (NEARER[choice.mode] ?? 1) * zoom;
     const me = phase === 'pick' ? null : view?.focus;

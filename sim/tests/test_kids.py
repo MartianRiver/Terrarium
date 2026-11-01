@@ -161,6 +161,9 @@ def test_snacks_fill_turbo_and_sprint_runs_on_it(brain):
     you = next(c for c in frames[-1]['creatures'] if c['id'] == game.you)
     assert you['sprinting'] == 1
     assert w.cfg.sprint.speed == TURBO and not w.cfg.sprint.on
+    # held still, sprint keeps the bar
+    game.step(3, 0.0, 1.0, ['sprint'])
+    assert game.boosted == 4 and game.turbo == pytest.approx(FILL - 4 * DRAIN / hz)
     # the runners never sprint
     others = np.arange(w.sprinting.shape[1]) != game.slot
     assert not w.sprinting[0, others].any()

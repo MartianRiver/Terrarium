@@ -82,12 +82,14 @@ HARDEN = 0.05
 BOUNCE = 5.0
 FLING = 0.6
 # snacks: what's on the floor (only the look differs), how much of the bar one fills, how fast holding sprint empties a
-# full one (a share a second), turbo's speed, how close counts as eating one (m from your middle), and how long until
-# an eaten one is replaced somewhere else
+# full one (a share a second), turbo's speed, how hard the stick must push before turbo runs (standing still with sprint
+# held keeps the bar), how close counts as eating one (m from your middle), and how long until an eaten one is
+# replaced somewhere else
 SNACKS = ('berry', 'seaweed')
 FILL = 0.34
-DRAIN = 0.5
-TURBO = 1.5
+DRAIN = 0.35
+TURBO = 1.75
+GO = 0.2
 EAT = 0.5
 REGROW = 2.5
 
@@ -170,7 +172,7 @@ class Catch(Game):
             # a sprint is the only yes there is to say in tag; with snacks it's turbo, while the bar lasts
             boost = False
             if 'sprint' in yes and self.mode.snacks:
-                boost = self.turbo > 0
+                boost = self.turbo > 0 and abs(thrust) > GO
                 if boost:
                     w.sprinting[0, self.slot] = 1
                     self.turbo = max(0.0, self.turbo - DRAIN / self.hz)

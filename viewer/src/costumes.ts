@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { ball, BlobView, DEPTH, eggRadius, hornGeo, mesh, seat } from './blob';
 
-export type Costume = 'panda' | 'dragon' | 'dino' | 'penguin' | 'cheetah';
+export type Costume = 'panda' | 'dragon' | 'dino' | 'penguin' | 'cheetah' | 'kelpie' | 'frenchie' | 'kitten';
 
 const clay = (color: number, roughness = 0.78) =>
   new THREE.MeshPhysicalMaterial({ color, roughness, sheen: 0.6, sheenColor: new THREE.Color(0xffffff) });
@@ -164,7 +164,103 @@ function cheetah(b: BlobView) {
   }
 }
 
-const COSTUMES: Record<Costume, (b: BlobView) => void> = { panda, dragon, dino, penguin, cheetah };
+// pointed ears on top of the head, tipped forward a little
+function pricked(b: BlobView, mat: THREE.Material, inner: THREE.Material | null, scale: [number, number, number], x = 0.2, y = 0.74) {
+  for (const side of [-1, 1]) {
+    const ear = mesh(hornGeo, mat, [side * x, y, -0.03], scale);
+    ear.rotation.set(0.15, 0, -side * 0.28);
+    if (inner) ear.add(mesh(hornGeo, inner, [0, -0.005, 0.018], [0.6, 0.75, 0.4], false));
+    b.body.add(ear);
+  }
+}
+
+// eyes ringed so they show on a dark face
+function ringEyes(b: BlobView, color: number) {
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.4 });
+  for (const eye of b.eyes) eye.add(mesh(ball, mat, [0, 0, -0.4], [1.45, 1.25, 0.5], false));
+}
+
+// stripes up the sides and over the back, the same ones every time
+function stripes(b: BlobView, mat: THREE.Material, count: number, width: number, length: number, front = 0.8) {
+  for (let i = 0; i < count; i++) {
+    const k = i / (count - 1);
+    for (const side of [-1, 1]) {
+      const around = side * (front + k * (Math.PI - front - 0.15));
+      const y = 0.42 + 0.1 * Math.sin(i * 2.3);
+      b.body.add(onSkin(mesh(ball, mat, [0, 0, 0], [width, length * (0.8 + 0.3 * Math.cos(i * 1.7)), 0.012], false), y, around));
+    }
+  }
+}
+
+const whiskerGeo = new THREE.CylinderGeometry(0.003, 0.003, 0.17, 4).rotateZ(Math.PI / 2);
+
+// a black Australian kelpie pup: black with tan eyebrows, muzzle and legs, pricked ears and a brush of a tail
+function kelpie(b: BlobView) {
+  const black = 0x24222a;
+  const tan = clay(0xc98a4b, 0.75);
+  b.tint.set(black);
+  b.dark = true;
+  b.limbs.color.set(0xc98a4b);
+  feet(b, 0xc98a4b);
+  ringEyes(b, 0x8a5a2b);
+  pricked(b, clay(black, 0.8), clay(0x4a3a36, 0.8), [1.7, 2.3, 0.6], 0.19, 0.72);
+  for (const side of [-1, 1]) b.body.add(seat(mesh(ball, tan, [0, 0, 0], [0.028, 0.02, 0.01], false), side * 0.13, 0.62, 0.006));
+  b.body.add(seat(mesh(ball, tan, [0, 0, 0], [0.13, 0.075, 0.03], false), 0, 0.41, -0.008));
+  b.body.add(seat(mesh(ball, clay(0x15151d, 0.3), [0, 0, 0], [0.03, 0.022, 0.02], false), 0, 0.455, 0.012));
+  recolourTail(b, black);
+  b.tail.children[0].scale.set(0.085, 0.2, 0.085);
+}
+
+// a brindle French bulldog pup: brown with dark tiger stripes, big upright bat ears, a dark flat muzzle, a white
+// patch on its chest and a stub of a tail
+function frenchie(b: BlobView) {
+  const brindle = 0x7a5537;
+  const dark = clay(0x2e2219, 0.8);
+  b.tint.set(brindle);
+  feet(b, 0x5e412b);
+  stripes(b, dark, 7, 0.02, 0.12, 0.8);
+  for (const side of [-1, 1]) {
+    const ear = mesh(ball, clay(brindle, 0.8), [side * 0.25, 0.82, -0.04], [0.11, 0.16, 0.035]);
+    ear.rotation.set(0, side * 0.35, -side * 0.35);
+    ear.add(mesh(ball, clay(0x3a2a24, 0.8), [0, -0.08, 0.75], [0.62, 0.7, 0.35], false));
+    b.body.add(ear);
+  }
+  b.body.add(seat(mesh(ball, dark, [0, 0, 0], [0.12, 0.075, 0.035], false), 0, 0.42, -0.006));
+  b.body.add(seat(mesh(ball, clay(0x15151d, 0.3), [0, 0, 0], [0.035, 0.022, 0.02], false), 0, 0.455, 0.022));
+  b.body.add(seat(mesh(ball, clay(0xf4efe6, 0.75), [0, 0, 0], [0.13, 0.08, 0.025], false), 0, 0.17, -0.004));
+  ringEyes(b, 0x6b4a30);
+  b.mouth.scale.set(1.4, 1, 1);
+  recolourTail(b, brindle);
+  b.tail.children[0].scale.set(0.06, 0.06, 0.06);
+}
+
+// a kitten, a ginger tabby: stripes on its head and sides, pointed ears pink inside, a pink nose, whiskers and a long
+// thin tail with rings
+function kitten(b: BlobView) {
+  const ginger = 0xf2a25c;
+  const stripe = clay(0xc8702f, 0.8);
+  b.tint.set(ginger);
+  feet(b, 0xfbe9d2);
+  pricked(b, clay(ginger, 0.8), clay(0xf6b6c2, 0.7), [1.75, 1.6, 0.6], 0.21, 0.72);
+  for (const x of [-0.06, 0, 0.06]) b.body.add(seat(mesh(ball, stripe, [0, 0, 0], [0.012, 0.045, 0.01], false), x, 0.7, 0.004));
+  stripes(b, stripe, 5, 0.018, 0.1, 1.0);
+  b.body.add(seat(mesh(ball, clay(0xfbe9d2, 0.75), [0, 0, 0], [0.12, 0.07, 0.03], false), 0, 0.41, -0.008));
+  b.body.add(seat(mesh(hornGeo, clay(0xf08fa0, 0.5), [0, 0, 0], [0.45, 0.25, 0.3], false), 0, 0.46, 0.016, Math.PI));
+  const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+  for (const side of [-1, 1]) {
+    for (const tilt of [-0.12, 0.12]) {
+      const w = seat(mesh(whiskerGeo, white, [0, 0, 0], 1, false), side * 0.15, 0.43 + tilt * 0.1, 0.02);
+      w.rotation.z += side * tilt;
+      b.body.add(w);
+    }
+  }
+  recolourTail(b, ginger);
+  const tail = b.tail.children[0];
+  tail.scale.set(0.04, 0.26, 0.04);
+  for (const y of [0.55, 1.05, 1.5]) tail.add(mesh(ball, stripe, [0, y, 0], [1.08, 0.08, 1.08], false));
+}
+
+const COSTUMES: Record<Costume, (b: BlobView) => void> = { panda, dragon, dino, penguin, cheetah, kelpie, frenchie, kitten };
 
 export function dress(b: BlobView, costume: Costume) {
   COSTUMES[costume](b);

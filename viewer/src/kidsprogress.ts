@@ -2,7 +2,7 @@
 // three for the level's targets), the best catch count, the stars caught in all, who they are (a Terrikin in a colour,
 // or a costume). Two stars on a level opens the next.
 
-export const LOOKS = ['terrikin', 'dino', 'dragon', 'panda', 'penguin', 'cheetah'] as const;
+export const LOOKS = ['terrikin', 'dino', 'dragon', 'panda', 'penguin', 'cheetah', 'kelpie', 'frenchie', 'kitten'] as const;
 export type Look = (typeof LOOKS)[number];
 // a Terrikin can be any colony's colour but the runners' (colony 0)
 export const COLOURS = [1, 2, 3] as const;
