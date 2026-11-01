@@ -1,5 +1,6 @@
 html,
 body {
+  --you: #6fb3d9;
   margin: 0;
   height: 100%;
   overflow: hidden;
@@ -87,19 +88,19 @@ button {
   height: auto;
 }
 
-.modes [data-mode]:hover,
+body:not(.steering) .modes [data-mode]:hover,
 .modes [data-mode]:focus-visible,
 .modes [data-mode].chosen {
   transform: translateY(-6px) scale(1.04);
   outline: 6px solid #ffc21a;
 }
 
-.modes [data-mode]:hover .runner,
+body:not(.steering) .modes [data-mode]:hover .runner,
 .modes [data-mode].chosen .runner {
   animation: hop 0.5s ease-in-out infinite alternate;
 }
 
-.modes [data-mode]:hover .you,
+body:not(.steering) .modes [data-mode]:hover .you,
 .modes [data-mode].chosen .you {
   animation: hop 0.35s ease-in-out infinite alternate;
 }
@@ -342,9 +343,9 @@ button {
   display: none !important;
 }
 
-/* Big's levels, under the pictures */
+/* each game's levels, under its picture */
 
-.big-col {
+.mode-col {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -386,7 +387,7 @@ button {
 }
 
 .levels button.chosen,
-.levels button:not(:disabled):hover {
+body:not(.steering) .levels button:not(:disabled):hover {
   transform: translateY(-4px);
   outline: 4px solid #ffc21a;
 }
@@ -409,8 +410,17 @@ button {
 
 /* who you are */
 
+.who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
 .looks {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
 }
 
@@ -425,8 +435,119 @@ button {
 }
 
 .looks button[aria-pressed='true'] {
-  outline: 5px solid #ffc21a;
+  outline: 5px solid #fff;
   transform: scale(1.08);
+}
+
+/* the row a stick or the arrow keys are moving along */
+#pick:not([data-row='game']) .modes [data-mode].chosen,
+#pick:not([data-row='game']) .levels button.chosen {
+  outline-color: #ffe08a;
+  transform: none;
+}
+
+#pick[data-row='look'] .looks button[aria-pressed='true'],
+#pick[data-row='colour'] .colours button[aria-pressed='true'] {
+  outline: 6px solid #ffc21a;
+  animation: hop 0.35s ease-in-out infinite alternate;
+}
+
+.colours {
+  display: flex;
+  gap: 16px;
+}
+
+.colours[hidden] {
+  display: none;
+}
+
+.colours button {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.15);
+}
+
+.colours button[aria-pressed='true'] {
+  outline: 4px solid #fff;
+  outline-offset: 3px;
+}
+
+/* turbo: filled by snacks, emptied while held */
+#turbo {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(440px, 70vw);
+  padding: 6px 14px 6px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.85);
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 30px;
+}
+
+#turbo div {
+  flex: 1;
+  height: 22px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.1);
+  overflow: hidden;
+}
+
+#turbo div span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(#ffe066, #ff9f1c);
+  transition: width 0.15s linear;
+}
+
+#turbo.full div span {
+  animation: pulse 0.4s ease-in-out infinite alternate;
+}
+
+#turbo.going {
+  box-shadow: 0 0 0 6px #ffd23f, 0 0 28px 10px rgb(255 140 0 / 0.7);
+  animation: rumble 0.12s linear infinite alternate;
+}
+
+#turbo.going > span {
+  animation: pulse 0.15s ease-in-out infinite alternate;
+}
+
+#turbo.going div span {
+  background: linear-gradient(90deg, #ff5e3a, #ff9f1c, #ffe066);
+}
+
+@keyframes rumble {
+  from { transform: translateX(-50%) translateY(0); }
+  to { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* on turbo the edges of the screen rush orange */
+body.turbo::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgb(255 140 0 / 0.38) 100%);
+  animation: rush 0.18s ease-in-out infinite alternate;
+}
+
+@keyframes rush {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+#turbo.gulp {
+  animation: bump 0.4s ease-out;
 }
 
 /* while playing */
@@ -436,6 +557,18 @@ button {
   padding: 2px 12px;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.85);
+}
+
+#role {
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #ffd23f;
+  font-size: clamp(30px, 5vw, 48px);
+  animation: hop 0.3s ease-in-out infinite alternate;
+}
+
+#role[hidden] {
+  display: none;
 }
 
 #goals i.on {

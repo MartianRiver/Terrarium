@@ -13,20 +13,23 @@
     <section id="pick" aria-label="Pick a game">
       <h1>Catch them!</h1>
       <div class="modes">
-        <button type="button" data-mode="little" aria-label="Little room: easy">
-          <svg viewBox="0 0 200 150" aria-hidden="true">
-            <rect x="6" y="6" width="188" height="138" rx="22" fill="#a8d672" stroke="#6c9b3c" stroke-width="6" />
-            <rect x="34" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
-            <rect x="144" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
-            <g class="runner"><circle cx="150" cy="30" r="13" fill="#f08a6c" /><circle cx="146" cy="27" r="3" fill="#222" /><circle cx="155" cy="27" r="3" fill="#222" /></g>
-            <g class="runner"><circle cx="160" cy="118" r="13" fill="#f08a6c" /><circle cx="156" cy="115" r="3" fill="#222" /><circle cx="165" cy="115" r="3" fill="#222" /></g>
-            <g class="runner"><circle cx="40" cy="118" r="13" fill="#f08a6c" /><circle cx="36" cy="115" r="3" fill="#222" /><circle cx="45" cy="115" r="3" fill="#222" /></g>
-            <circle cx="100" cy="74" r="28" fill="#fff36b" opacity="0.55" />
-            <g class="you"><circle cx="100" cy="74" r="19" fill="#6fb3d9" stroke="#fff" stroke-width="4" /><circle cx="94" cy="70" r="4" fill="#222" /><circle cx="106" cy="70" r="4" fill="#222" /><path d="M93 81 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></g>
-          </svg>
-          <span>Little</span>
-        </button>
-        <div class="big-col">
+        <div class="mode-col">
+          <button type="button" data-mode="little" aria-label="Little room: easy">
+            <svg viewBox="0 0 200 150" aria-hidden="true">
+              <rect x="6" y="6" width="188" height="138" rx="22" fill="#a8d672" stroke="#6c9b3c" stroke-width="6" />
+              <rect x="34" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
+              <rect x="144" y="62" width="22" height="22" rx="5" fill="#b98a5a" />
+              <g class="runner"><circle cx="150" cy="30" r="13" fill="#f08a6c" /><circle cx="146" cy="27" r="3" fill="#222" /><circle cx="155" cy="27" r="3" fill="#222" /></g>
+              <g class="runner"><circle cx="160" cy="118" r="13" fill="#f08a6c" /><circle cx="156" cy="115" r="3" fill="#222" /><circle cx="165" cy="115" r="3" fill="#222" /></g>
+              <g class="runner"><circle cx="40" cy="118" r="13" fill="#f08a6c" /><circle cx="36" cy="115" r="3" fill="#222" /><circle cx="45" cy="115" r="3" fill="#222" /></g>
+              <circle cx="100" cy="74" r="28" fill="#fff36b" opacity="0.55" />
+              <g class="you"><circle cx="100" cy="74" r="19" fill="var(--you)" stroke="#fff" stroke-width="4" /><circle cx="94" cy="70" r="4" fill="#222" /><circle cx="106" cy="70" r="4" fill="#222" /><path d="M93 81 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></g>
+            </svg>
+            <span>Little</span>
+          </button>
+          <div class="levels" data-levels="little" aria-label="Little room levels"></div>
+        </div>
+        <div class="mode-col">
           <button type="button" data-mode="big" aria-label="Big room with blocks to hide behind: harder">
             <svg viewBox="0 0 200 150" aria-hidden="true">
               <rect x="6" y="6" width="188" height="138" rx="22" fill="#86c4a8" stroke="#4f8f72" stroke-width="6" />
@@ -40,23 +43,48 @@
               <g class="runner"><circle cx="30" cy="104" r="11" fill="#f08a6c" /><circle cx="27" cy="101" r="2.5" fill="#222" /><circle cx="34" cy="101" r="2.5" fill="#222" /></g>
               <g class="runner"><circle cx="64" cy="22" r="11" fill="#f08a6c" /><circle cx="61" cy="19" r="2.5" fill="#222" /><circle cx="68" cy="19" r="2.5" fill="#222" /></g>
               <circle cx="104" cy="76" r="26" fill="#fff36b" opacity="0.55" />
-              <g class="you"><circle cx="104" cy="76" r="17" fill="#6fb3d9" stroke="#fff" stroke-width="4" /><circle cx="98" cy="72" r="3.5" fill="#222" /><circle cx="110" cy="72" r="3.5" fill="#222" /><path d="M97 82 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></g>
+              <g class="you"><circle cx="104" cy="76" r="17" fill="var(--you)" stroke="#fff" stroke-width="4" /><circle cx="98" cy="72" r="3.5" fill="#222" /><circle cx="110" cy="72" r="3.5" fill="#222" /><path d="M97 82 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></g>
             </svg>
             <span>Big</span>
           </button>
-          <div id="levels" class="levels" aria-label="Big room levels"></div>
+          <div class="levels" data-levels="big" aria-label="Big room levels"></div>
         </div>
       </div>
-      <div class="looks" aria-label="Who you are">
-        <button type="button" data-look="terrikin" aria-label="A Terrikin">
-          <svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="32" r="22" fill="#6fb3d9" /><circle cx="23" cy="28" r="3.5" fill="#222" /><circle cx="37" cy="28" r="3.5" fill="#222" /><path d="M23 39 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></svg>
-        </button>
-        <button type="button" data-look="panda" aria-label="A panda">
-          <svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="#2a2930" /><circle cx="47" cy="13" r="8" fill="#2a2930" /><circle cx="30" cy="32" r="22" fill="#f4f1ea" stroke="#d8d3c8" stroke-width="2" /><ellipse cx="21" cy="30" rx="6" ry="8" fill="#2a2930" transform="rotate(25 21 30)" /><ellipse cx="39" cy="30" rx="6" ry="8" fill="#2a2930" transform="rotate(-25 39 30)" /><circle cx="22" cy="29" r="2.5" fill="#fff" /><circle cx="38" cy="29" r="2.5" fill="#fff" /><ellipse cx="30" cy="40" rx="4" ry="3" fill="#2a2930" /></svg>
-        </button>
-        <button type="button" data-look="dragon" aria-label="A baby dragon">
-          <svg viewBox="0 0 60 60" aria-hidden="true"><path d="M14 16 l4 -12 l5 10 z M46 16 l-4 -12 l-5 10 z" fill="#f7a440" /><path d="M6 30 q-4 -14 10 -12 q-2 8 0 14 z M54 30 q4 -14 -10 -12 q2 8 0 14 z" fill="#9be07a" /><circle cx="30" cy="33" r="21" fill="#6cc35a" /><ellipse cx="30" cy="43" rx="12" ry="8" fill="#f6e27a" /><circle cx="23" cy="29" r="3.5" fill="#222" /><circle cx="37" cy="29" r="3.5" fill="#222" /><circle cx="24" cy="28" r="1.2" fill="#fff" /><circle cx="38" cy="28" r="1.2" fill="#fff" /><path d="M24 40 q6 5 12 0" stroke="#222" stroke-width="2.5" fill="none" /><circle cx="26" cy="37" r="1" fill="#2d6b24" /><circle cx="34" cy="37" r="1" fill="#2d6b24" /></svg>
-        </button>
+      <div class="who" aria-label="Who you are">
+        <div class="looks">
+          <button type="button" data-look="terrikin" aria-label="A Terrikin">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><path d="M30 10 v-6" stroke="var(--you)" stroke-width="3" /><circle cx="30" cy="4" r="3" fill="#fff36b" /><circle cx="30" cy="32" r="22" fill="var(--you)" /><circle cx="23" cy="28" r="3.5" fill="#222" /><circle cx="37" cy="28" r="3.5" fill="#222" /><path d="M23 39 q7 6 14 0" stroke="#222" stroke-width="3" fill="none" /></svg>
+          </button>
+          <button type="button" data-look="dino" aria-label="A baby dinosaur">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><path d="M44 12 l6 -4 l-1 7 l7 -1 l-4 6 l6 2 l-6 4 z" fill="#84d9c4" /><circle cx="30" cy="33" r="21" fill="#8b7565" stroke="#3b3029" stroke-width="2" /><ellipse cx="30" cy="45" rx="11" ry="8" fill="#efe5d3" /><circle cx="22" cy="27" r="6.5" fill="#fff" stroke="#3b3029" stroke-width="1.5" /><circle cx="38" cy="27" r="6.5" fill="#fff" stroke="#3b3029" stroke-width="1.5" /><circle cx="23" cy="28" r="3" fill="#222" /><circle cx="37" cy="28" r="3" fill="#222" /><path d="M19 38 l4 3 l3 -3 l4 3 l4 -3 l3 3 l4 -3" stroke="#3b3029" stroke-width="2" fill="none" stroke-linejoin="round" /><circle cx="47" cy="38" r="2.5" fill="#84d9c4" /><circle cx="44" cy="45" r="1.8" fill="#84d9c4" /></svg>
+          </button>
+          <button type="button" data-look="dragon" aria-label="A baby dragon">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><path d="M14 16 l4 -12 l5 10 z M46 16 l-4 -12 l-5 10 z" fill="#f7a440" /><path d="M10 34 l-8 -16 l6 4 l2 -6 l4 8 z M50 34 l8 -16 l-6 4 l-2 -6 l-4 8 z" fill="#f7c95a" /><circle cx="30" cy="33" r="21" fill="#6cc35a" /><ellipse cx="30" cy="43" rx="12" ry="8" fill="#f6e27a" /><circle cx="23" cy="29" r="3.5" fill="#222" /><circle cx="37" cy="29" r="3.5" fill="#222" /><circle cx="24" cy="28" r="1.2" fill="#fff" /><circle cx="38" cy="28" r="1.2" fill="#fff" /><path d="M24 40 q6 5 12 0" stroke="#222" stroke-width="2.5" fill="none" /><circle cx="26" cy="37" r="1" fill="#2d6b24" /><circle cx="34" cy="37" r="1" fill="#2d6b24" /></svg>
+          </button>
+          <button type="button" data-look="panda" aria-label="A panda">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="#2a2930" /><circle cx="47" cy="13" r="8" fill="#2a2930" /><circle cx="30" cy="32" r="22" fill="#f4f1ea" stroke="#d8d3c8" stroke-width="2" /><ellipse cx="21" cy="30" rx="6" ry="8" fill="#2a2930" transform="rotate(25 21 30)" /><ellipse cx="39" cy="30" rx="6" ry="8" fill="#2a2930" transform="rotate(-25 39 30)" /><circle cx="22" cy="29" r="2.5" fill="#fff" /><circle cx="38" cy="29" r="2.5" fill="#fff" /><ellipse cx="30" cy="40" rx="4" ry="3" fill="#2a2930" /></svg>
+          </button>
+          <button type="button" data-look="penguin" aria-label="A baby penguin">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="32" r="22" fill="#2e3647" /><ellipse cx="30" cy="37" rx="15" ry="16" fill="#f7f6f0" /><circle cx="24" cy="29" r="3.2" fill="#222" /><circle cx="36" cy="29" r="3.2" fill="#222" /><circle cx="25" cy="28" r="1.1" fill="#fff" /><circle cx="37" cy="28" r="1.1" fill="#fff" /><path d="M26 34 l4 6 l4 -6 z" fill="#f5a23a" /><circle cx="20" cy="36" r="2.5" fill="#ffb3c0" opacity="0.8" /><circle cx="40" cy="36" r="2.5" fill="#ffb3c0" opacity="0.8" /></svg>
+          </button>
+          <button type="button" data-look="cheetah" aria-label="A baby cheetah">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="14" cy="14" r="7" fill="#f0b44a" /><circle cx="14" cy="14" r="3.5" fill="#3a2a1a" /><circle cx="46" cy="14" r="7" fill="#f0b44a" /><circle cx="46" cy="14" r="3.5" fill="#3a2a1a" /><circle cx="30" cy="33" r="21" fill="#f0b44a" /><ellipse cx="30" cy="41" rx="9" ry="6" fill="#fbf1dc" /><circle cx="23" cy="29" r="3.5" fill="#222" /><circle cx="37" cy="29" r="3.5" fill="#222" /><path d="M22 32 q-1 5 2 9 M38 32 q1 5 -2 9" stroke="#3a2a1a" stroke-width="2" fill="none" /><ellipse cx="30" cy="38" rx="3" ry="2" fill="#3a2a1a" /><circle cx="17" cy="24" r="1.8" fill="#3a2a1a" /><circle cx="43" cy="24" r="1.8" fill="#3a2a1a" /><circle cx="30" cy="17" r="2" fill="#3a2a1a" /><circle cx="22" cy="18" r="1.5" fill="#3a2a1a" /><circle cx="38" cy="18" r="1.5" fill="#3a2a1a" /><circle cx="13" cy="34" r="1.6" fill="#3a2a1a" /><circle cx="47" cy="34" r="1.6" fill="#3a2a1a" /></svg>
+          </button>
+          <button type="button" data-look="kelpie" aria-label="A kelpie puppy">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><path d="M12 22 l3 -18 l10 12 z M48 22 l-3 -18 l-10 12 z" fill="#24222a" /><path d="M15 18 l1.5 -9 l5 6 z M45 18 l-1.5 -9 l-5 6 z" fill="#4a3a36" /><circle cx="30" cy="33" r="21" fill="#24222a" /><ellipse cx="30" cy="42" rx="10" ry="7" fill="#c98a4b" /><circle cx="23" cy="20.5" r="2.2" fill="#c98a4b" /><circle cx="37" cy="20.5" r="2.2" fill="#c98a4b" /><circle cx="23" cy="28" r="4.5" fill="#8a5a2b" /><circle cx="37" cy="28" r="4.5" fill="#8a5a2b" /><circle cx="23" cy="28" r="2.8" fill="#111" /><circle cx="37" cy="28" r="2.8" fill="#111" /><circle cx="24" cy="27" r="1" fill="#fff" /><circle cx="38" cy="27" r="1" fill="#fff" /><ellipse cx="30" cy="38" rx="3.5" ry="2.5" fill="#111" /><path d="M26 43 q4 3 8 0" stroke="#111" stroke-width="2" fill="none" /></svg>
+          </button>
+          <button type="button" data-look="frenchie" aria-label="A French bulldog puppy">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><ellipse cx="13" cy="15" rx="8" ry="12" fill="#7a5537" transform="rotate(-20 13 15)" /><ellipse cx="47" cy="15" rx="8" ry="12" fill="#7a5537" transform="rotate(20 47 15)" /><ellipse cx="13" cy="16" rx="4.5" ry="8" fill="#3a2a24" transform="rotate(-20 13 16)" /><ellipse cx="47" cy="16" rx="4.5" ry="8" fill="#3a2a24" transform="rotate(20 47 16)" /><circle cx="30" cy="34" r="21" fill="#7a5537" /><path d="M14 30 q2 -6 5 -9 M46 30 q-2 -6 -5 -9 M12 38 q1 -4 3 -6 M48 38 q-1 -4 -3 -6" stroke="#2e2219" stroke-width="2" fill="none" /><ellipse cx="30" cy="41" rx="10" ry="7" fill="#2e2219" /><circle cx="22" cy="29" r="4.2" fill="#6b4a30" /><circle cx="38" cy="29" r="4.2" fill="#6b4a30" /><circle cx="22" cy="29" r="2.8" fill="#111" /><circle cx="38" cy="29" r="2.8" fill="#111" /><circle cx="23" cy="28" r="1" fill="#fff" /><circle cx="39" cy="28" r="1" fill="#fff" /><ellipse cx="30" cy="38" rx="4" ry="2.5" fill="#111" /><path d="M25 44 q5 3 10 0" stroke="#f4efe6" stroke-width="1.5" fill="none" /><ellipse cx="30" cy="53" rx="5" ry="3" fill="#f4efe6" /></svg>
+          </button>
+          <button type="button" data-look="kitten" aria-label="A kitten">
+            <svg viewBox="0 0 60 60" aria-hidden="true"><path d="M11 24 l2 -17 l12 9 z M49 24 l-2 -17 l-12 9 z" fill="#f2a25c" /><path d="M14 19 l1 -8 l6 5 z M46 19 l-1 -8 l-6 5 z" fill="#f6b6c2" /><circle cx="30" cy="33" r="21" fill="#f2a25c" /><path d="M24 14 v6 M30 13 v7 M36 14 v6 M10 32 h6 M44 32 h6 M11 38 h5 M44 38 h5" stroke="#c8702f" stroke-width="2.2" stroke-linecap="round" /><ellipse cx="30" cy="41" rx="9" ry="6" fill="#fbe9d2" /><ellipse cx="23" cy="29" rx="3.6" ry="4.2" fill="#222" /><ellipse cx="37" cy="29" rx="3.6" ry="4.2" fill="#222" /><circle cx="24" cy="28" r="1.3" fill="#fff" /><circle cx="38" cy="28" r="1.3" fill="#fff" /><path d="M28 37 h4 l-2 2.5 z" fill="#f08fa0" /><path d="M30 39.5 q-2 3 -4 2 M30 39.5 q2 3 4 2" stroke="#222" stroke-width="1.4" fill="none" /><path d="M8 38 l14 1 M8 42 l14 -1 M52 38 l-14 1 M52 42 l-14 -1" stroke="#fff" stroke-width="1.2" /></svg>
+          </button>
+        </div>
+        <div class="colours" aria-label="Your colour">
+          <button type="button" data-colour="1" aria-label="Blue" style="--c: #6fb3d9"></button>
+          <button type="button" data-colour="2" aria-label="Purple" style="--c: #b48ee0"></button>
+          <button type="button" data-colour="3" aria-label="Green" style="--c: #9ccc7a"></button>
+        </div>
       </div>
       <p class="jar" aria-label="Stars caught so far"><span class="star" aria-hidden="true">★</span> <b id="stars-total">0</b></p>
     </section>
@@ -64,10 +92,12 @@
     <div id="kids-hud" hidden>
       <div id="count-box" aria-label="Caught"><span class="star" aria-hidden="true">★</span><b id="count" aria-live="polite">0</b></div>
       <div id="goals" aria-label="Stars this round"></div>
+      <b id="role" hidden aria-label="Run! They're coming for you">🏃</b>
       <b id="level" aria-label="Level"></b>
       <div id="time" aria-label="Time left"><span></span></div>
       <button id="quit" type="button" aria-label="Stop and go back">✕</button>
     </div>
+    <div id="turbo" hidden aria-label="Turbo: eat snacks to fill it, hold to go fast"><span aria-hidden="true">⚡</span><div><span></span></div></div>
     <div id="big" aria-live="assertive"></div>
 
     <section id="end" hidden aria-label="How you did">

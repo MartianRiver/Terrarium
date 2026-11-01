@@ -2,6 +2,7 @@
 // whoever's dizzy, and a boing. The sounds are made on the spot (Web Audio oscillators), so there are no files to
 // load and nothing to license; quiet by design, since small children sit close to the speakers.
 import * as THREE from 'three';
+import type { Pose } from './sightfan';
 import type { Frame } from './world';
 
 const STAR = '#ffd23f';
@@ -37,7 +38,12 @@ interface Spark {
   vy: number;
   vz: number;
   age: number;
+  life: number;
 }
+
+const FLAMES = ['#ff9f1c', '#ffd23f', '#ff5e3a'];
+// sparks a second streaming out behind you on turbo
+const STREAM = 60;
 
 export class CatchFx {
   private texture = starTexture();
@@ -45,17 +51,26 @@ export class CatchFx {
   private circling = new Map<number, THREE.Sprite[]>();
   private ring: { mesh: THREE.Mesh; age: number }[] = [];
   private ringGeo = new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2);
+  private glow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.8, 32).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: '#ff9f1c', transparent: true, opacity: 0, depthWrite: false }),
+  );
+  private owed = 0;
 
-  constructor(private scene: THREE.Scene) {}
+  constructor(private scene: THREE.Scene) {
+    this.glow.position.y = 0.03;
+    scene.add(this.glow);
+  }
 
-  burst(x: number, y: number) {
+  burst(x: number, y: number, size = 0.7, ring = true) {
     for (let i = 0; i < BURST; i++) {
-      const sprite = this.star(0.7);
+      const sprite = this.star(size);
       sprite.position.set(x, 0.6, y);
       const a = (i / BURST) * Math.PI * 2 + Math.random() * 0.4;
       const out = 2 + Math.random() * 1.5;
-      this.sparks.push({ sprite, vx: Math.cos(a) * out, vy: 3 + Math.random() * 2, vz: Math.sin(a) * out, age: 0 });
+      this.sparks.push({ sprite, vx: Math.cos(a) * out, vy: 3 + Math.random() * 2, vz: Math.sin(a) * out, age: 0, life: LIFE });
     }
+    if (!ring) return;
     const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: STAR, transparent: true, depthWrite: false }));
     mesh.position.set(x, 0.03, y);
     this.scene.add(mesh);
@@ -70,8 +85,8 @@ export class CatchFx {
       s.sprite.position.x += s.vx * dt;
       s.sprite.position.y = Math.max(0.1, s.sprite.position.y + s.vy * dt);
       s.sprite.position.z += s.vz * dt;
-      s.sprite.material.opacity = 1 - (s.age / LIFE) ** 2;
-      if (s.age < LIFE) return true;
+      s.sprite.material.opacity = 1 - (s.age / s.life) ** 2;
+      if (s.age < s.life) return true;
       this.scene.remove(s.sprite);
       s.sprite.material.dispose();
       return false;
@@ -106,6 +121,28 @@ export class CatchFx {
         const a = time * 5 + (i / CIRCLE) * Math.PI * 2;
         s.position.set(c.x + Math.cos(a) * 0.45, 1.15 + Math.sin(a * 2) * 0.05, c.y + Math.sin(a) * 0.45);
       });
+    }
+  }
+
+  // turbo: a glow under you and flames streaming out behind while it runs (`at` null when it isn't)
+  turbo(dt: number, time: number, at: Pose | null) {
+    const mat = this.glow.material as THREE.MeshBasicMaterial;
+    mat.opacity += ((at ? 0.45 + 0.15 * Math.sin(time * 30) : 0) - mat.opacity) * Math.min(1, dt * 12);
+    if (!at) {
+      this.owed = 0;
+      return;
+    }
+    this.glow.position.x = at.x;
+    this.glow.position.z = at.y;
+    const bx = -Math.cos(at.heading);
+    const bz = -Math.sin(at.heading);
+    for (this.owed += dt * STREAM; this.owed >= 1; this.owed--) {
+      const sprite = this.star(0.25 + Math.random() * 0.25);
+      sprite.material.color.set(FLAMES[Math.floor(Math.random() * FLAMES.length)]);
+      const side = (Math.random() - 0.5) * 0.5;
+      sprite.position.set(at.x + bx * 0.45 - bz * side, 0.25 + Math.random() * 0.4, at.y + bz * 0.45 + bx * side);
+      const out = 1.5 + Math.random();
+      this.sparks.push({ sprite, vx: bx * out - bz * side * 2, vy: 1 + Math.random(), vz: bz * out + bx * side * 2, age: 0, life: 0.45 });
     }
   }
 
@@ -187,6 +224,24 @@ export class Beeps {
     }
     this.tone({ from: 392, to: 370, length: 0.12, type: 'square', level: 0.25 });
     this.tone({ from: 494, to: 466, length: 0.16, type: 'square', level: 0.25, at: 0.13 });
+  }
+
+  // a snack: two crunches and a happy chirp
+  nom() {
+    this.tone({ from: 320, to: 170, length: 0.05, type: 'square', level: 0.3 });
+    this.tone({ from: 300, to: 160, length: 0.05, type: 'square', level: 0.3, at: 0.09 });
+    this.tone({ from: 660, to: 990, length: 0.12, type: 'triangle', level: 0.4, at: 0.18 });
+  }
+
+  // caught yourself: two notes down
+  uhOh() {
+    this.tone({ from: 660, to: 600, length: 0.16, type: 'triangle', level: 0.5 });
+    this.tone({ from: 470, to: 420, length: 0.28, type: 'triangle', level: 0.5, at: 0.17 });
+  }
+
+  // turbo starting up
+  whoosh() {
+    this.tone({ from: 220, to: 660, length: 0.28, type: 'sine', level: 0.35 });
   }
 
   count(last = false) {

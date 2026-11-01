@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { fresh, opened, record, starsFor } from '../src/kidsprogress';
+import { fresh, load, opened, record, starsFor } from '../src/kidsprogress';
 
 const TARGETS: [number, number] = [8, 14];
 
@@ -41,4 +41,18 @@ test('levels of other games are their own', () => {
   expect(opened(p, 'big', 5)).toBe(1);
   [p] = record(p, 'big', 1, 5, 0, TARGETS);
   expect(p.stars['big:1']).toBe(0);
+});
+
+test('a costume or colour this page no longer has comes back as a blue Terrikin, the rest kept', () => {
+  const stored = new Map<string, string>();
+  stored.set('terrarium.kids.progress', JSON.stringify({ ...fresh(), total: 9, look: 'unicorn', colour: 0 }));
+  const was = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k: string) => stored.get(k) ?? null } as Storage;
+  try {
+    expect(load()).toMatchObject({ total: 9, look: 'terrikin', colour: 1 });
+    stored.set('terrarium.kids.progress', JSON.stringify({ ...fresh(), look: 'dino', colour: 3 }));
+    expect(load()).toMatchObject({ look: 'dino', colour: 3 });
+  } finally {
+    globalThis.localStorage = was;
+  }
 });

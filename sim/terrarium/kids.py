@@ -43,15 +43,29 @@ class Mode:
     # catches for two stars and for three (two opens the next level): about 45% and 80% of what the sloppy pretend
     # player in the 0.4 notes catches
     stars: tuple[int, int]
+    # snacks on the floor at once (0: none): each one eaten fills some of a turbo bar, and holding sprint runs on it
+    snacks: int = 0
+    # seconds a caught one waits in the nest, sent home once it's tumbled, before it runs again (0: it spins dizzy
+    # where it stops instead)
+    home: float = 0.0
+    # tag back: one you catch is it and comes after you (and anyone), and you're it again once it catches you
+    swap: bool = False
+    # tag back: the share of whoever's it's steering that heads for you, on top of the brain's, so it comes after
+    # you rather than whoever's nearest
+    pull: float = 0.0
 
 
 LITTLE = Mode('nursery-tag.toml', runners=6, seconds=90, you=1.35, reach=0.25, dizzy=2.0, safe=3.5, gap=5.0,
-              slowest=0.35, fastest=0.9, start=0.6, stars=(6, 14))
+              slowest=0.35, fastest=0.9, start=0.6, stars=(6, 14), snacks=3)
 BIG = Mode('nursery-tag-hide.toml', runners=6, seconds=90, you=1.3, reach=0.15, dizzy=1.5, safe=3.0, gap=6.0,
            slowest=0.45, fastest=0.8, start=0.6, stars=(10, 18))
 MODES = {
-    # the little room with two pillars, everyone in sight
-    'little': (LITTLE,),
+    # the little room with two pillars, everyone in sight: caught ones spin dizzy, then are sent home to the nest
+    # (eight of them), then tag back, where one you catch comes after you
+    'little': (LITTLE,
+               replace(LITTLE, runners=8, home=1.0, start=0.7, stars=(8, 16)),
+               replace(LITTLE, runners=4, you=1.15, swap=True, pull=0.75, dizzy=1.0, gap=6.0, slowest=0.5, start=0.7,
+                       stars=(4, 8))),
     # the room with blocks to hide behind, and a sprint (yours too), in levels: each a little less on your side,
     # the last in the playground (20 m, twenty-four blocks)
     'big': (BIG,
@@ -67,10 +81,25 @@ HARDEN = 0.05
 # a caught one is knocked away at this speed (m/s) and rolls on for this long before it spins
 BOUNCE = 5.0
 FLING = 0.6
+# snacks: what's on the floor (only the look differs), how much of the bar one fills, how fast holding sprint empties a
+# full one (a share a second), turbo's speed, how hard the stick must push before turbo runs (standing still with sprint
+# held keeps the bar), how close counts as eating one (m from your middle), and how long until an eaten one is
+# replaced somewhere else
+SNACKS = ('berry', 'seaweed')
+FILL = 0.34
+DRAIN = 0.35
+TURBO = 1.75
+GO = 0.2
+EAT = 0.5
+REGROW = 2.5
 
 
 def world(mode: Mode) -> Config:
     cfg = load(DEFAULT.parent / mode.world)
+    if mode.snacks:
+        # turbo is the world's sprint run by the bar; [sprint] seconds stay 0, so the runners still can't sprint
+        assert not cfg.sprint.on, f'{mode.world} has a sprint of its own'
+        cfg = replace(cfg, sprint=replace(cfg.sprint, speed=TURBO))
     return replace(cfg, colonies=replace(cfg.colonies, size=mode.runners + 1),
                    episode=replace(cfg.episode, seconds=mode.seconds),
                    tag=replace(cfg.tag, speed=mode.you, reach=mode.reach, back=mode.safe, cooldown=0.3))
@@ -88,13 +117,24 @@ class Catch(Game):
         self.first = replay.frame(w, 0)
         self.pace = self.mode.start
         self.catches: list[dict] = []
-        self.events: list[dict] = []  # catches since the last step, for the viewer
-        self.dizzy: dict[int, int] = {}
+        self.events: list[dict] = []  # since the last step, for the viewer: catches, being caught, sent home
+        self.dizzy: dict[int, int] = {}  # ticks left of each caught one's tumble and spin (or wait at home)
+        self.got = 0  # times you were caught, in tag back
         self.last = 0  # tick of the last catch, or of the start
         self.ticks = 0
         self.began = time.time()
         self.device = device
         self.closed = False
+        if self.mode.snacks and 'sprint' not in self.controls:
+            self.controls.append('sprint')
+        self.rng = np.random.default_rng(seed + 1)
+        self.snacks: list[dict] = []
+        self.coming: list[int] = [0] * self.mode.snacks  # ticks until each missing snack is put down
+        self.turbo = 0.0
+        self.eaten = 0
+        self.boosted = 0  # ticks on turbo
+        self.serial = 0
+        self.grow()
         self.file = self.writer = None
         if keep:
             day = keep / time.strftime('%Y-%m-%d')
@@ -111,27 +151,58 @@ class Catch(Game):
         for _ in range(ticks):
             if w.ended[0]:
                 break
+            # a caught one tumbles away from you, then spins where it stops, or is sent home to wait there
+            full, fling = round(self.stunned * self.hz), round(FLING * self.hz)
+            if self.mode.home:
+                for slot in [s for s, left in self.dizzy.items() if full - left == fling]:
+                    self.send_home(slot)
             actions = self.act(w).copy()
-            # theirs at the pace the game has set; a caught one tumbles away from you, then spins where it stops
-            actions[0, :, 0] = np.where(actions[0, :, 0] > 0, actions[0, :, 0] * self.pace, actions[0, :, 0])
-            full = round(self.mode.dizzy * self.hz)
+            # theirs at the pace the game has set; in tag back, whoever's it comes at full chasing speed
+            pace = np.full(actions.shape[1], self.pace)
+            if self.mode.swap:
+                pace[self.tag.it[0]] = 1.0
+            actions[0, :, 0] = np.where(actions[0, :, 0] > 0, actions[0, :, 0] * pace, actions[0, :, 0])
+            if self.mode.pull:
+                self.come(actions)
             for slot, left in self.dizzy.items():
-                rolling = full - left < round(FLING * self.hz)
-                actions[0, slot, 0], actions[0, slot, 1] = (1.0, 0.0) if rolling else (0.0, 1.0)
+                rolling = full - left < fling
+                actions[0, slot, 0], actions[0, slot, 1] = (1.0, 0.0) if rolling else (0.0, 0.0 if self.mode.home else 1.0)
             mine = np.full(actions.shape[-1], -1.0)
             mine[0], mine[1] = np.clip(thrust, -1, 1), np.clip(turn, -1, 1)
-            # a sprint is the only yes there is to say in tag
-            if 'sprint' in yes and 'sprint' in self.controls:
+            # a sprint is the only yes there is to say in tag; with snacks it's turbo, while the bar lasts
+            boost = False
+            if 'sprint' in yes and self.mode.snacks:
+                boost = self.turbo > 0 and abs(thrust) > GO
+                if boost:
+                    w.sprinting[0, self.slot] = 1
+                    self.turbo = max(0.0, self.turbo - DRAIN / self.hz)
+                    self.boosted += 1
+            elif 'sprint' in yes and 'sprint' in self.controls:
                 mine[ACTIONS.index('sprint')] = 1.0
             actions[0, self.slot] = mine
+            tag = self.tag
+            before = (int(tag.it[0]), int(tag.back[0]), int(tag.since[0]), int(tag.wait[0]))
             w.step(actions)
             self.ticks += 1
+            self.munch()
+            self.grow()
             self.dizzy = {s: t - 1 for s, t in self.dizzy.items() if t > 1}
-            caught = int(self.tag.it[0])
-            if caught != self.slot:
-                self.caught(caught)
+            now, was = int(tag.it[0]), before[0]
+            if now != was and not self.counts(was, now):
+                # not a tag in this game: put it back as it was
+                tag.it[0], tag.back[0], tag.since[0], tag.wait[0] = before
+                tag.since[0] += 1
+            elif now != was and was == self.slot:
+                self.caught(now)
+            elif now == self.slot != was:
+                self.tagged(was)
             self.adjust()
             frame = replay.frame(w, 0)
+            if boost:
+                me = int(w.creature_id[0, self.slot])
+                for c in frame['creatures']:
+                    if c['id'] == me:
+                        c['sprinting'] = 1
             frames.append(frame)
             if self.writer:
                 self.writer.write(frame)
@@ -139,11 +210,40 @@ class Catch(Game):
             self.close('over')
         return frames
 
+    def come(self, actions: np.ndarray):
+        # tag back: whoever's it leans its way towards you
+        w, it = self.world, int(self.tag.it[0])
+        if it == self.slot or it in self.dizzy:
+            return
+        d = w.pos[0, self.slot] - w.pos[0, it]
+        off = np.arctan2(d[1], d[0]) - w.heading[0, it]
+        off = np.arctan2(np.sin(off), np.cos(off))
+        p = self.mode.pull
+        actions[0, it, 1] = (1 - p) * actions[0, it, 1] + p * np.clip(off * 2.5, -1, 1)
+        actions[0, it, 0] = max(actions[0, it, 0], p * max(0.0, np.cos(off)))
+
+    def counts(self, was: int, now: int) -> bool:
+        # tag back: they only tag you, never each other, so whoever's it comes for you; sent home: the nest is a
+        # safe base, as in the playground
+        if self.mode.swap and self.slot not in (was, now):
+            return False
+        if self.mode.home and was == self.slot:
+            w = self.world
+            return bool(np.hypot(*(w.pos[0, now] - w.nests[w.colony[now]])) > w.cfg.colonies.nest_radius)
+        return True
+
+    @property
+    def stunned(self) -> float:
+        # seconds a caught one isn't its own: tumbling then spinning, or tumbling then waiting at home
+        return FLING + self.mode.home if self.mode.home else self.mode.dizzy
+
     def caught(self, slot: int):
         w, hz, tag = self.world, self.hz, self.tag
-        tag.it[0], tag.back[0], tag.since[0] = self.slot, slot, 0
-        tag.wait[0] = round(w.cfg.tag.cooldown * hz)
-        self.dizzy[slot] = round(self.mode.dizzy * hz)
+        # handed straight back, unless it's tag back: then the world has made the caught one it
+        if not self.mode.swap:
+            tag.it[0], tag.back[0], tag.since[0] = self.slot, slot, 0
+            tag.wait[0] = round(w.cfg.tag.cooldown * hz)
+        self.dizzy[slot] = round(self.stunned * hz)
         # boing: knocked away from you, facing away
         away = w.pos[0, slot] - w.pos[0, self.slot]
         w.heading[0, slot] = np.arctan2(away[1], away[0])
@@ -156,12 +256,76 @@ class Catch(Game):
             self.pace = min(self.mode.fastest, self.pace + HARDEN)
         self.last = self.ticks
         x, y = w.pos[0, slot]
-        event = {'at': round(self.ticks / hz, 2), 'tick': int(w.tick), 'id': int(w.creature_id[0, slot]),
+        event = {'kind': 'catch', 'at': round(self.ticks / hz, 2), 'tick': int(w.tick), 'id': int(w.creature_id[0, slot]),
                  'x': round(float(x), 2), 'y': round(float(y), 2), 'took': round(took, 2), 'pace': round(self.pace, 3)}
         self.catches.append(event)
         self.events.append(event)
 
+    def munch(self):
+        x, y = self.world.pos[0, self.slot]
+        for s in [s for s in self.snacks if np.hypot(s['x'] - x, s['y'] - y) < EAT]:
+            self.snacks.remove(s)
+            self.coming.append(round(REGROW * self.hz))
+            self.turbo = min(1.0, self.turbo + FILL)
+            self.eaten += 1
+
+    def grow(self):
+        left = []
+        for t in self.coming:
+            t -= 1
+            if t <= 0 and (spot := self.spot()):
+                self.serial += 1
+                self.snacks.append({'id': self.serial, 'x': spot[0], 'y': spot[1],
+                                    'kind': SNACKS[int(self.rng.integers(len(SNACKS)))]})
+            else:
+                # nowhere clear this time: try again next tick
+                left.append(max(t, 1))
+        self.coming = left
+
+    def spot(self) -> tuple[float, float] | None:
+        # somewhere clear: off the walls and blocks, not under you, not on another snack
+        w = self.world
+        half = w.cfg.arena.size / 2 - 0.8
+        for _ in range(50):
+            x, y = (float(v) for v in self.rng.uniform(-half, half, 2))
+            if any(np.hypot(x - b.x, y - b.y) < max(b.w, b.h) / 2 + 0.6 for b in w.cfg.block):
+                continue
+            if np.hypot(*(w.pos[0, self.slot] - (x, y))) < 2.0:
+                continue
+            if any(np.hypot(x - s['x'], y - s['y']) < 1.5 for s in self.snacks):
+                continue
+            return round(x, 2), round(y, 2)
+        return None
+
+    def tagged(self, by: int):
+        # tag back: caught, and knocked away from whoever did it, so there's a moment to turn round
+        w = self.world
+        self.got += 1
+        self.last = self.ticks
+        away = w.pos[0, self.slot] - w.pos[0, by]
+        w.physics.bodies[0][self.slot].velocity = tuple(float(v) for v in 0.7 * BOUNCE * away / max(np.hypot(*away), 1e-6))
+        w.physics.read()
+        x, y = w.pos[0, self.slot]
+        self.events.append({'kind': 'tagged', 'at': round(self.ticks / self.hz, 2), 'tick': int(w.tick),
+                            'id': int(w.creature_id[0, by]), 'x': round(float(x), 2), 'y': round(float(y), 2)})
+
+    def send_home(self, slot: int):
+        # in a puff, to somewhere in its nest; the viewer puffs at both ends
+        w = self.world
+        x, y = (float(v) for v in w.pos[0, slot])
+        r = w.cfg.colonies.nest_radius * 0.5 * np.sqrt(self.rng.random())
+        a = self.rng.uniform(0, 2 * np.pi)
+        to = w.nests[w.colony[slot]] + r * np.array([np.cos(a), np.sin(a)])
+        body = w.physics.bodies[0][slot]
+        body.position, body.velocity = tuple(float(v) for v in to), (0.0, 0.0)
+        w.physics.read()
+        self.events.append({'kind': 'home', 'tick': int(w.tick) + 1, 'id': int(w.creature_id[0, slot]),
+                            'x': round(x, 2), 'y': round(y, 2), 'tx': round(float(to[0]), 2), 'ty': round(float(to[1]), 2)})
+
     def adjust(self):
+        # tag back: only your time as it counts
+        if self.mode.swap and self.tag.it[0] != self.slot:
+            return
         # a second at a time, past the gap without a catch: slower runners
         waited = (self.ticks - self.last) / self.hz
         if waited > self.mode.gap and self.ticks % self.hz == 0:
@@ -172,6 +336,8 @@ class Catch(Game):
         return {'catches': len(self.catches), 'seconds': round(self.ticks / self.hz, 1),
                 'length': self.mode.seconds, 'over': bool(w.ended[0]), 'pace': round(self.pace, 3),
                 'level': self.level, 'stars': list(self.mode.stars),
+                'snacks': self.snacks if self.mode.snacks else [], 'turbo': round(self.turbo, 3),
+                'it': bool(self.tag.it[0] == self.slot), 'got': self.got,
                 'dizzy': [int(w.creature_id[0, s]) for s in self.dizzy]}
 
     def close(self, why: str):
@@ -186,7 +352,8 @@ class Catch(Game):
                 'per_minute': round(60 * len(self.catches) / played, 2) if played else 0.0,
                 'pace': round(self.pace, 3), 'device': self.device, 'brain': self.header['source']['brain'],
                 'seed': self.header['source']['seed'], 'replay': self.file.name if self.file else None,
-                'times': [c['at'] for c in self.catches], 'paces': [c['pace'] for c in self.catches]}
+                'times': [c['at'] for c in self.catches], 'paces': [c['pace'] for c in self.catches],
+                'snacks': self.eaten, 'turbo': round(self.boosted / self.hz, 1), 'got': self.got}
         if self.writer:
             self.writer.close()
             with open(self.keep / 'plays.jsonl', 'a') as f:
