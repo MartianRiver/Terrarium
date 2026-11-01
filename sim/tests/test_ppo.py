@@ -110,7 +110,9 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
     rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
     assert [r['update'] for r in rows] == [1, 2, 3, 4] and all(np.isfinite(r['policy_loss']) for r in rows)
     assert all(0 < r['live_samples'] <= r['samples'] and 0 < r['live_share'] <= 1 for r in rows)
-    assert sorted(p.name for p in (run.dir / 'checkpoints').iterdir()) == ['00000000128.pt', '00000000256.pt']
+    # the brain it started as comes first
+    assert sorted(p.name for p in (run.dir / 'checkpoints').iterdir()) == ['00000000000.pt', '00000000128.pt',
+                                                                            '00000000256.pt']
     evals = json.loads((run.dir / 'evals.json').read_text())
     assert set(evals) == {'checkpoint', 'random', 'brain', 'mean', 'sampled'}
 
@@ -121,6 +123,10 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
     assert child_record['parent']['id'] == record['brain'] and child_record['id'] == child.id
     _, meta = load_brain(child.dir / 'checkpoints' / '00000000256.pt')
     assert meta['parent'] == record['brain'] and meta['run'] == child.id and meta['scratch']
+    # a child's start is its parent
+    start, _ = load_brain(child.dir / 'checkpoints' / '00000000000.pt')
+    parent, _ = load_brain(run.dir / 'checkpoints' / '00000000256.pt')
+    assert torch.equal(start.policy.weight, parent.policy.weight)
 
 
 def test_training_changes_the_brain(tmp_path):

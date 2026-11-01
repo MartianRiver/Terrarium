@@ -37,7 +37,7 @@ Each run gets a folder `runs/<date>-<time>-<name>/` at the repo root, outside gi
 |---|---|
 | `run.json` | id, start and finish, full commit, dirty and scratch flags, both configs in full, parent brain (file, id, and the meta saved in it: the run and samples it came from), schema, brain shape, seed, device, GPU, workers, `fast` and `gpu_collect`, torch threads, machine (platform, CPU, memory), python/numpy/pymunk/torch versions; at the end the samples trained, the last checkpoint's id and its eval numbers |
 | `metrics.jsonl` | one line per update: samples, speed, seconds collecting and updating, reward, episodes finished with their mean return and length, losses, entropy, KL, clip fraction, explained variance, action spread, and how hard the machine worked in each phase (below) |
-| `checkpoints/` | every `checkpoint_every` updates and at the end, named by samples trained |
+| `checkpoints/` | the brain it starts as (`00000000000.pt`: untrained, or its parent), then every `checkpoint_every` updates and at the end, named by samples trained |
 | `evals.json` | the last checkpoint and random on the evals ([evals.md](evals.md)) |
 | `diff.patch`, `untracked.txt` | only for a run from uncommitted code |
 
@@ -98,7 +98,7 @@ uv run python -m terrarium.serve    # in sim/
 npm run dev                         # in viewer/, then open /runs.html
 ```
 
-The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (reward per life, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent. Watch opens one in the viewer.
+The runs page lists every run in `runs/`: live, finished, or stopped (no `finished` and nothing written for two minutes). A run's page has its curves (reward per life, seconds alive, samples a second, action spread, KL, explained variance), updating while it trains, and its checkpoints as generations. PPO has no generations of its own, so each checkpoint is one, and random is generation 0 for a run that didn't start from a parent; runs since 1 Nov 2026 also keep the brain they started as, listed as the start. Watch opens one in the viewer, where a row of chips under a run's replay switches to the same run's brain on the same seed: random moves, the start, the checkpoints nearest a quarter and half of the way, and now (`viewer/src/learns.ts`; local and Terrarium at Home only, as the runs server records each the first time). `&learns` plays them in that order and stays on now.
 
 Each run's page also says what went into the brain it ends with, per machine: hours and dollars for the run and every run behind its parent, back to the first. A parent that was a checkpoint partway through a run counts up to that checkpoint, and a brain made from another without training (new actions set up, say) is followed through to the one it came from, if its checkpoint's meta names it as `parent`. A rented machine's bill is shared across the runs it hosted by their hours, idle time included; rentals with the same GPU at the same time can only be told apart by their `cpu`, and without one they share their runs. Training hours add up every run, so a pod running three at once shows more training than rented time. The list ends with everything so far per machine, including rentals with no training run on them (evals, probes, failed starts).
 

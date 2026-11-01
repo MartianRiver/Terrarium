@@ -160,6 +160,10 @@ energy = 0.0
 reach = 0.0
 slow = 0.0
 energy = 0.0
+# picking up or putting down takes `stoop` seconds standing still, and each pick-up costs `lift` energy, so
+# setting something down to pick it straight up again isn't a way round what carrying costs
+stoop = 0.0
+lift = 0.0
 
 [smell]
 # food gives off a smell that spreads over a grid of `cell`-metre squares: each tick a share `spread` of the difference
