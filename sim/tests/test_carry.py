@@ -154,3 +154,27 @@ def test_with_carry_off_the_action_does_nothing():
     step(world, YES)
     assert world.load[0, 0] == -1 and world.food_present[0, 0]
     assert 'load' not in frame(world, 0)['creatures'][0]
+
+
+def test_picking_up_and_putting_down_stops_you_a_moment_and_a_pick_up_costs_energy():
+    cfg = replace(COLONY, carry=replace(COLONY.carry, stoop=0.3, lift=0.05))
+    world = world_of(cfg=cfg)
+    world.energy[:] = 1.0
+    berry(world, 3, beside(world))
+    still = round(0.3 * cfg.tick_hz)
+    spent = world.spent[0, 0]
+    step(world, YES)
+    assert world.load[0, 0] == 3 and world.stooping[0, 0] == still
+    assert world.spent[0, 0] - spent > 0.05 * 0.99
+    start = world.pos[0, 0].copy()
+    for _ in range(still):
+        step(world, YES, thrust=1.0)
+    assert np.allclose(world.pos[0, 0], start, atol=1e-3)
+    step(world, YES, thrust=1.0)
+    assert np.hypot(*(world.pos[0, 0] - start)) > 1e-3
+    # putting it down stops you again, at no cost
+    step(world, NO)
+    spent = world.spent[0, 0]
+    step(world, YES)
+    assert world.load[0, 0] == -1 and world.stooping[0, 0] == still
+    assert world.spent[0, 0] - spent < 0.05 / 2

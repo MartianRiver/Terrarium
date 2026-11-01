@@ -134,6 +134,8 @@ def train(name: str, world_path: Path | str, train_path: Path | str = TRAIN, par
     metas = [meta] + [{**meta, 'parent': brain_id(r), 'rival': k} for k, r in enumerate(rivals, 1)]
     log.info('training', run=run.id, updates=updates, per_update=per_update, device=device, workers=workers)
 
+    # the brain it starts as (untrained, or the parent), so a viewer can show how it learned from the start
+    save(learner, run.dir / 'checkpoints' / f'{0:011d}.pt', **meta, samples=0)
     sampler = Sampler(device).start()
     started = time.perf_counter()
     checkpoint = None

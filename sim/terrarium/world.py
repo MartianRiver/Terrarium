@@ -183,6 +183,8 @@ class World:
         # also counted for a hungry nestmate; who put each berry down where it lies, -1 if it grew there
         self.load = np.full((arenas, n), -1)
         self.carry_was = np.zeros((arenas, n), bool)
+        # ticks left standing still after picking something up or putting it down
+        self.stooping = np.zeros((arenas, n), int)
         # the block each creature carries (-1 for none), and how many it has lifted since its arena started
         self.block_load = np.full((arenas, n), -1)
         self.lifted = np.zeros((arenas, n), int)
@@ -323,6 +325,7 @@ class World:
         self.drunk[idx] = 0
         self.load[idx] = -1
         self.carry_was[idx] = False
+        self.stooping[idx] = 0
         self.block_load[idx] = -1
         self.shut_in[idx] = -1
         self.lifted[idx] = 0
@@ -371,12 +374,12 @@ class World:
 
         self.heading = self.heading + turn * c.turn_rate * cfg.dt
         self.heading = (self.heading + np.pi) % (2 * np.pi) - np.pi
-        laden = (self.load >= 0) | (self.block_load >= 0) | (self.dung.load >= 0 if self.dung else False)
+        laden = self._laden()
         young = self.young > 0
         chasing = self.tag.mask() if self.tag else np.zeros_like(young)
         top = (c.max_speed * np.where(young, cfg.young.speed, 1.0) * np.where(chasing, cfg.tag.speed, 1.0)
                * np.where(self.nectar > 0, cfg.flowers.speed, 1.0) * (1 - cfg.crop.slow * self.crop) * (1 - cfg.carry.slow * laden)
-               * tired.speed(self))
+               * tired.speed(self) * (self.stooping == 0))
         speed = np.where(thrust >= 0, thrust * np.where(bursting, s.speed, 1.0), thrust * c.reverse) * top
         target = np.stack([np.cos(self.heading), np.sin(self.heading)], -1) * speed[..., None]
         # the force that closes this share of the gap to the wanted velocity in one tick, if nothing's in the way
@@ -398,6 +401,7 @@ class World:
         if cfg.tired.on:
             tired.tire(self, thrust, bursting)
         np.maximum(self.young - 1, 0, out=self.young)
+        np.maximum(self.stooping - 1, 0, out=self.stooping)
         self.sprinting[bursting] -= 1
         np.maximum(self.resting - 1, 0, out=self.resting)
         np.maximum(self.nectar - 1, 0, out=self.nectar)
@@ -498,6 +502,21 @@ class World:
         self.carry_was = carry
         if not want.any():
             return
+        cfg = self.cfg
+        before = self._laden()
+        self._carry_each(want)
+        after = self._laden()
+        self.stooping[before != after] = round(cfg.carry.stoop * cfg.tick_hz)
+        lifted = after & ~before
+        if cfg.carry.lift > 0 and lifted.any():
+            cost = cfg.carry.lift * np.where(self.young > 0, cfg.young.energy, 1.0) * lifted
+            self.spent += cost
+            self.energy = np.clip(self.energy - cost, 0, 1)
+
+    def _laden(self) -> np.ndarray:
+        return (self.load >= 0) | (self.block_load >= 0) | (self.dung.load >= 0 if self.dung else False)
+
+    def _carry_each(self, want: np.ndarray):
         cfg = self.cfg
         reach = cfg.creature.radius + cfg.food.radius + cfg.carry.reach
         facing = np.stack([np.cos(self.heading), np.sin(self.heading)], -1)

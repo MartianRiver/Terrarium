@@ -1013,3 +1013,48 @@ body {
   font: inherit;
   cursor: pointer;
 }
+
+/* a run's replay: the same run's brain from random moves to now (learns.ts) */
+#learns {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.8);
+  backdrop-filter: blur(6px);
+  font-size: 0.9em;
+}
+
+#learns button {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#learns button[aria-pressed='true'] {
+  background: rgb(0 0 0 / 0.75);
+  color: white;
+}
+
+/* phones: the channel card takes the bottom, so the chips go up top under the buttons */
+@media (max-width: 640px) {
+  #learns {
+    top: 64px;
+    bottom: auto;
+    left: 16px;
+    border-radius: 14px;
+    justify-content: flex-start;
+  }
+}

@@ -8,6 +8,7 @@ import { Cues } from './cues';
 import { createDemo } from './demo';
 import { Director } from './director';
 import { galleryBar } from './gallery';
+import { LearnsBar } from './learns';
 import { createLogger } from './lib/logger';
 import { namesFor } from './names';
 import { Game } from './play';
@@ -132,6 +133,8 @@ function boot() {
   let tick = 0;
   // the brain window (B): local only, it reads brains through the runs server
   const brain = SITE ? null : new BrainView(document.body, stage.scene, (url) => void open(`${url.pathname.split('/').pop()} (recorded here)`, () => fetchReplay(url), url));
+  // chips for the same brain from random moves to now (learns.ts): a run's replay here, a channel item's stages
+  const learns = new LearnsBar((url, label) => void open(label, () => fetchReplay(url), url), params.has('learns'));
   // after a restart the camera jumps to the blob rather than sweeping across the arena after it
   let snap = true;
   // in a nursery game, who to follow and where the action is (&solo turns it off)
@@ -205,6 +208,7 @@ function boot() {
       brain?.playingNow(url, replay.frames);
       if (brain) brain.name = nameOf;
       restart(true);
+      void learns.show(url);
       setStatus('ok');
     } catch (err) {
       log.error('replay failed to open', { name, err });
@@ -336,6 +340,7 @@ function boot() {
       showing = item.replay;
       await open(item.title, async () => bytes, url);
       card.show(item, games, place, items.length, note);
+      if (item.stages?.length) learns.set(item.stages.map((s) => ({ label: s.label, url: new URL(s.replay, index), aria: s.about ?? s.label })), url, item.title);
     } catch (err) {
       log.warn('channel not read', { err: String(err) });
       if (!showing) setStatus('loading', 'The channel isn’t answering. Trying again in 30 s…');
@@ -464,6 +469,7 @@ function boot() {
         const next = source.step();
         if (!next) {
           restart();
+          learns.ended();
           if (watching) void openLatest();
           if (channel) void openChannel();
           break;

@@ -20,6 +20,8 @@ export interface Item {
   game?: string;
   brain?: string; // "has a memory · 1.0M samples of training"
   score?: { label: string; value: number; marks: [string, number][] };
+  // the same brain on the same seed as it learned: random moves, the start, partway, now (learns.ts)
+  stages?: { label: string; replay: string; about?: string }[];
 }
 
 export class ChannelCard {
