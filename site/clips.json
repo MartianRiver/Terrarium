@@ -108,5 +108,74 @@
     "width": 480,
     "crop": "1080:1080:0:540",
     "alt": "Just after the third dawn, a purple Terrikin out on the lawn slows, greys and starves, and a small tombstone is left where it fell."
+  },
+  "nursery-tag": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/tag.mp4",
+    "start": 0,
+    "seconds": 6.5,
+    "width": 480,
+    "crop": "1080:1080:0:460",
+    "alt": "Five baby Terrikins play tag among wooden blocks. The one who's it glows yellow underneath; one sprints, kicking up dust."
+  },
+  "nursery-blindspot": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/blind.mp4",
+    "start": 0,
+    "seconds": 7.0,
+    "width": 480,
+    "crop": "1080:1080:0:460",
+    "alt": "The it's view drawn as a pale fan in front of it. A runner tucks in close behind, out of the fan, and the two go round in a tight circle."
+  },
+  "nursery-ears": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/ears.mp4",
+    "start": 0,
+    "seconds": 7.6,
+    "width": 480,
+    "crop": "1080:1080:0:460",
+    "alt": "The same game with hearing on: the it turns to a runner behind it and tags it."
+  },
+  "nursery-seek": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/seek.mp4",
+    "start": 0,
+    "seconds": 8.0,
+    "width": 480,
+    "crop": "1080:1080:0:460",
+    "alt": "Hide-and-seek: after the count, a seeker heads round the walls straight to a hider."
+  },
+  "nursery-peek": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/peek.mp4",
+    "start": 0,
+    "seconds": 10.9,
+    "width": 480,
+    "crop": "1080:1080:0:460",
+    "alt": "Peekaboo: a berry shows for a moment and vanishes, the baby is spun round, then turns back and goes straight to where the berry was."
+  },
+  "nursery-tagbacks": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/tagbacks.mp4",
+    "start": 0,
+    "seconds": 12,
+    "width": 960,
+    "alt": "Two babies stand touching and pass being it back and forth every two seconds, while the others wander."
+  },
+  "nursery-wall": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/wall.mp4",
+    "start": 0,
+    "seconds": 14,
+    "width": 960,
+    "alt": "A baby parked in a corner, face against the hedge, eating each berry as it appears at its nose."
+  },
+  "nursery-lap": {
+    "from": "0.4/reels/2026-10-31-nursery/clips/lap.mp4",
+    "start": 0,
+    "seconds": 14,
+    "width": 960,
+    "alt": "A baby runs a fixed lap of the arena at full speed and runs into each hidden berry along the way."
+  },
+  "nursery-tidy": {
+    "from": "0.4/moments/2026-11-01-tidy-dribble/tidy-port-clean.mp4",
+    "start": 7,
+    "seconds": 7.0,
+    "width": 480,
+    "crop": "1080:1080:0:460",
+    "alt": "A baby Terrikin beside its nest picks up a dropping, sets it down a little further out, and picks it up again until it's past the dashed line."
   }
 }
