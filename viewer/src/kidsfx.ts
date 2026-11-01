@@ -48,14 +48,15 @@ export class CatchFx {
 
   constructor(private scene: THREE.Scene) {}
 
-  burst(x: number, y: number) {
+  burst(x: number, y: number, size = 0.7, ring = true) {
     for (let i = 0; i < BURST; i++) {
-      const sprite = this.star(0.7);
+      const sprite = this.star(size);
       sprite.position.set(x, 0.6, y);
       const a = (i / BURST) * Math.PI * 2 + Math.random() * 0.4;
       const out = 2 + Math.random() * 1.5;
       this.sparks.push({ sprite, vx: Math.cos(a) * out, vy: 3 + Math.random() * 2, vz: Math.sin(a) * out, age: 0 });
     }
+    if (!ring) return;
     const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: STAR, transparent: true, depthWrite: false }));
     mesh.position.set(x, 0.03, y);
     this.scene.add(mesh);
@@ -187,6 +188,18 @@ export class Beeps {
     }
     this.tone({ from: 392, to: 370, length: 0.12, type: 'square', level: 0.25 });
     this.tone({ from: 494, to: 466, length: 0.16, type: 'square', level: 0.25, at: 0.13 });
+  }
+
+  // a snack: two crunches and a happy chirp
+  nom() {
+    this.tone({ from: 320, to: 170, length: 0.05, type: 'square', level: 0.3 });
+    this.tone({ from: 300, to: 160, length: 0.05, type: 'square', level: 0.3, at: 0.09 });
+    this.tone({ from: 660, to: 990, length: 0.12, type: 'triangle', level: 0.4, at: 0.18 });
+  }
+
+  // turbo starting up
+  whoosh() {
+    this.tone({ from: 220, to: 660, length: 0.28, type: 'sine', level: 0.35 });
   }
 
   count(last = false) {

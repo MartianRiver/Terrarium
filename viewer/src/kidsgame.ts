@@ -1,8 +1,8 @@
 // A game of Catch them! on the kids server (sim kids.py, kidsserve.py), as a Source for the kids page: frames a few
 // ticks ahead, each request carrying where you're steering. You steer by pointing: your Terrikin walks to wherever
 // the mouse (or trackpad) is, no button needed, or a finger is, and keys and a gamepad's stick go by the screen, so
-// they stay right as the camera turns. A click, Space, Shift or the pad's A or right trigger is the sprint, where
-// the world has one.
+// they stay right as the camera turns. A click, Space, Shift or the pad's A, a bumper or the right trigger is the
+// sprint where the world has one; with snacks it's turbo, held down while the bar lasts.
 import * as THREE from 'three';
 import type { Pad } from './kidspad';
 import { parseReplay } from './replay';
@@ -15,6 +15,16 @@ export interface Score {
   over: boolean;
   pace: number;
   dizzy: number[];
+  // on the floor now, and the turbo bar from 0 to 1 (little has them; big has none)
+  snacks: Snack[];
+  turbo: number;
+}
+
+export interface Snack {
+  id: number;
+  x: number;
+  y: number;
+  kind: 'berry' | 'seaweed';
 }
 
 export interface Catch {
@@ -40,10 +50,9 @@ const BATCH = 2;
 const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const parse = (header: unknown, raw: unknown[]) => parseReplay([header, ...raw].map((x) => JSON.stringify(x)).join('\n'));
-// yours is drawn in the second colony's colour, so it stands out from the runners at a glance
-const YOURS = 1;
-const mark = (frames: Frame[], you: number) => {
-  for (const f of frames) for (const c of f.creatures) if (c.id === you) c.colony = YOURS;
+// yours is drawn in another colony's colour than the runners' (the one picked), so it stands out at a glance
+const mark = (frames: Frame[], you: number, colour: number) => {
+  for (const f of frames) for (const c of f.creatures) if (c.id === you) c.colony = colour;
   return frames;
 };
 
@@ -72,25 +81,27 @@ export class KidsGame {
   private held = new Set<string>();
   private point: { x: number; y: number } | null = null;
   private dash = false;
+  // a mouse button held (or a second finger down): turbo runs while it's held
+  private pressing = false;
   private caster = new THREE.Raycaster();
   private stop: () => void;
 
   private constructor(private start: Start, private camera: THREE.Camera, private canvas: HTMLCanvasElement, device: Device,
-    private pad: Pad) {
+    private pad: Pad, private colour: number) {
     const { info, frames } = parse(start.header, [start.frame]);
     this.info = info;
     this.you = start.you;
     this.token = start.game;
     this.canSprint = start.controls.includes('sprint');
-    this.buffer = mark(frames, start.you);
+    this.buffer = mark(frames, start.you, colour);
     this.last = frames[0];
     this.score = start.score;
     this.device = device;
     this.stop = this.listen();
   }
 
-  static async begin(mode: string, level: number, camera: THREE.Camera, canvas: HTMLCanvasElement, device: Device, pad: Pad) {
-    return new KidsGame(await post('/api/kids', { mode, level, device }), camera, canvas, device, pad);
+  static async begin(mode: string, level: number, camera: THREE.Camera, canvas: HTMLCanvasElement, device: Device, pad: Pad, colour: number) {
+    return new KidsGame(await post('/api/kids', { mode, level, device }), camera, canvas, device, pad, colour);
   }
 
   // the Source
@@ -133,7 +144,7 @@ export class KidsGame {
     this.asking = true;
     try {
       const got = await post(`/api/kids/${this.token}`, { ticks: BATCH, ...this.input() });
-      this.buffer.push(...(got.frames.length ? mark(parse(this.start.header, got.frames).frames, this.you) : []));
+      this.buffer.push(...(got.frames.length ? mark(parse(this.start.header, got.frames).frames, this.you, this.colour) : []));
       this.catches.push(...got.events);
       this.score = got.score;
     } catch (err) {
@@ -175,7 +186,7 @@ export class KidsGame {
       // slowing only right at the spot, so it doesn't jitter round the pointer
       if (hit) towards(hit.x - me.x, hit.z - me.y, Math.hypot(hit.x - me.x, hit.z - me.y) / 0.6);
     }
-    const sprint = this.canSprint && (this.dash || on(' ', 'shift') || pad.held('a') || pad.held('rt'));
+    const sprint = this.canSprint && (this.dash || this.pressing || on(' ', 'shift') || pad.held('a') || pad.held('rt') || pad.held('rb') || pad.held('lb'));
     this.dash = false;
     return { thrust, turn, yes: sprint ? ['sprint'] : [] };
   }
@@ -192,6 +203,7 @@ export class KidsGame {
     const up = (e: KeyboardEvent) => this.held.delete(e.key.toLowerCase());
     const blur = () => {
       this.held.clear();
+      this.pressing = false;
       this.point = null;
     };
     const move = (e: PointerEvent) => {
@@ -202,9 +214,10 @@ export class KidsGame {
     };
     const press = (e: PointerEvent) => {
       move(e);
-      if (e.pointerType === 'mouse' || !e.isPrimary) this.dash = true;
+      if (e.pointerType === 'mouse' || !e.isPrimary) this.dash = this.pressing = true;
     };
     const lift = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' || !e.isPrimary) this.pressing = false;
       if (e.pointerType !== 'mouse' && e.isPrimary) this.point = null;
     };
     const left = (e: PointerEvent) => {

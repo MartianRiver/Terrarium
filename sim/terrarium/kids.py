@@ -43,10 +43,12 @@ class Mode:
     # catches for two stars and for three (two opens the next level): about 45% and 80% of what the sloppy pretend
     # player in the 0.4 notes catches
     stars: tuple[int, int]
+    # snacks on the floor at once (0: none): each one eaten fills some of a turbo bar, and holding sprint runs on it
+    snacks: int = 0
 
 
 LITTLE = Mode('nursery-tag.toml', runners=6, seconds=90, you=1.35, reach=0.25, dizzy=2.0, safe=3.5, gap=5.0,
-              slowest=0.35, fastest=0.9, start=0.6, stars=(6, 14))
+              slowest=0.35, fastest=0.9, start=0.6, stars=(6, 14), snacks=3)
 BIG = Mode('nursery-tag-hide.toml', runners=6, seconds=90, you=1.3, reach=0.15, dizzy=1.5, safe=3.0, gap=6.0,
            slowest=0.45, fastest=0.8, start=0.6, stars=(10, 18))
 MODES = {
@@ -67,10 +69,23 @@ HARDEN = 0.05
 # a caught one is knocked away at this speed (m/s) and rolls on for this long before it spins
 BOUNCE = 5.0
 FLING = 0.6
+# snacks: what's on the floor (only the look differs), how much of the bar one fills, how fast holding sprint empties a
+# full one (a share a second), turbo's speed, how close counts as eating one (m from your middle), and how long until
+# an eaten one is replaced somewhere else
+SNACKS = ('berry', 'seaweed')
+FILL = 0.34
+DRAIN = 0.5
+TURBO = 1.5
+EAT = 0.5
+REGROW = 2.5
 
 
 def world(mode: Mode) -> Config:
     cfg = load(DEFAULT.parent / mode.world)
+    if mode.snacks:
+        # turbo is the world's sprint run by the bar; [sprint] seconds stay 0, so the runners still can't sprint
+        assert not cfg.sprint.on, f'{mode.world} has a sprint of its own'
+        cfg = replace(cfg, sprint=replace(cfg.sprint, speed=TURBO))
     return replace(cfg, colonies=replace(cfg.colonies, size=mode.runners + 1),
                    episode=replace(cfg.episode, seconds=mode.seconds),
                    tag=replace(cfg.tag, speed=mode.you, reach=mode.reach, back=mode.safe, cooldown=0.3))
@@ -95,6 +110,16 @@ class Catch(Game):
         self.began = time.time()
         self.device = device
         self.closed = False
+        if self.mode.snacks and 'sprint' not in self.controls:
+            self.controls.append('sprint')
+        self.rng = np.random.default_rng(seed + 1)
+        self.snacks: list[dict] = []
+        self.coming: list[int] = [0] * self.mode.snacks  # ticks until each missing snack is put down
+        self.turbo = 0.0
+        self.eaten = 0
+        self.boosted = 0  # ticks on turbo
+        self.serial = 0
+        self.grow()
         self.file = self.writer = None
         if keep:
             day = keep / time.strftime('%Y-%m-%d')
@@ -120,18 +145,32 @@ class Catch(Game):
                 actions[0, slot, 0], actions[0, slot, 1] = (1.0, 0.0) if rolling else (0.0, 1.0)
             mine = np.full(actions.shape[-1], -1.0)
             mine[0], mine[1] = np.clip(thrust, -1, 1), np.clip(turn, -1, 1)
-            # a sprint is the only yes there is to say in tag
-            if 'sprint' in yes and 'sprint' in self.controls:
+            # a sprint is the only yes there is to say in tag; with snacks it's turbo, while the bar lasts
+            boost = False
+            if 'sprint' in yes and self.mode.snacks:
+                boost = self.turbo > 0
+                if boost:
+                    w.sprinting[0, self.slot] = 1
+                    self.turbo = max(0.0, self.turbo - DRAIN / self.hz)
+                    self.boosted += 1
+            elif 'sprint' in yes and 'sprint' in self.controls:
                 mine[ACTIONS.index('sprint')] = 1.0
             actions[0, self.slot] = mine
             w.step(actions)
             self.ticks += 1
+            self.munch()
+            self.grow()
             self.dizzy = {s: t - 1 for s, t in self.dizzy.items() if t > 1}
             caught = int(self.tag.it[0])
             if caught != self.slot:
                 self.caught(caught)
             self.adjust()
             frame = replay.frame(w, 0)
+            if boost:
+                me = int(w.creature_id[0, self.slot])
+                for c in frame['creatures']:
+                    if c['id'] == me:
+                        c['sprinting'] = 1
             frames.append(frame)
             if self.writer:
                 self.writer.write(frame)
@@ -161,6 +200,42 @@ class Catch(Game):
         self.catches.append(event)
         self.events.append(event)
 
+    def munch(self):
+        x, y = self.world.pos[0, self.slot]
+        for s in [s for s in self.snacks if np.hypot(s['x'] - x, s['y'] - y) < EAT]:
+            self.snacks.remove(s)
+            self.coming.append(round(REGROW * self.hz))
+            self.turbo = min(1.0, self.turbo + FILL)
+            self.eaten += 1
+
+    def grow(self):
+        left = []
+        for t in self.coming:
+            t -= 1
+            if t <= 0 and (spot := self.spot()):
+                self.serial += 1
+                self.snacks.append({'id': self.serial, 'x': spot[0], 'y': spot[1],
+                                    'kind': SNACKS[int(self.rng.integers(len(SNACKS)))]})
+            else:
+                # nowhere clear this time: try again next tick
+                left.append(max(t, 1))
+        self.coming = left
+
+    def spot(self) -> tuple[float, float] | None:
+        # somewhere clear: off the walls and blocks, not under you, not on another snack
+        w = self.world
+        half = w.cfg.arena.size / 2 - 0.8
+        for _ in range(50):
+            x, y = (float(v) for v in self.rng.uniform(-half, half, 2))
+            if any(np.hypot(x - b.x, y - b.y) < max(b.w, b.h) / 2 + 0.6 for b in w.cfg.block):
+                continue
+            if np.hypot(*(w.pos[0, self.slot] - (x, y))) < 2.0:
+                continue
+            if any(np.hypot(x - s['x'], y - s['y']) < 1.5 for s in self.snacks):
+                continue
+            return round(x, 2), round(y, 2)
+        return None
+
     def adjust(self):
         # a second at a time, past the gap without a catch: slower runners
         waited = (self.ticks - self.last) / self.hz
@@ -172,6 +247,7 @@ class Catch(Game):
         return {'catches': len(self.catches), 'seconds': round(self.ticks / self.hz, 1),
                 'length': self.mode.seconds, 'over': bool(w.ended[0]), 'pace': round(self.pace, 3),
                 'level': self.level, 'stars': list(self.mode.stars),
+                'snacks': self.snacks if self.mode.snacks else [], 'turbo': round(self.turbo, 3),
                 'dizzy': [int(w.creature_id[0, s]) for s in self.dizzy]}
 
     def close(self, why: str):
@@ -186,7 +262,8 @@ class Catch(Game):
                 'per_minute': round(60 * len(self.catches) / played, 2) if played else 0.0,
                 'pace': round(self.pace, 3), 'device': self.device, 'brain': self.header['source']['brain'],
                 'seed': self.header['source']['seed'], 'replay': self.file.name if self.file else None,
-                'times': [c['at'] for c in self.catches], 'paces': [c['pace'] for c in self.catches]}
+                'times': [c['at'] for c in self.catches], 'paces': [c['pace'] for c in self.catches],
+                'snacks': self.eaten, 'turbo': round(self.boosted / self.hz, 1)}
         if self.writer:
             self.writer.close()
             with open(self.keep / 'plays.jsonl', 'a') as f:

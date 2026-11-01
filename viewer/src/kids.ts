@@ -1,14 +1,17 @@
 // Catch them!, the kids page (kids.html, served by sim kidsserve.py): pick a game by its picture, a 3-2-1, ninety
 // seconds of being it, then how many you caught, the stars that earned, and one big button to go again. Nothing needs
 // reading. The camera holds still over the room unless a gamepad's right stick (or Q and E) turns it, so pointing at
-// a Terrikin is walking to it. A gamepad does everything: the left stick walks, A sprints and starts, X honks, the
-// bumpers zoom, Y puts the camera back, Menu pauses. A game goes fullscreen (&window keeps it in the window).
-// Progress (stars, levels, the costume) stays in this browser.
+// a Terrikin is walking to it. A gamepad does everything: the left stick walks (and on the picture screen moves along
+// the game, who you are and your colour), A starts, A, a bumper or the right trigger sprints (turbo in the little
+// room, where snacks fill it), X honks, Y puts the camera back, Menu pauses. A game goes fullscreen (&window keeps it
+// in the window). Progress (stars, levels, who you are) stays in this browser.
+import { dress as wear } from './costumes';
 import { Beeps, CatchFx } from './kidsfx';
 import { KidsGame, type Device } from './kidsgame';
-import { Menu, type Choice, type Levels } from './kidsmenu';
+import { Menu, type Choice, type Levels, type Row } from './kidsmenu';
 import { Pad } from './kidspad';
-import { LOOKS, load, record, save, type Look } from './kidsprogress';
+import { COLOURS, LOOKS, load, record, save, type Look } from './kidsprogress';
+import { Snacks } from './kidssnacks';
 import { createLogger } from './lib/logger';
 import { createStage } from './stage';
 import type { Frame, WorldInfo } from './world';
@@ -34,6 +37,9 @@ async function boot() {
   stage.holdStill();
   stage.setWorld(EMPTY);
   const fx = new CatchFx(stage.scene);
+  const snacks = new Snacks(stage.scene);
+  const turbo = $('#turbo');
+  const fuel = $('#turbo div span');
   const beeps = new Beeps();
   const pad = new Pad();
   const canvas = stage.renderer.domElement;
@@ -47,6 +53,8 @@ async function boot() {
   let game: KidsGame | null = null;
   let view: WorldView | null = null;
   let choice: Choice = { mode: 'little', level: 1 };
+  let row: Row = 'game';
+  let fueled = 0;
   let phase: 'pick' | 'starting' | 'counting' | 'playing' | 'paused' | 'end' = 'pick';
   let device: Device = 'mouse';
   let progress = load();
@@ -78,19 +86,20 @@ async function boot() {
     show('error', 'The game’s server isn’t answering. Is terrarium.kidsserve running?');
     return;
   }
-  const menu = new Menu(levels, (c) => void begin(c), dress);
+  const menu = new Menu(levels, (c) => void begin(c), dress, paint);
 
   function screen(next: typeof phase) {
     phase = next;
     $('#pick').hidden = next !== 'pick';
     $('#end').hidden = next !== 'end';
     hud.hidden = !['counting', 'playing', 'paused'].includes(next);
+    turbo.hidden = hud.hidden || !game?.canSprint || choice.mode !== 'little';
     document.body.dataset.phase = next;
   }
 
   function showPick() {
     screen('pick');
-    menu.showPick(progress, choice);
+    menu.showPick(progress, choice, row);
   }
 
   function dress(look: Look) {
@@ -98,7 +107,17 @@ async function boot() {
     save(progress);
     beeps.wake();
     beeps.honk(look);
-    menu.showPick(progress, choice);
+    row = 'look';
+    menu.showPick(progress, choice, row);
+  }
+
+  function paint(colour: number) {
+    progress = { ...progress, colour };
+    save(progress);
+    beeps.wake();
+    beeps.count();
+    row = 'colour';
+    menu.showPick(progress, choice, row);
   }
 
   async function begin(next: Choice) {
@@ -110,21 +129,23 @@ async function boot() {
     screen('starting');
     show('loading', 'Waking them up…');
     try {
-      const started = await KidsGame.begin(next.mode, next.level, stage.camera, canvas, device, pad);
+      const started = await KidsGame.begin(next.mode, next.level, stage.camera, canvas, device, pad, progress.colour);
       game?.end('again');
       game = started;
       view?.dispose();
       fx.clear();
+      snacks.clear();
       stage.setWorld(started.info);
       view = new WorldView(stage.scene, started.info, false);
       view.chosen = started.you;
       view.marked = true;
       const look = progress.look;
-      if (look !== 'terrikin') view.dress = (id, blob) => id === started.you && blob[look]();
+      if (look !== 'terrikin') view.dress = (id, blob) => id === started.you && wear(blob, look);
       const first = started.step()!;
       view.push(first);
       lastTick = first.tick;
-      acc = warned = lit = 0;
+      acc = warned = lit = fueled = 0;
+      fuel.style.width = '0%';
       count.textContent = '0';
       menu.goals(0, menu.targets(next));
       bar.style.width = '100%';
@@ -189,6 +210,7 @@ async function boot() {
   function home() {
     game?.end('home');
     game = null;
+    snacks.clear();
     say('');
     showPick();
   }
@@ -222,12 +244,42 @@ async function boot() {
     fx.honk(view.focus.x, view.focus.y);
   }
 
-  // left and right through everything on the picture screen
+  // left and right along a row of the picture screen: the games, who you are, your colour
   function step(by: number) {
+    document.body.classList.add('steering');
+    const around = <T,>(all: readonly T[], now: T) => all[(all.indexOf(now) + by + all.length) % all.length];
+    if (row === 'look') return dress(around(LOOKS, progress.look));
+    if (row === 'colour') return paint(around(COLOURS, progress.colour as (typeof COLOURS)[number]));
     const all = menu.choices(progress);
     const i = all.findIndex((c) => c.mode === choice.mode && c.level === choice.level);
     choice = all[(i + by + all.length) % all.length];
-    menu.showPick(progress, choice);
+    menu.showPick(progress, choice, row);
+  }
+
+  // up and down between the rows
+  function climb(by: number) {
+    document.body.classList.add('steering');
+    const rows = menu.rows(progress);
+    row = rows[Math.max(0, Math.min(rows.length - 1, rows.indexOf(row) + by))];
+    menu.showPick(progress, choice, row);
+  }
+
+  // snacks eaten since the last frame, and the turbo bar
+  function fill() {
+    for (const s of snacks.set(game!.score.snacks)) {
+      fx.burst(s.x, s.y, 0.4, false);
+      beeps.nom();
+      turbo.classList.remove('gulp');
+      void turbo.offsetWidth;
+      turbo.classList.add('gulp');
+    }
+    const now = game!.score.turbo;
+    const going = now < fueled - 1e-4;
+    if (going && !turbo.classList.contains('going')) beeps.whoosh();
+    turbo.classList.toggle('going', going);
+    turbo.classList.toggle('full', now >= 0.99);
+    fuel.style.width = `${now * 100}%`;
+    fueled = now;
   }
 
   $('#again').addEventListener('click', again);
@@ -240,6 +292,9 @@ async function boot() {
     soundButton.setAttribute('aria-pressed', String(beeps.on));
   });
   soundButton.setAttribute('aria-pressed', String(beeps.on));
+  addEventListener('pointermove', (e) => {
+    if (e.movementX || e.movementY) document.body.classList.remove('steering');
+  });
   addEventListener('pointerdown', (e) => {
     device = e.pointerType === 'mouse' ? 'mouse' : 'touch';
     // paused, any click or tap goes on
@@ -257,6 +312,7 @@ async function boot() {
     else if (phase === 'paused' && key !== 'escape') pause(false);
     if (phase === 'pick') {
       if (key === 'arrowleft' || key === 'arrowright') step(key === 'arrowleft' ? -1 : 1);
+      if (key === 'arrowup' || key === 'arrowdown') climb(key === 'arrowup' ? -1 : 1);
       if (key === 'enter' || key === ' ') void begin(choice);
     } else if (phase === 'end' && (key === 'enter' || key === ' ')) again();
   });
@@ -266,13 +322,16 @@ async function boot() {
   });
 
   let side = 0;
+  let upDown = 0;
   function gamepad(dt: number) {
     pad.poll();
     if (!pad.connected) return;
     if (pad.any()) device = 'pad';
     const s = Math.abs(pad.move.x) > 0.5 ? Math.sign(pad.move.x) : 0;
+    const v = Math.abs(pad.move.y) > 0.5 ? Math.sign(pad.move.y) : 0;
     if (phase === 'pick') {
       if (s && s !== side) step(s);
+      if (v && v !== upDown) climb(v);
       if (pad.pressed('a') || pad.pressed('menu')) void begin(choice);
       if (pad.pressed('x') || pad.pressed('b')) dress(LOOKS[(LOOKS.indexOf(progress.look) + 1) % LOOKS.length]);
     } else if (phase === 'end') {
@@ -288,9 +347,10 @@ async function boot() {
         zoom = 1;
       }
       yaw -= pad.look.x * TURN * dt;
-      zoom += (pad.look.y + (pad.held('lb') ? 1 : 0) - (pad.held('rb') ? 1 : 0)) * ZOOM * dt;
+      zoom += pad.look.y * ZOOM * dt;
     }
     side = s;
+    upDown = v;
   }
 
   const gap = params.has('lite') ? 1000 / 30 - 2 : 0;
@@ -319,6 +379,7 @@ async function boot() {
           view.push(next);
           lastTick = next.tick;
           for (const c of game.caughtBy(next.tick)) celebrate(c);
+          fill();
         }
         acc -= tickSeconds;
       }
@@ -338,6 +399,7 @@ async function boot() {
     const moving = phase === 'playing';
     if (view) view.render(moving ? acc * (game?.info.tickHz ?? 20) : 1, moving ? dt : 0, now / 1000);
     fx.render(dt, now / 1000, view?.current ?? null, moving || phase === 'paused' ? game?.score.dizzy ?? [] : []);
+    snacks.render(dt, now / 1000);
     const near = (NEARER[choice.mode] ?? 1) * zoom;
     const me = phase === 'pick' ? null : view?.focus;
     stage.over(me ?? { x: 0, y: 0 }, near, dt, yaw);

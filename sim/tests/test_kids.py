@@ -5,7 +5,7 @@ import pytest
 
 from terrarium import replay
 from terrarium.brain import SHAPE, Brain, save
-from terrarium.kids import EASE, LITTLE, MODES, Catch
+from terrarium.kids import DRAIN, EASE, FILL, LITTLE, MODES, REGROW, TURBO, Catch
 
 
 @pytest.fixture
@@ -142,3 +142,35 @@ def test_a_game_played_to_the_end_closes_itself(brain, tmp_path):
     assert game.closed
     line = json.loads((tmp_path / 'plays.jsonl').read_text())
     assert line['why'] == 'over' and line['played'] == LITTLE.seconds
+
+
+def test_snacks_fill_turbo_and_sprint_runs_on_it(brain):
+    game = Catch('little', brain, 4)
+    w, hz = game.world, game.hz
+    assert len(game.snacks) == LITTLE.snacks and game.turbo == 0
+    # no bar, no turbo: holding sprint does nothing
+    game.step(1, 1.0, 0.0, ['sprint'])
+    assert game.boosted == 0
+    snack = game.snacks[0]
+    w.physics.bodies[0][game.slot].position = (snack['x'], snack['y'])
+    w.physics.read()
+    game.step(1, 0.0, 0.0, [])
+    assert snack not in game.snacks and game.eaten == 1 and game.turbo == pytest.approx(FILL)
+    frames = game.step(4, 1.0, 0.0, ['sprint'])
+    assert game.boosted == 4 and game.turbo == pytest.approx(FILL - 4 * DRAIN / hz)
+    you = next(c for c in frames[-1]['creatures'] if c['id'] == game.you)
+    assert you['sprinting'] == 1
+    assert w.cfg.sprint.speed == TURBO and not w.cfg.sprint.on
+    # the runners never sprint
+    others = np.arange(w.sprinting.shape[1]) != game.slot
+    assert not w.sprinting[0, others].any()
+    # an eaten one comes back somewhere else
+    game.step(round(REGROW * hz) + 1, 0.0, 0.0, [])
+    assert len(game.snacks) == LITTLE.snacks and all(s['kind'] in ('berry', 'seaweed') for s in game.snacks)
+
+
+def test_big_keeps_its_own_sprint_and_has_no_snacks(brain):
+    game = Catch('big', brain, 5)
+    assert game.snacks == [] and game.world.cfg.sprint.on
+    game.step(1, 1.0, 0.0, ['sprint'])
+    assert game.world.sprinting[0, game.slot] > 0 and game.boosted == 0

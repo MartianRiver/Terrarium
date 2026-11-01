@@ -1,5 +1,6 @@
 html,
 body {
+  --you: #6fb3d9;
   margin: 0;
   height: 100%;
   overflow: hidden;
@@ -87,19 +88,19 @@ button {
   height: auto;
 }
 
-.modes [data-mode]:hover,
+body:not(.steering) .modes [data-mode]:hover,
 .modes [data-mode]:focus-visible,
 .modes [data-mode].chosen {
   transform: translateY(-6px) scale(1.04);
   outline: 6px solid #ffc21a;
 }
 
-.modes [data-mode]:hover .runner,
+body:not(.steering) .modes [data-mode]:hover .runner,
 .modes [data-mode].chosen .runner {
   animation: hop 0.5s ease-in-out infinite alternate;
 }
 
-.modes [data-mode]:hover .you,
+body:not(.steering) .modes [data-mode]:hover .you,
 .modes [data-mode].chosen .you {
   animation: hop 0.35s ease-in-out infinite alternate;
 }
@@ -386,7 +387,7 @@ button {
 }
 
 .levels button.chosen,
-.levels button:not(:disabled):hover {
+body:not(.steering) .levels button:not(:disabled):hover {
   transform: translateY(-4px);
   outline: 4px solid #ffc21a;
 }
@@ -409,8 +410,17 @@ button {
 
 /* who you are */
 
+.who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
 .looks {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
 }
 
@@ -425,8 +435,90 @@ button {
 }
 
 .looks button[aria-pressed='true'] {
-  outline: 5px solid #ffc21a;
+  outline: 5px solid #fff;
   transform: scale(1.08);
+}
+
+/* the row a stick or the arrow keys are moving along */
+#pick:not([data-row='game']) .modes [data-mode].chosen,
+#pick:not([data-row='game']) .levels button.chosen {
+  outline-color: #ffe08a;
+  transform: none;
+}
+
+#pick[data-row='look'] .looks button[aria-pressed='true'],
+#pick[data-row='colour'] .colours button[aria-pressed='true'] {
+  outline: 6px solid #ffc21a;
+  animation: hop 0.35s ease-in-out infinite alternate;
+}
+
+.colours {
+  display: flex;
+  gap: 16px;
+}
+
+.colours[hidden] {
+  display: none;
+}
+
+.colours button {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.15);
+}
+
+.colours button[aria-pressed='true'] {
+  outline: 4px solid #fff;
+  outline-offset: 3px;
+}
+
+/* turbo: filled by snacks, emptied while held */
+#turbo {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(440px, 70vw);
+  padding: 6px 14px 6px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.85);
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 30px;
+}
+
+#turbo div {
+  flex: 1;
+  height: 22px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.1);
+  overflow: hidden;
+}
+
+#turbo div span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(#ffe066, #ff9f1c);
+  transition: width 0.15s linear;
+}
+
+#turbo.full div span {
+  animation: pulse 0.4s ease-in-out infinite alternate;
+}
+
+#turbo.going {
+  box-shadow: 0 0 0 5px #ffd23f;
+}
+
+#turbo.gulp {
+  animation: bump 0.4s ease-out;
 }
 
 /* while playing */
