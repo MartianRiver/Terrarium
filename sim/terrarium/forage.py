@@ -64,7 +64,8 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    world.tag.mask() if world.tag else np.zeros(store.shape),
                    *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
                      if world.seek else (np.zeros(store.shape),) * 2),
-                   *flag_senses(world, store.shape), world.stamina, *hearing.heard(world)], -1)
+                   *flag_senses(world, store.shape), world.stamina, *hearing.heard(world),
+                   *dung_senses(world, store.shape)], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape
@@ -132,6 +133,8 @@ class Forage:
                 play += w.flags.points(w.alive)
             if w.peek:
                 play += w.peek.points(w.alive)
+            if w.dung:
+                play += w.dung.points(w.alive)
             if self.fun:
                 fun += self.fun.step(actions)
             if r.snug or r.warm:
@@ -198,3 +201,10 @@ def colony_mean(x: np.ndarray, alive: np.ndarray, colony: np.ndarray) -> np.ndar
         mean = (x[:, mine] * live).sum(1) / np.maximum(live.sum(1), 1)
         out[:, mine] = mean[:, None]
     return out
+
+
+def dung_senses(world: World, shape) -> tuple:
+    """How many droppings lie close (a pile as one; 1 at four or more), and carrying one."""
+    if not world.dung:
+        return (np.zeros(shape),) * 2
+    return np.minimum(world.dung.dirt() / 4, 1), world.dung.load >= 0
