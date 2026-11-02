@@ -183,3 +183,33 @@ def test_spread_packs_rays_towards_the_middle_and_side_sees_less_far():
     assert np.abs(np.diff(a))[v.rays // 2 - 1] < np.abs(np.diff(a))[0]
     r = reach(v)
     assert r[0] == pytest.approx(v.range / 2) and r.max() < v.range and r.min() == pytest.approx(v.range / 2)
+
+
+def test_a_flag_is_seen_on_its_nest_but_not_once_someone_carries_it():
+    from terrarium.config import DEFAULT
+    from terrarium.forage import flag_senses
+    from terrarium.vision import FLAG, FLAG_RADIUS
+    sight = load(DEFAULT.parent / 'nursery-flag-sight.toml')
+    cfg = replace(sight, block=(), colonies=replace(sight.colonies, count=2, size=1),
+                  vision=replace(sight.vision, rays=1, fov=0.0))
+    world = World(cfg)
+    nest = world.nests[1]
+    spot = nest + np.array([0.0, -3.0]) * np.sign(nest[1] or 1)
+    world.physics.bodies[0][0].position = tuple(spot)
+    # the other colony's baby stands aside, out of the ray's way
+    world.physics.bodies[0][1].position = (nest[0] + 3.0, nest[1])
+    world.physics.read()
+    to = nest - world.pos[0, 0]
+    world.heading[0, 0] = np.arctan2(to[1], to[0])
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == FLAG and dist[0, 0, 0] == pytest.approx(np.hypot(*to) - FLAG_RADIUS, abs=1e-6)
+    # carried, it's its carrier the rays see
+    world.flags.carrier[0, 1] = 1
+    assert seen(world)[1][0, 0, 0] != FLAG
+    # with the compass off, the flag senses say who carries what, and nothing of where
+    world.flags.carrier[0, 1] = -1
+    senses = np.array(flag_senses(world, world.alive.shape))
+    assert not senses[[1, 2, 3, 6, 7, 8]].any()
+    on = replace(cfg, flag=replace(cfg.flag, sense=True))
+    world.cfg = on
+    assert np.array(flag_senses(world, world.alive.shape))[1].any()

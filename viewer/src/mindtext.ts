@@ -36,6 +36,8 @@ export const KINDS: Record<string, Words & { colour: string }> = {
   food: { label: 'food', colour: '#e0473c', text: 'Food: berries growing, or jelly dropped on the ground.' },
   block: { label: 'block', colour: '#c89b5e', text: 'A wooden block. It can be pushed.' },
   flower: { label: 'flower', colour: '#ffb21f', text: 'An open nectar flower: rare, rich, and gone in 15 s.' },
+  dung: { label: 'dropping', colour: '#8a5a2b', text: 'A dropping on the ground. Being close to one makes a Terrikin a little sick.' },
+  flag: { label: 'flag', colour: '#3d7bd9', text: 'A colony’s flag, on its nest or lying where it was put down. A carried one shows as its carrier.' },
 };
 
 export const ACTIONS: Record<string, Words> = {

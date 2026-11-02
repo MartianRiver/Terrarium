@@ -62,6 +62,10 @@ class Flags:
             out[a, self.carrier[a, t]] = t
         return out
 
+    def carried(self) -> np.ndarray:
+        """Whether each colony's flag is with a carrier, (arenas, 2)."""
+        return self.carrier >= 0
+
     def carrying(self) -> np.ndarray:
         """Which creatures carry a flag, either one, (arenas, creatures)."""
         return self.held() >= 0

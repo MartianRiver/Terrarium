@@ -238,6 +238,8 @@ home = 0.0
 steal = false
 guard = 0.0
 lie = 0.0
+# the flags' compass: how far each flag is and which way, felt from anywhere; false leaves only what the rays see
+sense = true
 
 [peek]
 # peekaboo, a nursery game for memory: a berry turns up `near`–`far` m in front of someone, in sight for `show` seconds
