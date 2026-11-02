@@ -45,7 +45,9 @@ SETTINGS = {
     'max_dph': 0.40,          # most US$ an hour for one pod
     'providers': ['vast', 'runpod'],
     'vast_gpus': ['RTX 3060', 'RTX 3070', 'RTX 3080', 'RTX 4060 Ti', 'RTX A4000'],
-    'runpod_gpus': ['NVIDIA GeForce RTX 3080', 'NVIDIA GeForce RTX 3070', 'NVIDIA RTX A4000'],
+    # RunPod's are tried cheapest first by what's in stock now, in either cloud
+    'runpod_gpus': ['NVIDIA RTX A4000', 'NVIDIA RTX A4500', 'NVIDIA RTX A5000', 'NVIDIA GeForce RTX 3070', 'NVIDIA GeForce RTX 3080',
+                    'NVIDIA GeForce RTX 3080 Ti', 'NVIDIA GeForce RTX 3090', 'NVIDIA GeForce RTX 4070 Ti', 'NVIDIA RTX 4000 Ada Generation'],
     'hours': 6.0,             # a pod's whole life, and its token's
     'start': 15.0,            # minutes to its worker's first hello
     'quiet': 10.0,            # minutes without a word from its worker
@@ -57,6 +59,11 @@ SETTINGS = {
 PREFIX = 'terrarium-q-'
 VAST_IMAGE = 'vastai/base-image@sha256:c5b7882c05d74e3de22af79c9698f569eac7725cdadbfc1a23304e5ffc2a1961'
 RUNPOD_IMAGE = 'runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04'
+# a pod's setup downloads about this much (uv sync of torch and the CUDA libs; 7.4-8.2 GB on 2026-11-02), and Vast
+# bills it per GB on top of the hourly price, by host: 0.009 a GB made a 3060's half hour cost 3x its dph
+SETUP_GB = 8.0
+VAST_DOWN_GB = 0.003
+RUNPOD_SPEC = {'gpuCount': 1, 'containerDiskInGb': 30, 'volumeInGb': 0, 'minVcpuCount': 4, 'minMemoryInGb': 16}
 
 
 def settings(state: Path) -> dict:
@@ -124,10 +131,11 @@ class Vast:
         return {str(i['id']): i.get('label') or '' for i in self.api('GET', '/api/v1/instances/')['instances']
                 if (i.get('label') or '').startswith(PREFIX)}
 
-    def rent(self, label: str, gpus: list[str], max_dph: float, script: str) -> tuple[str, float] | None:
+    def rent(self, label: str, gpus: list[str], max_dph: float, script: str, avoid=()) -> tuple[str, float, dict] | None:
         q = {'rentable': {'eq': True}, 'verified': {'eq': True}, 'num_gpus': {'eq': 1}, 'gpu_name': {'in': gpus},
              'cuda_max_good': {'gte': 12.6}, 'reliability': {'gte': 0.98}, 'inet_down': {'gte': 300},
-             'disk_space': {'gte': 30}, 'dph_total': {'lte': max_dph}, 'type': 'on-demand',
+             'disk_space': {'gte': 30}, 'dph_total': {'lte': max_dph}, 'inet_down_cost': {'lte': VAST_DOWN_GB},
+             **({'machine_id': {'notin': list(avoid)}} if avoid else {}), 'type': 'on-demand',
              'order': [['dph_total', 'asc']], 'limit': 20}
         offers = self.api('GET', '/bundles/?' + urllib.parse.urlencode({'q': json.dumps(q)}))['offers']
         for o in offers:
@@ -141,7 +149,8 @@ class Vast:
                 log.warn('rent refused', provider='vast', offer=o['id'], status=e.code)
                 continue
             if r and r.get('success') and r.get('new_contract'):
-                return str(r['new_contract']), float(o['dph_total'])
+                return str(r['new_contract']), float(o['dph_total']), \
+                    {'machine': str(o.get('machine_id')), 'setup': SETUP_GB * float(o.get('inet_down_cost') or 0)}
         return None
 
     def destroy(self, id: str):
@@ -168,20 +177,46 @@ class RunPod:
         return {p['id']: p['name'] for p in self.api('{ myself { pods { id name } } }')['myself']['pods']
                 if p['name'].startswith(PREFIX)}
 
-    def rent(self, label: str, gpus: list[str], max_dph: float, script: str) -> tuple[str, float] | None:
+    def offers(self, gpus: list[str], max_dph: float) -> list[tuple[float, str, str]]:
+        """(US$ an hour, card, cloud) for each card in stock at or under max_dph, cheapest first. A card is often in
+        stock in one cloud only, and the console shows Secure Cloud prices; asking first also means a pod over the
+        ceiling is never rented just to be destroyed."""
+        mins = (f"gpuCount: 1, minVcpuCount: {RUNPOD_SPEC['minVcpuCount']}, minMemoryInGb: {RUNPOD_SPEC['minMemoryInGb']}, "
+                f"minDisk: {RUNPOD_SPEC['containerDiskInGb']}")
+        q = ('query($ids: [String!]) { gpuTypes(input: {ids: $ids}) { id '
+             f'COMMUNITY: lowestPrice(input: {{{mins}, secureCloud: false}}) {{ uninterruptablePrice stockStatus }} '
+             f'SECURE: lowestPrice(input: {{{mins}, secureCloud: true}}) {{ uninterruptablePrice stockStatus }} }} }}')
+        found = {g['id']: g for g in self.api(q, {'ids': gpus})['gpuTypes']}
+        out = []
+        for card in gpus:
+            if card not in found:
+                log.warn('not rented', provider='runpod', gpu=card, why='no such card')
+                continue
+            for cloud in ('COMMUNITY', 'SECURE'):
+                low = found[card][cloud] or {}
+                price, stock = low.get('uninterruptablePrice'), low.get('stockStatus')
+                if not price or not stock:
+                    log.info('not rented', provider='runpod', gpu=card, cloud=cloud, why='none in stock')
+                elif price > max_dph:
+                    log.info('not rented', provider='runpod', gpu=card, cloud=cloud, why='over max_dph', dph=price, stock=stock)
+                else:
+                    out.append((price, card, cloud, stock))
+        return [o[:3] for o in sorted(out)]
+
+    def rent(self, label: str, gpus: list[str], max_dph: float, script: str, avoid=()) -> tuple[str, float, dict] | None:
         q = '''mutation($i: PodFindAndDeployOnDemandInput) { podFindAndDeployOnDemand(input: $i) { id costPerHr } }'''
         packed = base64.b64encode(script.encode()).decode()
-        for g in gpus:
-            i = {'cloudType': 'COMMUNITY', 'gpuCount': 1, 'gpuTypeId': g, 'name': label, 'imageName': RUNPOD_IMAGE,
-                 'containerDiskInGb': 30, 'volumeInGb': 0, 'minVcpuCount': 4, 'minMemoryInGb': 16,
+        for price, g, cloud in self.offers(gpus, max_dph):
+            i = {**RUNPOD_SPEC, 'cloudType': cloud, 'gpuTypeId': g, 'name': label, 'imageName': RUNPOD_IMAGE,
                  'dockerArgs': f"bash -c 'echo {packed} | base64 -d > /root/boot.sh && bash /root/boot.sh'"}
             try:
                 p = self.api(q, {'i': i})['podFindAndDeployOnDemand']
             except RuntimeError as e:
-                log.info('not rented', provider='runpod', gpu=g, why=str(e)[:100])
+                log.info('not rented', provider='runpod', gpu=g, cloud=cloud, dph=price, why=str(e)[:100])
                 continue
             if p and float(p['costPerHr']) <= max_dph:
-                return p['id'], float(p['costPerHr'])
+                log.info('rented', provider='runpod', gpu=g, cloud=cloud, dph=float(p['costPerHr']))
+                return p['id'], float(p['costPerHr']), {}
             if p:
                 self.destroy(p['id'])
         return None
@@ -200,10 +235,15 @@ class Ledger:
         self.db = sqlite3.connect(path)
         self.db.execute('create table if not exists pods (name text primary key, provider text, id text, dph real, '
                         'rented real, gone real, why text, commit_sha text, job text)')
+        have = {r[1] for r in self.db.execute('pragma table_info(pods)')}
+        # the provider's machine, and what setting it up cost beyond the hourly price (Vast's download)
+        for col, kind in (('machine', 'text'), ('setup', 'real')):
+            if col not in have:
+                self.db.execute(f'alter table pods add column {col} {kind}')
 
-    def add(self, name: str, provider: str, id: str, dph: float, now: float, commit: str):
-        self.db.execute('insert into pods (name, provider, id, dph, rented, commit_sha) values (?, ?, ?, ?, ?, ?)',
-                        (name, provider, id, dph, now, commit))
+    def add(self, name: str, provider: str, id: str, dph: float, now: float, commit: str, machine=None, setup=0.0):
+        self.db.execute('insert into pods (name, provider, id, dph, rented, commit_sha, machine, setup) '
+                        'values (?, ?, ?, ?, ?, ?, ?, ?)', (name, provider, id, dph, now, commit, machine, setup))
         self.db.commit()
 
     def gone(self, name: str, now: float, why: str):
@@ -215,11 +255,17 @@ class Ledger:
         return [dict(zip(('name', 'provider', 'id', 'dph', 'rented'), r)) for r in rows]
 
     def spent(self, now: float, hours: float = 24) -> float:
-        """US$ over the last `hours`, pods still running counted to now."""
+        """US$ over the last `hours`, pods still running counted to now, each one's setup download included."""
         since = now - hours * 3600
-        rows = self.db.execute('select dph, rented, coalesce(gone, ?) from pods where coalesce(gone, ?) > ?',
+        rows = self.db.execute('select dph, rented, coalesce(gone, ?), coalesce(setup, 0) from pods where coalesce(gone, ?) > ?',
                                (now, now, since)).fetchall()
-        return sum(dph * (end - max(start, since)) / 3600 for dph, start, end in rows)
+        return sum(dph * (end - max(start, since)) / 3600 + (setup if start > since else 0) for dph, start, end, setup in rows)
+
+    def bad(self, now: float, hours: float = 24) -> set[str]:
+        """Machines whose pods went for failing jobs in the last `hours`, not to be rented again yet."""
+        rows = self.db.execute("select machine from pods where why like 'failed %' and gone > ? and machine is not null",
+                               (now - hours * 3600,)).fetchall()
+        return {r[0] for r in rows}
 
 
 class Manager:
@@ -269,6 +315,9 @@ class Manager:
         seen = (said or {}).get('seen')
         if age >= cfg['hours'] * 60:
             return 'its hours are up'
+        failed, finished = (said or {}).get('failed', 0), (said or {}).get('finished', 0)
+        if failed >= 2 and not finished:
+            return f'failed {failed} jobs, finished none'
         if not seen:
             return f"no hello in {cfg['start']:g} min" if age >= cfg['start'] else None
         if (now - seen) / 60 >= cfg['quiet']:
@@ -293,7 +342,7 @@ class Manager:
         free = sum(1 for p in pods if not (back['pods'].get(p['name']) or {}).get('job'))
         if back['waiting'] <= free or len(pods) >= cfg['max_pods']:
             return None
-        if self.ledger.spent(now) + cfg['max_dph'] * cfg['hours'] > cfg['cap_usd_day']:
+        if self.ledger.spent(now) + cfg['max_dph'] * cfg['hours'] + VAST_DOWN_GB * SETUP_GB > cfg['cap_usd_day']:
             log.info('not renting: over the day\'s cap', spent=round(self.ledger.spent(now), 3), cap=cfg['cap_usd_day'])
             return None
         name = f'pod-{time.strftime("%m%d%H%M", time.gmtime(now))}-{secrets.token_hex(2)}'
@@ -304,11 +353,11 @@ class Manager:
         made = self.coordinator('POST', f'/api/pods/{name}', {'hours': cfg['hours']})
         script = boot(cfg['server'], made['token'], cfg['repo'], commit, cfg['hours'])
         for p in cfg['providers']:
-            got = self.providers[p].rent(PREFIX + name, cfg[f'{p}_gpus'], cfg['max_dph'], script)
+            got = self.providers[p].rent(PREFIX + name, cfg[f'{p}_gpus'], cfg['max_dph'], script, avoid=self.ledger.bad(now))
             if got:
-                id, dph = got
-                self.ledger.add(name, p, id, dph, now, commit)
-                log.info('rented', name=name, provider=p, id=id, dph=dph, commit=commit)
+                id, dph, more = got
+                self.ledger.add(name, p, id, dph, now, commit, more.get('machine'), more.get('setup', 0.0))
+                log.info('rented', name=name, provider=p, id=id, dph=dph, commit=commit, **more)
                 return name
         self.coordinator('POST', f'/api/pods/{name}/gone', {})
         log.warn('nothing rentable', providers=cfg['providers'])
