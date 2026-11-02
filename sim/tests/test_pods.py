@@ -210,3 +210,27 @@ def test_settings_refuse_a_typo(tmp_path):
     (tmp_path / 'pods.toml').write_text('cap_usd_dya = 3.0\n')
     with pytest.raises(ValueError, match='cap_usd_dya'):
         pods.settings(tmp_path)
+
+
+def test_runpod_rents_the_cheapest_card_in_stock_in_either_cloud(monkeypatch):
+    stock = {'NVIDIA RTX A4500': ({'uninterruptablePrice': 0.19, 'stockStatus': 'Low'}, {'uninterruptablePrice': 0.25, 'stockStatus': 'High'}),
+             'NVIDIA RTX A4000': ({'uninterruptablePrice': None, 'stockStatus': None}, {'uninterruptablePrice': 0.17, 'stockStatus': 'Low'}),
+             'NVIDIA GeForce RTX 3090': ({'uninterruptablePrice': 0.22, 'stockStatus': 'Low'}, None)}
+    asked = []
+
+    def api(self, query, variables=None):
+        if query.startswith('query'):
+            return {'gpuTypes': [{'id': g, 'COMMUNITY': c, 'SECURE': s} for g, (c, s) in stock.items() if g in variables['ids']]}
+        asked.append(variables['i'])
+        if variables['i']['gpuTypeId'] == 'NVIDIA RTX A4000':
+            raise RuntimeError('There are no longer any instances available with the requested specifications')
+        return {'podFindAndDeployOnDemand': {'id': 'p1', 'costPerHr': 0.19}}
+
+    monkeypatch.setattr(pods.RunPod, 'api', api)
+    r = pods.RunPod('key')
+    cards = [*stock, 'A4500']
+    assert r.offers(cards, 0.24) == [(0.17, 'NVIDIA RTX A4000', 'SECURE'), (0.19, 'NVIDIA RTX A4500', 'COMMUNITY'),
+                                    (0.22, 'NVIDIA GeForce RTX 3090', 'COMMUNITY')]
+    # the A4000 sells out between asking and renting, so the next cheapest goes
+    assert r.rent('terrarium-q-x', cards, 0.24, 'echo hi') == ('p1', 0.19)
+    assert [(i['gpuTypeId'], i['cloudType']) for i in asked] == [('NVIDIA RTX A4000', 'SECURE'), ('NVIDIA RTX A4500', 'COMMUNITY')]
