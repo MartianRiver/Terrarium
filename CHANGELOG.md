@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The queue can rent its own pods: `terrarium.pods`, the pod manager, rents a Vast or RunPod pod when `on = "rented"` jobs wait, under a daily spend cap, and destroys one that never starts, goes quiet, sits idle or reaches its hours, revoking its token and handing any job it held straight back. A pod sets itself up from a start script, no ssh, with a token of its own that dies with it. The coordinator gets a `pods` role for it, which only sees that backlog and makes and revokes its pods' tokens (12 h at most); tokens can now expire.
+
 Rays see flags (schema v16): one on its nest or lying on the ground is its own kind of thing to hit, and a carried one still shows as its carrier; `[flag] sense = false` turns off the compass that told every baby where both flags were from anywhere, so in `configs/nursery-flag-sight.toml` (the fair game, compass off) a flag has to be seen to be found. 0.4 notes: seeing the flag lifts pickups up to three times, still with no capture.
 
 `terrarium.compute` matches a pod's runs to its rental by the instance they record, which it had compared as text against a number and so never matched; compute.toml has the pods of 1 November's evening, from Vast's own bill, downloads included. Efficiency notes: what a pod's downloads and disk cost, and why a CPU's listed clock doesn't say how fast it trains; where a world step's time goes at training sizes, and what's been measured so far for faster rays, physics, workers, ramps and the sim in a browser.
