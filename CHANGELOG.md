@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Rays see a dropping on the midden's heap as its own kind (schema v18), apart from a loose one: until now the tidy baby couldn't tell the two apart and kept walking to the heap to pick up droppings that can't be picked up again. A kind carved out of an older one starts as a copy of it when an older brain loads, so the tidy brains still see the heap as they did; the evals count yeses to carry with only heaped droppings in reach (`carry_heap`).
+
 The pod manager counts what a pod's setup download costs: Vast bills it per GB on top of the hourly price, which made a 3060's half hour cost three times its price, so offers dear to download are skipped and the setup goes into the day's spend. A pod that fails two jobs without finishing one is destroyed and its machine skipped for a day; the coordinator tells the manager how many jobs each pod has failed and finished.
 
 The pod manager asks RunPod what's in stock before renting, in the Community and Secure clouds both, and rents the cheapest card under the price, saying why it passed over each of the others; it used to try only the Community cloud, card by card, learning the price only once a pod was rented and destroying one over the ceiling.

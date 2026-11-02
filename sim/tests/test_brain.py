@@ -76,6 +76,21 @@ def test_a_brain_from_shorter_lists_acts_the_same(tmp_path):
     assert (mean2[:, 1] == 0).all()
 
 
+def test_a_kind_carved_out_of_an_older_one_starts_as_a_copy(tmp_path):
+    """A brain from before heaped droppings were their own kind sees them as it saw every dropping."""
+    torch.manual_seed(2)
+    now = schema.current()
+    old = now | {'kinds': [k for k in now['kinds'] if k != 'heap']}
+    save(Brain(**SHAPE, lists=old), tmp_path / 'old.pt')
+    grown, _ = load_brain(tmp_path / 'old.pt')
+    rows = grown.kind.weight
+    assert torch.equal(rows[schema.KINDS.index('heap')], rows[schema.KINDS.index('dung')])
+    # one that already knew heaps keeps its own
+    rows[schema.KINDS.index('heap')].data.zero_()
+    save(grown, tmp_path / 'new.pt')
+    assert not load_brain(tmp_path / 'new.pt')[0].kind.weight[schema.KINDS.index('heap')].any()
+
+
 def test_a_new_yes_no_action_is_tried_now_and_then(tmp_path):
     """Grown unload and eat lean no: yes on about 5% of samples, and never when acting on the mean."""
     torch.manual_seed(2)

@@ -172,6 +172,8 @@ CONTEXTS = {
     # a dropping in reach, and a yes while carrying one (puts it down)
     'carry_dung': (lambda w, nest, mine: w.dung.in_reach() if w.dung else np.zeros_like(w.alive), 6),
     'carry_dung_laden': (lambda w, nest, mine: w.dung.load >= 0 if w.dung else np.zeros_like(w.alive), 6),
+    # only heaped ones in reach, which can't be picked up: a yes there is a try at the impossible
+    'carry_heap': (lambda w, nest, mine: w.dung.in_reach(heap=True) & ~w.dung.in_reach() if w.dung else np.zeros_like(w.alive), 6),
     # the young may eat in the nest whenever they aren't full
     'eat_young_home': (lambda w, nest, mine: (nest == w.colony) & (w.young > 0) & (w.energy < 1) & (mine > 0), 3),
 }
