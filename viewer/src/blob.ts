@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { COLONY_COLOURS, SIGNAL_COLOURS, SIGNAL_OFF_BULB, shimmer } from './palette';
 import { pellets } from './droppings';
-import { berryGeo, berryMat, leafGeo, leafMat } from './props';
+import { appleProp, berryGeo, berryMat, leafGeo, leafMat } from './props';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SIGNAL_OFF, type CreatureState } from './world';
 
@@ -119,6 +119,9 @@ export class BlobView {
   // a berry carried in its jaws (carry), held up on top of its head like an ant's seed
   private berry = new THREE.Group();
   private carried = 0;
+  // an apple in its crop on the way home (the tree nursery's [tree] home), held up on its head the same way
+  private apple = appleProp();
+  private carriedApple = 0;
   // or a dropping ([dung]), taken somewhere out of the way
   private poop = pellets();
   private carriedDung = 0;
@@ -210,6 +213,9 @@ export class BlobView {
     this.berry.position.set(0, 0.92, 0.12);
     this.berry.visible = false;
     this.body.add(this.berry);
+    this.apple.position.set(0, 0.86, 0.1);
+    this.apple.visible = false;
+    this.body.add(this.apple);
     this.poop.position.set(0, 0.86, 0.12);
     this.poop.visible = false;
     this.body.add(this.poop);
@@ -264,6 +270,13 @@ export class BlobView {
     this.carried += ((load > 0 ? 1 : 0) - this.carried) * Math.min(1, dt * (load > 0 ? 10 : 18));
     this.berry.visible = this.carried > 0.02;
     this.berry.scale.setScalar(this.carried);
+  }
+
+  // the tree nursery's crop holds an apple: shown on its head as well
+  holdApple(carrying: number, dt: number) {
+    this.carriedApple += ((carrying > 0 ? 1 : 0) - this.carriedApple) * Math.min(1, dt * (carrying > 0 ? 10 : 18));
+    this.apple.visible = this.carriedApple > 0.02;
+    this.apple.scale.setScalar(this.carriedApple);
   }
 
   private applyDung(dung: number, dt: number) {

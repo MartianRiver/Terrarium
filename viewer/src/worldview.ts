@@ -147,6 +147,7 @@ export class WorldView {
       // the dead are a tombstone now
       blob.root.visible = !this.tombstones.isDead(c.id);
       if (blob.root.visible) blob.update(s, this.info.maxSpeed, dt, time);
+      if (blob.root.visible && this.info.tree !== null) blob.holdApple(s.carrying, dt);
       if (blob.root.visible && blob.sprinting) this.dust.kick(c.id, s.x, s.y, s.heading, dt, time, c.nectar > 0);
       if (c.holding && blob.root.visible) holders.push({ x: s.x, y: s.y, colony: c.colony });
       poses.set(c.id, { x: s.x, y: s.y, heading: s.heading });

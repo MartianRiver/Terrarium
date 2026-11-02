@@ -6,6 +6,8 @@
 # tree as food grows back. Rays see a hanging apple where it hangs, as food. Each
 # jump costs its jumper `hop` points: without it, the first brain hopped round the
 # tree non-stop (in the air 87% of the time), taking every apple it passed under.
+# With `home`, an apple taken goes in the crop, so one with a full crop can't take
+# another, and it pays only once it's unloaded in the nest: carried home.
 import numpy as np
 
 from .config import ConfigError
@@ -20,6 +22,8 @@ class Tree:
             raise ConfigError('[tree] trunk must be one of the blocks')
         if t.reach > 0 and t.reach >= world.cfg.jump.height:
             raise ConfigError('[tree] reach must be below [jump] height, or no apple can be taken')
+        if t.home and world.cfg.crop.capacity < 1:
+            raise ConfigError('[tree] home needs [crop] capacity, to carry an apple in')
         self.world = world
         self.seen = np.zeros(world.alive.shape[0])
         self.hops = np.zeros(world.alive.shape)
@@ -29,9 +33,10 @@ class Tree:
         self.hops[idx] = 0
 
     def reaching(self) -> np.ndarray:
-        """Who is high enough to take an apple, (arenas, creatures)."""
+        """Who is high enough to take an apple, and has room for it when apples go home, (arenas, creatures)."""
         w = self.world
-        return w.alive & (w.z >= w.cfg.tree.reach)
+        up = w.alive & (w.z >= w.cfg.tree.reach)
+        return up & (w.crop < w.cfg.crop.capacity) if w.cfg.tree.home else up
 
     def spot(self, a: int) -> np.ndarray:
         """Where a new apple hangs: round the trunk, over open ground inside the walls."""
@@ -52,7 +57,7 @@ class Tree:
     def points(self, alive: np.ndarray) -> np.ndarray:
         """What each creature's arena won since last asked, (arenas, creatures)."""
         w, t = self.world, self.world.cfg.tree
-        now = w.meals.sum(1).astype(float)
+        now = (w.stored if t.home else w.meals).sum(1).astype(float)
         out = (now - self.seen)[:, None] * t.points * alive - (w.jumps - self.hops) * t.hop
         self.seen, self.hops = now, w.jumps.astype(float)
         return out
