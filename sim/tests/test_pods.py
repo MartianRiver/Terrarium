@@ -82,13 +82,14 @@ class Fake:
     def live(self):
         return dict(self.pods)
 
-    def rent(self, label, gpus, max_dph, script):
+    def rent(self, label, gpus, max_dph, script, avoid=()):
+        self.avoided = set(avoid)
         if not self.stock or self.dph > max_dph:
             return None
         id = str(100 + len(self.scripts))
         self.pods[id] = label
         self.scripts.append(script)
-        return id, self.dph
+        return id, self.dph, {'machine': f'm{id}', 'setup': 0.02}
 
     def destroy(self, id):
         self.pods.pop(id, None)
@@ -232,5 +233,29 @@ def test_runpod_rents_the_cheapest_card_in_stock_in_either_cloud(monkeypatch):
     assert r.offers(cards, 0.24) == [(0.17, 'NVIDIA RTX A4000', 'SECURE'), (0.19, 'NVIDIA RTX A4500', 'COMMUNITY'),
                                     (0.22, 'NVIDIA GeForce RTX 3090', 'COMMUNITY')]
     # the A4000 sells out between asking and renting, so the next cheapest goes
-    assert r.rent('terrarium-q-x', cards, 0.24, 'echo hi') == ('p1', 0.19)
+    assert r.rent('terrarium-q-x', cards, 0.24, 'echo hi') == ('p1', 0.19, {})
     assert [(i['gpuTypeId'], i['cloudType']) for i in asked] == [('NVIDIA RTX A4000', 'SECURE'), ('NVIDIA RTX A4500', 'COMMUNITY')]
+
+
+def test_a_pod_whose_jobs_keep_failing_goes_and_its_machine_is_skipped_for_the_day(server, tmp_path):
+    url, c = server
+    m, provs, clock = manager(tmp_path, c)
+    upload(c['admin'], spec('a' * 12))
+    m.tick()
+    script = provs['vast'].scripts[0]
+    pod = jobs.Client(url, script.split("printf %s '")[1].split("'")[0])
+    for _ in range(2):
+        id = pod.json('POST', '/api/claim', {})['spec']['id']
+        pod.json('POST', f'/api/jobs/{id}/fail', {'error': 'uv sync returned non-zero exit status 1'})
+    assert c['pods'].json('GET', '/api/pods')['pods'][m.ledger.live()[0]['name']] | {'seen': 1} == \
+        {'until': pytest.approx(clock.t + 6 * 3600, abs=60), 'seen': 1, 'job': None, 'failed': 2, 'finished': 0}
+    clock.t += 60
+    m.tick()
+    assert provs['vast'].destroyed == ['100'] and m.ledger.bad(clock.t) == {'m100'}
+    # its setup download counts towards the day's spend
+    assert m.ledger.spent(clock.t) == pytest.approx(0.2 * 60 / 3600 + 0.02, abs=1e-3)
+    upload(c['admin'], spec('b' * 12, added=2))
+    m.tick()
+    assert provs['vast'].avoided == {'m100'} and len(provs['vast'].pods) == 1
+    clock.t += 25 * 3600
+    assert m.ledger.bad(clock.t) == set()

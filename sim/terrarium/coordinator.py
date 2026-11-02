@@ -49,6 +49,11 @@ SAVE_EVERY = 60
 BOARD_TTL = 30
 
 
+def last_claim(job: dict) -> str | None:
+    claims = [h[1][len('claimed by '):] for h in job['history'] if h[1].startswith('claimed by ')]
+    return claims[-1] if claims else None
+
+
 class Refused(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
@@ -156,9 +161,14 @@ class Queue:
         with self.lock:
             seen = {name: self.workers.get(name, {}).get('seen') for name in pods}
         held = {j['worker']: j['spec']['id'] for j in every if j['state'] == 'running'}
+        # jobs that failed on each pod, and jobs it finished: a pod whose jobs keep failing before any finishes is
+        # likely a bad host (one couldn't install the code, 2026-11-02)
+        failed = {name: sum(h[1] == f'failed on {name}' for j in every for h in j['history']) for name in pods}
+        finished = {name: sum(j['state'] == 'done' and last_claim(j) == name for j in every) for name in pods}
         return {'waiting': len(waiting), 'chained': sum(1 for j in every if j['state'] == 'pending'
                                                          and j['spec'].get('on') == 'rented' and not self.store.ready(j)),
-                'pods': {name: {'until': until, 'seen': seen[name], 'job': held.get(name)} for name, until in pods.items()}}
+                'pods': {name: {'until': until, 'seen': seen[name], 'job': held.get(name), 'failed': failed[name],
+                                'finished': finished[name]} for name, until in pods.items()}}
 
     def pod_token(self, name: str, hours: float) -> dict:
         if not name.startswith('pod-') or not jobs.NAME.match(name):
