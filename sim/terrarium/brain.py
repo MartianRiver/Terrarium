@@ -17,7 +17,7 @@
 
 import hashlib
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
 import numpy as np
 import torch
@@ -183,8 +183,16 @@ class Brain(nn.Module):
 
     def sense(self, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor) -> torch.Tensor:
         """What the self token makes of this moment, per sample."""
-        tokens = torch.cat([self.me(me)[:, None], self.kind(kinds) + self.ray(rays)], 1)
-        return self.norm(self.encoder(tokens)[:, 0])
+        x = torch.cat([self.me(me)[:, None], self.kind(kinds) + self.ray(rays)], 1)
+        *before, last = cast(list[nn.TransformerEncoderLayer], list(self.encoder.layers))
+        for layer in before:
+            x = layer(x)
+        # only the self token leaves the last layer, so it alone asks the others there: the same answer as the
+        # whole layer (as nn.TransformerEncoderLayer, norm_first, no dropout) for ~1/17 of its attention and feed-forward
+        h = last.norm1(x)
+        x = x[:, :1] + last.self_attn(h[:, :1], h, h, need_weights=False)[0]
+        x = x + last.linear2(last.activation(last.linear1(last.norm2(x))))
+        return self.norm(x[:, 0])
 
     def remember(self, out: torch.Tensor, notes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Write this moment into the notes, and read them back into what the heads see."""

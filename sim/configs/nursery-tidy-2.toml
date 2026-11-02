@@ -194,6 +194,12 @@ pile = 0.0
 start = 3
 midden = 2.5
 points = 1.0
+# with `spot` (m) the midden is a spot that big, its middle `midden` past the nest's edge, `wander` degrees either side
+# of due east anew each episode (180: anywhere): one put down on it stays there, on a heap that can't be picked
+# up again, and `heap` lie on it at the start so there's something to see. 0: the line all round
+spot = 0.0
+heap = 0
+wander = 0.0
 
 [tag]
 # a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the

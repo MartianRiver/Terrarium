@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from terrarium import load
+from terrarium import evals, load
 from terrarium.config import DEFAULT
 from terrarium.forage import observe
 from terrarium.replay import frame
@@ -100,6 +100,60 @@ def test_the_tidy_nursery_pays_for_one_taken_out_and_puts_a_new_one_at_home():
     dung.pick(0, 0, out)
     dung.put(0, 0, nest + (0.0, -(r + 3.0)))
     assert dung.points(world.alive)[0, 0] == 0
+
+
+def test_a_midden_spot_keeps_what_lands_on_it_on_a_heap_that_cant_be_picked_up_or_paid_twice():
+    world = world_of(every=0, start=2, slots=6, midden=3.0, points=1.0, spot=0.5, heap=2, wander=0.0)
+    nest, r, dung = world.nests[0], world.cfg.colonies.nest_radius, world.dung
+    spot = dung.midden_at[0]
+    assert np.allclose(spot, nest + (r + 3.0, 0.0))
+    # two on the heap from the start, two loose in the nest
+    assert dung.heaped[0].sum() == 2 and dung.loose()[0].sum() == 2
+    assert (np.hypot(*(dung.pos[0][dung.heaped[0]] - spot).T) < 0.5).all()
+    k = int(np.flatnonzero(dung.loose()[0])[0])
+    # past where the line would be, but off the spot: nothing
+    dung.pick(0, 0, k)
+    dung.put(0, 0, nest + (0.0, -(r + 3.0)))
+    assert dung.points(world.alive)[0, 0] == 0
+    dung.pick(0, 0, k)
+    dung.put(0, 0, spot + (0.2, 0.1))
+    assert dung.points(world.alive)[0, 0] == 1.0 and dung.heaped[0, k]
+    # it stays on the heap, a new one turns up at home, and the heap is out of reach
+    assert dung.lying()[0, k] and dung.loose()[0].sum() == 2
+    world.pos[0, 0] = spot + (0.3, 0.0)
+    world.load[:] = -1
+    assert not (dung.in_reach()[0, 0] and dung.nearest(0, 0)[0] in np.flatnonzero(dung.heaped[0]))
+    # slots full: the heap's oldest makes room for the next one at home
+    for _ in range(3):
+        k = int(np.flatnonzero(dung.loose()[0])[0])
+        dung.pick(0, 0, k)
+        dung.put(0, 0, spot)
+    assert dung.loose()[0].sum() == 2 and dung.heaped[0].sum() == 4 and dung.taken[0, 0] == 4
+
+
+def test_trips_time_the_first_one_out_and_the_ones_after():
+    world = world_of(every=0, start=1, slots=6, midden=3.0, points=1.0, spot=0.5, heap=1, wander=0.0)
+    dung, spot = world.dung, world.dung.midden_at[0]
+    for at in (100, 160, 180):
+        world.age[0] = at
+        k = int(np.flatnonzero(dung.loose()[0])[0])
+        dung.pick(0, 0, k)
+        dung.put(0, 0, spot)
+    assert dung.first_trip[0, 0] == 100 and dung.later_trips[0, 0] == 80 and dung.taken[0, 0] == 3
+    trips = evals.trips(dung.taken, dung.first_trip, dung.later_trips, 20)
+    assert trips == {'first_trip': 5.0, 'later_trip': 2.0}
+
+
+def test_a_wandering_midden_moves_each_episode_and_stays_in_the_arena():
+    world = world_of(every=0, start=1, slots=4, midden=3.0, points=1.0, spot=0.5, heap=1, wander=180.0)
+    bearings = []
+    for _ in range(8):
+        world.dung.reset(np.arange(1))
+        x, y = world.dung.midden_at[0] - world.nests[0]
+        assert np.hypot(x, y) <= world.cfg.colonies.nest_radius + 3.0 + 1e-9
+        assert (np.abs(world.dung.midden_at[0]) <= world.cfg.arena.size / 2 - 0.5).all()
+        bearings.append(np.arctan2(y, x))
+    assert np.ptp(bearings) > 2.0
 
 
 def test_off_by_default_and_a_brain_sees_it_last():

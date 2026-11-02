@@ -61,6 +61,7 @@ export interface WorldInfo {
   maxSpeed: number;
   nests: NestInfo[];
   midden: number; // metres past a nest's edge a dropping counts as taken out ([dung] midden); 0 without
+  middenSpot?: { x: number; y: number; radius: number }; // or the spot it has to go on ([dung] spot), this episode's
 }
 
 // jelly in a colony's store, in food unloaded

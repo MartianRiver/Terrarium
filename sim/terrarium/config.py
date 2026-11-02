@@ -198,6 +198,9 @@ class Dung:
     start: int
     midden: float
     points: float
+    spot: float
+    heap: int
+    wander: float
 
     @property
     def on(self) -> bool:
@@ -478,7 +481,8 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0},
          'hearing': {'range': 0.0},
          'dung': {'every': 0, 'after': 0.0, 'lasts': 0.0, 'slots': 0, 'radius': 0.0, 'near': 0.0, 'sick': 0.0, 'away': 1.0,
-                  'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0}}
+                  'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0,
+                  'spot': 0.0, 'heap': 0, 'wander': 0.0}}
 
 
 def upgrade(data: dict) -> dict:

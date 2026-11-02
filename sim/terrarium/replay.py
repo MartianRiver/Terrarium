@@ -29,7 +29,10 @@ def header(world: World, arena: int, source: dict) -> dict:
              for c, (x, y) in enumerate(world.nests)]
     info = {'width': cfg.arena.size, 'height': cfg.arena.size, 'tickHz': cfg.tick_hz,
             'maxSpeed': cfg.creature.max_speed, 'nests': nests}
-    if cfg.dung.midden > 0:
+    if cfg.dung.spot > 0:
+        x, y = world.dung.midden_at[arena]
+        info['middenSpot'] = {'x': _r(x), 'y': _r(y), 'radius': cfg.dung.spot}
+    elif cfg.dung.midden > 0:
         info['midden'] = cfg.dung.midden
     return {'format': FORMAT, 'version': VERSION, 'info': info,
             'source': {**source, 'arena': arena, 'config': cfg.to_dict()}}
