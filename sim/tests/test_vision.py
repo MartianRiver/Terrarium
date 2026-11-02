@@ -213,3 +213,26 @@ def test_a_flag_is_seen_on_its_nest_but_not_once_someone_carries_it():
     on = replace(cfg, flag=replace(cfg.flag, sense=True))
     world.cfg = on
     assert np.array(flag_senses(world, world.alive.shape))[1].any()
+
+
+def test_a_dropping_on_the_heap_is_its_own_kind():
+    from terrarium.config import DEFAULT
+    from terrarium.vision import DUNG, HEAP
+    tidy = load(DEFAULT.parent / 'nursery-tidy-wander.toml')
+    cfg = replace(tidy, block=(), colonies=replace(tidy.colonies, count=1, size=1),
+                  vision=replace(tidy.vision, rays=1, fov=0.0))
+    world = World(cfg)
+    world.physics.bodies[0][0].position = (0, 0)
+    world.physics.read()
+    world.heading[:] = 0
+    d = world.dung
+    d.left[:], d.held[:], d.heaped[:] = 0, False, False
+    d.left[0, 0], d.pos[0, 0] = 100, (2.0, 0)
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == DUNG and dist[0, 0, 0] == pytest.approx(2.0 - cfg.dung.radius)
+    d.heaped[0, 0] = True
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == HEAP and dist[0, 0, 0] == pytest.approx(2.0 - cfg.dung.radius)
+    # a loose one in front of the heap is the one seen
+    d.left[0, 1], d.pos[0, 1] = 100, (1.0, 0)
+    assert seen(world)[1][0, 0, 0] == DUNG

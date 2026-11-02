@@ -133,15 +133,17 @@ class Droppings:
         k = int(gap.argmin()) if len(gap) else -1
         return k, (gap[k] - w.cfg.creature.radius if k >= 0 else np.inf)
 
-    def in_reach(self) -> np.ndarray:
-        """(arenas, creatures): who could pick up a dropping now, carrying nothing."""
+    def in_reach(self, heap: bool = False) -> np.ndarray:
+        """(arenas, creatures): who could pick up a dropping now, carrying nothing; with heap, who has one on the
+        midden's heap in reach instead, which can't be picked up."""
         w = self.world
         if not w.cfg.carry.on:
             return np.zeros_like(w.alive)
         dx = w.pos[:, :, None, 0] - self.pos[:, None, :, 0]
         dy = w.pos[:, :, None, 1] - self.pos[:, None, :, 1]
         r = w.cfg.creature.radius + w.cfg.dung.radius + w.cfg.carry.reach
-        near = ((dx * dx + dy * dy < r * r) & self.loose()[:, None]).any(-1)
+        which = self.lying() & self.heaped if heap else self.loose()
+        near = ((dx * dx + dy * dy < r * r) & which[:, None]).any(-1)
         return near & (w.load < 0) & (w.block_load < 0) & (self.load < 0) & w.alive
 
     def pick(self, a: int, i: int, k: int):

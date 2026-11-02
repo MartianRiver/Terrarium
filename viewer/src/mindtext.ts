@@ -38,6 +38,7 @@ export const KINDS: Record<string, Words & { colour: string }> = {
   flower: { label: 'flower', colour: '#ffb21f', text: 'An open nectar flower: rare, rich, and gone in 15 s.' },
   dung: { label: 'dropping', colour: '#8a5a2b', text: 'A dropping on the ground. Being close to one makes a Terrikin a little sick.' },
   flag: { label: 'flag', colour: '#3d7bd9', text: 'A colony’s flag, on its nest or lying where it was put down. A carried one shows as its carrier.' },
+  heap: { label: 'heap', colour: '#5c3a1a', text: 'A dropping on the midden’s heap, where they’re put. It stays there: it can’t be picked up again.' },
 };
 
 export const ACTIONS: Record<string, Words> = {

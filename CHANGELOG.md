@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Rays see a dropping on the midden's heap as its own kind (schema v18), apart from a loose one: until now the tidy baby couldn't tell the two apart and kept walking to the heap to pick up droppings that can't be picked up again. A kind carved out of an older one starts as a copy of it when an older brain loads, so the tidy brains still see the heap as they did; the evals count yeses to carry with only heaped droppings in reach (`carry_heap`).
+
 The queue can rent its own pods: `terrarium.pods`, the pod manager, rents a Vast or RunPod pod when `on = "rented"` jobs wait, under a daily spend cap, and destroys one that never starts, goes quiet, sits idle or reaches its hours, revoking its token and handing any job it held straight back. A pod sets itself up from a start script, no ssh, with a token of its own that dies with it. The coordinator gets a `pods` role for it, which only sees that backlog and makes and revokes its pods' tokens (12 h at most); tokens can now expire.
 
 The tree's apples can go home (`[tree] home`, `nursery-tree-home`): an apple taken goes in the crop, a full crop takes no other, and it pays only once unloaded in the nest; `terrarium.games tree-home` scores apples brought home a minute. The tree's `picker` walks round the trunk instead of sticking on it, which takes its apples a minute from 25 to 30 and its step 3 points from 21.6 to 25.1, the brains' lead from 5 points a minute to 2. `nursery-tree-4` is step 3 with a jump costing 0.4.

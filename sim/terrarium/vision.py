@@ -14,7 +14,7 @@ import numpy as np
 if TYPE_CHECKING:
     from .world import World
 
-NOTHING, WALL, CREATURE, FOOD, BLOCK, FLOWER, DUNG, FLAG = range(8)
+NOTHING, WALL, CREATURE, FOOD, BLOCK, FLOWER, DUNG, FLAG, HEAP = range(9)
 # rays start this far outside the body, so a creature never sees itself
 GAP = 0.01
 # a flag's pennant pole, as rays see it
@@ -71,6 +71,15 @@ def look(world: 'World') -> Sight:
     food = np.broadcast_to(world.food_seen[:, None], (arenas, n, world.food_present.shape[1]))
     flowers = np.broadcast_to(world.flowers_open[:, None], (arenas, n, world.flowers_open.shape[1]))
     half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2)
+    # droppings: loose ones, and those on the midden's heap, which can't be picked up again
+    loose = heap = np.full(dirs.shape[:-1], np.inf)
+    if world.dung:
+        d = world.dung
+        lying = np.broadcast_to(d.lying()[:, None], (arenas, n, cfg.dung.slots))
+        each = hit_circles(pos, dirs, d.pos, cfg.dung.radius, lying, start, wide)
+        on_heap = d.heaped[:, None, None]
+        loose = np.where(on_heap, np.inf, each).min(-1, initial=np.inf)
+        heap = np.where(on_heap, each, np.inf).min(-1, initial=np.inf)
     creatures = hit_circles(pos, dirs, pos, cfg.creature.radius, others, start, wide)
     hits = np.stack([
         hit_walls(pos, dirs, cfg.arena.size / 2, start),
@@ -78,11 +87,11 @@ def look(world: 'World') -> Sight:
         hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start, wide).min(-1, initial=np.inf),
         hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start),
         hit_circles(pos, dirs, world.flower_pos, cfg.flowers.radius, flowers, start, wide).min(-1, initial=np.inf),
-        hit_circles(pos, dirs, world.dung.pos, cfg.dung.radius, np.broadcast_to(world.dung.lying()[:, None], (arenas, n, cfg.dung.slots)),
-                    start, wide).min(-1, initial=np.inf) if world.dung else np.full(dirs.shape[:-1], np.inf),
+        loose,
         # a flag on its nest or lying where it was put down; a carried one shows as its carrier (`carrier`)
         hit_circles(pos, dirs, world.flags.where(), FLAG_RADIUS, np.broadcast_to(~world.flags.carried()[:, None], (arenas, n, 2)),
                     start, wide).min(-1) if world.flags else np.full(dirs.shape[:-1], np.inf),
+        heap,
     ], -1)
     dist = hits.min(-1)
     seen = dist < far

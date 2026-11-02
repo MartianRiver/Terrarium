@@ -284,6 +284,9 @@ def load(path: Path | str) -> tuple[Brain, dict]:
         grown = torch.zeros_like(state[name]) if old.shape != state[name].shape else state[name]
         grown[tuple(slice(0, n) for n in old.shape)] = old
         state[name] = grown
+    for kind, was in schema.SPLIT_FROM.items():
+        if kind not in data['schema']['kinds'] and was in data['schema']['kinds']:
+            state['kind.weight'][schema.KINDS.index(kind)] = state['kind.weight'][schema.KINDS.index(was)]
     brain.load_state_dict(state)
     brain.start_actions(len(data['schema']['actions']))
     log.info('brain loaded', path=str(path), id=brain_id(path)[:12], schema=data['schema']['version'])
