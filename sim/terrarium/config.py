@@ -306,6 +306,30 @@ class Peek:
 
 
 @dataclass(frozen=True)
+class Jump:
+    height: float    # metres a jump from standing lifts a Terrikin (0: it can't jump)
+    energy: float    # each jump costs this
+
+    @property
+    def on(self) -> bool:
+        return self.height > 0
+
+
+@dataclass(frozen=True)
+class Tree:
+    trunk: int       # the block that is its trunk
+    near: float      # apples hang between these distances (m) from the trunk's middle
+    far: float
+    reach: float     # how high (m) a Terrikin has to jump to take one (0: from the ground)
+    points: float    # for each apple taken (0 is off)
+    hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
+
+    @property
+    def on(self) -> bool:
+        return self.points > 0
+
+
+@dataclass(frozen=True)
 class Vision:
     rays: int
     fov: float
@@ -347,6 +371,8 @@ class Config:
     seek: Seek
     flag: Flag
     peek: Peek
+    jump: Jump
+    tree: Tree
     ground: Ground
     vision: Vision
     episode: Episode
@@ -483,7 +509,9 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'hearing': {'range': 0.0},
          'dung': {'every': 0, 'after': 0.0, 'lasts': 0.0, 'slots': 0, 'radius': 0.0, 'near': 0.0, 'sick': 0.0, 'away': 1.0,
                   'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0,
-                  'spot': 0.0, 'heap': 0, 'wander': 0.0}}
+                  'spot': 0.0, 'heap': 0, 'wander': 0.0},
+         'jump': {'height': 0.0, 'energy': 0.0},
+         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0}}
 
 
 def upgrade(data: dict) -> dict:

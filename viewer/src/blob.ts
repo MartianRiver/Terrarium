@@ -232,7 +232,7 @@ export class BlobView {
 
   update(s: CreatureState, maxSpeed: number, dt: number, time: number) {
     const yaw = Math.PI / 2 - s.heading;
-    this.root.position.set(s.x, 0, s.y);
+    this.root.position.set(s.x, s.z, s.y);
     this.root.rotation.y = yaw;
     this.root.scale.setScalar(s.size * FIT);
 

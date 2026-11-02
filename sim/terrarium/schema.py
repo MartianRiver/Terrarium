@@ -6,19 +6,19 @@
 # The number of rays isn't part of it: each ray is its own token, so a brain
 # works with however many the config casts.
 
-VERSION = 16
+VERSION = 17
 SELF = ('energy', 'forward_speed', 'side_speed', 'last_thrust', 'last_turn',
         'home_distance', 'home_sin', 'home_cos', 'carrying', 'at_home', 'store', 'light', 'sprinting', 'rested',
         'holding', 'smell', 'smell_sin', 'smell_cos', 'nectar', 'load', 'young',
         'it', 'seeker', 'waiting', 'flag', 'flag_distance', 'flag_sin', 'flag_cos', 'flag_taken',
         'own_flag', 'own_flag_distance', 'own_flag_sin', 'own_flag_cos', 'stamina',
-        'heard', 'heard_sin', 'heard_cos', 'dirty', 'dung_load')
+        'heard', 'heard_sin', 'heard_cos', 'dirty', 'dung_load', 'height')
 RAY = ('distance', 'sin', 'cos', 'nestmate', 'own_nest', 'other_nest', 'it', 'carrier')
 # what a ray hit, in vision's order
 KINDS = ('nothing', 'wall', 'creature', 'food', 'block', 'flower', 'dung', 'flag')
-ACTIONS = ('thrust', 'turn', 'unload', 'eat', 'sprint', 'grab', 'carry')
+ACTIONS = ('thrust', 'turn', 'unload', 'eat', 'sprint', 'grab', 'carry', 'jump')
 # yes when above 0; a new one starts leaning no (brain.py), so it's tried now and then rather than on every other tick
-YES_NO = ('unload', 'eat', 'sprint', 'grab', 'carry')
+YES_NO = ('unload', 'eat', 'sprint', 'grab', 'carry', 'jump')
 
 LISTS = ('self', 'ray', 'kinds', 'actions')
 

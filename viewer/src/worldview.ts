@@ -16,6 +16,7 @@ import type { Pose } from './sightfan';
 import { Dust } from './sprint';
 import { TagPops } from './tagpop';
 import { Tombstones } from './tombstones';
+import { TreeView } from './tree';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
 const log = createLogger('worldview');
@@ -37,7 +38,8 @@ export class WorldView {
   private blobs = new Map<number, BlobView>();
   private food = new Map<number, FoodView>();
   private dyingFood: FoodView[] = [];
-  private blocks = new Map<number, BlockView>();
+  private blocks = new Map<number, BlockView | TreeView>();
+  private tree: TreeView | null = null;
   private prevCreatures = new Map<number, CreatureState>();
   private prevBlocks = new Map<number, Frame['blocks'][number]>();
   private frame: Frame | null = null;
@@ -53,7 +55,7 @@ export class WorldView {
   focusId: number | null = null;
   private ring: THREE.Mesh;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1, dung: 0 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1, dung: 0, z: 0 };
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;
@@ -64,7 +66,8 @@ export class WorldView {
   private pops: TagPops;
 
   constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true, cone = 0) {
-    this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
+    // made-up droppings every few meals, but not under the apple tree, where a meal comes every couple of seconds
+    this.droppings = droppings && info.tree === null ? new Droppings(scene, info.tickHz) : null;
     this.tombstones = new Tombstones(scene, info.tickHz);
     this.grips = new Grips(scene);
     this.eggs = new Eggs(scene, info.tickHz);
@@ -100,6 +103,7 @@ export class WorldView {
     this.syncCreatures(frame);
     this.syncFood(frame);
     this.syncBlocks(frame);
+    this.tree?.apples(frame.food);
     this.droppings?.push(frame);
     this.tombstones.push(frame);
     this.eggs.push(frame);
@@ -127,6 +131,7 @@ export class WorldView {
       s.heading = lerpAngle(p.heading, c.heading, alpha);
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
+      s.z = lerp(p.z, c.z, alpha);
       // a signal changes where the bodies arrive, not as they set off: a tag lights the new it's bulb when they touch
       s.signal = p.signal;
       if (s.signal === 0) shownIt = c.id;
@@ -261,7 +266,7 @@ export class WorldView {
   private syncBlocks(frame: Frame) {
     for (const b of frame.blocks) {
       if (this.blocks.has(b.id)) continue;
-      const view = new BlockView(b);
+      const view = b.id === this.info.tree ? (this.tree = new TreeView(b)) : new BlockView(b);
       this.blocks.set(b.id, view);
       this.scene.add(view.root);
     }
