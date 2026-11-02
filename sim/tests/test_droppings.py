@@ -156,9 +156,10 @@ def test_a_wandering_midden_moves_each_episode_and_stays_in_the_arena():
     assert np.ptp(bearings) > 2.0
 
 
-def test_off_by_default_and_a_brain_sees_it_last():
+def test_off_by_default_and_a_brain_sees_it():
     world = World(COLONY, 2, seed=0)
     assert world.dung is None
     obs = observe(world, np.zeros((*world.alive.shape, 2)))
-    assert obs.me.shape[-1] == len(SELF) and SELF[-2:] == ('dirty', 'dung_load')
-    assert (obs.me[:, -2:] == 0).all()
+    at = SELF.index('dirty')
+    assert obs.me.shape[-1] == len(SELF) and SELF[at:at + 2] == ('dirty', 'dung_load')
+    assert (obs.me[:, at:at + 2] == 0).all()

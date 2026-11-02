@@ -161,6 +161,36 @@ def maze_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarr
     return {'berries_a_minute': w.meals.sum(1) / (cfg.episode.seconds / 60), 'walked': walked}
 
 
+def tree_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarray]:
+    w, walked = play(cfg, episodes, seed, [(everyone, player)])
+    minutes = cfg.episode.seconds / 60
+    jumps = w.jumps.sum(1)
+    return {'apples_a_minute': w.meals.sum(1) / minutes, 'jumps_a_minute': jumps / minutes,
+            'apples_a_jump': w.meals.sum(1) / np.maximum(jumps, 1), 'walked': walked}
+
+
+def picker(world: World):
+    """The tree game done by hand: walks to under the nearest apple and jumps once it's there, which is about the
+    most a game holds."""
+    jump = ACTIONS.index('jump')
+
+    def act(w):
+        out = np.full((*w.alive.shape, len(ACTIONS)), -1.0)
+        here = w.food_present[:, :w.wild]
+        d = w.food_pos[:, None, :w.wild] - w.pos[:, :, None]
+        gap = np.where(here[:, None], np.hypot(d[..., 0], d[..., 1]), np.inf)
+        k = gap.argmin(-1)
+        to = np.take_along_axis(d, k[..., None, None], 2)[:, :, 0]
+        near = np.take_along_axis(gap, k[..., None], 2)[..., 0]
+        want = (np.arctan2(to[..., 1], to[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
+        under = near < 0.3
+        out[..., 0] = np.where(np.isfinite(near) & ~under, np.where(np.abs(want) < 1, 1.0, 0.2), 0.0)
+        out[..., 1] = np.clip(want * 3, -1, 1)
+        out[..., jump] = np.where(under, 1.0, -1.0)
+        return out
+    return act
+
+
 def still(world: World):
     """Stands where it starts: what doing nothing scores, which a cost on moving makes look good."""
     def act(w):
@@ -215,8 +245,10 @@ GAMES = {
     }),
     'peek': ('nursery-peek-again.toml', {'find': (lambda b: (peek, b), 'found_a_minute', +1)}),
     'maze': ('nursery-maze.toml', {'find': (lambda b: (maze_game, b), 'berries_a_minute', +1)}),
+    'tree': ('nursery-tree-3.toml', {'pick': (lambda b: (tree_game, b), 'apples_a_minute', +1)}),
 }
-BASELINES = {'random': random_policy, 'chaser': chaser, 'still': still, 'last_seen': last_seen, 'wall': maze.wall_policy,
+BASELINES = {'random': random_policy, 'chaser': chaser, 'still': still, 'last_seen': last_seen, 'picker': picker,
+             'wall': maze.wall_policy,
              'mapped': maze.mapped_policy}
 
 

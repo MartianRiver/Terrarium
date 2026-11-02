@@ -34,6 +34,9 @@ def header(world: World, arena: int, source: dict) -> dict:
         info['middenSpot'] = {'x': _r(x), 'y': _r(y), 'radius': cfg.dung.spot}
     elif cfg.dung.midden > 0:
         info['midden'] = cfg.dung.midden
+    if world.tree:
+        # the block drawn as an apple tree
+        info['tree'] = int(world.block_id[cfg.tree.trunk])
     return {'format': FORMAT, 'version': VERSION, 'info': info,
             'source': {**source, 'arena': arena, 'config': cfg.to_dict()}}
 
@@ -82,10 +85,18 @@ def frame(world: World, a: int) -> dict:
         # seconds of nectar boost left
         for c, boost in zip(creatures, world.nectar[a][born]):
             c['nectar'] = _r(boost / cfg.tick_hz)
+    if cfg.jump.on:
+        for c, z in zip(creatures, world.z[a][born]):
+            c['z'] = _r(z)
     here = world.food_present[a]
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
             for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
+    if world.tree:
+        # the tree's berries are apples, hanging this far above a standing Terrikin's reach
+        for f in food:
+            if f['kind'] == 'common':
+                f.update(kind='apple', z=cfg.tree.reach)
     if world.peek and world.peek.hidden[a]:
         # peekaboo's berry, out of sight
         food[0]['hidden'] = 1

@@ -58,6 +58,8 @@ from .droppings import Droppings
 from .smell import Field
 from .flags import Flags
 from .peek import Peek
+from .jump import step as jump_step
+from .tree import Tree
 from .maze import carve, check as check_maze
 from .scatter import scatter
 from .seek import Seek
@@ -113,6 +115,10 @@ class World:
         self.episode_ticks = round(cfg.episode.seconds * cfg.tick_hz)
         self.physics = Physics(cfg, pos)
         self.physics.remove(self.unborn)
+        # how high each is off the ground and rising ([jump]), and its jumps since its arena started
+        self.z = np.zeros((arenas, n))
+        self.vz = np.zeros((arenas, n))
+        self.jumps = np.zeros((arenas, n), int)
 
         # ids the viewer keys on: blocks keep theirs, food gets a new one each time it regrows, and a hatchling
         # gets the one its egg had
@@ -134,6 +140,7 @@ class World:
         # ticks until a food grows back; 0 means it's there
         self.food_regrow = np.zeros((arenas, slots), int)
         self.food_regrow[:, self.wild:] = EMPTY
+        self.tree = Tree(self) if cfg.tree.on else None
         for a in range(arenas):
             for f in range(self.wild):
                 self._grow(a, f)
@@ -322,6 +329,9 @@ class World:
         self.flower_due[idx] = self._flower_wait(len(idx))
         self.nectar[idx] = 0
         self.stamina[idx] = 1
+        self.z[idx] = 0
+        self.vz[idx] = 0
+        self.jumps[idx] = 0
         self.drunk[idx] = 0
         self.load[idx] = -1
         self.carry_was[idx] = False
@@ -345,6 +355,8 @@ class World:
             self.flags.reset(idx)
         if self.peek:
             self.peek.reset(idx)
+        if self.tree:
+            self.tree.reset(idx)
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -357,16 +369,16 @@ class World:
         log.debug('arenas reset', tick=self.tick, count=len(idx))
 
     def step(self, actions: np.ndarray):
-        """actions (arenas, creatures, k): thrust and turn, then unload, eat, sprint, grab and carry (yes when above
-        0), as many of those as k has room for."""
+        """actions (arenas, creatures, k): thrust and turn, then unload, eat, sprint, grab, carry and jump (yes when
+        above 0), as many of those as k has room for."""
         cfg, c, s, g = self.cfg, self.cfg.creature, self.cfg.sprint, self.cfg.grab
         # the dead don't move
         actions = np.clip(actions, -1, 1) * self.alive[..., None]
         if self.seek:
             actions = self.seek.hold(actions)
         thrust, turn = actions[..., 0], actions[..., 1]
-        unload, eat, sprint, grab, carry = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k
-                                            else np.zeros_like(self.alive) for k in (2, 3, 4, 5, 6))
+        unload, eat, sprint, grab, carry, jump = ((actions[..., k] > 0) & self.alive if actions.shape[-1] > k
+                                                  else np.zeros_like(self.alive) for k in (2, 3, 4, 5, 6, 7))
         if s.on:
             go = sprint & (self.sprinting == 0) & (self.resting == 0)
             self.sprinting[go] = round(s.seconds * cfg.tick_hz)
@@ -389,6 +401,8 @@ class World:
             self.holding = self.physics.grab(self.gripping > 0, g.reach, g.grip)
             np.maximum(self.gripping - 1, 0, out=self.gripping)
         self.physics.step(change * (c.mass / cfg.dt))
+        if cfg.jump.on:
+            jump_step(self, jump)
 
         e = cfg.energy
         # a sprint costs by how hard it runs: standing still through one is free
@@ -471,6 +485,9 @@ class World:
         takes = self.alive & (hungry | (self.crop < cfg.crop.capacity))
         wants_jelly = self.alive & (self.energy <= 1 - cfg.jelly.energy)
         takes = np.where(np.arange(self.food_pos.shape[1]) < self.wild, takes[..., None], wants_jelly[..., None])
+        if self.tree:
+            # an apple on the tree goes to whoever jumps high enough under it, hungry or not
+            takes = self.tree.reaching()[..., None]
         touching = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None] & takes
         eaten = touching.any(1)
         if not eaten.any():
@@ -814,7 +831,10 @@ class World:
 
     def _grow(self, a, f):
         patches = self.cfg.food.patches
-        self.food_pos[a, f] = self._open_ground(a, self.patch_pos[a, f % patches] if patches else None)
+        if self.tree:
+            self.food_pos[a, f] = self.tree.spot(a)
+        else:
+            self.food_pos[a, f] = self._open_ground(a, self.patch_pos[a, f % patches] if patches else None)
         self.food_id[a, f] = self.next_id[a]
         self.next_id[a] += 1
 
