@@ -165,14 +165,17 @@ def tree_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarr
     w, walked = play(cfg, episodes, seed, [(everyone, player)])
     minutes = cfg.episode.seconds / 60
     jumps = w.jumps.sum(1)
-    return {'apples_a_minute': w.meals.sum(1) / minutes, 'jumps_a_minute': jumps / minutes,
-            'apples_a_jump': w.meals.sum(1) / np.maximum(jumps, 1), 'walked': walked}
+    out = {'apples_a_minute': w.meals.sum(1) / minutes, 'jumps_a_minute': jumps / minutes,
+           'apples_a_jump': w.meals.sum(1) / np.maximum(jumps, 1), 'walked': walked}
+    if cfg.tree.home:
+        out['home_a_minute'] = w.stored.sum(1) / minutes
+    return out
 
 
 def picker(world: World):
     """The tree game done by hand: walks to under the nearest apple and jumps once it's there, which is about the
-    most a game holds."""
-    jump = ACTIONS.index('jump')
+    most a game holds. With apples going home, one with a full crop walks to its nest and unloads there."""
+    jump, unload = ACTIONS.index('jump'), ACTIONS.index('unload')
 
     def act(w):
         out = np.full((*w.alive.shape, len(ACTIONS)), -1.0)
@@ -182,13 +185,32 @@ def picker(world: World):
         k = gap.argmin(-1)
         to = np.take_along_axis(d, k[..., None, None], 2)[:, :, 0]
         near = np.take_along_axis(gap, k[..., None], 2)[..., 0]
-        want = (np.arctan2(to[..., 1], to[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
         under = near < 0.3
-        out[..., 0] = np.where(np.isfinite(near) & ~under, np.where(np.abs(want) < 1, 1.0, 0.2), 0.0)
+        full = (w.crop >= w.cfg.crop.capacity) if w.cfg.tree.home else np.zeros(w.alive.shape, bool)
+        to = np.where(full[..., None], w.nests[w.colony] - w.pos, to)
+        to = around_trunk(w, to)
+        inside = w.nest_at() == w.colony
+        want = (np.arctan2(to[..., 1], to[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
+        go = np.where(full, ~inside, np.isfinite(near) & ~under)
+        out[..., 0] = np.where(go, np.where(np.abs(want) < 1, 1.0, 0.2), 0.0)
         out[..., 1] = np.clip(want * 3, -1, 1)
-        out[..., jump] = np.where(under, 1.0, -1.0)
+        out[..., jump] = np.where(under & ~full, 1.0, -1.0)
+        out[..., unload] = np.where(full & inside, 1.0, -1.0)
         return out
     return act
+
+
+def around_trunk(w: World, to: np.ndarray) -> np.ndarray:
+    """A way to `to` that doesn't walk into the tree: past the trunk's side when it's in the way."""
+    trunk = w.cfg.block[w.cfg.tree.trunk]
+    clear = np.hypot(trunk.w, trunk.h) / 2 + w.cfg.creature.radius + 0.15
+    c = w.physics.block_pos[:, w.cfg.tree.trunk][:, None] - w.pos
+    t = np.clip((c * to).sum(-1) / np.maximum((to * to).sum(-1), 1e-9), 0, 1)
+    miss = c - t[..., None] * to
+    blocked = (np.hypot(miss[..., 0], miss[..., 1]) < clear) & (t > 0) & (t < 1)
+    side = np.stack([-to[..., 1], to[..., 0]], -1) / np.maximum(np.hypot(to[..., 0], to[..., 1]), 1e-9)[..., None]
+    side *= np.where((side * c).sum(-1) > 0, -1.0, 1.0)[..., None]
+    return np.where(blocked[..., None], c + side * clear * 1.3, to)
 
 
 def still(world: World):
@@ -246,6 +268,7 @@ GAMES = {
     'peek': ('nursery-peek-again.toml', {'find': (lambda b: (peek, b), 'found_a_minute', +1)}),
     'maze': ('nursery-maze.toml', {'find': (lambda b: (maze_game, b), 'berries_a_minute', +1)}),
     'tree': ('nursery-tree-3.toml', {'pick': (lambda b: (tree_game, b), 'apples_a_minute', +1)}),
+    'tree-home': ('nursery-tree-home.toml', {'pick': (lambda b: (tree_game, b), 'home_a_minute', +1)}),
 }
 BASELINES = {'random': random_policy, 'chaser': chaser, 'still': still, 'last_seen': last_seen, 'picker': picker,
              'wall': maze.wall_policy,

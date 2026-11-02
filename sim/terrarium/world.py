@@ -489,6 +489,9 @@ class World:
             # an apple on the tree goes to whoever jumps high enough under it, hungry or not
             takes = self.tree.reaching()[..., None]
         touching = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None] & takes
+        if self.tree and cfg.tree.home:
+            # one apple a tick each, so a crop with room for one doesn't take two
+            touching &= np.arange(touching.shape[2]) == touching.argmax(2)[..., None]
         eaten = touching.any(1)
         if not eaten.any():
             return
@@ -496,7 +499,8 @@ class World:
         arena, food = np.nonzero(eaten)
         who = touching.argmax(1)[arena, food]
         wild = food < self.wild
-        eats = hungry[arena, who] | ~wild
+        # an apple on its way home goes in the crop, hungry or not
+        eats = hungry[arena, who] & (self.tree is None or not cfg.tree.home) | ~wild
         before = self.energy.copy()
         self._credit(arena, food, who)
         np.add.at(self.energy, (arena[eats], who[eats]), np.where(wild, cfg.energy.food, cfg.jelly.energy)[eats])

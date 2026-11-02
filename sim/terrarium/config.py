@@ -323,6 +323,7 @@ class Tree:
     reach: float     # how high (m) a Terrikin has to jump to take one (0: from the ground)
     points: float    # for each apple taken (0 is off)
     hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
+    home: bool       # an apple taken goes in the crop, and pays only once it's unloaded in the nest
 
     @property
     def on(self) -> bool:
@@ -511,7 +512,7 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
                   'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0,
                   'spot': 0.0, 'heap': 0, 'wander': 0.0},
          'jump': {'height': 0.0, 'energy': 0.0},
-         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0}}
+         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False}}
 
 
 def upgrade(data: dict) -> dict:

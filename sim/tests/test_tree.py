@@ -80,3 +80,39 @@ def test_the_brain_feels_how_high_it_is():
 def test_a_branch_out_of_reach_is_refused():
     with pytest.raises(ConfigError):
         World(replace(TREE, tree=replace(TREE.tree, reach=TREE.jump.height)))
+
+
+HOME = load(DEFAULT.parent / 'nursery-tree-home.toml')
+UNLOAD = ACTIONS.index('unload')
+
+
+def test_an_apple_going_home_is_carried_and_pays_only_once_unloaded_in_the_nest():
+    world = World(HOME)
+    world.energy[:] = 0.2
+    under_an_apple(world)
+    world.step(act(True))
+    for _ in range(20):
+        world.step(act())
+    assert world.meals[0, 0] == 1 and world.crop[0, 0] == 1 and world.energy[0, 0] < 0.2
+    assert world.tree.points(world.alive)[0, 0] == pytest.approx(-HOME.tree.hop)
+    world.physics.place(np.array([0]), world.nests[None, :1].copy())
+    unload = act()
+    unload[..., UNLOAD] = 1.0
+    world.step(unload)
+    assert world.crop[0, 0] == 0 and world.stored[0, 0] == 1
+    assert world.tree.points(world.alive)[0, 0] == HOME.tree.points
+
+
+def test_a_full_crop_takes_no_apple():
+    world = World(HOME)
+    world.crop[:] = HOME.crop.capacity
+    under_an_apple(world)
+    world.step(act(True))
+    for _ in range(20):
+        world.step(act())
+    assert world.meals[0, 0] == 0
+
+
+def test_apples_going_home_need_a_crop():
+    with pytest.raises(ConfigError):
+        World(replace(HOME, crop=replace(HOME.crop, capacity=0)))
