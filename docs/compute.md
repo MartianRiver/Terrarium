@@ -176,7 +176,7 @@ The queue is closed: every machine has a token I made for its handle, and the ha
 `on = "rented"` jobs can rent their own machines. The pod manager (`terrarium.pods`) runs on a small box of its own, on a bare python with nothing installed, and once a minute:
 
 - asks the coordinator how many `on = "rented"` jobs are waiting and what each of its pods last said, with a token of role `pods`, which can see that and make and revoke its pods' tokens, and nothing else: it can't add, sign, read or cancel jobs;
-- rents a pod on Vast, or RunPod if Vast has nothing under the price, when more jobs wait than its pods can take, as long as the last 24 hours' spend plus the whole of the new pod's life stays under the day's cap;
+- rents a pod from the first provider in its list with a card under the price (RunPod: it asks what's in stock first, in the Community and Secure clouds both, and rents the cheapest; the console shows Secure prices, and Community stock for one card comes and goes by the minute), when more jobs wait than its pods can take, as long as the last 24 hours' spend plus the whole of the new pod's life stays under the day's cap;
 - destroys a pod that hasn't said hello within 15 minutes, has gone quiet for 10, has sat 5 minutes with nothing to do and nothing waiting, or has reached its hours. Its token is revoked with it, and any job it held goes back in the queue at once instead of when its lease runs out;
 - destroys any pod of its own that its ledger doesn't know (one left over after a crash), and writes down every pod with its price, when it came and went, why, and the commit it ran (SQLite), plus a status file for the box's monitoring.
 

@@ -45,7 +45,9 @@ SETTINGS = {
     'max_dph': 0.40,          # most US$ an hour for one pod
     'providers': ['vast', 'runpod'],
     'vast_gpus': ['RTX 3060', 'RTX 3070', 'RTX 3080', 'RTX 4060 Ti', 'RTX A4000'],
-    'runpod_gpus': ['NVIDIA GeForce RTX 3080', 'NVIDIA GeForce RTX 3070', 'NVIDIA RTX A4000'],
+    # RunPod's are tried cheapest first by what's in stock now, in either cloud
+    'runpod_gpus': ['NVIDIA RTX A4000', 'NVIDIA RTX A4500', 'NVIDIA RTX A5000', 'NVIDIA GeForce RTX 3070', 'NVIDIA GeForce RTX 3080',
+                    'NVIDIA GeForce RTX 3080 Ti', 'NVIDIA GeForce RTX 3090', 'NVIDIA GeForce RTX 4070 Ti', 'NVIDIA RTX 4000 Ada Generation'],
     'hours': 6.0,             # a pod's whole life, and its token's
     'start': 15.0,            # minutes to its worker's first hello
     'quiet': 10.0,            # minutes without a word from its worker
@@ -57,6 +59,7 @@ SETTINGS = {
 PREFIX = 'terrarium-q-'
 VAST_IMAGE = 'vastai/base-image@sha256:c5b7882c05d74e3de22af79c9698f569eac7725cdadbfc1a23304e5ffc2a1961'
 RUNPOD_IMAGE = 'runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04'
+RUNPOD_SPEC = {'gpuCount': 1, 'containerDiskInGb': 30, 'volumeInGb': 0, 'minVcpuCount': 4, 'minMemoryInGb': 16}
 
 
 def settings(state: Path) -> dict:
@@ -168,19 +171,45 @@ class RunPod:
         return {p['id']: p['name'] for p in self.api('{ myself { pods { id name } } }')['myself']['pods']
                 if p['name'].startswith(PREFIX)}
 
+    def offers(self, gpus: list[str], max_dph: float) -> list[tuple[float, str, str]]:
+        """(US$ an hour, card, cloud) for each card in stock at or under max_dph, cheapest first. A card is often in
+        stock in one cloud only, and the console shows Secure Cloud prices; asking first also means a pod over the
+        ceiling is never rented just to be destroyed."""
+        mins = (f"gpuCount: 1, minVcpuCount: {RUNPOD_SPEC['minVcpuCount']}, minMemoryInGb: {RUNPOD_SPEC['minMemoryInGb']}, "
+                f"minDisk: {RUNPOD_SPEC['containerDiskInGb']}")
+        q = ('query($ids: [String!]) { gpuTypes(input: {ids: $ids}) { id '
+             f'COMMUNITY: lowestPrice(input: {{{mins}, secureCloud: false}}) {{ uninterruptablePrice stockStatus }} '
+             f'SECURE: lowestPrice(input: {{{mins}, secureCloud: true}}) {{ uninterruptablePrice stockStatus }} }} }}')
+        found = {g['id']: g for g in self.api(q, {'ids': gpus})['gpuTypes']}
+        out = []
+        for card in gpus:
+            if card not in found:
+                log.warn('not rented', provider='runpod', gpu=card, why='no such card')
+                continue
+            for cloud in ('COMMUNITY', 'SECURE'):
+                low = found[card][cloud] or {}
+                price, stock = low.get('uninterruptablePrice'), low.get('stockStatus')
+                if not price or not stock:
+                    log.info('not rented', provider='runpod', gpu=card, cloud=cloud, why='none in stock')
+                elif price > max_dph:
+                    log.info('not rented', provider='runpod', gpu=card, cloud=cloud, why='over max_dph', dph=price, stock=stock)
+                else:
+                    out.append((price, card, cloud, stock))
+        return [o[:3] for o in sorted(out)]
+
     def rent(self, label: str, gpus: list[str], max_dph: float, script: str) -> tuple[str, float] | None:
         q = '''mutation($i: PodFindAndDeployOnDemandInput) { podFindAndDeployOnDemand(input: $i) { id costPerHr } }'''
         packed = base64.b64encode(script.encode()).decode()
-        for g in gpus:
-            i = {'cloudType': 'COMMUNITY', 'gpuCount': 1, 'gpuTypeId': g, 'name': label, 'imageName': RUNPOD_IMAGE,
-                 'containerDiskInGb': 30, 'volumeInGb': 0, 'minVcpuCount': 4, 'minMemoryInGb': 16,
+        for price, g, cloud in self.offers(gpus, max_dph):
+            i = {**RUNPOD_SPEC, 'cloudType': cloud, 'gpuTypeId': g, 'name': label, 'imageName': RUNPOD_IMAGE,
                  'dockerArgs': f"bash -c 'echo {packed} | base64 -d > /root/boot.sh && bash /root/boot.sh'"}
             try:
                 p = self.api(q, {'i': i})['podFindAndDeployOnDemand']
             except RuntimeError as e:
-                log.info('not rented', provider='runpod', gpu=g, why=str(e)[:100])
+                log.info('not rented', provider='runpod', gpu=g, cloud=cloud, dph=price, why=str(e)[:100])
                 continue
             if p and float(p['costPerHr']) <= max_dph:
+                log.info('rented', provider='runpod', gpu=g, cloud=cloud, dph=float(p['costPerHr']))
                 return p['id'], float(p['costPerHr'])
             if p:
                 self.destroy(p['id'])
