@@ -181,7 +181,9 @@ def flag_senses(world: World, shape) -> tuple:
     for side in (1 - world.colony, world.colony):
         to = where[:, side] - world.pos                              # A,N,2
         bearing = np.arctan2(to[..., 1], to[..., 0]) - world.heading
-        out.append((held == side, np.hypot(to[..., 0], to[..., 1]) / world.cfg.vision.range, np.sin(bearing), np.cos(bearing)))
+        way = (np.hypot(to[..., 0], to[..., 1]) / world.cfg.vision.range, np.sin(bearing), np.cos(bearing))
+        # with the compass off, where a flag is comes only from what the rays see
+        out.append((held == side, *(way if world.cfg.flag.sense else (np.zeros(shape),) * 3)))
     taken = ((flags.carrier >= 0) | flags.down)[:, world.colony]
     return (*out[0], taken, *out[1])
 

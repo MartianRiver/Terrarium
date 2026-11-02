@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Rays see flags (schema v16): one on its nest or lying on the ground is its own kind of thing to hit, and a carried one still shows as its carrier; `[flag] sense = false` turns off the compass that told every baby where both flags were from anywhere, so in `configs/nursery-flag-sight.toml` (the fair game, compass off) a flag has to be seen to be found. 0.4 notes: seeing the flag lifts pickups up to three times, still with no capture.
+
 `terrarium.compute` matches a pod's runs to its rental by the instance they record, which it had compared as text against a number and so never matched; compute.toml has the pods of 1 November's evening, from Vast's own bill, downloads included. Efficiency notes: what a pod's downloads and disk cost, and why a CPU's listed clock doesn't say how fast it trains; where a world step's time goes at training sizes, and what's been measured so far for faster rays, physics, workers, ramps and the sim in a browser.
 
 The brain's last attention layer works out only the self token, the one its heads read, so picking actions is 1.5 to 1.7 times faster on a CPU with the same answers; brains trained before need nothing changed.
