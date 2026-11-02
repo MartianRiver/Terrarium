@@ -123,6 +123,8 @@ def test_a_run_that_names_its_instance_is_matched_by_it():
     pod = {'started': '2026-10-24T10:30:00+1100', 'device': 'cuda', 'gpu': 'NVIDIA A10', 'machine': POD | {'instance': 2}}
     window = {'started': '2026-10-24T10:00:00+11:00', 'ended': '2026-10-24T11:00:00+11:00', 'gpu': 'A10'}
     assert [rented_on(pod, window | {'instance': i}) for i in (1, 2)] == [False, True]
+    # as a pod's run.json records it
+    assert rented_on(pod | {'machine': POD | {'instance': '2'}}, window | {'instance': 2})
 
 
 def test_a_pod_whose_cpu_differs_is_another_rental():

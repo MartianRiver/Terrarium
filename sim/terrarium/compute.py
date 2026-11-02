@@ -127,8 +127,9 @@ def lineage_hours(root: Path, record: dict, brains: list[dict]) -> float:
 
 def rented_on(record: dict, session: dict) -> bool:
     # a queue worker on a pod writes its instance in; before that, the time window and the GPU have to do
+    # run.json has it as the text the pod's environment gave (rental()), compute.toml as a number
     if instance := record.get('machine', {}).get('instance'):
-        return session.get('instance') == instance
+        return str(session.get('instance')) == str(instance)
     if record.get('device') != 'cuda' or not when(session['started']) <= when(record['started']) <= when(session['ended']):
         return False
     if record.get('gpu') and session['gpu'] not in record['gpu']:

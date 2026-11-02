@@ -68,6 +68,12 @@ function parseLine(line: string, n: number): Obj {
   return obj(value, `line ${n}`);
 }
 
+function spot(v: unknown, where: string) {
+  if (typeof v !== 'object' || v === null) throw new ReplayError(`${where}: not an object`);
+  const o = v as Obj;
+  return { x: num(o, 'x', where), y: num(o, 'y', where), radius: num(o, 'radius', where) };
+}
+
 function readInfo(o: Obj): WorldInfo {
   const where = 'line 1: info';
   return {
@@ -79,6 +85,7 @@ function readInfo(o: Obj): WorldInfo {
       colony: int(n, 'colony', w), x: num(n, 'x', w), y: num(n, 'y', w), radius: num(n, 'radius', w),
     })),
     midden: o.midden === undefined ? 0 : num(o, 'midden', where),
+    ...(o.middenSpot === undefined ? {} : { middenSpot: spot(o.middenSpot, `${where}.middenSpot`) }),
   };
 }
 

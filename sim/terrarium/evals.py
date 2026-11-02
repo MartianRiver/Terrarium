@@ -14,7 +14,7 @@
 # else to do: the ceiling for what remembering the spots could be worth.
 #
 #   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled]
-#                                    [--device cuda] [--wiped]
+#                                    [--device cuda] [--wiped] [--wipe-every S...]
 #
 # Each policy (and each brain in each mode) is scored in its own process, side by side.
 
@@ -259,7 +259,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     picked, put_home, given, given_hungry, lifted = (np.zeros(shape, int) for _ in range(5))
     # with [dung] on: droppings made, picked up, taken out past the midden, metres moved further from home, and how
     # many lie near each living one (a pile as one) and within 3 m of a nest, summed over ticks
-    made, dung_picked, taken = (np.zeros(shape, int) for _ in range(3))
+    made, dung_picked, taken, first_trip, later_trips = (np.zeros(shape, int) for _ in range(5))
     tidied = np.zeros(shape)
     dirt, lived_ticks, nest_dung, all_dung = 0.0, 0, 0, 0
     # deaths in each slot: with hatching, one slot can die more than once
@@ -358,6 +358,8 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
             made[finished] = world.dung.made[finished]
             dung_picked[finished] = world.dung.picked[finished]
             taken[finished] = world.dung.taken[finished]
+            first_trip[finished] = world.dung.first_trip[finished]
+            later_trips[finished] = world.dung.later_trips[finished]
             tidied[finished] = world.dung.tidied[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         hatched[finished] = world.hatched[finished]
@@ -404,17 +406,25 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
            if cfg.carry.on else {}),
         **({'dung': {'made': summary(made[:, starters]), 'picked': summary(dung_picked[:, starters]),
                      'taken_out': summary(taken[:, starters]), 'moved_away': summary(tidied[:, starters]),
-                     'near_each': dirt / max(lived_ticks, 1), 'near_nest_share': nest_dung / max(all_dung, 1)}}
+                     'near_each': dirt / max(lived_ticks, 1), 'near_nest_share': nest_dung / max(all_dung, 1),
+                     **trips(taken[:, starters], first_trip[:, starters], later_trips[:, starters], cfg.tick_hz)}}
            if cfg.dung.on else {}),
     }
 
 
+def trips(taken: np.ndarray, first: np.ndarray, later: np.ndarray, hz: float) -> dict:
+    """Seconds to the first one taken out, and between later ones, over those that took any out (that many more)."""
+    some, more = taken >= 1, taken >= 2
+    return {'first_trip': float(first[some].mean() / hz) if some.any() else None,
+            'later_trip': float(later[more].sum() / (taken[more] - 1).sum() / hz) if more.any() else None}
+
+
 def score(cfg: Config, policy: str | None = None, brain: Path | str | None = None, mode: str = 'drawn',
           episodes: int = EPISODES, seed: int = SEED, device: str = 'cpu', threads: int = 1,
-          wiped: bool = False) -> dict:
+          wiped: bool = False, wipe_every: float = 0.0) -> dict:
     """One eval, of a scripted policy by name or of a brain in one of MODES, its memory wiped or not."""
     torch.set_num_threads(threads)
-    make = brain_policy(brain, mode, device, wiped=wiped) if brain else POLICIES[policy or 'random']
+    make = brain_policy(brain, mode, device, wiped=wiped, wipe_every=wipe_every) if brain else POLICIES[policy or 'random']
     return run(cfg, make, episodes, seed)
 
 
@@ -457,6 +467,8 @@ def main():
     parser.add_argument('--brain', nargs='*', default=[], help='checkpoints to score alongside the policies')
     parser.add_argument('--modes', nargs='+', choices=MODES, default=['drawn'], help='how each brain picks its actions')
     parser.add_argument('--wiped', action='store_true', help='also score each brain with its memory wiped before every choice')
+    parser.add_argument('--wipe-every', type=float, nargs='*', default=[], metavar='S',
+                        help='also score each brain with its memory wiped every S seconds (the tidy game: do later trips still get faster?)')
     parser.add_argument('--held-out', action='store_true', help=f'the promotion worlds (seed {HELD_OUT}) instead of {SEED}')
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--device', default='cpu', help="where the brains run; the worlds are always on the CPU")
@@ -474,6 +486,8 @@ def main():
             jobs[name] = {'brain': b, 'mode': mode}
             if args.wiped:
                 jobs[f'{name} wiped'] = {'brain': b, 'mode': mode, 'wiped': True}
+            for every in args.wipe_every:
+                jobs[f'{name} wiped {every:g} s'] = {'brain': b, 'mode': mode, 'wipe_every': every}
     results = side_by_side(cfg, jobs, args.episodes, seed, args.device)
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {seed}; ± over arenas')
     width = max(8, *map(len, jobs))
@@ -525,12 +539,13 @@ def main():
                                                    ('lifted', 13))))
     if cfg.dung.on:
         print(f'\n{"droppings, each":<{width}}  {"made":>5}  {"picked up":>9}  {"taken out":>9}  {"m moved away":>12}'
-              f'  {"lying near":>10}  {"by a nest":>9}')
+              f'  {"lying near":>10}  {"by a nest":>9}  {"first trip s":>12}  {"later trips s":>13}')
         for name, r in results.items():
             du = r['dung']
             print(f'{name:<{width}}  ' + '  '.join(f'{du[k]["mean"]:{n}.2f}' for k, n in
                                                   (('made', 5), ('picked', 9), ('taken_out', 9), ('moved_away', 12)))
-                  + f'  {du["near_each"]:10.2f}  {du["near_nest_share"]:9.0%}')
+                  + f'  {du["near_each"]:10.2f}  {du["near_nest_share"]:9.0%}'
+                  + ''.join(f'  {"–" if du[k] is None else f"{du[k]:.1f}":>{n}}' for k, n in (('first_trip', 12), ('later_trip', 13))))
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

@@ -2560,3 +2560,233 @@ ended = "2026-11-01T04:11:09+11:00"
 dollars = 0.121
 note = "night toysfun2-s1 (lab 2026-11-01-night/vast-toysfun2.log, machine 144567, $0.149/h)"
 
+
+[[session]]
+provider = "vast"
+instance = 58632715
+gpu = "RTX 4060 Ti"
+cpu = "36 cores"
+started = "2026-11-01T18:36:49+11:00"
+ended = "2026-11-01T19:33:05+11:00"
+dollars = 0.131
+note = "slow (lab 2026-11-02-slow/pod.log, machine 148242, $0.120/h; 3.9 GB down at $0.003/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58639918
+gpu = "RTX A4000"
+cpu = "16 cores"
+started = "2026-11-01T20:03:39+11:00"
+ended = "2026-11-01T20:49:40+11:00"
+dollars = 0.085
+note = "drift-size (lab 2026-11-01-drift/pod-size.log, machine 69147, $0.087/h; 3.7 GB down at $0.004/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58639950
+gpu = "RTX A4000"
+cpu = "16 cores"
+started = "2026-11-01T20:03:59+11:00"
+ended = "2026-11-01T20:50:43+11:00"
+dollars = 0.240
+note = "drift-lean (lab 2026-11-01-drift/pod-lean.log, machine 151510, $0.107/h; 3.8 GB down at $0.039/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58640865
+gpu = "RTX A4000"
+cpu = "16 cores"
+started = "2026-11-01T20:15:02+11:00"
+ended = "2026-11-01T20:50:22+11:00"
+dollars = 0.225
+note = "half (lab 2026-11-01-half/pod.log, machine 150258, $0.120/h; 3.8 GB down at $0.039/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58642585
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T20:35:27+11:00"
+ended = "2026-11-01T20:44:34+11:00"
+dollars = 0.050
+note = "sight-a (lab 2026-11-01-sight/failed-1/pod-a.log, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58642604
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T20:35:42+11:00"
+ended = "2026-11-01T20:44:09+11:00"
+dollars = 0.048
+note = "sight-b (lab 2026-11-01-sight/failed-1/pod-b.log, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58643331
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T20:45:05+11:00"
+ended = "2026-11-01T20:50:18+11:00"
+dollars = 0.040
+note = "sight-a (lab 2026-11-01-sight/failed-2/pod-a.log, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58643351
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T20:45:19+11:00"
+ended = "2026-11-01T20:50:32+11:00"
+dollars = 0.040
+note = "sight-b (lab 2026-11-01-sight/failed-2/pod-b.log, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58644678
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T21:03:25+11:00"
+ended = "2026-11-01T22:01:51+11:00"
+dollars = 0.187
+note = "sight-a (lab 2026-11-01-sight/pod-a.log, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58644698
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T21:03:37+11:00"
+ended = "2026-11-01T22:02:03+11:00"
+dollars = 0.187
+note = "sight-b (lab 2026-11-01-sight/pod-b.log, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58645885
+gpu = "RTX 4060 Ti"
+cpu = "16 cores"
+started = "2026-11-01T21:16:14+11:00"
+ended = "2026-11-01T22:02:15+11:00"
+dollars = 0.154
+note = "journey (lab 2026-11-01-journey/pod.log, machine 30927, $0.159/h; 3.8 GB down at $0.006/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58647940
+gpu = "RTX 4060 Ti"
+cpu = "22 cores"
+started = "2026-11-01T21:39:22+11:00"
+ended = "2026-11-01T21:49:30+11:00"
+dollars = 0.176
+note = "wide (lab 2026-11-01-wide/pod.log, machine 143899, $0.120/h; 3.9 GB down at $0.039/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58649059
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-11-01T21:52:09+11:00"
+ended = "2026-11-01T22:07:27+11:00"
+dollars = 0.022
+note = "wide2 (lab 2026-11-01-wide/failed-pod2.log, machine 35285, $0.071/h; 0.8 GB down at $0.001/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58650168
+gpu = "RTX 3060"
+cpu = "16 cores"
+started = "2026-11-01T22:06:09+11:00"
+ended = "2026-11-01T22:13:13+11:00"
+dollars = 0.011
+note = "wide2 (lab 2026-11-01-wide/pod2.log, machine 28139, $0.073/h)"
+
+[[session]]
+provider = "runpod"
+instance = "l7zrvjomn815dr"
+gpu = "RTX 4000 Ada"
+cpu = "18 cores"
+started = "2026-11-01T23:40:25+11:00"
+ended = "2026-11-01T23:40:27+11:00"
+dollars = 0.000
+note = "rp-a, the price guard's first catch: cloud ALL gave Secure at $0.28/h, ended at once (lab 2026-11-02-rp/failed/a-guard.log)"
+
+[[session]]
+provider = "runpod"
+instance = "2gxwtu29zz0cuk"
+gpu = "RTX 4000 Ada"
+cpu = "18 cores"
+started = "2026-11-01T23:40:52+11:00"
+ended = "2026-11-02T00:01:12+11:00"
+dollars = 0.095
+note = "rp-a (machine b48xrfaas4es, community $0.28/h, balance down $0.088 by then)"
+
+[[session]]
+provider = "vast"
+instance = 58655162
+gpu = "RTX A4000"
+cpu = "16.0 cores"
+started = "2026-11-01T23:06:05+11:00"
+ended = "2026-11-01T23:19:17+11:00"
+dollars = 0.036
+note = "collect (lab hosts.jsonl, machine 69147, $0.087/h; 3.8 GB down at $0.004/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58656190
+gpu = "RTX 4060 Ti"
+cpu = "16.0 cores"
+started = "2026-11-01T23:15:38+11:00"
+ended = "2026-11-01T23:42:02+11:00"
+dollars = 0.098
+note = "collect-epyc (lab hosts.jsonl, machine 30927, $0.159/h; 3.8 GB down at $0.007/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58656758
+gpu = "RTX A4000"
+cpu = "16.0 cores"
+started = "2026-11-01T23:20:32+11:00"
+ended = "2026-11-01T23:36:11+11:00"
+dollars = 0.040
+note = "wide3 (lab hosts.jsonl, machine 69147, $0.091/h; 3.7 GB down at $0.004/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58662803
+gpu = "RTX A4000"
+cpu = "28.0 cores"
+started = "2026-11-02T00:24:38+11:00"
+ended = "2026-11-02T00:30:09+11:00"
+dollars = 0.019
+note = "l2c (lab hosts.jsonl, machine 144264, $0.093/h; 3.8 GB down at $0.003/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58662835
+gpu = "RTX 3070"
+cpu = "16.0 cores"
+started = "2026-11-02T00:25:07+11:00"
+ended = "2026-11-02T00:25:07+11:00"
+dollars = 0.001
+note = "pay (lab hosts.jsonl, machine 19028, $0.000/h)"
+
+[[session]]
+provider = "vast"
+instance = 58662895
+gpu = "RTX A4000"
+cpu = "16.0 cores"
+started = "2026-11-02T00:25:55+11:00"
+ended = "2026-11-02T02:03:17+11:00"
+dollars = 0.314
+note = "pay (lab hosts.jsonl, machine 20044, $0.147/h; 3.8 GB down at $0.010/GB)"
+
+[[session]]
+provider = "vast"
+instance = 58663235
+gpu = "RTX 4060 Ti"
+cpu = "16.0 cores"
+started = "2026-11-02T00:30:18+11:00"
+ended = "2026-11-02T00:30:18+11:00"
+dollars = 0.001
+note = "l2c (lab hosts.jsonl, machine 38778, $0.000/h)"

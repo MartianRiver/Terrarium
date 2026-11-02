@@ -83,6 +83,7 @@ export class WorldView {
       scene.add(pile.root);
       if (info.midden > 0) scene.add(middenLine(nest.x, nest.y, nest.radius + info.midden));
     }
+    if (info.middenSpot) scene.add(middenLine(info.middenSpot.x, info.middenSpot.y, info.middenSpot.radius));
   }
 
   // call once per sim tick
@@ -268,7 +269,7 @@ export class WorldView {
   }
 }
 
-// the tidy nursery's line: a dropping put down past it counts as taken out
+// the tidy nursery's line: a dropping put down past it counts as taken out (or a ring round the midden's spot)
 function middenLine(x: number, y: number, r: number): THREE.Group {
   const root = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({ color: 0x6b4a2f, transparent: true, opacity: 0.55, depthWrite: false });

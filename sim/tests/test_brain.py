@@ -312,3 +312,16 @@ def test_the_coin_bonus_keeps_a_coin_from_settling_on_never():
     # aimed at one coin, the bonus leaves the others alone
     sprint = schema.ACTIONS.index('sprint')
     assert torch.allclose(dist.coin_entropy(brain.named(('sprint',))), dist.coin.entropy()[..., sprint])
+
+
+def test_sense_skips_the_last_layers_other_tokens_and_says_the_same():
+    torch.manual_seed(3)
+    for width, layers, heads in ((64, 2, 4), (128, 2, 8), (32, 1, 4)):
+        b = Brain(width, layers, heads).eval()
+        n, s = 5, b.schema
+        me, rays = torch.randn(n, len(s['self'])), torch.randn(n, 16, len(s['ray']))
+        kinds = torch.randint(0, len(s['kinds']), (n, 16))
+        tokens = torch.cat([b.me(me)[:, None], b.kind(kinds) + b.ray(rays)], 1)
+        with torch.no_grad():
+            whole = b.norm(b.encoder(tokens)[:, 0])
+            assert torch.allclose(b.sense(me, kinds, rays), whole, atol=1e-5)
