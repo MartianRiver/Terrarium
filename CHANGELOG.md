@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The pod manager counts what a pod's setup download costs: Vast bills it per GB on top of the hourly price, which made a 3060's half hour cost three times its price, so offers dear to download are skipped and the setup goes into the day's spend. A pod that fails two jobs without finishing one is destroyed and its machine skipped for a day; the coordinator tells the manager how many jobs each pod has failed and finished.
+
 The pod manager asks RunPod what's in stock before renting, in the Community and Secure clouds both, and rents the cheapest card under the price, saying why it passed over each of the others; it used to try only the Community cloud, card by card, learning the price only once a pod was rented and destroying one over the ceiling.
 
 The queue can rent its own pods: `terrarium.pods`, the pod manager, rents a Vast or RunPod pod when `on = "rented"` jobs wait, under a daily spend cap, and destroys one that never starts, goes quiet, sits idle or reaches its hours, revoking its token and handing any job it held straight back. A pod sets itself up from a start script, no ssh, with a token of its own that dies with it. The coordinator gets a `pods` role for it, which only sees that backlog and makes and revokes its pods' tokens (12 h at most); tokens can now expire.
