@@ -171,6 +171,23 @@ A worker claims a job for five minutes and renews the claim every minute, throug
 
 The queue is closed: every machine has a token I made for its handle, and the handle is its name on the board. Someone offering a machine asks by issue, email or Instagram, and I make the token on the coordinator's admin page (`/api/admin`), which only I can sign in to, with Google: the coordinator checks the account's verified address against a list it's given (`ADMIN_EMAILS`) and keeps nothing about it, not even the address. A token is shown once. A lost one gets a new one and the old one stops working; one that's misused is revoked. The page also lists every machine with what it is (GPU and its memory, CPU, threads, OS, memory), its worker version (so I can tell who's due a `git pull`), what it's doing, and how its jobs ended: done, lost (it went quiet, so its lease ran out), failed or given back (a lent machine does that by design, when its owner comes back). Sign-in uses Google's code flow with PKCE, a state tied to the browser that started it, and a session that lives 12 hours in the coordinator's memory, in a cookie scripts can't read and other sites can't send. Its settings come from the environment: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS` and `PUBLIC_URL`. On my Mac, `python -m terrarium.coordinator token NAME --role donor` still works.
 
+## Rented pods
+
+`on = "rented"` jobs can rent their own machines. The pod manager (`terrarium.pods`) runs on a small box of its own, on a bare python with nothing installed, and once a minute:
+
+- asks the coordinator how many `on = "rented"` jobs are waiting and what each of its pods last said, with a token of role `pods`, which can see that and make and revoke its pods' tokens, and nothing else: it can't add, sign, read or cancel jobs;
+- rents a pod on Vast, or RunPod if Vast has nothing under the price, when more jobs wait than its pods can take, as long as the last 24 hours' spend plus the whole of the new pod's life stays under the day's cap;
+- destroys a pod that hasn't said hello within 15 minutes, has gone quiet for 10, has sat 5 minutes with nothing to do and nothing waiting, or has reached its hours. Its token is revoked with it, and any job it held goes back in the queue at once instead of when its lease runs out;
+- destroys any pod of its own that its ledger doesn't know (one left over after a crash), and writes down every pod with its price, when it came and went, why, and the commit it ran (SQLite), plus a status file for the box's monitoring.
+
+A pod sets itself up from a start script, with no ssh: uv, the commit the manager picked when renting it (the newest on `next`), and the worker with a token of its own that dies after the pod's hours, so a token left on a host doesn't outlive the rental. If the worker ends, or the hours run out, the pod stops itself with the provider's own key for that one pod. Only pods named `terrarium-q-…` are touched, so pods I rent by hand are left alone.
+
+```
+python3 -m terrarium.pods --state DIR --status FILE [--once] [--dry-run]
+```
+
+Keys come from systemd's credentials (`coordinator_token`, `vast_api_key`, `runpod_api_key`), never the environment. Settings are `DIR/pods.toml`: `cap_usd_day`, `max_pods`, `max_dph`, `hours`, the GPUs to ask each provider for, and the minutes above; with no file it rents nothing. `--dry-run` decides and logs but rents, destroys and revokes nothing.
+
 ## Not built yet
 
-`promote` re-scoring a donated brain on my machine instead of trusting the run's `evals.json`, renting GPUs automatically when the queue is long (with daily, weekly and monthly spend caps), a queue page next to the runs page, and a container for Unraid. The coordinator runs at `terrarium-jobs.martianriver.com`.
+`promote` re-scoring a donated brain on my machine instead of trusting the run's `evals.json`, weekly and monthly spend caps for the pods, jobs that add jobs (a population of runs that copies its best, without my Mac), a queue page next to the runs page, and a container for Unraid. The coordinator runs at `terrarium-jobs.martianriver.com`.

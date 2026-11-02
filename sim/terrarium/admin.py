@@ -39,7 +39,7 @@ LOGIN_MINUTES = 10
 FORM_LIMIT = 4096
 # sign-ins started and not finished, at most: each is a few bytes, but /start needs no token
 PENDING = 1000
-ROLES = ('donor', 'trusted', 'rented')
+ROLES = ('donor', 'trusted', 'rented', 'pods')
 SESSION, LOGIN = 'tj_admin', 'tj_login'
 HEADERS = {'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY',
            'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "

@@ -8,6 +8,10 @@
 #            the ones kept to rented machines (on = "rented")
 #   donor    someone else's machine: only jobs on public code, and only the
 #            blobs of the job it holds right now
+#   pods     the pod manager (pods.py): sees how many jobs wait for a rented
+#            machine, and makes and revokes the tokens of its own pods (rented,
+#            named pod-…, 12 h at most). Nothing else, so the box it runs on
+#            never holds a token that could add or sign jobs
 #
 # /api/health and /api/board (what each machine has done, board.py) need no token. /api/admin is River's
 # page for tokens and machines, signed in with Google (admin.py).
@@ -33,7 +37,9 @@ from .store import Full, Gone, Store, sha256, write_atomic
 log = Logger('coordinator')
 
 PORT = 5194
-ROLES = ('admin', *jobs.MACHINES)
+ROLES = ('admin', *jobs.MACHINES, 'pods')
+# a pod's token dies with it, or after this long whatever happens
+POD_HOURS = 12
 LIMITS = {'blob': 16_000_000, 'result': jobs.RESULT_LIMIT, 'json': 64_000}
 # requests a minute per machine token, and how many it may make at once; a worker makes a few a minute
 RATE, BURST = 60, 60
@@ -58,16 +64,17 @@ class Tokens:
 
     def who(self, token: str) -> dict | None:
         # only hashes are kept, so a copy of the state folder doesn't hand out tokens
-        return self.load().get(sha256(token.encode())) if token else None
+        who = self.load().get(sha256(token.encode())) if token else None
+        return None if who is None or who.get('until', float('inf')) < time.time() else who
 
-    def add(self, name: str, role: str) -> str:
+    def add(self, name: str, role: str, until: float | None = None) -> str:
         if role not in ROLES or not jobs.NAME.match(name):
             raise ValueError(f'bad name or role: {name!r} {role!r}')
         tokens = self.load()
         if any(t['name'] == name for t in tokens.values()):
             raise ValueError(f'{name} already has a token; revoke it first')
         token = secrets.token_urlsafe(32)
-        tokens[sha256(token.encode())] = {'name': name, 'role': role}
+        tokens[sha256(token.encode())] = {'name': name, 'role': role} | ({'until': until} if until else {})
         self.path.parent.mkdir(parents=True, exist_ok=True)
         write_atomic(self.path, (json.dumps(tokens, indent=1) + '\n').encode())
         self.path.chmod(0o600)
@@ -136,6 +143,41 @@ class Queue:
             self.store.add(spec, sig)  # type: ignore[arg-type]
         except (ValueError, KeyError) as e:
             raise Refused(400, str(e))
+
+    def backlog(self) -> dict:
+        """What the pod manager needs to decide: jobs waiting that only a rented machine will take, and what each of
+        its pods is doing."""
+        with self.store.lock:
+            self.store.expire(time.time())
+        every = self.store.all()
+        waiting = [j for j in every if j['state'] == 'pending' and j['spec'].get('on') == 'rented'
+                   and self.store.ready(j) and not self.store.blocked(j)]
+        pods = {t['name']: t.get('until') for t in self.tokens.load().values() if t['name'].startswith('pod-')}
+        with self.lock:
+            seen = {name: self.workers.get(name, {}).get('seen') for name in pods}
+        held = {j['worker']: j['spec']['id'] for j in every if j['state'] == 'running'}
+        return {'waiting': len(waiting), 'chained': sum(1 for j in every if j['state'] == 'pending'
+                                                         and j['spec'].get('on') == 'rented' and not self.store.ready(j)),
+                'pods': {name: {'until': until, 'seen': seen[name], 'job': held.get(name)} for name, until in pods.items()}}
+
+    def pod_token(self, name: str, hours: float) -> dict:
+        if not name.startswith('pod-') or not jobs.NAME.match(name):
+            raise Refused(400, 'a pod is named pod-…')
+        if not 0 < hours <= POD_HOURS:
+            raise Refused(400, f'a pod token lasts up to {POD_HOURS} h')
+        until = time.time() + hours * 3600
+        try:
+            return {'token': self.tokens.add(name, 'rented', until), 'until': until}
+        except ValueError as e:
+            raise Refused(409, str(e))
+
+    def drop_pod(self, name: str) -> list[str]:
+        """A pod that's gone: its token goes, and so does any job it held, back to the queue at once rather than
+        when its lease runs out. Only pods' tokens."""
+        if not name.startswith('pod-'):
+            raise Refused(403, 'only a pod-… token')
+        self.tokens.revoke(name)
+        return self.store.restarted(name)
 
     def list(self) -> list[dict]:
         with self.store.lock:
@@ -206,7 +248,7 @@ def handler(queue: Queue, env=None):
                 self.json({'error': 'something broke on the coordinator'}, 500)
 
         def dispatch(self, method: str, parts: list[str], who: dict):
-            admin, worker = who['role'] == 'admin', who['role'] in ROLES
+            admin, worker = who['role'] == 'admin', who['role'] != 'pods'
             match method, parts:
                 case ('GET' | 'HEAD'), ['api', 'blobs', digest] if worker:
                     if not queue.may_read(who, digest):
@@ -260,6 +302,13 @@ def handler(queue: Queue, env=None):
                 case 'POST', ['api', 'jobs', id, 'return'] if worker:
                     queue.store.give_back(id, who['name'])
                     self.json({'ok': True})
+                case 'GET', ['api', 'pods'] if who['role'] in ('pods', 'admin'):
+                    self.json(queue.backlog())
+                case 'POST', ['api', 'pods', name] if who['role'] == 'pods':
+                    hours = json.loads(self.body('json') or b'{}').get('hours', POD_HOURS)
+                    self.json(queue.pod_token(name, float(hours)))
+                case 'POST', ['api', 'pods', name, 'gone'] if who['role'] == 'pods':
+                    self.json({'returned': queue.drop_pod(name)})
                 case 'POST', ['api', 'jobs', id, 'fail'] if worker:
                     error = json.loads(self.body('json') or b'{}').get('error', '')
                     queue.store.fail(id, who['name'], str(error))
