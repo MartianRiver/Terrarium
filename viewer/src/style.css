@@ -836,13 +836,13 @@ body {
 
 /* the site's /watch/ with nothing asked for: what there is to watch (picker.ts) */
 #picker {
-  width: min(560px, calc(100vw - 32px));
+  width: min(600px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   box-sizing: border-box;
   padding: 18px 20px 14px;
   border: 0;
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.94);
+  background: rgb(255 255 255 / 0.95);
   color: #2c3a33;
   font: inherit;
   outline: none;
@@ -853,37 +853,94 @@ body {
 }
 
 #picker h2 {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 19px;
 }
 
-#picker ol {
+#picker ol,
+#picker ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-#picker section + section {
-  margin-top: 8px;
-  padding-top: 10px;
-  border-top: 1px solid rgb(44 58 51 / 0.12);
-}
-
 #picker h3 {
-  margin: 4px 10px 0;
+  display: inline;
+  margin: 0;
   font-size: 13px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #3f7a38;
 }
 
+.picker-live {
+  margin: 0 -8px 10px;
+  padding: 10px 8px 6px;
+  border-radius: 12px;
+  background: rgb(95 174 79 / 0.1);
+}
+
+.picker-live h3 {
+  margin-left: 10px;
+}
+
 .picker-about {
-  margin: 2px 10px 4px;
+  display: block;
+  margin: 2px 10px 6px;
   font-size: 12px;
   opacity: 0.7;
 }
 
-#picker li a {
+#picker details {
+  border-top: 1px solid rgb(44 58 51 / 0.12);
+}
+
+#picker summary {
+  padding: 10px 10px 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+#picker summary::-webkit-details-marker {
+  display: none;
+}
+
+#picker summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 14px;
+  margin-left: -4px;
+  color: #3f7a38;
+  transition: transform 0.15s;
+}
+
+#picker details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+#picker summary .picker-about {
+  margin: 2px 0 4px 10px;
+}
+
+.picker-count {
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.picker-all {
+  display: inline-block;
+  margin: 0 10px 6px;
+  font-size: 13px;
+  color: #3f7a38;
+}
+
+.picker-card + .picker-card {
+  border-top: 1px dashed rgb(44 58 51 / 0.1);
+}
+
+#picker .picker-head,
+.picker-rows a {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 2px 10px;
@@ -893,13 +950,29 @@ body {
   text-decoration: none;
 }
 
-#picker li a:hover,
-#picker li a:focus-visible {
+#picker a:hover,
+#picker a:focus-visible {
   background: rgb(95 174 79 / 0.14);
 }
 
-#picker li b {
+.picker-head b {
   font-size: 15px;
+}
+
+/* a card's setups: indented under it, each its own link */
+.picker-rows {
+  margin: -4px 0 6px 14px !important;
+  border-left: 2px solid rgb(95 174 79 / 0.3);
+}
+
+.picker-rows a {
+  padding: 6px 10px;
+  border-radius: 0 10px 10px 0;
+}
+
+.picker-rows b {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .picker-tag {
@@ -907,7 +980,7 @@ body {
   align-self: start;
   padding: 1px 7px;
   border-radius: 9px;
-  background: rgb(95 174 79 / 0.18);
+  background: rgb(44 58 51 / 0.08);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -928,27 +1001,12 @@ body {
   animation: picker-pulse 1.6s ease-in-out infinite;
 }
 
-.picker-tag.held {
-  background: rgb(44 58 51 / 0.1);
-  color: rgb(44 58 51 / 0.75);
-}
-
 @keyframes picker-pulse {
   50% { opacity: 0.3; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .picker-tag.live::before { animation: none; }
-}
-
-.picker-key {
-  margin: -4px 0 10px;
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.picker-key .picker-tag {
-  margin-right: 2px;
 }
 
 .picker-text {
@@ -961,38 +1019,7 @@ body {
 .picker-note {
   grid-column: 1 / -1;
   font-size: 12px;
-  opacity: 0.55;
-}
-
-.picker-variants {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: -2px 10px 8px;
-}
-
-.picker-variants a {
-  padding: 3px 9px;
-  border-radius: 9px;
-  background: rgb(44 58 51 / 0.08);
-  color: inherit;
-  font-size: 12px;
-  text-decoration: none;
-}
-
-.picker-variants a.live::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 5px;
-  border-radius: 50%;
-  background: #3f9a3a;
-}
-
-.picker-variants a:hover,
-.picker-variants a:focus-visible {
-  background: rgb(95 174 79 / 0.2);
+  opacity: 0.6;
 }
 
 .picker-foot {

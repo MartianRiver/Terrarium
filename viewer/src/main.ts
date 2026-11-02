@@ -332,7 +332,9 @@ function boot() {
       const game = params.get('game')?.split(',');
       const items = game ? read.items.filter((i) => game.includes(i.game ?? '')) : read.items;
       if (!items.length) throw new ReplayError('nothing on the channel yet');
-      const place = (items.findIndex((i) => i.replay === showing) + 1) % items.length;
+      // &start=<replay> opens on that one first (the picker's link to one run), then goes on in turn
+      const start = showing ? -1 : items.findIndex((i) => i.replay === params.get('start'));
+      const place = start >= 0 ? start : (items.findIndex((i) => i.replay === showing) + 1) % items.length;
       const item = items[place];
       const url = new URL(item.replay, index);
       if (url.origin !== location.origin) throw new ReplayError(`won’t fetch a replay from another site (${url.origin})`);
