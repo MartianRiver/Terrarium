@@ -255,6 +255,23 @@ spin = false
 again = 0.0
 flash = 0.0
 
+[jump]
+# a yes to jump while standing lifts a Terrikin this high (m) and gravity brings it down; each jump costs `energy`.
+# 0 is off
+height = 0.0
+energy = 0.0
+
+[tree]
+# a nursery game for jumping: block `trunk` is a tree, every apple hangs `near`-`far` m from its middle and `reach` m
+# above what a Terrikin standing under it can get to, and each one taken is worth `points` (0 is off); each jump
+# costs `hop` points
+trunk = 0
+near = 0.0
+far = 0.0
+reach = 0.0
+points = 0.0
+hop = 0.0
+
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
 friction = 1.2

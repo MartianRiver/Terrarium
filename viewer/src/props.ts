@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { dropGeo, jellyMat } from './jelly';
+import { REACH } from './tree';
 import type { BlockState, FoodKind, FoodState } from './world';
 
 export const berryGeo = new THREE.SphereGeometry(0.11, 20, 14);
@@ -46,6 +47,7 @@ function buildFood(kind: FoodKind): THREE.Group {
     g.add(drop);
     return g;
   }
+  if (kind === 'apple') return buildApple(g);
   const offsets: [number, number][] = [[0, 0], [0.13, 0.07], [0.04, -0.13]];
   for (const [x, z] of offsets) {
     const b = new THREE.Mesh(berryGeo, berryMat);
@@ -60,6 +62,29 @@ function buildFood(kind: FoodKind): THREE.Group {
   return g;
 }
 
+const appleGeo = new THREE.SphereGeometry(0.13, 20, 14).scale(1, 0.92, 1);
+const appleMat = new THREE.MeshPhysicalMaterial({ color: 0xe23b2e, roughness: 0.35, clearcoat: 0.6, sheen: 0.3 });
+const stalkGeo = new THREE.CylinderGeometry(0.012, 0.016, 0.1, 5);
+
+// hanging from its stalk, its bottom at the group's origin
+function buildApple(g: THREE.Group): THREE.Group {
+  const apple = new THREE.Mesh(appleGeo, appleMat);
+  apple.position.y = 0.12;
+  apple.castShadow = true;
+  const stalk = new THREE.Mesh(stalkGeo, leafMat);
+  stalk.position.y = 0.27;
+  const leaf = new THREE.Mesh(leafGeo, leafMat);
+  leaf.position.set(0.06, 0.28, 0);
+  leaf.rotation.set(0.2, 0.4, -0.5);
+  g.add(apple, stalk, leaf);
+  return g;
+}
+
+// an apple hangs over a standing Terrikin's head; everything else lies on the ground
+function rise(s: FoodState): number {
+  return s.kind === 'apple' ? REACH + s.z : 0;
+}
+
 export class FoodView {
   readonly root: THREE.Group;
   private age = 0;
@@ -71,7 +96,7 @@ export class FoodView {
 
   constructor(readonly state: FoodState) {
     this.root = buildFood(state.kind);
-    this.root.position.set(state.x, 0, state.y);
+    this.root.position.set(state.x, rise(state), state.y);
     this.root.rotation.y = this.seed;
     this.root.scale.setScalar(0.001);
     this.sync(state);
@@ -83,7 +108,7 @@ export class FoodView {
 
   // peekaboo moves its berry where someone can see it, and hides it a second later
   sync(s: FoodState) {
-    this.root.position.set(s.x, 0, s.y);
+    this.root.position.set(s.x, rise(s), s.y);
     if (s.hidden === this.hidden) return;
     this.hidden = s.hidden;
     this.root.traverse((o) => {

@@ -4,7 +4,7 @@ import type { CreatureState, Frame } from '../src/world';
 
 function blob(id: number, x: number, y: number, extra: Partial<CreatureState> = {}): CreatureState {
   return { id, colony: 0, x, y, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0,
-    nectar: 0, sprinting: 0, load: 0, young: 1, stamina: 1, dung: 0, ...extra };
+    nectar: 0, sprinting: 0, load: 0, young: 1, stamina: 1, dung: 0, z: 0, ...extra };
 }
 
 function frame(creatures: CreatureState[], food: Frame['food'] = []): Frame {
@@ -46,7 +46,7 @@ describe('the action camera', () => {
   });
 
   it('in peekaboo, watches the berry and whoever is nearest it', () => {
-    const shot = new Director().shot(frame([blob(1, 0, 0), blob(2, 8, 8)], [{ id: 9, kind: 'common', x: 2, y: 0, hidden: true }]), 0.1)!;
+    const shot = new Director().shot(frame([blob(1, 0, 0), blob(2, 8, 8)], [{ id: 9, kind: 'common', x: 2, y: 0, hidden: true, z: 0 }]), 0.1)!;
     expect(shot.spread).toBeCloseTo(2);
     expect(shot.from).toBeCloseTo(0);
   });

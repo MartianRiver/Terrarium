@@ -29,7 +29,7 @@ describe('cues in the sample replays', () => {
 
 const blob = (id: number, x: number, y: number, more: Partial<CreatureState> = {}): CreatureState => ({
   id, colony: 0, x, y, heading: 0, speed: 0, size: 1, energy: 0.8, signal: -1,
-  carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1, dung: 0, ...more,
+  carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1, dung: 0, z: 0, ...more,
 });
 const frame = (tick: number, creatures: CreatureState[], food: Frame['food'] = []): Frame =>
   ({ tick, creatures, food, blocks: [], stores: [], light: 1, eggs: [], flowers: [], flags: [] });

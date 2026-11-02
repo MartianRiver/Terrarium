@@ -65,7 +65,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
                      if world.seek else (np.zeros(store.shape),) * 2),
                    *flag_senses(world, store.shape), world.stamina, *hearing.heard(world),
-                   *dung_senses(world, store.shape)], -1)
+                   *dung_senses(world, store.shape), world.z / max(cfg.jump.height, 1e-9)], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape
@@ -135,6 +135,8 @@ class Forage:
                 play += w.peek.points(w.alive)
             if w.dung:
                 play += w.dung.points(w.alive)
+            if w.tree:
+                play += w.tree.points(w.alive)
             if self.fun:
                 fun += self.fun.step(actions)
             if r.snug or r.warm:

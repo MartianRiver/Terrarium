@@ -86,6 +86,7 @@ function readInfo(o: Obj): WorldInfo {
     })),
     midden: o.midden === undefined ? 0 : num(o, 'midden', where),
     ...(o.middenSpot === undefined ? {} : { middenSpot: spot(o.middenSpot, `${where}.middenSpot`) }),
+    tree: o.tree === undefined ? null : int(o, 'tree', where),
   };
 }
 
@@ -106,11 +107,13 @@ function readFrame(o: Obj, where: string): Frame {
         young: c.young === undefined ? 0 : num(c, 'young', w),
         stamina: c.stamina === undefined ? 1 : num(c, 'stamina', w),
         dung: c.dung === undefined ? 0 : int(c, 'dung', w),
+        z: c.z === undefined ? 0 : num(c, 'z', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {
-      if (f.kind !== 'common' && f.kind !== 'jelly') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
-      return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w), hidden: f.hidden === undefined ? false : int(f, 'hidden', w) > 0 };
+      if (f.kind !== 'common' && f.kind !== 'jelly' && f.kind !== 'apple') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
+      return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w), hidden: f.hidden === undefined ? false : int(f, 'hidden', w) > 0,
+        z: f.z === undefined ? 0 : num(f, 'z', w) };
     }),
     blocks: list(o, 'blocks', where, (b, w): BlockState => ({
       id: int(b, 'id', w), x: num(b, 'x', w), y: num(b, 'y', w), angle: num(b, 'angle', w), w: num(b, 'w', w), h: num(b, 'h', w),

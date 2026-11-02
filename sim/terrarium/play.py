@@ -27,6 +27,7 @@ NEEDS = {
     'sprint': lambda c: c.sprint.on,
     'grab': lambda c: c.grab.on,
     'carry': lambda c: c.carry.on,
+    'jump': lambda c: c.jump.on,
 }
 # points for a second alive, a berry picked up, and a food brought home to its own nest
 POINTS = {'second': 1, 'berry': 10, 'home': 20}

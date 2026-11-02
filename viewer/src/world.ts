@@ -6,7 +6,8 @@ export const SIGNAL_COUNT = 5;
 export const SIGNAL_OFF = -1;
 
 // jelly is what a Terrikin leaves when it unloads its crop outside a nest (0.3 on)
-export type FoodKind = 'common' | 'jelly';
+// and an apple grows on a tree, hanging up out of reach ([tree])
+export type FoodKind = 'common' | 'jelly' | 'apple';
 
 export interface CreatureState {
   id: number;
@@ -26,6 +27,7 @@ export interface CreatureState {
   young: number; // share of its youth left, 1 just hatched to 0 grown; 0 in worlds without young
   stamina: number; // 0..1, how much go it has left before it tires ([tired]); 1 in worlds without it
   dung: number; // 1 while it carries a dropping in its jaws; 0 in worlds without droppings
+  z: number; // metres off the ground mid-jump ([jump]); 0 in worlds without jumping
 }
 
 export interface FoodState {
@@ -34,6 +36,7 @@ export interface FoodState {
   x: number;
   y: number;
   hidden: boolean; // peekaboo's berry, out of the Terrikins' sight but still there
+  z: number; // an apple: metres above a standing Terrikin's reach it hangs; 0 for food on the ground
 }
 
 export interface BlockState {
@@ -62,6 +65,7 @@ export interface WorldInfo {
   nests: NestInfo[];
   midden: number; // metres past a nest's edge a dropping counts as taken out ([dung] midden); 0 without
   middenSpot?: { x: number; y: number; radius: number }; // or the spot it has to go on ([dung] spot), this episode's
+  tree: number | null; // the id of the block that is an apple tree's trunk ([tree]); null without
 }
 
 // jelly in a colony's store, in food unloaded
