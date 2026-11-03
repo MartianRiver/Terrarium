@@ -1017,6 +1017,18 @@ body {
   border-top: none;
 }
 
+/* a nursery's older stages and those to come, folded away under what's going on now */
+#picker .picker-fold {
+  border-top: none;
+  margin-left: 14px;
+}
+
+#picker .picker-fold > summary {
+  padding: 5px 10px;
+  font-size: 13px;
+  color: #5b6b57;
+}
+
 #picker .picker-stage summary,
 .picker-stage .picker-off {
   display: grid;
