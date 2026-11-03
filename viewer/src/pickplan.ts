@@ -27,6 +27,8 @@ export interface Game {
   name: string; kind: string; goal: string; setup?: string; training?: boolean; finished?: string;
   family?: string; variant?: string; group?: Group; question?: string; about?: string; result?: string;
   nursery?: string; order?: number; planned?: boolean; status?: Status;
+  // a nursery's stage: what it has to show before the next one starts; now: where the nursery is at, the same on each stage
+  pass?: string; now?: string;
 }
 interface Replay { label: string; replay: string; about?: string }
 export interface Item {
@@ -50,8 +52,9 @@ export interface Chip { label: string; href: string; about?: string }
 // recent: finished in the last 12 hours, so it's shown with what's training rather than folded away with the older ones
 export interface Stage {
   order: number; title: string; text: string; status: Status; note: string; took?: string; chips: Chip[]; earlier: Chip[]; recent: boolean;
+  pass?: string;
 }
-export interface Nursery { status: Status; count: string; stages: Stage[] }
+export interface Nursery { status: Status; count: string; stages: Stage[]; now?: string }
 export interface Section { key: string; title: string; text: string; cards: Card[]; all?: string }
 
 export function sentence(text = '') {
@@ -144,13 +147,14 @@ function nursery(keys: string[], games: Record<string, Game>, items: Item[], tra
       chips: item ? (item.stages ?? [{ label: 'now', replay: item.replay }]).map(chip) : [],
       earlier: item ? (item.earlier ?? []).map(chip) : [],
       recent: !!g.finished && now - new Date(g.finished).getTime() < RECENT_MS,
+      pass: g.pass,
     };
   });
   const n = (s: Status) => stages.filter((x) => x.status === s).length;
   const status: Status = n('training') ? 'training' : n('planned') === stages.length ? 'planned' : n('held') || n('planned') ? 'held' : 'done';
   const count = [`${stages.length} stages`, n('training') && `${n('training')} training`, n('held') && `${n('held')} on hold`,
     n('planned') && `${n('planned')} to come`].filter(Boolean).join(' · ');
-  return { status, count, stages };
+  return { status, count, stages, now: keys.map((k) => games[k].now).find(Boolean) };
 }
 
 function gallerySections(g: Gallery, now: number) {

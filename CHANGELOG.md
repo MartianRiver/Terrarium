@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Each nursery in the picker says where it's at (what's training, what the last stage showed, what comes next), and each stage says when it moves on to the next ("Moves on when: …"), taken from the channel's index (`now` per nursery, `pass` per stage). The stages to come show open, so the plan is in sight.
+
 The picker's top list is what's training now and the newest to finish in the last 12 hours, six at most, so the groups below show without a long scroll. Inside a nursery, the stages training, on hold or finished in the last 12 hours show straight away, with the older ones folded into "earlier stages" and the planned ones into "to come".
 
 The watch picker folds each nursery into its stages, numbered in the order they're trained: each says whether it's finished, training now, on hold or not yet in training, and opens to its checkpoints (random moves, the brain it started from, partway, now) and to the earlier stages' brains playing its world, so you can see what each step taught. Each stage also says what its samples mean: how long the babies played, and how long the learning took and where ("4.6 days of play, learned in 17 min on a rented A40"), which the channel card shows too. A watch link can open on any of those replays (`&at=`). The channel says which nursery and stage each game is (`nursery`, `order`, `status`, `took`, `earlier`).
