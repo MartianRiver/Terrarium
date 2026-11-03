@@ -51,6 +51,8 @@ HOME = jobs.HOME / 'worker'
 PORT = 5191
 POLL = 30
 BEAT = 60
+# the run so far goes up this often while training, so the channel can show a run before it's done
+PEEK = 900
 VERSION = 8
 
 
@@ -108,6 +110,7 @@ class Task:
         self.started = time.time()
         self.paused_at: float | None = None
         self.paused = 0.0
+        self.peeked = time.time()
 
     def progress(self) -> dict:
         p = {'state': self.state, 'reason': self.reason, 'samples': 0, 'samples_per_second': None}
@@ -140,6 +143,7 @@ class Worker:
                  rules: machine.Rules = machine.Rules.anytime(), watch: machine.Watch | None = None):
         self.client, self.home, self.slots, self.trusted = client, Path(home), slots, trusted
         self.paused, self.draining, self.stopping = paused, False, threading.Event()
+        self.peeks = True
         self.rules, self.watch = rules, watch or machine.Watch(rules)
         self.awake = machine.Awake()
         self.verdict = machine.Verdict('go', '')
@@ -238,6 +242,23 @@ class Worker:
                         machine.kill(task.proc.pid)
             except (urllib.error.URLError, OSError) as e:
                 log.warn('beat failed', id=task.id, error=str(e))
+            if self.peeks and task.state == 'training' and task.run and time.time() - task.peeked >= PEEK:
+                self.peek(task)
+
+    def peek(self, task: Task):
+        task.peeked = time.time()
+        assert task.run
+        try:
+            status, body = self.client.call('PUT', f'/api/jobs/{task.id}/peek', peek(task.run))
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            log.warn('peek not sent', id=task.id, error=str(e))
+            return
+        if status == 404:
+            # a coordinator from before peeks: stop asking until this worker restarts
+            log.warn('coordinator takes no peeks', id=task.id)
+            self.peeks = False
+        elif status != 200:
+            log.warn('peek refused', id=task.id, status=status, body=body[:200])
 
     def stop(self):
         """Hand every unfinished job back and stop; a job given back doesn't count against it."""
@@ -457,6 +478,27 @@ class Worker:
 
 def tail(path: Path, lines: int = 40) -> str:
     return '\n'.join(path.read_text(errors='replace').splitlines()[-lines:]) if path.exists() else ''
+
+
+def peek(run: Path, limit: int = jobs.PEEK_LIMIT) -> bytes:
+    """The run so far as a tar.gz: run.json, metrics and its newest checkpoint, with the ones nearest a quarter and
+    half the way while they fit. A checkpoint written in the last few seconds may be half written, so it waits."""
+    checkpoints = [c for c in sorted((run / 'checkpoints').glob('*.pt')) if time.time() - c.stat().st_mtime > 10]
+    if not checkpoints:
+        raise ValueError('no checkpoint yet')
+    newest = checkpoints[-1]
+    near = {min(checkpoints, key=lambda c: abs(int(c.stem) - share * int(newest.stem))) for share in (0.25, 0.5)}
+    for files in (sorted(near | {newest}), [newest]):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+            for name in ('run.json', 'metrics.jsonl'):
+                if (run / name).exists():
+                    tar.add(run / name, arcname=f'{run.name}/{name}')
+            for c in files:
+                tar.add(c, arcname=f'{run.name}/checkpoints/{c.name}')
+        if len(buf.getvalue()) <= limit:
+            return buf.getvalue()
+    raise ValueError(f'over {limit} bytes with one checkpoint')
 
 
 def pack(run: Path, instance: int | None = None, paused: float = 0, limit: int = jobs.RESULT_LIMIT,

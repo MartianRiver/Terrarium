@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tarfile
 import threading
+import time
 import tomllib
 
 import pytest
@@ -355,6 +356,49 @@ def test_a_donor_gets_public_jobs_and_only_their_blobs(server, tmp_path, monkeyp
     runs = tmp_path / 'runs'
     [path] = jobs.sync(c['admin'], runs)
     assert (path / 'evals.json').exists() and jobs.sync(c['admin'], runs) == []
+
+
+def test_a_running_job_shows_its_run_so_far_until_it_ends(server, tmp_path):
+    httpd, c = server
+    upload(c['admin'], spec('d' * 12, trusted=True))
+    c['trusted'].json('POST', '/api/claim', {})
+    name = f'20261103-120000-nddd-{"d" * 12}'
+    assert c['lab'].call('GET', f'/api/jobs/{"d" * 12}/peek')[0] == 404
+    assert c['rented'].call('PUT', f'/api/jobs/{"d" * 12}/peek', result(name))[0] == 410
+    c['trusted'].json('PUT', f'/api/jobs/{"d" * 12}/peek', result(name, weights=b'halfway'))
+    assert c['donor'].call('GET', f'/api/jobs/{"d" * 12}/peek')[0] == 404
+    [path] = jobs.peeks(c['lab'], tmp_path / 'peeks')
+    assert (path / 'checkpoints' / '00000000064.pt').read_bytes() == b'halfway'
+    c['trusted'].json('PUT', f'/api/jobs/{"d" * 12}/result', result(name))
+    assert c['lab'].call('GET', f'/api/jobs/{"d" * 12}/peek')[0] == 404
+
+
+def test_the_lab_token_manages_jobs_but_never_works_them(server):
+    httpd, c = server
+    upload(c['lab'], spec('e' * 12, trusted=True))
+    assert [j['spec']['id'] for j in c['lab'].json('GET', '/api/jobs')] == ['e' * 12]
+    assert c['lab'].call('GET', '/api/pods')[0] == 200
+    assert c['lab'].call('POST', '/api/claim', {})[0] == 404
+    assert c['lab'].call('PUT', f'/api/jobs/{"e" * 12}/peek', b'x')[0] == 404
+
+
+def test_a_peek_carries_the_newest_finished_checkpoint_and_the_rest_while_they_fit(tmp_path):
+    run = tmp_path / '20261103-120000-run'
+    (run / 'checkpoints').mkdir(parents=True)
+    (run / 'run.json').write_text('{}')
+    old = time.time() - 60
+    for n in (0, 16, 32, 48, 64):
+        ck = run / 'checkpoints' / f'{n:011d}.pt'
+        ck.write_bytes(os.urandom(20_000))
+        os.utime(ck, (old, old))
+    (run / 'checkpoints' / f'{80:011d}.pt').write_bytes(b'being written')
+
+    def names(data):
+        with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tar:
+            return sorted(m.name.rsplit('/', 1)[1] for m in tar.getmembers() if '/checkpoints/' in m.name)
+
+    assert names(worker.peek(run)) == ['00000000016.pt', '00000000032.pt', '00000000064.pt']
+    assert names(worker.peek(run, limit=30_000)) == ['00000000064.pt']
 
 
 def test_a_long_job_can_go_out_in_pieces_that_carry_on_from_each_other(repo, tmp_path):

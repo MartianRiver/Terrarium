@@ -154,6 +154,7 @@ class Store:
         log.warn('job released', id=job['spec']['id'], worker=job['worker'], why=why, state=job['state'])
         job['worker'], job['lease'] = None, None
         self.save(job)
+        self.unpeek(job['spec']['id'])
 
     def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None) -> dict | None:
         now = now or time.time()
@@ -204,7 +205,23 @@ class Store:
                     'worker': worker, 'error': None}
             job['history'].append([now, f'done by {worker}'])
             self.save(job)
+            self.unpeek(id)
             log.info('job done', id=id, worker=worker, bytes=len(result))
+
+    def peek(self, id: str, worker: str, data: bytes):
+        """A running job's run so far, from the worker holding it; one a job, the newest kept."""
+        with self.lock:
+            self.mine(id, worker)
+            write_atomic(self.jobs / f'{id}.peek', data)
+
+    def peeked(self, id: str) -> bytes:
+        path = self.jobs / f'{id}.peek'
+        if not id.isalnum() or not path.exists():
+            raise KeyError(id)
+        return path.read_bytes()
+
+    def unpeek(self, id: str):
+        (self.jobs / f'{id}.peek').unlink(missing_ok=True)
 
     def fail(self, id: str, worker: str, error: str, now: float | None = None):
         now = now or time.time()
@@ -235,6 +252,7 @@ class Store:
                 job |= {'state': 'cancelled', 'worker': None, 'lease': None}
                 job['history'].append([now or time.time(), 'cancelled'])
                 self.save(job)
+                self.unpeek(id)
 
     def retry(self, id: str, now: float | None = None):
         with self.lock:
