@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Terrikins get a compass (schema v19): the sin and cos of which way they face in the world. The way home was felt only off their own heading, so a brain had no simple way to hold where an out-of-sight heap or tree lies. The way home can also fade with distance (`[home] near`/`far`, off everywhere for now), with `home_felt` saying how much of it is left, so lost never reads like home. The midden spot and the apple tree can move mid-game (`[dung] move`, `[tree] move`, seconds, 0 is never): the spot takes its heap along, the tree goes where `[arena] scatter` would draw it, clear of everyone, with its apples growing round it there. All three are off in every world, and an older brain acts as before until training finds a use for the compass.
+
 Rays see a dropping on the midden's heap as its own kind (schema v18), apart from a loose one: until now the tidy baby couldn't tell the two apart and kept walking to the heap to pick up droppings that can't be picked up again. A kind carved out of an older one starts as a copy of it when an older brain loads, so the tidy brains still see the heap as they did; the evals count yeses to carry with only heaped droppings in reach (`carry_heap`).
 
 The pod manager counts what a pod's setup download costs: Vast bills it per GB on top of the hourly price, which made a 3060's half hour cost three times its price, so offers dear to download are skipped and the setup goes into the day's spend. A pod that fails two jobs without finishing one is destroyed and its machine skipped for a day; the coordinator tells the manager how many jobs each pod has failed and finished.

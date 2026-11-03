@@ -445,6 +445,8 @@ class World:
         self._feed(eat)
         if self.dung:
             self.dung.step(self.meals + self.jelly + self.drunk - ate)
+        if self.tree:
+            self.tree.step()
         if self.smell:
             self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
         dying = self.alive & (self.energy <= 0)

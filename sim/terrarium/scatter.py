@@ -50,3 +50,26 @@ def scatter(world, idx: np.ndarray):
             if len(placed) == len(cfg.block):
                 world.physics.shift([a], every, np.array([(p.x, p.y) for p in placed]), np.array([p.angle for p in placed]))
                 break
+
+
+def move(world, a: int, k: int) -> bool:
+    """Draw block k somewhere new in arena a mid-game, as scatter would, clear of the other blocks where they are
+    now and of every Terrikin; False when nowhere fits and it stays put."""
+    from .world import box_gap
+    cfg, ph = world.cfg, world.physics
+    room = cfg.arena.size / 2 - GAP
+    reach = cfg.colonies.spawn_ring + cfg.creature.radius + GAP
+    others = [corners(replace(b, x=ph.block_pos[a, j, 0], y=ph.block_pos[a, j, 1], angle=ph.block_angle[a, j]))
+              for j, b in enumerate(cfg.block) if j != k]
+    bodies = world.pos[a][world.alive[a]]
+    b = cfg.block[k]
+    for _ in range(TRIES):
+        d, t = cfg.arena.scatter * np.sqrt(world.rng.uniform()), world.rng.uniform(0, 2 * np.pi)
+        moved = replace(b, x=b.x + d * np.cos(t), y=b.y + d * np.sin(t), angle=world.rng.uniform(0, np.pi))
+        box = corners(moved)
+        if ((np.abs(box) <= room).all() and (box_gap(world.nests, moved) > reach).all()
+                and (box_gap(bodies, moved) > cfg.creature.radius + GAP).all()
+                and all(apart(box, o, GAP) for o in others)):
+            ph.shift([a], [k], np.array([(moved.x, moved.y)]), np.array([moved.angle]))
+            return True
+    return False

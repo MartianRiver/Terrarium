@@ -29,9 +29,11 @@ def header(world: World, arena: int, source: dict) -> dict:
              for c, (x, y) in enumerate(world.nests)]
     info = {'width': cfg.arena.size, 'height': cfg.arena.size, 'tickHz': cfg.tick_hz,
             'maxSpeed': cfg.creature.max_speed, 'nests': nests}
+    # a spot that moves mid-game isn't marked (the marker is drawn once): its heap shows where it is
     if cfg.dung.spot > 0:
-        x, y = world.dung.midden_at[arena]
-        info['middenSpot'] = {'x': _r(x), 'y': _r(y), 'radius': cfg.dung.spot}
+        if not cfg.dung.move:
+            x, y = world.dung.midden_at[arena]
+            info['middenSpot'] = {'x': _r(x), 'y': _r(y), 'radius': cfg.dung.spot}
     elif cfg.dung.midden > 0:
         info['midden'] = cfg.dung.midden
     if world.tree:
