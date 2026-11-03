@@ -336,11 +336,13 @@ function boot() {
       const start = showing ? -1 : items.findIndex((i) => i.replay === params.get('start'));
       const place = start >= 0 ? start : (items.findIndex((i) => i.replay === showing) + 1) % items.length;
       const item = items[place];
-      const url = new URL(item.replay, index);
+      // &at=<replay> opens one of that item's checkpoints, or an earlier stage's brain in its world
+      const at = showing ? undefined : [...(item.stages ?? []), ...(item.earlier ?? [])].find((s) => s.replay === params.get('at'));
+      const url = new URL(at?.replay ?? item.replay, index);
       if (url.origin !== location.origin) throw new ReplayError(`won’t fetch a replay from another site (${url.origin})`);
       const bytes = await fetchReplay(url);
       showing = item.replay;
-      await open(item.title, async () => bytes, url);
+      await open(at ? `${item.title} · ${at.label}` : item.title, async () => bytes, url);
       card.show(item, games, place, items.length, note);
       if (item.stages?.length) learns.set(item.stages.map((s) => ({ label: s.label, url: new URL(s.replay, index), aria: s.about ?? s.label })), url, item.title);
     } catch (err) {

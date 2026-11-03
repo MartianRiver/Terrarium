@@ -22,6 +22,10 @@ export interface Item {
   score?: { label: string; value: number; marks: [string, number][] };
   // the same brain on the same seed as it learned: random moves, the start, partway, now (learns.ts)
   stages?: { label: string; replay: string; about?: string }[];
+  // the brains of a nursery's earlier stages, each playing this stage's world
+  earlier?: { label: string; replay: string }[];
+  samples?: number;
+  took?: string; // what the samples mean: "4.6 days of play, learned in 17 min on a rented A40"
 }
 
 export class ChannelCard {
@@ -55,6 +59,7 @@ export class ChannelCard {
     this.now.hidden = true;
     this.box.append(this.now);
     if (item.brain) this.box.append(row('This brain', item.brain));
+    if (item.took) this.box.append(row('Training', item.samples ? `${+(item.samples / 1e6).toFixed(1)}M samples: ${item.took}` : item.took));
     if (item.score) this.box.append(scoreBar(item.score));
     this.box.append(text('p', `${place + 1} of ${count} on the channel · ${note ?? 'newer brains turn up as training goes'}`, 'channel-foot'));
     this.box.hidden = false;

@@ -17,12 +17,19 @@ const GROUPS: { key: Group; title: string; text: string }[] = [
 ];
 
 // family groups setups of one game under one card; variant says what's different about this one, about why,
-// question what the family is trying to find out, result how it did; finished: when its last run ended (ISO)
+// question what the family is trying to find out, result how it did; finished: when its last run ended (ISO).
+// A nursery's games are its stages: order says where each comes, status whether it's training, on hold (a run
+// left unfinished), done or planned (nothing trained on it yet)
+export type Status = 'training' | 'held' | 'done' | 'planned';
 export interface Game {
   name: string; kind: string; goal: string; setup?: string; training?: boolean; finished?: string;
   family?: string; variant?: string; group?: Group; question?: string; about?: string; result?: string;
+  nursery?: string; order?: number; planned?: boolean; status?: Status;
 }
-export interface Item { replay: string; title: string; game?: string; samples?: number }
+interface Replay { label: string; replay: string; about?: string }
+export interface Item {
+  replay: string; title: string; game?: string; samples?: number; took?: string; stages?: Replay[]; earlier?: Replay[];
+}
 export interface Channel { updated: string; games?: Record<string, Game>; items: Item[] }
 interface Brain { name: string; replay: string; world: string; samples: number; total: number; started?: string; finished?: string }
 export interface Gallery {
@@ -31,9 +38,14 @@ export interface Gallery {
   working?: { title: string; text: string; group?: Group; brains: Brain[] }[];
 }
 
-// a row or card shows its note ("22.1M samples so far", "finished 20:21") small under the text
-export interface Row { title: string; text: string; href: string; live?: boolean; note?: string }
-export interface Card { title: string; text: string; href: string; live?: boolean; note?: string; rows: Row[] }
+// a row or card shows its note ("22.1M samples so far", "finished 20:21") small under the text; a row with no
+// href has nothing to watch yet (a planned stage, or one whose first run isn't back)
+export interface Row { title: string; text: string; href?: string; live?: boolean; note?: string }
+export interface Card { title: string; text: string; href: string; live?: boolean; note?: string; rows: Row[]; nursery?: Nursery }
+// a nursery opens to its stages; a stage opens to its checkpoints and the earlier stages' brains in its world
+export interface Chip { label: string; href: string; about?: string }
+export interface Stage { order: number; title: string; text: string; status: Status; note: string; took?: string; chips: Chip[]; earlier: Chip[] }
+export interface Nursery { status: Status; count: string; stages: Stage[] }
 export interface Section { key: string; title: string; text: string; cards: Card[]; all?: string }
 
 export function sentence(text = '') {
@@ -47,8 +59,8 @@ export function when(iso: string, now: number) {
   return today ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-const watch = (keys: string[], start?: string) =>
-  `/watch/?channel=${CHANNEL}&game=${keys.map(encodeURIComponent).join(',')}${start ? `&start=${encodeURIComponent(start)}` : ''}`;
+const watch = (keys: string[], start?: string, at?: string) =>
+  `/watch/?channel=${CHANNEL}&game=${keys.map(encodeURIComponent).join(',')}${start ? `&start=${encodeURIComponent(start)}` : ''}${at ? `&at=${encodeURIComponent(at)}` : ''}`;
 const groupOf = (g: Game): Group => g.group ?? (g.kind === 'the main world' ? 'colonies' : 'nursery');
 const familyOf = (g: Game) => g.family ?? g.name;
 
@@ -63,9 +75,11 @@ function channelSections(c: Channel, now: number): { live: Card[]; groups: Map<G
   const fresh = now - new Date(c.updated).getTime() < LIVE_MS;
   const says = Object.values(games).some((g) => g.training !== undefined);
   const training = (g: Game) => (says ? !!g.training : fresh);
-  const keys = [...new Set(c.items.map((i) => i.game).filter((k): k is string => !!k && !!games[k]))];
+  const watched = new Set(c.items.map((i) => i.game).filter((k): k is string => !!k && !!games[k]));
+  // a nursery's stages are listed even with nothing to watch yet
+  const keys = [...watched, ...Object.keys(games).filter((k) => games[k].nursery && !watched.has(k))];
   const live: Card[] = [];
-  for (const key of keys) {
+  for (const key of watched) {
     const g = games[key];
     const recent = g.finished && now - new Date(g.finished).getTime() < RECENT_MS;
     if (!training(g) && !recent) continue;
@@ -87,11 +101,15 @@ function channelSections(c: Channel, now: number): { live: Card[]; groups: Map<G
     families.set(id, [...(families.get(id) ?? []), key]);
   }
   const groups = new Map<Group, Card[]>();
-  for (const members of families.values()) {
-    const g = games[members[0]];
-    const question = members.map((k) => games[k].question).find(Boolean) ?? g.goal;
-    const card: Card = { title: familyOf(g), text: question, href: watch(members), live: members.some((k) => training(games[k])), rows: [] };
-    if (members.length > 1) {
+  for (const all of families.values()) {
+    const g = games[all[0]];
+    const members = all.filter((k) => watched.has(k));
+    const question = all.map((k) => games[k].question).find(Boolean) ?? g.goal;
+    const card: Card = { title: familyOf(g), text: question, href: members.length ? watch(members) : '', live: all.some((k) => training(games[k])), rows: [] };
+    if (g.nursery) {
+      card.nursery = nursery(all, games, c.items, training, now);
+      card.live = card.nursery.status === 'training';
+    } else if (members.length > 1) {
       card.rows = members.map((k) => ({
         title: variantOf(games[k]), text: [games[k].about, games[k].result].filter(Boolean).join(' '),
         href: watch([k]), live: training(games[k]),
@@ -102,7 +120,29 @@ function channelSections(c: Channel, now: number): { live: Card[]; groups: Map<G
     groups.set(groupOf(g), [...(groups.get(groupOf(g)) ?? []), card]);
   }
   for (const [k, cards] of groups) groups.set(k, [...cards.filter((c) => c.live), ...cards.filter((c) => !c.live)]);
-  return { live, groups, all: keys.filter((k) => groupOf(games[k]) === 'nursery') };
+  return { live, groups, all: [...watched].filter((k) => groupOf(games[k]) === 'nursery') };
+}
+
+// a nursery's stages in the order they're trained, each saying whether it's training, on hold, done or to come
+function nursery(keys: string[], games: Record<string, Game>, items: Item[], training: (g: Game) => boolean, now: number): Nursery {
+  const stages = [...keys].sort((a, b) => (games[a].order ?? 0) - (games[b].order ?? 0)).map((k): Stage => {
+    const g = games[k];
+    const item = items.find((i) => i.game === k);
+    const status: Status = g.status ?? (training(g) ? 'training' : !item || g.planned ? 'planned' : 'done');
+    const note = { training: 'training now', held: 'on hold', planned: 'not yet in training', done: g.finished ? `finished ${when(g.finished, now)}` : 'finished' }[status];
+    const chip = (r: Replay): Chip => ({ label: r.label, href: watch([k], item!.replay, r.replay), about: r.about });
+    return {
+      order: g.order ?? 0, title: variantOf(g), text: [g.about, g.result].filter(Boolean).join(' '), status, note,
+      took: item?.took && item.samples ? `${+(item.samples / 1e6).toFixed(1)}M samples: ${item.took}` : item?.took,
+      chips: item ? (item.stages ?? [{ label: 'now', replay: item.replay }]).map(chip) : [],
+      earlier: item ? (item.earlier ?? []).map(chip) : [],
+    };
+  });
+  const n = (s: Status) => stages.filter((x) => x.status === s).length;
+  const status: Status = n('training') ? 'training' : n('planned') === stages.length ? 'planned' : n('held') || n('planned') ? 'held' : 'done';
+  const count = [`${stages.length} stages`, n('training') && `${n('training')} training`, n('held') && `${n('held')} on hold`,
+    n('planned') && `${n('planned')} to come`].filter(Boolean).join(' · ');
+  return { status, count, stages };
 }
 
 function gallerySections(g: Gallery, now: number) {

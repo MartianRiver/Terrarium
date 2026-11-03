@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { plan, type Channel } from '../src/pickplan';
+import { plan, when, type Channel } from '../src/pickplan';
 
 const NOW = Date.parse('2026-11-01T21:00:00+11:00');
 const game = (name: string, more = {}) => ({ name, kind: 'a memory game', goal: 'Find the berry.', setup: 'A berry. Then more.', ...more });
@@ -53,6 +53,45 @@ describe('the picker', () => {
 
   it('keeps the main world with the colonies', () => {
     expect(sections.find((s) => s.key === 'colonies')!.cards.map((c) => c.title)).toEqual(['Young colonies']);
+  });
+
+  it('folds a nursery into its stages in order: checkpoints to watch, earlier brains, and what’s still to come', () => {
+    const stage = (order: number, variant: string, more = {}) =>
+      game('The apple tree', { kind: 'a jumping game', family: 'The apple tree', nursery: 'tree', order, variant, ...more });
+    const trees: Channel = {
+      updated: channel.updated,
+      games: {
+        'tree-04': stage(4, '18 m', { status: 'planned' }),
+        'tree-01': stage(1, 'apples just out of reach', { status: 'done', finished: '2026-11-01T20:00:00+11:00' }),
+        'tree-03': stage(3, '16 m', { status: 'held' }),
+        'tree-02': stage(2, '14 m', { status: 'training', training: true }),
+        'needs-01': game('Needs', { family: 'Needs', nursery: 'needs', order: 1, variant: 'hungry babies', status: 'planned' }),
+      },
+      items: [
+        { replay: 'a.jsonl.gz', title: 'The apple tree · apples just out of reach · seed 1 · 4.2M samples', game: 'tree-01', samples: 4.2e6, took: '2.4 days of play, learned in 9 min on the Mac',
+          stages: [{ label: 'random moves', replay: 'a-r.jsonl.gz' }, { label: 'now · 4.2M', replay: 'a.jsonl.gz' }] },
+        { replay: 'b.jsonl.gz', title: 'The apple tree · 14 m · seed 1 · 2.0M samples so far', game: 'tree-02', earlier: [{ label: 'apples just out of reach', replay: 'b-was-a.jsonl.gz' }] },
+        { replay: 'c.jsonl.gz', title: 'The apple tree · 16 m · seed 1 · 1.0M samples so far', game: 'tree-03' },
+      ],
+    };
+    const cards = plan(trees, null, NOW).find((s) => s.key === 'nursery')!.cards;
+    const tree = cards.find((c) => c.title === 'The apple tree')!.nursery!;
+    expect(tree.stages.map((s) => [s.order, s.title, s.status, s.note])).toEqual([
+      [1, 'apples just out of reach', 'done', `finished ${when('2026-11-01T20:00:00+11:00', NOW)}`],
+      [2, '14 m', 'training', 'training now'],
+      [3, '16 m', 'held', 'on hold'],
+      [4, '18 m', 'planned', 'not yet in training'],
+    ]);
+    expect(tree.status).toBe('training');
+    expect(tree.count).toBe('4 stages · 1 training · 1 on hold · 1 to come');
+    expect(tree.stages[0].took).toBe('4.2M samples: 2.4 days of play, learned in 9 min on the Mac');
+    expect(tree.stages[0].chips.map((c) => c.label)).toEqual(['random moves', 'now · 4.2M']);
+    expect(tree.stages[0].chips[0].href).toContain('&start=a.jsonl.gz&at=a-r.jsonl.gz');
+    expect(tree.stages[1].earlier[0].href).toContain('&at=b-was-a.jsonl.gz');
+    expect(tree.stages[3].chips).toEqual([]);
+    const needs = cards.find((c) => c.title === 'Needs')!;
+    expect(needs.href).toBe('');
+    expect(needs.nursery!.status).toBe('planned');
   });
 
   it('with an older index that doesn’t say what’s training, goes by how fresh it is', () => {
