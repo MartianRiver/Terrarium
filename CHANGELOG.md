@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The picker's top list is what's training now and the newest to finish in the last 12 hours, six at most, so the groups below show without a long scroll. Inside a nursery, the stages training, on hold or finished in the last 12 hours show straight away, with the older ones folded into "earlier stages" and the planned ones into "to come".
+
 The watch picker folds each nursery into its stages, numbered in the order they're trained: each says whether it's finished, training now, on hold or not yet in training, and opens to its checkpoints (random moves, the brain it started from, partway, now) and to the earlier stages' brains playing its world, so you can see what each step taught. Each stage also says what its samples mean: how long the babies played, and how long the learning took and where ("4.6 days of play, learned in 17 min on a rented A40"), which the channel card shows too. A watch link can open on any of those replays (`&at=`). The channel says which nursery and stage each game is (`nursery`, `order`, `status`, `took`, `earlier`).
 
 A running queue job shows its run so far: every 15 minutes the worker sends run.json, the metrics and the newest checkpoint (with the ones a quarter and half the way while they fit, 8 MB at most) to the coordinator, which keeps the newest for each job until it ends, so the channel can put a run from a pod or a lent machine on the site before it's done. A coordinator from before this answers 404 and the worker stops asking. A new `lab` token does what the admin token does with jobs (add, list, cancel, retry, results, peeks, the pods backlog) without the admin page, so the scripts on River's Mac don't hold a token that gets round the page's sign-in.

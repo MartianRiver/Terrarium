@@ -1,18 +1,20 @@
 // What the picker lists, worked out from the channel's and the gallery's index.json: first what's training now (and
-// what finished in the last two days), each line with what it's trying and a link per run; then every game by group,
+// what finished in the last 12 hours, a few at most), each line with what it's trying and a link per run; then every game by group,
 // a card per family with the question it asks and a row per setup saying what's different and how it did; then the
 // main line's steps from the gallery, newest first. picker.ts draws it.
 import { flatten } from './gallery';
 
 export const CHANNEL = '/replays/nursery/index.json';
-const RECENT_MS = 48 * 3600_000;
+const RECENT_MS = 12 * 3600_000;
+// the top list: everything training, then the newest finished ones up to this many in all
+const TOP = 6;
 // older indexes don't say per game whether it's training: then anything updated in the last 40 min counts
 const LIVE_MS = 40 * 60_000;
 
 export type Group = 'colonies' | 'nursery' | 'experiments';
 const GROUPS: { key: Group; title: string; text: string }[] = [
   { key: 'colonies', title: 'Colonies', text: 'The main world: colonies that forage, store food, get through the nights and hatch new Terrikins.' },
-  { key: 'nursery', title: 'The nursery', text: 'Small worlds where baby Terrikins can’t go hungry, learning kids’ games.' },
+  { key: 'nursery', title: 'The nursery', text: 'Small worlds where baby Terrikins learn one thing at a time: kids’ games, chores and looking after themselves.' },
   { key: 'experiments', title: 'Experiments', text: 'Tried on the side: holes they found, dead ends, and setups that aren’t the main line.' },
 ];
 
@@ -41,10 +43,14 @@ export interface Gallery {
 // a row or card shows its note ("22.1M samples so far", "finished 20:21") small under the text; a row with no
 // href has nothing to watch yet (a planned stage, or one whose first run isn't back)
 export interface Row { title: string; text: string; href?: string; live?: boolean; note?: string }
-export interface Card { title: string; text: string; href: string; live?: boolean; note?: string; rows: Row[]; nursery?: Nursery }
+// at: when it finished (ms), for putting the newest first
+export interface Card { title: string; text: string; href: string; live?: boolean; note?: string; rows: Row[]; nursery?: Nursery; at?: number }
 // a nursery opens to its stages; a stage opens to its checkpoints and the earlier stages' brains in its world
 export interface Chip { label: string; href: string; about?: string }
-export interface Stage { order: number; title: string; text: string; status: Status; note: string; took?: string; chips: Chip[]; earlier: Chip[] }
+// recent: finished in the last 12 hours, so it's shown with what's training rather than folded away with the older ones
+export interface Stage {
+  order: number; title: string; text: string; status: Status; note: string; took?: string; chips: Chip[]; earlier: Chip[]; recent: boolean;
+}
 export interface Nursery { status: Status; count: string; stages: Stage[] }
 export interface Section { key: string; title: string; text: string; cards: Card[]; all?: string }
 
@@ -93,6 +99,7 @@ function channelSections(c: Channel, now: number): { live: Card[]; groups: Map<G
     live.push({
       title: `${familyOf(g)}: ${variantOf(g)}`, text: [g.about ?? sentence(g.setup), g.result].filter(Boolean).join(' '),
       href: runs.length === 1 ? watch([key], runs[0].replay) : watch([key]), live: training(g), note: training(g) ? 'training now' : `finished ${when(g.finished!, now)}`, rows,
+      at: g.finished ? new Date(g.finished).getTime() : undefined,
     });
   }
   const families = new Map<string, string[]>();
@@ -136,6 +143,7 @@ function nursery(keys: string[], games: Record<string, Game>, items: Item[], tra
       took: item?.took && item.samples ? `${+(item.samples / 1e6).toFixed(1)}M samples: ${item.took}` : item?.took,
       chips: item ? (item.stages ?? [{ label: 'now', replay: item.replay }]).map(chip) : [],
       earlier: item ? (item.earlier ?? []).map(chip) : [],
+      recent: !!g.finished && now - new Date(g.finished).getTime() < RECENT_MS,
     };
   });
   const n = (s: Status) => stages.filter((x) => x.status === s).length;
@@ -170,11 +178,13 @@ function gallerySections(g: Gallery, now: number) {
 export function plan(channel: Channel | null, gallery: Gallery | null, now = Date.now()): Section[] {
   const c = channel ? channelSections(channel, now) : { live: [], groups: new Map<Group, Card[]>(), all: [] };
   const g = gallery ? gallerySections(gallery, now) : { live: [], steps: [], extra: new Map<Group, Card[]>() };
+  const training = [...c.live.filter((x) => x.live), ...g.live];
+  const finished = c.live.filter((x) => !x.live).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   const out: Section[] = [{
     key: 'live', title: 'Training now, and just finished',
-    text: 'What’s learning now, and what finished in the last two days. Each one opens with buttons to compare it '
-      + 'with random moves, the brain it started from and partway through.',
-    cards: [...c.live.filter((x) => x.live), ...g.live, ...c.live.filter((x) => !x.live)],
+    text: 'What’s learning now, and the newest to finish. Everything else is in the groups below, '
+      + 'each stage with buttons to compare it with random moves, the brain it started from and partway through.',
+    cards: [...training, ...finished.slice(0, Math.max(TOP - training.length, 0))],
   }];
   for (const grp of GROUPS) {
     const cards = [...(c.groups.get(grp.key) ?? []), ...(g.extra.get(grp.key) ?? [])];

@@ -87,11 +87,30 @@ function nursery(c: Card) {
     all.className = 'picker-all';
     box.append(all);
   }
-  const list = el('ol', '', 'picker-stages');
-  list.append(...n.stages.map(stage));
-  box.append(list);
+  // what's training, on hold or just finished shows straight away; older stages and those to come fold away
+  const older = n.stages.filter((s) => s.status === 'done' && !s.recent);
+  const later = n.stages.filter((s) => s.status === 'planned');
+  let now = n.stages.filter((s) => !older.includes(s) && !later.includes(s));
+  if (!now.length && older.length) now = [older.pop()!];
+  if (older.length) box.append(fold(`${older.length} earlier ${older.length === 1 ? 'stage' : 'stages'}, finished`, older));
+  box.append(stages(now));
+  if (later.length) box.append(fold(`${later.length} to come`, later));
   li.append(box);
   return li;
+}
+
+function stages(list: Stage[]) {
+  // numbered by where each comes in the nursery, not by where it sits in this list
+  const ol = el('ol', '', 'picker-stages');
+  ol.append(...list.map(stage));
+  return ol;
+}
+
+function fold(label: string, list: Stage[]) {
+  const box = document.createElement('details');
+  box.className = 'picker-fold';
+  box.append(el('summary', label), stages(list));
+  return box;
 }
 
 function card(c: Card) {

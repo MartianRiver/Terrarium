@@ -89,9 +89,23 @@ describe('the picker', () => {
     expect(tree.stages[0].chips[0].href).toContain('&start=a.jsonl.gz&at=a-r.jsonl.gz');
     expect(tree.stages[1].earlier[0].href).toContain('&at=b-was-a.jsonl.gz');
     expect(tree.stages[3].chips).toEqual([]);
+    expect(tree.stages.map((s) => s.recent)).toEqual([true, false, false, false]);
+    expect(plan(trees, null, NOW + 13 * 3600_000).find((s) => s.key === 'nursery')!.cards
+      .find((c) => c.title === 'The apple tree')!.nursery!.stages[0].recent).toBe(false);
     const needs = cards.find((c) => c.title === 'Needs')!;
     expect(needs.href).toBe('');
     expect(needs.nursery!.status).toBe('planned');
+  });
+
+  it('tops the list with everything training, then only the newest finished, six in all', () => {
+    const games: Channel['games'] = { half: channel.games!.half };
+    const items = [channel.items[0]];
+    for (let i = 0; i < 8; i++) {
+      games[`f${i}`] = game(`Done ${i}`, { training: false, finished: new Date(NOW - (i + 1) * 3600_000).toISOString() });
+      items.push({ replay: `f${i}.jsonl.gz`, title: `Done ${i}`, game: `f${i}` });
+    }
+    const top = plan({ updated: channel.updated, games, items }, null, NOW)[0].cards;
+    expect(top.map((c) => c.title)).toEqual(['Peekaboo: half speed', 'Done 0: A berry.', 'Done 1: A berry.', 'Done 2: A berry.', 'Done 3: A berry.', 'Done 4: A berry.']);
   });
 
   it('with an older index that doesn’t say what’s training, goes by how fresh it is', () => {
