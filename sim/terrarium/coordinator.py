@@ -12,6 +12,9 @@
 #            machine, and makes and revokes the tokens of its own pods (rented,
 #            named pod-…, 12 h at most). Nothing else, so the box it runs on
 #            never holds a token that could add or sign jobs
+#   lab      River's scripts (heartbeat, sync, the channel): what admin does with jobs (add, list, cancel,
+#            retry, results, peeks) and the pods backlog, without the admin page, so MFA there can't be
+#            gone round with it. Jobs it adds still need River's signature to run
 #
 # /api/health and /api/board (what each machine has done, board.py) need no token. /api/admin is River's
 # page for tokens and machines, signed in with Google (admin.py).
@@ -37,10 +40,10 @@ from .store import Full, Gone, Store, sha256, write_atomic
 log = Logger('coordinator')
 
 PORT = 5194
-ROLES = ('admin', *jobs.MACHINES, 'pods')
+ROLES = ('admin', *jobs.MACHINES, 'pods', 'lab')
 # a pod's token dies with it, or after this long whatever happens
 POD_HOURS = 12
-LIMITS = {'blob': 16_000_000, 'result': jobs.RESULT_LIMIT, 'json': 64_000}
+LIMITS = {'blob': 16_000_000, 'result': jobs.RESULT_LIMIT, 'peek': jobs.PEEK_LIMIT, 'json': 64_000}
 # requests a minute per machine token, and how many it may make at once; a worker makes a few a minute
 RATE, BURST = 60, 60
 # seconds between writes of workers.json when nothing but the time last seen has changed
@@ -258,7 +261,7 @@ def handler(queue: Queue, env=None):
                 self.json({'error': 'something broke on the coordinator'}, 500)
 
         def dispatch(self, method: str, parts: list[str], who: dict):
-            admin, worker = who['role'] == 'admin', who['role'] != 'pods'
+            admin, worker = who['role'] in ('admin', 'lab'), who['role'] not in ('pods', 'lab')
             match method, parts:
                 case ('GET' | 'HEAD'), ['api', 'blobs', digest] if worker:
                     if not queue.may_read(who, digest):
@@ -280,6 +283,8 @@ def handler(queue: Queue, env=None):
                 case 'POST', ['api', 'jobs', id, ('cancel' | 'retry') as what] if admin:
                     getattr(queue.store, what)(id)
                     self.json({'ok': True})
+                case 'GET', ['api', 'jobs', id, 'peek'] if admin:
+                    self.send(queue.store.peeked(id), 'application/gzip')
                 case 'GET', ['api', 'results', id] if admin:
                     job = queue.store.read(id)
                     if not job['result']:
@@ -303,6 +308,9 @@ def handler(queue: Queue, env=None):
                     queue.seen(who)
                     queue.store.beat(id, who['name'], progress if isinstance(progress, dict) else None)
                     self.json({'ok': True})
+                case 'PUT', ['api', 'jobs', id, 'peek'] if worker:
+                    queue.store.peek(id, who['name'], self.body('peek'))
+                    self.json({'ok': True})
                 case 'PUT', ['api', 'jobs', id, 'result'] if worker:
                     try:
                         queue.store.finish(id, who['name'], self.body('result'))
@@ -312,7 +320,7 @@ def handler(queue: Queue, env=None):
                 case 'POST', ['api', 'jobs', id, 'return'] if worker:
                     queue.store.give_back(id, who['name'])
                     self.json({'ok': True})
-                case 'GET', ['api', 'pods'] if who['role'] in ('pods', 'admin'):
+                case 'GET', ['api', 'pods'] if who['role'] in ('pods', 'admin', 'lab'):
                     self.json(queue.backlog())
                 case 'POST', ['api', 'pods', name] if who['role'] == 'pods':
                     hours = json.loads(self.body('json') or b'{}').get('hours', POD_HOURS)

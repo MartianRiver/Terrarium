@@ -54,6 +54,8 @@ KEY = Path.home() / '.ssh' / 'terrarium_jobs_ed25519'
 SERVER = os.environ.get('TERRARIUM_JOBS', 'http://127.0.0.1:5194')
 # the biggest result the coordinator takes; Atlas's nginx takes 64 MB on that path, Cloudflare 100 MB at most
 RESULT_LIMIT = 64_000_000
+# a running job's run so far (worker.peek): run.json, metrics and a few checkpoints
+PEEK_LIMIT = 8_000_000
 AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
@@ -327,6 +329,18 @@ def sync(client: Client, runs: Path = ROOT) -> list[Path]:
             log.warn('result not fetched', id=spec['id'], status=status)
             continue
         got.append(unpack(data, spec, runs))
+    return got
+
+
+def peeks(client: Client, into: Path) -> list[Path]:
+    """Each running job's run so far, unpacked into into/ over the one before."""
+    got = []
+    for job in client.json('GET', '/api/jobs'):
+        if job['state'] != 'running':
+            continue
+        status, data = client.call('GET', f'/api/jobs/{job["spec"]["id"]}/peek')
+        if status == 200:
+            got.append(unpack(data, job['spec'], into))
     return got
 
 
