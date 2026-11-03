@@ -1,7 +1,7 @@
 // The site's /watch/ with nothing asked for: what there is to watch in plain words, over the garden playing behind.
 // Training now stays open at the top; each group below opens on a tap, so the list starts short (pickplan.ts says what's in it).
 import { createLogger } from './lib/logger';
-import { CHANNEL, plan, type Card, type Channel, type Gallery, type Section } from './pickplan';
+import { CHANNEL, plan, type Card, type Channel, type Chip, type Gallery, type Section, type Stage, type Status } from './pickplan';
 
 const log = createLogger('picker');
 const GALLERY = '/replays/gallery/index.json';
@@ -24,9 +24,11 @@ function el(tag: string, text = '', cls?: string) {
   return e;
 }
 
-function link(href: string, ...kids: (Node | string)[]) {
-  const a = document.createElement('a');
-  a.href = href;
+// nothing to watch yet: the same layout, not a link
+function link(href: string | undefined, ...kids: (Node | string)[]) {
+  const a = document.createElement(href ? 'a' : 'div');
+  if (href) (a as HTMLAnchorElement).href = href;
+  else a.className = 'picker-off';
   a.append(...kids);
   return a;
 }
@@ -35,12 +37,70 @@ function tag(text: string, live?: boolean) {
   return el('span', text, live ? 'picker-tag live' : 'picker-tag');
 }
 
+function tagFor(status: Status, text: string) {
+  return el('span', text, `picker-tag ${status}`);
+}
+
+function chips(label: string, list: Chip[]) {
+  const p = el('p', '', 'picker-chips');
+  p.append(el('span', label, 'picker-chips-label'));
+  for (const c of list) {
+    const a = link(c.href, c.label);
+    if (c.about) a.title = c.about;
+    p.append(a);
+  }
+  return p;
+}
+
+// a stage with something to watch opens to its checkpoints; one still to come is a greyed line
+function stage(s: Stage) {
+  const li = el('li', '', `picker-stage ${s.status}`);
+  const head = [el('b', `${s.order}. ${s.title}`), tagFor(s.status, s.note)];
+  if (!s.chips.length) {
+    const off = el('div', '', 'picker-off');
+    off.append(...head, el('span', s.text, 'picker-text'));
+    li.append(off);
+    return li;
+  }
+  const box = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.append(...head);
+  if (s.took) summary.append(el('span', s.took, 'picker-when'));
+  box.append(summary, el('p', s.text, 'picker-text'), chips('Watch it learn:', s.chips));
+  if (s.earlier.length) box.append(chips('Earlier stages’ brains here:', s.earlier));
+  li.append(box);
+  return li;
+}
+
+// a nursery opens to its stages in order: what's done, what's training, what's on hold and what's to come
+function nursery(c: Card) {
+  const n = c.nursery!;
+  const li = el('li', '', c.live ? 'picker-card live' : 'picker-card');
+  const box = document.createElement('details');
+  box.className = 'picker-nursery';
+  const summary = document.createElement('summary');
+  summary.append(el('b', c.title), tagFor(n.status, { training: 'training now', held: 'on hold', done: 'finished', planned: 'to come' }[n.status]),
+    el('span', c.text, 'picker-text'), el('span', n.count, 'picker-when'));
+  box.append(summary);
+  if (c.href) {
+    const all = link(c.href, 'Watch every stage, one after another');
+    all.className = 'picker-all';
+    box.append(all);
+  }
+  const list = el('ol', '', 'picker-stages');
+  list.append(...n.stages.map(stage));
+  box.append(list);
+  li.append(box);
+  return li;
+}
+
 function card(c: Card) {
+  if (c.nursery) return nursery(c);
   const li = el('li', '', c.live ? 'picker-card live' : 'picker-card');
   const head = link(c.href, el('b', c.title));
   if (c.note) head.append(tag(c.note, c.live));
   head.append(el('span', c.text, 'picker-text'));
-  head.className = 'picker-head';
+  head.classList.add('picker-head');
   li.append(head);
   if (c.rows.length) {
     const rows = el('ul', '', 'picker-rows');
