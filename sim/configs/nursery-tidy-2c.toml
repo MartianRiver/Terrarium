@@ -48,6 +48,12 @@ nest_distance = 0.0
 # creatures start on a ring this far from their nest's centre
 spawn_ring = 1.8
 
+[home]
+# the way home is felt in full within `near` m of the nest's centre and fades to nothing by `far` (0: felt
+# everywhere); home_felt tells the brain how much is left
+near = 0.0
+far = 0.0
+
 [food]
 count = 0
 radius = 0.25
@@ -201,6 +207,8 @@ points = 1.0
 spot = 0.0
 heap = 0
 wander = 0.0
+# the spot (and its heap) moves somewhere new every this many seconds (0: never)
+move = 0.0
 
 [tag]
 # a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
@@ -268,6 +276,8 @@ reach = 0.0
 points = 0.0
 hop = 0.0
 home = false
+# the tree moves every this many seconds, where [arena] scatter would draw it (0: never)
+move = 0.0
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)

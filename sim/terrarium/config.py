@@ -54,6 +54,12 @@ class Colonies:
 
 
 @dataclass(frozen=True)
+class Home:
+    near: float      # the way home is felt in full within this far (m) of the nest's centre
+    far: float       # and fades to nothing by here (0: felt everywhere)
+
+
+@dataclass(frozen=True)
 class Food:
     count: int
     radius: float
@@ -201,6 +207,7 @@ class Dung:
     spot: float
     heap: int
     wander: float
+    move: float      # the spot moves somewhere new every this many seconds, its heap with it (0: never)
 
     @property
     def on(self) -> bool:
@@ -324,6 +331,7 @@ class Tree:
     points: float    # for each apple taken (0 is off)
     hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
     home: bool       # an apple taken goes in the crop, and pays only once it's unloaded in the nest
+    move: float      # the tree moves every this many seconds, where [arena] scatter would put it (0: never)
 
     @property
     def on(self) -> bool:
@@ -354,6 +362,7 @@ class Config:
     creature: Creature
     energy: Energy
     colonies: Colonies
+    home: Home
     food: Food
     crop: Crop
     jelly: Jelly
@@ -510,9 +519,10 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'hearing': {'range': 0.0},
          'dung': {'every': 0, 'after': 0.0, 'lasts': 0.0, 'slots': 0, 'radius': 0.0, 'near': 0.0, 'sick': 0.0, 'away': 1.0,
                   'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0,
-                  'spot': 0.0, 'heap': 0, 'wander': 0.0},
+                  'spot': 0.0, 'heap': 0, 'wander': 0.0, 'move': 0.0},
          'jump': {'height': 0.0, 'energy': 0.0},
-         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False}}
+         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False, 'move': 0.0},
+         'home': {'near': 0.0, 'far': 0.0}}
 
 
 def upgrade(data: dict) -> dict:

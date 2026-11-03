@@ -7,9 +7,12 @@
 # jump costs its jumper `hop` points: without it, the first brain hopped round the
 # tree non-stop (in the air 87% of the time), taking every apple it passed under.
 # With `home`, an apple taken goes in the crop, so one with a full crop can't take
-# another, and it pays only once it's unloaded in the nest: carried home.
+# another, and it pays only once it's unloaded in the nest: carried home. With `move`, the tree goes somewhere new
+# every so often in a game (where [arena] scatter would draw it), its apples growing round it there, so where it
+# stands has to be found again and remembered afresh.
 import numpy as np
 
+from . import scatter
 from .config import ConfigError
 
 TRIES = 50
@@ -31,6 +34,16 @@ class Tree:
     def reset(self, idx: np.ndarray):
         self.seen[idx] = 0
         self.hops[idx] = 0
+
+    def step(self):
+        w, t = self.world, self.world.cfg.tree
+        if t.move <= 0:
+            return
+        ticks = max(round(t.move * w.cfg.tick_hz), 1)
+        for a in np.nonzero((w.age > 0) & (w.age % ticks == 0))[0]:
+            if scatter.move(w, a, t.trunk):
+                for f in np.nonzero(w.food_present[a])[0]:
+                    w._grow(a, f)
 
     def reaching(self) -> np.ndarray:
         """Who is high enough to take an apple, and has room for it when apples go home, (arenas, creatures)."""

@@ -49,13 +49,18 @@ def observe(world: World, last: np.ndarray) -> Observation:
     # how much jelly its colony has, as an ant knows how hungry its nest is: near 1 at a jelly a member
     store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
+    # with [home] far, it fades with distance and is gone past it: home_felt says how much is left, so a lost
+    # Terrikin's 0 can't be mistaken for standing in the middle of its nest
+    away = np.hypot(home[..., 0], home[..., 1])
+    h = cfg.home
+    felt = np.clip((h.far - away) / max(h.far - h.near, 1e-9), 0, 1) if h.far > 0 else np.ones_like(away)
     # how much of its sprint is left, how far through its rest it is (1: it can sprint now; 0 with sprint off),
     # holding a block, how much of its grip is left, how much of a nectar boost, and a berry (or block) in its jaws
     s = cfg.sprint
     sprinting = world.sprinting / max(round(s.seconds * cfg.tick_hz), 1)
     rested = (1 - world.resting / max(round(s.cooldown * cfg.tick_hz), 1)) * (world.sprinting == 0) * s.on
     me = np.stack([world.energy, forward, side, last[..., 0], last[..., 1],
-                   np.hypot(home[..., 0], home[..., 1]) / v.range, np.sin(bearing), np.cos(bearing),
+                   away / v.range * felt, np.sin(bearing) * felt, np.cos(bearing) * felt,
                    world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony, store,
                    np.broadcast_to(world.light()[:, None], store.shape), sprinting, rested,
                    world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1),
@@ -65,7 +70,9 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
                      if world.seek else (np.zeros(store.shape),) * 2),
                    *flag_senses(world, store.shape), world.stamina, *hearing.heard(world),
-                   *dung_senses(world, store.shape), world.z / max(cfg.jump.height, 1e-9)], -1)
+                   *dung_senses(world, store.shape), world.z / max(cfg.jump.height, 1e-9),
+                   # which way it faces in the world, as an ant reads the sky
+                   np.sin(world.heading), np.cos(world.heading), felt], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape

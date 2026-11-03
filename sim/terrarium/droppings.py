@@ -17,6 +17,8 @@
 # With `spot` the midden is a spot instead of a line all round: `midden` past the nest's edge, `wander` degrees either
 # side of due east, anew each episode. One put down on it stays, on a heap that can't be picked up again (so nothing
 # scores twice), the oldest on the heap making room when the slots run out; `heap` lie there at the start, to be seen.
+# With `move` the spot (and its heap) goes somewhere new every so often in a game, so where it is has to be found
+# again and remembered afresh.
 import numpy as np
 
 
@@ -61,10 +63,7 @@ class Droppings:
         w, d = self.world, self.world.cfg.dung
         for a in idx:
             if d.spot > 0:
-                bearing = np.radians(d.wander) * (2 * w.rng.random() - 1)
-                spot = w.nests[0] + (w.cfg.colonies.nest_radius + d.midden) * np.array([np.cos(bearing), np.sin(bearing)])
-                # a nest off the middle can point it past a wall: then it's as far out as the arena lets it be
-                self.midden_at[a] = np.clip(spot, -(w.cfg.arena.size / 2 - d.spot), w.cfg.arena.size / 2 - d.spot)
+                self.midden_at[a] = self._new_spot()
                 for _ in range(d.heap):
                     r, t = d.spot * 0.5 * np.sqrt(w.rng.random()), w.rng.random() * 2 * np.pi
                     k = self._new(a, self.midden_at[a] + r * np.array([np.cos(t), np.sin(t)]))
@@ -73,6 +72,23 @@ class Droppings:
             for c in range(len(w.nests)):
                 for _ in range(d.start):
                     self._at_home(a, c)
+
+    def _new_spot(self) -> np.ndarray:
+        w, d = self.world, self.world.cfg.dung
+        bearing = np.radians(d.wander) * (2 * w.rng.random() - 1)
+        spot = w.nests[0] + (w.cfg.colonies.nest_radius + d.midden) * np.array([np.cos(bearing), np.sin(bearing)])
+        # a nest off the middle can point it past a wall: then it's as far out as the arena lets it be
+        return np.clip(spot, -(w.cfg.arena.size / 2 - d.spot), w.cfg.arena.size / 2 - d.spot)
+
+    def _move(self):
+        """With `move`, each arena's spot goes somewhere new every so often, and the heap on it goes too."""
+        w, d = self.world, self.world.cfg.dung
+        ticks = max(round(d.move * w.cfg.tick_hz), 1)
+        for a in np.nonzero((w.age > 0) & (w.age % ticks == 0))[0]:
+            new = self._new_spot()
+            on = self.heaped[a] & (self.left[a] > 0)
+            self.pos[a, on] += new - self.midden_at[a]
+            self.midden_at[a] = new
 
     def lying(self) -> np.ndarray:
         """(arenas, slots): droppings on the ground."""
@@ -86,6 +102,8 @@ class Droppings:
         """ate: meals each creature had this tick. Meals become droppings, droppings go, and lying near them makes
         you sick."""
         w, d = self.world, self.world.cfg.dung
+        if d.spot > 0 and d.move > 0:
+            self._move()
         self.since += ate
         due = (self.since >= d.every) & (self.digest == 0) & (d.every > 0)
         self.since[due] -= d.every
