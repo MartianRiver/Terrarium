@@ -1023,6 +1023,24 @@ body {
   margin-left: 14px;
 }
 
+/* a nursery's plan: where it's at, and what each stage has to show before the next */
+#picker .picker-now {
+  margin: 4px 10px 8px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.picker-pass {
+  display: block;
+  margin: 0 10px 6px;
+  font-size: 12.5px;
+  color: #3f7a38;
+}
+
+.picker-stage .picker-off .picker-pass {
+  margin: 0;
+}
+
 #picker .picker-fold > summary {
   padding: 5px 10px;
   font-size: 13px;

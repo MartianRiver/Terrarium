@@ -59,6 +59,7 @@ function stage(s: Stage) {
   if (!s.chips.length) {
     const off = el('div', '', 'picker-off');
     off.append(...head, el('span', s.text, 'picker-text'));
+    if (s.pass) off.append(el('span', `Moves on when: ${s.pass}`, 'picker-pass'));
     li.append(off);
     return li;
   }
@@ -66,7 +67,9 @@ function stage(s: Stage) {
   const summary = document.createElement('summary');
   summary.append(...head);
   if (s.took) summary.append(el('span', s.took, 'picker-when'));
-  box.append(summary, el('p', s.text, 'picker-text'), chips('Watch it learn:', s.chips));
+  box.append(summary, el('p', s.text, 'picker-text'));
+  if (s.pass) box.append(el('p', `Moves on when: ${s.pass}`, 'picker-pass'));
+  box.append(chips('Watch it learn:', s.chips));
   if (s.earlier.length) box.append(chips('Earlier stages’ brains here:', s.earlier));
   li.append(box);
   return li;
@@ -92,9 +95,15 @@ function nursery(c: Card) {
   const later = n.stages.filter((s) => s.status === 'planned');
   let now = n.stages.filter((s) => !older.includes(s) && !later.includes(s));
   if (!now.length && older.length) now = [older.pop()!];
+  if (n.now) {
+    const at = el('p', '', 'picker-now');
+    at.append(el('b', 'Where it’s at: '), n.now);
+    box.append(at);
+  }
   if (older.length) box.append(fold(`${older.length} earlier ${older.length === 1 ? 'stage' : 'stages'}, finished`, older));
   box.append(stages(now));
-  if (later.length) box.append(fold(`${later.length} to come`, later));
+  // open, so what's planned next is in view
+  if (later.length) box.append(fold(`${later.length} to come`, later, true));
   li.append(box);
   return li;
 }
@@ -106,9 +115,10 @@ function stages(list: Stage[]) {
   return ol;
 }
 
-function fold(label: string, list: Stage[]) {
+function fold(label: string, list: Stage[], open = false) {
   const box = document.createElement('details');
   box.className = 'picker-fold';
+  box.open = open;
   box.append(el('summary', label), stages(list));
   return box;
 }

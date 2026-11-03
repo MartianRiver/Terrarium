@@ -61,7 +61,7 @@ describe('the picker', () => {
     const trees: Channel = {
       updated: channel.updated,
       games: {
-        'tree-04': stage(4, '18 m', { status: 'planned' }),
+        'tree-04': stage(4, '18 m', { status: 'planned', pass: 'it beats the picker.', now: 'Growing the garden.' }),
         'tree-01': stage(1, 'apples just out of reach', { status: 'done', finished: '2026-11-01T20:00:00+11:00' }),
         'tree-03': stage(3, '16 m', { status: 'held' }),
         'tree-02': stage(2, '14 m', { status: 'training', training: true }),
@@ -90,6 +90,8 @@ describe('the picker', () => {
     expect(tree.stages[1].earlier[0].href).toContain('&at=b-was-a.jsonl.gz');
     expect(tree.stages[3].chips).toEqual([]);
     expect(tree.stages.map((s) => s.recent)).toEqual([true, false, false, false]);
+    expect(tree.stages[3].pass).toBe('it beats the picker.');
+    expect(tree.now).toBe('Growing the garden.');
     expect(plan(trees, null, NOW + 13 * 3600_000).find((s) => s.key === 'nursery')!.cards
       .find((c) => c.title === 'The apple tree')!.nursery!.stages[0].recent).toBe(false);
     const needs = cards.find((c) => c.title === 'Needs')!;
