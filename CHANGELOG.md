@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+0.4 notes on the night two jobs shared one world (every brain stayed a specialist, since points that add up pay most for the better job alone), a choice every 0.2 s instead of every 0.05 s (the only way the tree's 2.8 m carry home was learned, 6 seeds of 6 against 0 of 4), a heap and a tree that move, the far tree from 8 to 32 m (no memory used: the tree was in sight far further than we'd said) and spread wider with sight cut to 4 m, a third young-colony seed with memory and 160M more that made them worse, and two passes over each rollout instead of four; efficiency.md rows for each, and what 74 pod rentals bought.
+
 Each nursery in the picker says where it's at (what's training, what the last stage showed, what comes next), and each stage says when it moves on to the next ("Moves on when: …"), taken from the channel's index (`now` per nursery, `pass` per stage). The stages to come show open, so the plan is in sight.
 
 The picker's top list is what's training now and the newest to finish in the last 12 hours, six at most, so the groups below show without a long scroll. Inside a nursery, the stages training, on hold or finished in the last 12 hours show straight away, with the older ones folded into "earlier stages" and the planned ones into "to come".
