@@ -167,6 +167,40 @@ def test_the_worker_pauses_resumes_and_hands_back_a_running_job(running):
     assert proc.wait(timeout=10) is not None
 
 
+def test_the_status_pause_stops_and_resumes_a_running_job(running):
+    wk, task, proc, fake, _ = running
+    fake.seen = QUIET
+    wk.paused = True
+    wk.mind(now=1000)
+    assert task.state == 'paused' and task.reason == 'paused from the status page'
+    assert machine.tree(proc.pid)[0].status() == 'stopped' or sys.platform == 'win32'
+    wk.paused = False
+    wk.mind(now=1010)
+    assert task.state == 'training' and task.paused == 10
+
+
+def test_manual_pause_keeps_machine_stop_rules(running):
+    wk, task, proc, fake, _ = running
+    wk.paused = True
+    fake.seen = QUIET._replace(fullscreen=True)
+    wk.mind(now=1000)
+    assert task.state == 'handed back' and task.reason == 'something is running full screen'
+    assert proc.wait(timeout=10) is not None
+
+
+def test_resuming_manually_waits_for_the_machine_to_be_ready(running):
+    wk, task, _, fake, _ = running
+    wk.paused = True
+    wk.mind(now=1000)
+    wk.paused = False
+    fake.seen = QUIET._replace(temp=90)
+    wk.mind(now=1010)
+    assert task.state == 'paused' and task.reason == 'GPU at 90 °C'
+    fake.seen = QUIET
+    wk.mind(now=1020)
+    assert task.state == 'training' and task.paused == 20
+
+
 def test_a_game_hands_the_job_back_straight_away(running):
     wk, task, proc, fake, _ = running
     fake.seen = QUIET._replace(fullscreen=True)

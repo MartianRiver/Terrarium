@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Pausing a worker from its status page (or `worker pause`) suspends the job it's running, as coming back to the machine does, instead of only stopping new ones; the machine's own rules (a game on, too hot) still win over a resume.
+
 A new world scatters its blocks as every later episode does. Scoring plays only a new world's first episode, so until now every scattered world was scored with its blocks where they're set: the far-spread tree was always at its spot when scored, though it moved in training. Worlds that don't scatter start exactly as before.
 
 Two scripted tree players to measure what remembering the tree is worth in a world: `searcher` sees only what's in range and in front of it, heads for the tree's usual spot and wanders from there, and `tree_seen` does the same but goes back to where it last saw the trunk. `--wiped-on-event` in `tree-home` wipes a brain's notes each time it unloads in the nest.
