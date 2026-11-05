@@ -332,6 +332,16 @@ class Tree:
     hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
     home: bool       # an apple taken goes in the crop, and pays only once it's unloaded in the nest
     move: float      # the tree moves every this many seconds, where [arena] scatter would put it (0: never)
+    start: float     # every episode starts with each Terrikin this far (m) from the trunk, facing it (0: at the nest)
+    burrow: bool     # unloading an apple at home takes the carrier down into the nest, back up at its middle turned any way
+
+    def __post_init__(self):
+        if self.start < 0:
+            raise ConfigError('[tree] start can\'t be below 0')
+        if self.start > 0 and self.points <= 0:
+            raise ConfigError('[tree] start needs the tree on ([tree] points above 0)')
+        if self.burrow and not (self.points > 0 and self.home):
+            raise ConfigError('[tree] burrow needs apples carried home ([tree] points above 0 and home)')
 
     @property
     def on(self) -> bool:
@@ -522,7 +532,7 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
                   'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0,
                   'spot': 0.0, 'heap': 0, 'wander': 0.0, 'move': 0.0},
          'jump': {'height': 0.0, 'energy': 0.0},
-         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False, 'move': 0.0},
+         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False, 'move': 0.0, 'start': 0.0, 'burrow': False},
          'home': {'near': 0.0, 'far': 0.0}}
 
 

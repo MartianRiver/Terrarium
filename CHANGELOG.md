@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+`[tree] start` (metres, 0 is off): every episode starts with each Terrikin that far from the trunk's edge, facing it, wherever scatter put the tree, instead of at its nest, so finding the tree the first time is free and only the trips after the first apple home need remembering it. A ring with no room (a wall, a block or a nest in the way) is tried at other angles and then falls back to the nest spawn.
+
+`[tree] burrow`: an apple unloaded at home takes its carrier down into the nest, and it comes back up at the middle turned any way. Without it a Terrikin that unloads at the rim facing in can find the tree again by walking straight back out the way it came, so getting back needed no memory at all; with it, where the tree is can only come from what it noted while it was there.
+
 Nim, a pet of your own on a local page (`viewer/pet.html`, `npm run dev` then /pet.html; not on the site): you feed it, clean up after it, play ball and give it attention in a little garden, and its needs keep going while the page is closed and catch up when it's opened. It can be neglected for real: it sleeps from 20:00 to 07:30 and everything slows to a tenth then, illness too, so a night is safe, a good breakfast lasts the school day, and if it goes about 8 waking hours with an empty tummy, no company or a mess left it falls ill, and 12 hours after that without medicine it dies; there's a medicine button, warnings on the way (hungry, poorly, ill, very ill), a gentle goodbye and a new egg, and `?debug` on the pet page jumps the clock to test it.
 
 Pausing a worker from its status page (or `worker pause`) suspends the job it's running, as coming back to the machine does, instead of only stopping new ones; the machine's own rules (a game on, too hot) still win over a resume.
