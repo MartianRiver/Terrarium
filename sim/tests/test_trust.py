@@ -15,7 +15,7 @@ def test_a_job_gets_only_the_environment_it_needs(monkeypatch):
     monkeypatch.setenv('PATH', '/usr/bin')
     env = trust.job_env(OMP_NUM_THREADS='2')
     assert env['PATH'] == '/usr/bin' and env['OMP_NUM_THREADS'] == '2' and 'AWS_SECRET_ACCESS_KEY' not in env
-
+    assert env['PYTHONIOENCODING'] == 'utf-8'
 
 def test_packages_only_come_from_the_indexes_and_torch_is_new_enough(tmp_path):
     trust.check_lock(LOCK)
