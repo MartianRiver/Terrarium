@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Nim, a pet of your own on a local page (`viewer/pet.html`, `npm run dev` then /pet.html; not on the site): you feed it, clean up after it, play ball and give it attention in a little garden, and its needs keep going while the page is closed and catch up when it's opened. It can be neglected for real: it sleeps from 20:00 to 07:30 and everything slows to a tenth then, illness too, so a night is safe, a good breakfast lasts the school day, and if it goes about 8 waking hours with an empty tummy, no company or a mess left it falls ill, and 12 hours after that without medicine it dies; there's a medicine button, warnings on the way (hungry, poorly, ill, very ill), a gentle goodbye and a new egg, and `?debug` on the pet page jumps the clock to test it.
+
 Pausing a worker from its status page (or `worker pause`) suspends the job it's running, as coming back to the machine does, instead of only stopping new ones; the machine's own rules (a game on, too hot) still win over a resume.
 
 A new world scatters its blocks as every later episode does. Scoring plays only a new world's first episode, so until now every scattered world was scored with its blocks where they're set: the far-spread tree was always at its spot when scored, though it moved in training. Worlds that don't scatter start exactly as before.
