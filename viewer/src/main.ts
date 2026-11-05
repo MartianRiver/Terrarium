@@ -17,7 +17,7 @@ import { readReplay, ReplayError, type Replay } from './replay';
 import { Sounds } from './sounds';
 import { createStage } from './stage';
 import type { Frame, WorldInfo } from './world';
-import { Vitals } from './vitals';
+import { Vitals, vitalsAsk } from './vitals';
 import { WorldView } from './worldview';
 
 const log = createLogger('main');
@@ -30,6 +30,8 @@ const fileInput = document.getElementById('file') as HTMLInputElement;
 // anything that hands out a Frame per tick; step() returns null when it has run out
 interface Source {
   info: WorldInfo;
+  // a replay's header `source` (brain, config), for what the vitals card reads from it
+  about?: Record<string, unknown>;
   step(): Frame | null;
   label(): string;
   // a live source (a game) can be waiting on its next frames; a replay always has one
@@ -77,6 +79,7 @@ function replaySource(replay: Replay, name: string): Source {
   let i = 0;
   return {
     info: replay.info,
+    about: replay.source,
     step: () => replay.frames[i++] ?? null,
     label: () => `${name} · ${clock(Math.max(0, i - 1) / hz)} / ${length}`,
   };
@@ -133,6 +136,15 @@ function boot() {
   const above = new THREE.Vector3();
   // the followed one's card: home, fed, tired, carrying, as its world has them
   let vitals: Vitals | null = null;
+  // ?vitals=1 shows it under any camera (reels), =0 never, =big for clips; S flips it
+  const ask = vitalsAsk(location.search);
+  let vitalsForce = ask.force;
+  let vitalsOn = false;
+  // the reel harness draws the card on its own canvas from this, since a clip is cut from the WebGL canvas
+  (window as unknown as { terrariumVitals: unknown }).terrariumVitals = {
+    model: () => vitals?.model ?? null,
+    force: (on: boolean | null) => { vitalsForce = on; },
+  };
   const facing = new THREE.Vector3();
   let tick = 0;
   // the brain window (B): local only, it reads brains through the runs server
@@ -165,8 +177,8 @@ function boot() {
     view.chosen = chosen;
     view.marked = !params.has('pick');
     director?.reset();
-    vitals ??= new Vitals(document.body, source.info);
-    vitals.reset(source.info);
+    vitals ??= new Vitals(document.body, source.info, source.about, ask.big);
+    vitals.reset(source.info, source.about);
     const first = source.step()!;
     view.push(first);
     cues.reset(source.info.nests);
@@ -394,6 +406,7 @@ function boot() {
     }
     if (e.key === 'v' || e.key === 'V') setCam(intro ? 'follow' : CAMS[(CAMS.indexOf(cam) + 1) % CAMS.length]);
     if (e.key === 'f' || e.key === 'F') setCam('follow');
+    if ((e.key === 's' || e.key === 'S') && !game && !e.metaKey && !e.ctrlKey && !e.altKey) vitalsForce = !vitalsOn;
     if (e.key === 'm' || e.key === 'M') void sounds.toggle();
     if (ant && (e.key === 'j' || e.key === 'J')) ant.marked = !ant.marked;
   });
@@ -506,7 +519,9 @@ function boot() {
     const step = snap ? Infinity : paused ? 0 : dt;
     const scripted = look || ant || game;
     const shown = view!.current;
-    const followed = cam === 'follow' && !scripted && !intro ? shown?.creatures.find((c) => c.id === view!.focusId) ?? null : null;
+    const cardOn = vitalsForce ?? (cam === 'follow' && !scripted && !intro);
+    const followed = cardOn ? shown?.creatures.find((c) => c.id === view!.focusId) ?? null : null;
+    vitalsOn = !!followed;
     stage.camera.getWorldDirection(facing);
     const flat = Math.hypot(facing.x, facing.z) || 1;
     vitals!.show(followed, followed ? nameOf(followed.id) : '', shown, { x: facing.x / flat, z: facing.z / flat });
