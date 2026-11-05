@@ -150,10 +150,13 @@ class Forage:
                 warm = night.warmth(w.pos, w.alive, w.colony, w.nest_at() == w.colony, w.cfg.night)
                 snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
         self.last = actions[..., :2].copy()
-        own = ((r.food * (w.fed - before['fed']) - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
+        gain = w.fed - before['fed']
+        # hunger before the meal squared, less after: gain × (2 × hunger after + gain)
+        needs = r.needs * gain * (2 * (1 - w.energy) + gain)
+        own = ((r.food * gain - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)
-               + w.cfg.dt * (r.alive * lived + snug) + fun + play)
+               + w.cfg.dt * (r.alive * lived + snug) + fun + play + needs)
         ended = w.ended.copy()
         died = alive & ~w.alive
         done = died | ended[:, None]
