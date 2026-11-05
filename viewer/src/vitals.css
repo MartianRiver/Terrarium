@@ -1,0 +1,79 @@
+.vitals {
+  position: fixed;
+  left: 16px;
+  top: 64px;
+  width: 210px;
+  box-sizing: border-box;
+  padding: 8px 12px 9px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  color: #2c3a33;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.vitals h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.vitals ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vitals li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 21px;
+}
+
+.vitals li[hidden] {
+  display: none;
+}
+
+.vitals-name {
+  width: 4.6em;
+  flex: none;
+  color: #5d6b63;
+}
+
+.vitals-value {
+  white-space: nowrap;
+}
+
+.vitals-arrow {
+  display: inline-block;
+  font-weight: 700;
+  color: #3f7a38;
+  transition: transform 0.15s linear;
+}
+
+.vitals-bar {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: rgb(44 58 51 / 0.12);
+  overflow: hidden;
+}
+
+.vitals-bar i {
+  display: block;
+  height: 100%;
+  background: #6aa84f;
+}
+
+.vitals li[data-low='true'] .vitals-bar i {
+  background: #d9822b;
+}
+
+/* phones: the channel card and the chips take the screen, so the card stays small */
+@media (max-width: 600px) {
+  .vitals {
+    width: 170px;
+    font-size: 12px;
+  }
+}
