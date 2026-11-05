@@ -40,7 +40,8 @@ class Refused(Exception):
 
 
 def job_env(**extra: str) -> dict[str, str]:
-    return {k: v for k in KEEP_ENV if (v := os.environ.get(k))} | extra
+    # utf-8 out: Windows' default (cp1252) can't write a scoring table's arrows
+    return {k: v for k in KEEP_ENV if (v := os.environ.get(k))} | {'PYTHONIOENCODING': 'utf-8'} | extra
 
 
 def capped(cmd: list[str], cores: float, of: int) -> list[str]:
