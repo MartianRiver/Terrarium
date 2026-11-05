@@ -248,6 +248,61 @@ def last_seen(world: World):
     return act
 
 
+def in_view(w: World, points: np.ndarray) -> np.ndarray:
+    """Which of each arena's points (arenas, k, 2) each creature has in range and in its field of view, (arenas,
+    creatures, k). No line of sight: the scripted searchers see through the trunk and each other."""
+    d = points[:, None] - w.pos[:, :, None]
+    turn = (np.arctan2(d[..., 1], d[..., 0]) - w.heading[..., None] + np.pi) % (2 * np.pi) - np.pi
+    return (np.hypot(d[..., 0], d[..., 1]) <= w.cfg.vision.range) & (np.abs(turn) <= w.cfg.vision.fov / 2)
+
+
+def searcher(world: World, remember: bool = False):
+    """The picker knowing only what it can see and where trees usually stand: heads for the tree's set spot (what a
+    brain's weights can learn) and wanders at random from there until an apple is in view, picks it, takes a full crop
+    home (it feels the way, as a Terrikin does). With remember it also keeps where it last saw the tree and goes back
+    there instead, forgetting the spot if no apple's in view when it gets there. The two apart are what remembering
+    the tree is worth in a world; a brain using its notes should land near the second."""
+    jump, unload = ACTIONS.index('jump'), ACTIONS.index('unload')
+    wander = padded(random_policy)(world)
+    spot = np.full((*world.alive.shape, 2), np.nan)
+
+    def act(w):
+        out = wander(w)
+        here = w.food_present[:, :w.wild]
+        apples = w.food_pos[:, :w.wild]
+        seen = in_view(w, apples) & here[:, None]
+        d = apples[:, None] - w.pos[:, :, None]
+        gap = np.where(seen, np.hypot(d[..., 0], d[..., 1]), np.inf)
+        k = gap.argmin(-1)
+        to = np.take_along_axis(d, k[..., None, None], 2)[:, :, 0]
+        near = np.take_along_axis(gap, k[..., None], 2)[..., 0]
+        trunk = w.physics.block_pos[:, w.cfg.tree.trunk]
+        if remember:
+            sees = in_view(w, trunk[:, None])[..., 0]
+            spot[sees] = np.broadcast_to(trunk[:, None], spot.shape)[sees]
+            there = np.hypot(*(spot - w.pos).transpose(2, 0, 1)) < 1.0
+            spot[there & ~np.isfinite(near)] = np.nan
+        full = (w.crop >= w.cfg.crop.capacity) if w.cfg.tree.home else np.zeros(w.alive.shape, bool)
+        known = ~np.isnan(spot[..., 0])
+        usual = np.array([w.cfg.block[w.cfg.tree.trunk].x, w.cfg.block[w.cfg.tree.trunk].y]) - w.pos
+        known_or_usual = known | (np.hypot(usual[..., 0], usual[..., 1]) > 1.5)
+        to = np.where(np.isfinite(near)[..., None], to,
+                      np.where(known[..., None], spot - w.pos, usual))
+        to = np.where(full[..., None], w.nests[w.colony] - w.pos, to)
+        to = around_trunk(w, to)
+        steer = full | np.isfinite(near) | known_or_usual
+        under = near < 0.3
+        inside = w.nest_at() == w.colony
+        want = (np.arctan2(to[..., 1], to[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
+        go = np.where(full, ~inside, ~under)
+        out[..., 0] = np.where(steer, np.where(go, np.where(np.abs(want) < 1, 1.0, 0.2), 0.0), out[..., 0])
+        out[..., 1] = np.where(steer, np.clip(want * 3, -1, 1), out[..., 1])
+        out[..., jump] = np.where(under & ~full, 1.0, -1.0)
+        out[..., unload] = np.where(full & inside, 1.0, -1.0)
+        return out
+    return act
+
+
 # each game: its world, its roles (what the brain plays, against what), the number that matters most in each role
 # and which way is better
 GAMES = {
@@ -271,7 +326,7 @@ GAMES = {
     'tree-home': ('nursery-tree-home.toml', {'pick': (lambda b: (tree_game, b), 'home_a_minute', +1)}),
 }
 BASELINES = {'random': random_policy, 'chaser': chaser, 'still': still, 'last_seen': last_seen, 'picker': picker,
-             'wall': maze.wall_policy,
+             'searcher': searcher, 'tree_seen': lambda w: searcher(w, remember=True), 'wall': maze.wall_policy,
              'mapped': maze.mapped_policy}
 
 
@@ -322,8 +377,22 @@ def new_room(world):
     return now
 
 
+def unloads(world):
+    """A Terrikin emptying its crop in its nest since the last choice: wiped then, it sets off for the tree again with
+    no notes of where it was."""
+    was = world.crop.copy()
+
+    def now(w):
+        nonlocal was
+        out = (w.crop < was) & (w.nest_at() == w.colony)
+        was = w.crop.copy()
+        return out
+    return now
+
+
 # the event a game's notes are wiped on with --wiped-on-event, and what to call it
-EVENTS = {'peek': (hides, 'as it hides'), 'maze': (new_room, 'in each new room')}
+EVENTS = {'peek': (hides, 'as it hides'), 'maze': (new_room, 'in each new room'),
+          'tree-home': (unloads, 'on unloading')}
 
 
 def policy(name: str, wiped: float | str | None = None) -> Make:
