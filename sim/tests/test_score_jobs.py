@@ -15,7 +15,7 @@ BRAIN = {'blob': sha256(b'brain'), 'file': 'brain.pt'}
 
 
 def score(id: str, parent=None, added: float = 1.0, on: str | None = None) -> dict:
-    s = spec(id, parent=parent or BRAIN, added=added, on=on)
+    s = spec(id, trusted=True, parent=parent or BRAIN, added=added, on=on)
     del s['train'], s['train_file']
     return s | {'kind': 'score', 'samples': 0, 'score': {'game': 'tree', 'episodes': 8, 'baselines': ['random']}}
 
@@ -48,6 +48,7 @@ def test_score_jobs_skip_old_workers_and_pods_unless_kept_to_pods(tmp_path):
     s.put(b'brain')
     s.add(score('a' * 12), 'sig')
     assert s.claim('Kelpie', True, specs=CPU, version=9) is None
+    assert s.claim('donor-1', False, role='donor', specs=CPU, version=10) is None
     assert s.claim('pod-1', True, role='rented', specs=LAPTOP_GPU, version=10) is None
     s.add(score('b' * 12, added=2, on='rented'), 'sig')
     assert s.claim('pod-1', True, role='rented', specs=LAPTOP_GPU, version=10)['spec']['id'] == 'b' * 12
@@ -77,7 +78,7 @@ def test_a_batch_can_score_its_own_training_job(repo, tmp_path):
         jobs.check(s)
     train, sc = made
     assert sc['kind'] == 'score' and sc['parent'] == {'job': train['id']} and 'train' not in sc
-    assert sc['samples'] == 0 and sc['seed'] == evals.HELD_OUT
+    assert sc['samples'] == 0 and sc['seed'] == evals.HELD_OUT and sc['trusted'] and not train['trusted']
     assert sc['score'] == {'game': 'tree', 'episodes': 16, 'wiped_every': 3.0, 'baselines': ['picker']}
     for bad, why in [('score = { game = "golf" }\nbrain = "job:t"', 'no game'),
                      ('score = { game = "tree", baselines = ["nobody"] }\nbrain = "job:t"', 'no baseline'),
@@ -92,6 +93,8 @@ def test_a_batch_can_score_its_own_training_job(repo, tmp_path):
         jobs.specs(batch, tmp_path / 'runs', repo)
     with pytest.raises(jobs.BadJob, match='no train'):
         jobs.check(sc | {'train': train['train']})
+    with pytest.raises(jobs.BadJob, match='only for trusted'):
+        jobs.check(sc | {'trusted': False})
 
 
 FAKE_SCORE = '''
