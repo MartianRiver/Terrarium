@@ -3,7 +3,7 @@
 #   uv run python -m terrarium.train NAME --world configs/solo.toml [--parent X.pt] [--seed 0] [--scratch]
 #                                         [--device cuda|mps|cpu] [--workers N] [--fast] [--gpu-collect]
 #                                         [--rivals B.pt C.pt [--rival-lr 5e-5 1e-4] [--fixed-seats]] [--memory 128 [--recall 0.1]]
-#                                         [--pool 10]
+#                                         [--pool 10] [--root DIR]
 #
 # --memory N gives the brain N notes of memory if it has none (brain.py); it acts as before until trained, unless
 # --recall starts it reading them a little (in a toy test of a 6 s wait, 0.1 learned it in
@@ -244,6 +244,7 @@ def main():
     parser.add_argument('--fast', action='store_true', help='compile the update and run its forward pass in bfloat16 (CUDA)')
     parser.add_argument('--gpu-collect', action='store_true',
                         help='run the brain for rollouts once a step for every worker, on --device; workers only step the worlds')
+    parser.add_argument('--root', type=Path, default=ROOT, help='the folder runs go in (default: runs/)')
     parser.add_argument('--no-evals', action='store_true', help="skip the evals at the end (when something else scores the run)")
     parser.add_argument('--rivals', nargs='*', default=[], metavar='BRAIN',
                         help='brains that play the other colonies and learn beside the parent (needs --gpu-collect)')
@@ -259,7 +260,7 @@ def main():
           workers=args.workers, score=not args.no_evals, fast=args.fast, gpu_collect=args.gpu_collect,
           mix=[(w, int(n)) for w, n in (m.rsplit(':', 1) for m in args.mix)], rivals=args.rivals,
           rival_lr=args.rival_lr, memory=args.memory, recall=args.recall, fixed_seats=args.fixed_seats,
-          pool=args.pool)
+          pool=args.pool, root=args.root)
 
 
 if __name__ == '__main__':
