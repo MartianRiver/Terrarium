@@ -219,6 +219,8 @@ class World:
             self.young[:] = np.where(self.spare, 0, round(cfg.young.seconds * cfg.tick_hz))
         if self.tag:
             self.tag.reset(np.arange(arenas))
+        if self.tree:
+            self.tree.start(np.arange(arenas))
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -370,6 +372,8 @@ class World:
                 self._grow(a, f)
         if self.dung:
             self.dung.reset(idx)
+        if self.tree:
+            self.tree.start(idx)
         log.debug('arenas reset', tick=self.tick, count=len(idx))
 
     def step(self, actions: np.ndarray):

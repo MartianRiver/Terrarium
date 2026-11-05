@@ -277,6 +277,10 @@ hop = 0.2
 home = false
 # the tree moves every this many seconds, where [arena] scatter would draw it (0: never)
 move = 0.0
+# every episode starts with each Terrikin this far (m) from the trunk, facing it (0: at the nest)
+start = 0.0
+# unloading an apple at home takes the carrier down into the nest, and it comes back up at the middle turned any way
+burrow = false
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
