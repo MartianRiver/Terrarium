@@ -411,6 +411,7 @@ class Reward:
     hatch: float
     novelty: float
     variety: float
+    needs: float
 
 
 @dataclass(frozen=True)
