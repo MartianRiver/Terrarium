@@ -319,6 +319,8 @@ class Worker:
                     if t.proc and t.proc.poll() is None and not t.gone.is_set()]
         ours = frozenset(p.pid for _, pid in training for p in machine.tree(pid))
         verdict = self.watch.check(ours, now)
+        if self.paused and verdict.action == 'go':
+            verdict = machine.Verdict('pause', 'paused from the status page')
         if verdict != self.verdict:
             log.info('machine', action=verdict.action, reason=verdict.reason)
         self.verdict = verdict
