@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Score jobs run on Windows: a job's output is written as utf-8, where Windows' default couldn't write the arrows in a scoring table and the job died after playing every game (worker version 11).
+
 Score jobs are always trusted, so they run only on my own machines and rented ones, never on a donated machine, which could send back any numbers it liked.
 
 Scoring is a job kind: a batch job with a `score` table and a `brain` plays that brain with `terrarium.games` on whichever machine is free (`brain = "job:<name>"` scores a training job of the same batch once it's done) and syncs into `runs/scores/` with the table, every game's numbers and how long it took on what. Machines without a GPU take score jobs first and machines with one take training first, so neither waits behind the other; pods score only jobs kept to them; workers before version 10 aren't given them (worker version 10). `terrarium.games --seed` picks the games played.

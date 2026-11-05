@@ -54,7 +54,7 @@ POLL = 30
 BEAT = 60
 # the run so far goes up this often while training, so the channel can show a run before it's done
 PEEK = 900
-VERSION = 10
+VERSION = 11
 
 
 def cpus() -> int:
