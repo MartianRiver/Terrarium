@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Score jobs are always trusted, so they run only on my own machines and rented ones, never on a donated machine, which could send back any numbers it liked.
+
 Scoring is a job kind: a batch job with a `score` table and a `brain` plays that brain with `terrarium.games` on whichever machine is free (`brain = "job:<name>"` scores a training job of the same batch once it's done) and syncs into `runs/scores/` with the table, every game's numbers and how long it took on what. Machines without a GPU take score jobs first and machines with one take training first, so neither waits behind the other; pods score only jobs kept to them; workers before version 10 aren't given them (worker version 10). `terrarium.games --seed` picks the games played.
 
 A job can say what machine it needs (`needs = { gpu = true, gpu_memory_gb = 6, cores = 8, memory_gb = 8, machine = "Kelpie" }`, any of them, or `gpu = false` for CPU work), and the coordinator gives it only to a worker whose report says it has that, so a CPU-only laptop no longer takes a job sized for a GPU; a Mac with Apple silicon reports its GPU (`mps`), and a job nothing online can meet says why it waits (`unmet`). A failed job says what kind of failure it was (stuck, give up, crash, setup, quiet): a brain that ended its own run fails at once instead of trying the same seed again, and doesn't count against the pod it ran on. `jobs add` reads world and train files with the strict loader before signing them; a synced run's folder appears only once it's whole; a worker no longer reads its next beat after an upload as the job taken away (worker version 9).

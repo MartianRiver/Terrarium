@@ -155,6 +155,8 @@ def check(spec: dict):
     if scores:
         need('train' not in spec and spec['samples'] == 0 and spec.get('parent'), 'a score job has a brain, no train')
         need(bad_score(spec.get('score')) is None, f'bad score: {bad_score(spec.get("score"))}')
+        # a score is what we decide on, so it comes only from our own machines: a donor could send back any numbers
+        need(spec['trusted'], 'a score job is only for trusted machines')
     need(isinstance(spec.get('trusted'), bool), 'bad trusted')
     code = spec.get('code') or {}
     need(isinstance(code, dict) and isinstance(code.get('commit'), str) and re.fullmatch(r'[0-9a-f]{40}', code['commit']),
@@ -255,7 +257,7 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
         if 'score' in job:
             if job['parent'].startswith('job:') and job['parent'][4:] in scored:
                 raise BadJob(f'{path.name} job {job["name"]}: a score job has no brain to score')
-            out.append(score_spec(job, path, code, trusted, runs, ids, blob, len(out)))
+            out.append(score_spec(job, path, code, runs, ids, blob, len(out)))
             ids[job['name']] = out[-1]['id']
             scored.add(job['name'])
             continue
@@ -292,7 +294,7 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
     return out, blobs
 
 
-def score_spec(job: dict, path: Path, code: dict, trusted: bool, runs: Path, ids: dict, blob, n: int) -> dict:
+def score_spec(job: dict, path: Path, code: dict, runs: Path, ids: dict, blob, n: int) -> dict:
     from . import evals, games
     where, score = f'{path.name} job {job["name"]}', dict(job['score'])
     if score['game'] not in games.GAMES:
@@ -304,7 +306,7 @@ def score_spec(job: dict, path: Path, code: dict, trusted: bool, runs: Path, ids
     # the games' own seed, written down, so the job says exactly which games it plays
     seed = score.pop('seed', evals.HELD_OUT if score.pop('held_out', False) else evals.SEED)
     spec = {'format': FORMAT, 'id': secrets.token_hex(6), 'batch': path.stem, 'name': job['name'],
-            'added': time.time() + n * 1e-3, 'code': code, 'trusted': trusted, 'kind': 'score',
+            'added': time.time() + n * 1e-3, 'code': code, 'trusted': True, 'kind': 'score',
             'world': blob(world.read_bytes()), 'world_file': world.name,
             'parent': parent(job['parent'], path.parent, runs, ids, blob), 'seed': seed, 'samples': 0,
             'on': job.get('on'), 'score': {'episodes': games.EPISODES, 'baselines': ['random']} | score}
