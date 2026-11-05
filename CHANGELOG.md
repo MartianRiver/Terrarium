@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+A new world scatters its blocks as every later episode does. Scoring plays only a new world's first episode, so until now every scattered world was scored with its blocks where they're set: the far-spread tree was always at its spot when scored, though it moved in training. Worlds that don't scatter start exactly as before.
+
+Two scripted tree players to measure what remembering the tree is worth in a world: `searcher` sees only what's in range and in front of it, heads for the tree's usual spot and wanders from there, and `tree_seen` does the same but goes back to where it last saw the trunk. `--wiped-on-event` in `tree-home` wipes a brain's notes each time it unloads in the nest.
+
 Score jobs run on Windows: a job's output is written as utf-8, where Windows' default couldn't write the arrows in a scoring table and the job died after playing every game (worker version 11).
 
 Score jobs are always trusted, so they run only on my own machines and rented ones, never on a donated machine, which could send back any numbers it liked.

@@ -134,6 +134,10 @@ class World:
         self.food_pos = np.zeros((arenas, slots, 2))
         # the ways between rooms in each arena's maze ([arena] maze)
         self.maze_open: list[set] = [set() for _ in range(arenas)]
+        # as reset() does, so the first episode isn't the one layout with every block where it's set (scoring plays
+        # only the first: until 2026-11-05 every scattered world was scored with its tree at its spot)
+        if cfg.arena.scatter:
+            scatter(self, np.arange(arenas))
         if cfg.arena.maze:
             carve(self, np.arange(arenas))
         self.food_id = np.zeros((arenas, slots), int)
