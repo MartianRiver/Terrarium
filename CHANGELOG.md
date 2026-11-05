@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Following a Terrikin can now show what it feels in a card: which way it faces on a small compass, the way home, how fed it is, what it carries, what's in the store, and whether its notes are kept or wiped each time it gets home. It switches on and off with `?vitals=1` or `0` (`big` for screen recordings) or the S key, and a reel clip draws it with `"vitals": true`, so the same replay renders with and without it. Reel clips can also move their labels (`top`), pin the clock (`clockAt`) and put small tags in a corner (`tags`), and `receive.py` takes a port so two renders can run side by side.
+
 `[tree] start` (metres, 0 is off): every episode starts with each Terrikin that far from the trunk's edge, facing it, wherever scatter put the tree, instead of at its nest, so finding the tree the first time is free and only the trips after the first apple home need remembering it. A ring with no room (a wall, a block or a nest in the way) is tried at other angles and then falls back to the nest spawn.
 
 `[tree] burrow`: an apple unloaded at home takes its carrier down into the nest, and it comes back up at the middle turned any way. Without it a Terrikin that unloads at the rim facing in can find the tree again by walking straight back out the way it came, so getting back needed no memory at all; with it, where the tree is can only come from what it noted while it was there.
