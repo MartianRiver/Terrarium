@@ -155,10 +155,32 @@ train = "train-full-more.toml"
 
 `needs` keeps a job to machines that have what it needs, from what each worker says it is: `needs = { gpu = true, gpu_memory_gb = 6 }` for a big brain, `needs = { gpu = false }` for CPU work that should leave the GPUs free, `cores` and `memory_gb` as least amounts, and `machine = "Kelpie"` for one machine by name (a test, or a job only one machine should run). A Mac with Apple silicon counts as having a GPU, its memory shared with the machine's. Unlike `on`, this rests on what the worker reports, so it decides only where a job fits best, never who may run it. A job no machine online can meet waits, and the queue says why (`jobs list` prints it, e.g. "no worker online with gpu = true"). Without `needs`, any machine allowed to run the job can take it. `jobs add` reads each world and train file with this checkout's strict loader before signing, so a file written for older code is refused here rather than on every machine that takes it.
 
+### Score jobs
+
+A job with a `score` table and a `brain` (in place of `train`) plays that brain in its world with `terrarium.games` on whichever machine is free, and comes back as the table (`report.txt`), every game's numbers (`games.json`) and how long it took on what (`score.json`), synced into `runs/scores/`:
+
+```toml
+world = "far-32.toml"
+train = "train.toml"
+
+[[job]]
+name = "far32-s1"
+parent = "run:20261105-101500-fs-r4-t1-s2-1a2b3c4d5e6f/00004000000.pt"
+
+[[job]]
+name = "far32-s1-score"
+brain = "job:far32-s1"
+score = { game = "tree-home", episodes = 256, held_out = true, wiped_every = 3.0, baselines = ["picker"] }
+```
+
+`brain` takes what `parent` does; `job:<name>` waits for that training job and scores its final brain, so training and its score can go in one batch and the score runs as soon as the brain exists, on another machine. `episodes` defaults to 128 and `baselines` to `["random"]`; `held_out` plays the held-out games, `seed = N` others, and the seed used is written into the job, so two score jobs with the same seed play the same games. `wiped` and `wiped_every` add the brain with its notes blanked, as `terrarium.games` does.
+
+Every game runs on the CPU, one thread a process, so it's the same games on any machine; whether two machines give exactly the same numbers for one brain is checked on the first real ones (a Mac and a Windows box), not assumed. A score job goes first to a machine without a GPU, and a machine with one takes training first and scores only when no training job fits it, so neither kind waits behind the other. Pods, paid by the hour for the GPU, never take a score job unless it says `on = "rented"`. A worker before version 10 doesn't know score jobs and isn't given them. A score job can't be another job's parent: it makes no brain.
+
 ```
 uv run python -m terrarium.jobs add grid.toml     # signs with ~/.ssh/terrarium_jobs_ed25519
 uv run python -m terrarium.jobs list
-uv run python -m terrarium.jobs sync              # finished runs → runs/
+uv run python -m terrarium.jobs sync              # finished runs → runs/, scores → runs/scores/
 uv run python -m terrarium.jobs cancel ID | retry ID
 uv run python -m terrarium.jobs workers           # each machine's specs, state and when it last reported
 ```

@@ -1,5 +1,6 @@
 # A machine that trains for the queue: asks the coordinator for a job, checks
-# it, builds the job's code, runs terrarium.train in it and uploads the run.
+# it, builds the job's code, runs terrarium.train in it (terrarium.games for a
+# score job) and uploads the run.
 #
 #   uv run python -m terrarium.worker --server URL [--slots 1] [--trusted] [--paused] [--anytime]
 #   uv run python -m terrarium.worker pause | resume | drain | status
@@ -42,7 +43,7 @@ import psutil
 
 from . import jobs, machine, runs, snapshot, usage
 from .log import Logger
-from .store import sha256
+from .store import scoring, sha256
 from .trust import KEEP_CODE, Refused, capped, check_lock, job_env, pin_signers, scrub, utc
 
 log = Logger('worker')
@@ -53,7 +54,7 @@ POLL = 30
 BEAT = 60
 # the run so far goes up this often while training, so the channel can show a run before it's done
 PEEK = 900
-VERSION = 9
+VERSION = 10
 
 
 def cpus() -> int:
@@ -162,7 +163,7 @@ class Worker:
     def __init__(self, client: jobs.Client, home: Path = HOME, slots: int = 1, trusted: bool = False,
                  paused: bool = False, rollouts: int | None = None, max_load: float | None = None,
                  instance: int | None = None, repo: str = '', signers: Path = jobs.SIGNERS, command=None,
-                 rules: machine.Rules = machine.Rules.anytime(), watch: machine.Watch | None = None):
+                 scorer=None, rules: machine.Rules = machine.Rules.anytime(), watch: machine.Watch | None = None):
         self.client, self.home, self.slots, self.trusted = client, Path(home), slots, trusted
         self.paused, self.draining, self.stopping = paused, False, threading.Event()
         self.peeks = True
@@ -172,7 +173,7 @@ class Worker:
         share = max(1, int(cpus() * rules.cpu) // slots)
         self.threads, self.rollouts = share, rollouts or max(1, min(8, share - 1))
         self.max_load, self.instance, self.repo, self.signers = max_load, instance, repo, signers
-        self.command = command or self.train_command
+        self.command, self.scorer = command or self.train_command, scorer or self.score_command
         self.tasks: dict[str, Task] = {}
         self.specs = specs()
         self.lock = threading.Lock()
@@ -288,7 +289,7 @@ class Worker:
         """Hand every unfinished job back and stop; a job given back doesn't count against it."""
         self.stopping.set()
         for task in list(self.tasks.values()):
-            if task.state in ('preparing', 'training', 'paused'):
+            if task.state in ('preparing', 'training', 'scoring', 'paused'):
                 self.hand_back(task, 'worker stopping')
 
     def hand_back(self, task: Task, reason: str):
@@ -335,10 +336,11 @@ class Worker:
             elif (since := task.paused_at) is not None:
                 machine.resume(pid)
                 task.paused += now - since
-                task.paused_at, task.state, task.reason = None, 'training', ''
+                task.paused_at, task.state, task.reason = None, 'scoring' if scoring(task.spec) else 'training', ''
                 log.info('job resumed', id=task.id)
         # a paused job lets it sleep: on battery, or with someone at it, sleep is the owner's call
-        self.awake.hold(self.rules.keep_awake and any(t.state in ('preparing', 'training') and not t.gone.is_set()
+        self.awake.hold(self.rules.keep_awake and any(t.state in ('preparing', 'training', 'scoring')
+                                                      and not t.gone.is_set()
                                                       for t in list(self.tasks.values())))
 
     # one job
@@ -348,31 +350,26 @@ class Worker:
         try:
             inputs = self.prepare(task, dir)
             code = self.code(task.spec)
-            task.state = 'training'
-            log.info('training', id=task.id, name=task.spec['name'], code=code.name)
+            task.state = 'scoring' if scoring(task.spec) else 'training'
+            log.info(task.state, id=task.id, name=task.spec['name'], code=code.name)
+            runs = code / 'runs' / ('scores' if scoring(task.spec) else '')
             # half a run from an attempt that was stopped would be mistaken for this one
-            for old in (code / 'runs').glob(f'*-{jobs.run_name(task.spec)}'):
+            for old in runs.glob(f'*-{jobs.run_name(task.spec)}'):
                 shutil.rmtree(old)
-            with open(dir / 'train.log', 'wb') as out:
-                env = job_env(OMP_NUM_THREADS=str(self.threads), PYTHONUNBUFFERED='1')
-                # relative, so the paths run.json records don't carry this machine's home folder
-                rel = {k: Path(os.path.relpath(v, code / 'sim')) for k, v in inputs.items()}
-                task.proc = subprocess.Popen(self.command(task.spec, rel, code / 'sim'), cwd=code / 'sim',
-                                             stdout=out, stderr=subprocess.STDOUT, env=env)
-                while task.proc.poll() is None:
-                    task.run = task.run or next((code / 'runs').glob(f'*-{jobs.run_name(task.spec)}'), None)
-                    time.sleep(2)
+            # relative, so the paths run.json records don't carry this machine's home folder
+            rel = {k: Path(os.path.relpath(v, code / 'sim')) for k, v in inputs.items()}
+            (self.score if scoring(task.spec) else self.train)(task, rel, code / 'sim', runs, dir)
             if self.stopping.is_set() or task.gone.is_set():
                 return
-            task.run = next((code / 'runs').glob(f'*-{jobs.run_name(task.spec)}'), None)
-            if task.proc.returncode != 0 or not task.run or not (task.run / 'evals.json').exists():
-                raise Refused(f'training exited {task.proc.returncode}:\n' + tail(dir / 'train.log'))
             task.state = 'uploading'
             (task.run / 'job.json').write_text(json.dumps({'spec': task.spec, 'sig': task.sig}, indent=1) + '\n')
             if task.spec['code']['overlay']:
                 # diff.patch has tracked changes and untracked.txt only names; this is the code itself
                 (task.run / 'overlay.tar.gz').write_bytes(self.blob(task.spec['code']['overlay']))
-            self.upload(task, pack(task.run, self.instance, task.paused, lent=not self.trusted and self.instance is None))
+            lent = not self.trusted and self.instance is None
+            # a score's machine and times are in its score.json; it has no run.json to add them to
+            extra = (None, 0, False) if scoring(task.spec) else (self.instance, task.paused, lent)
+            self.upload(task, pack(task.run, *extra))
             # kept, so the owner can see what their machine made
             shutil.move(task.run, self.home / 'runs' / task.run.name)
             prune(self.home / 'runs', self.rules.keep_gb)
@@ -391,6 +388,43 @@ class Worker:
             with self.lock:
                 self.tasks.pop(task.id, None)
 
+    def train(self, task: Task, inputs: dict[str, Path], sim: Path, runs: Path, dir: Path):
+        with open(dir / 'train.log', 'wb') as out:
+            env = job_env(OMP_NUM_THREADS=str(self.threads), PYTHONUNBUFFERED='1')
+            task.proc = subprocess.Popen(self.command(task.spec, inputs, sim), cwd=sim,
+                                         stdout=out, stderr=subprocess.STDOUT, env=env)
+            while task.proc.poll() is None:
+                task.run = task.run or next(runs.glob(f'*-{jobs.run_name(task.spec)}'), None)
+                time.sleep(2)
+        if self.stopping.is_set() or task.gone.is_set():
+            return
+        task.run = next(runs.glob(f'*-{jobs.run_name(task.spec)}'), None)
+        if task.proc.returncode != 0 or not task.run or not (task.run / 'evals.json').exists():
+            raise Refused(f'training exited {task.proc.returncode}:\n' + tail(dir / 'train.log'))
+
+    def score(self, task: Task, inputs: dict[str, Path], sim: Path, runs: Path, dir: Path):
+        """The brain played by terrarium.games: its table in report.txt, every game's numbers in games.json, and
+        score.json with how long it took on what, so machines can be compared on the same job."""
+        spec = task.spec
+        task.run = runs / f'{time.strftime("%Y%m%d-%H%M%S")}-{jobs.run_name(spec)}'
+        task.run.mkdir(parents=True)
+        started = time.time()
+        with open(task.run / 'report.txt', 'wb') as out, open(dir / 'score.log', 'wb') as err:
+            env = job_env(OMP_NUM_THREADS='1', PYTHONUNBUFFERED='1', TERRARIUM_LOG='WARN')
+            cmd = self.scorer(spec, inputs, sim, Path(os.path.relpath(task.run / 'games.json', sim)))
+            task.proc = subprocess.Popen(cmd, cwd=sim, stdout=out, stderr=err, env=env)
+            task.proc.wait()
+        if self.stopping.is_set() or task.gone.is_set():
+            return
+        if task.proc.returncode != 0 or not (task.run / 'games.json').exists():
+            raise Refused(f'scoring exited {task.proc.returncode}:\n' + tail(dir / 'score.log'))
+        box = {k: self.specs.get(k) for k in ('os', 'cpu', 'cores')} | {'instance': self.instance}
+        # games run one process per player and role, up to the cores this worker gives a job
+        record = {'game': spec['score']['game'], 'seed': spec['seed'], 'episodes': spec['score']['episodes'],
+                  'seconds': round(time.time() - started - task.paused, 1), 'paused': round(task.paused),
+                  'cores_given': self.threads, 'machine': box}
+        (task.run / 'score.json').write_text(json.dumps(record, indent=1) + '\n')
+
     def prepare(self, task: Task, dir: Path) -> dict[str, Path]:
         spec = task.spec
         jobs.check(spec)
@@ -401,7 +435,9 @@ class Worker:
         parent = spec['parent'] or {}
         if 'blob' in parent and task.parent != parent['blob']:
             raise Refused('the parent sent is not the one the job names')
-        inputs = {'world': (spec['world'], spec['world_file']), 'train': (spec['train'], spec['train_file'])}
+        inputs = {'world': (spec['world'], spec['world_file'])}
+        if not scoring(spec):
+            inputs['train'] = (spec['train'], spec['train_file'])
         if task.parent:
             inputs['parent'] = (task.parent, parent.get('file', 'parent.pt'))
         paths = {}
@@ -465,6 +501,18 @@ class Worker:
             cmd += ['--parent', str(inputs['parent'])]
         if spec['code']['overlay']:
             cmd.append('--scratch')
+        return capped(cmd, cpus() * self.rules.cpu / self.slots, cpus())
+
+    def score_command(self, spec: dict, inputs: dict[str, Path], sim: Path, out: Path) -> list[str]:
+        # on the CPU, one thread a process: the same games on any machine
+        s = spec['score']
+        cmd = [str(python(sim)), '-m', 'terrarium.games', s['game'], '--config', str(inputs['world']),
+               '--baseline', *s['baselines'], '--brain', str(inputs['parent']), '--episodes', str(s['episodes']),
+               '--seed', str(spec['seed']), '--processes', str(self.threads), '--out', str(out)]
+        if s.get('wiped'):
+            cmd.append('--wiped')
+        if s.get('wiped_every'):
+            cmd += ['--wiped-every', str(s['wiped_every'])]
         return capped(cmd, cpus() * self.rules.cpu / self.slots, cpus())
 
     def upload(self, task: Task, data: bytes):

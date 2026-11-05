@@ -31,6 +31,16 @@ BRAIN = ('stuck', 'give_up')
 # what a job can ask of the machine that runs it, checked against what the worker says it is; gpu = false keeps a
 # job off machines with a GPU, so CPU work leaves them free
 NEEDS = {'gpu': bool, 'gpu_memory_gb': (int, float), 'cores': int, 'memory_gb': (int, float), 'machine': str}
+# the first worker version that knows a score job; an older one would take it and fail it
+SCORE_VERSION = 10
+
+
+def scoring(spec: dict) -> bool:
+    return spec.get('kind') == 'score'
+
+
+def has_gpu(specs: dict | None) -> bool:
+    return bool((specs or {}).get('gpus')) or bool((specs or {}).get('mps'))
 
 
 def bad_needs(needs) -> str | None:
@@ -52,12 +62,12 @@ def unmet(needs: dict | None, name: str, specs: dict | None) -> str | None:
     gpus = specs.get('gpus') or []
     # a Mac's GPU shares the machine's memory
     gpu_memory = max([g.get('memory_gb') or 0 for g in gpus] + [specs.get('memory_gb') or 0 if specs.get('mps') else 0])
-    has_gpu = bool(gpus) or bool(specs.get('mps'))
+    gpu = has_gpu(specs)
     if 'machine' in needs and needs['machine'] != name:
         return f'machine {needs["machine"]}'
-    if needs.get('gpu') is True and not has_gpu:
+    if needs.get('gpu') is True and not gpu:
         return 'a GPU'
-    if needs.get('gpu') is False and has_gpu:
+    if needs.get('gpu') is False and gpu:
         return 'no GPU'
     if 'gpu_memory_gb' in needs and gpu_memory < needs['gpu_memory_gb']:
         return f'gpu_memory_gb >= {needs["gpu_memory_gb"]:g}'
@@ -200,16 +210,28 @@ class Store:
         self.save(job)
         self.unpeek(job['spec']['id'])
 
+    def fits(self, job: dict, worker: str, trusted: bool, role: str | None, specs: dict | None,
+             version: int | None) -> bool:
+        spec = job['spec']
+        if job['state'] != 'pending' or (spec['trusted'] and not trusted) or not self.ready(job):
+            return False
+        if spec.get('on') not in (None, role) or unmet(spec.get('needs'), worker, specs):
+            return False
+        if scoring(spec):
+            # a pod is paid by the hour for its GPU: it scores only what's kept to rented machines
+            return (version or 0) >= SCORE_VERSION and (role != 'rented' or spec.get('on') == 'rented')
+        return True
+
     def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None,
-              specs: dict | None = None) -> dict | None:
+              specs: dict | None = None, version: int | None = None) -> dict | None:
+        """The oldest job this worker may take, but the oldest of the kind it's best at first: training for a machine
+        with a GPU, scoring (which plays games on the CPU) for one without, so neither waits behind the other."""
         now = now or time.time()
         with self.lock:
             self.expire(now)
-            for job in self.all():
-                if job['state'] != 'pending' or (job['spec']['trusted'] and not trusted) or not self.ready(job):
-                    continue
-                if job['spec'].get('on') not in (None, role) or unmet(job['spec'].get('needs'), worker, specs):
-                    continue
+            fit = [j for j in self.all() if self.fits(j, worker, trusted, role, specs, version)]
+            best = [j for j in fit if scoring(j['spec']) != has_gpu(specs)]
+            for job in (best or fit)[:1]:
                 job |= {'state': 'running', 'worker': worker, 'lease': now + LEASE, 'progress': None,
                         'attempts': job['attempts'] + 1}
                 job['history'].append([now, f'claimed by {worker}'])
@@ -245,8 +267,9 @@ class Store:
                 raise Gone(id)
             if self.results_size() + len(result) > self.results_cap:
                 raise Full(f'results are over {self.results_cap} bytes; sync and prune them')
-            final = final_checkpoint(result)
-            job |= {'state': 'done', 'result': self.put(result), 'final': self.put(final), 'lease': None,
+            # a score job's result is its scores, no brain
+            final = None if scoring(job['spec']) else final_checkpoint(result)
+            job |= {'state': 'done', 'result': self.put(result), 'final': final and self.put(final), 'lease': None,
                     'worker': worker, 'error': None, 'kind': None}
             job['history'].append([now, f'done by {worker}'])
             self.save(job)
@@ -311,5 +334,5 @@ class Store:
 
 def blobs_of(spec: dict) -> list[str]:
     code = spec['code']
-    found = [spec['world'], spec['train'], code.get('bundle'), code.get('overlay'), (spec.get('parent') or {}).get('blob')]
+    found = [spec['world'], spec.get('train'), code.get('bundle'), code.get('overlay'), (spec.get('parent') or {}).get('blob')]
     return [d for d in found if d]

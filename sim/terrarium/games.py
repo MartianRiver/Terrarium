@@ -366,7 +366,7 @@ def score(game: str, players: list[str], world: str | None = None, episodes: int
             raise SystemExit(f'{game} has no event to wipe the notes on (only {", ".join(EVENTS)})')
         names += [(p, game) for p in remembers]
     jobs = [(game, role, p, w, world, episodes, seed) for p, w in names for role in roles]
-    with mp.get_context('spawn').Pool(processes or min(len(jobs), max(1, (mp.cpu_count() or 2) - 1))) as pool:
+    with mp.get_context('spawn').Pool(min(len(jobs), processes or max(1, (mp.cpu_count() or 2) - 1))) as pool:
         done = pool.map(score_one, jobs)
     out = {'game': game, 'world': world, 'seed': seed, 'episodes': episodes, 'players': {}}
     for (_, role, p, w, *_), values in zip(jobs, done):
@@ -427,6 +427,7 @@ def main():
     parser.add_argument('--config', help="the game's world (default: its nursery)")
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--held-out', action='store_true', help=f'seed {HELD_OUT} instead of {SEED}')
+    parser.add_argument('--seed', type=int, help='the games played start from this seed (beats --held-out)')
     parser.add_argument('--wiped', action='store_true',
                         help='also score brains with memory with their notes wiped before every choice')
     parser.add_argument('--wiped-every', type=float, default=0.0, metavar='SECONDS',
@@ -437,9 +438,9 @@ def main():
     parser.add_argument('--processes', type=int)
     parser.add_argument('--out', help='every episode\'s numbers as JSON')
     args = parser.parse_args()
-    result = score(args.game, args.baseline + args.brain, args.config, args.episodes,
-                   HELD_OUT if args.held_out else SEED, args.wiped, args.processes, args.wiped_every,
-                   args.wiped_on_event)
+    seed = args.seed if args.seed is not None else HELD_OUT if args.held_out else SEED
+    result = score(args.game, args.baseline + args.brain, args.config, args.episodes, seed, args.wiped,
+                   args.processes, args.wiped_every, args.wiped_on_event)
     print(report(result))
     if args.out:
         Path(args.out).write_text(json.dumps(result) + '\n')
