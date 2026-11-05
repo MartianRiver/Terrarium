@@ -17,6 +17,15 @@ from terrarium.store import LEASE, Gone, Store, sha256
 needs_ssh = pytest.mark.skipif(not shutil.which('ssh-keygen'), reason='no ssh-keygen')
 
 
+real_strict = jobs.strict
+
+
+@pytest.fixture(autouse=True)
+def loose_configs(monkeypatch):
+    # the small repos here have stub world and train files, not ones this code's loader takes
+    monkeypatch.setattr(jobs, 'strict', lambda world, train, where: None)
+
+
 @pytest.fixture(autouse=True)
 def own_repos_only(monkeypatch):
     # under a git hook GIT_DIR points at the real repo, and git init there marked it bare
@@ -80,8 +89,9 @@ def store(tmp_path) -> Store:
     return s
 
 
-def claimed(s: Store, worker: str, trusted: bool, now: float | None = None, role: str | None = None) -> dict:
-    job = s.claim(worker, trusted, now, role)
+def claimed(s: Store, worker: str, trusted: bool, now: float | None = None, role: str | None = None,
+            specs: dict | None = None) -> dict:
+    job = s.claim(worker, trusted, now, role, specs)
     assert job is not None
     return job
 
@@ -505,3 +515,101 @@ def test_workers_refuse_unsigned_jobs_and_donors_refuse_trusted_ones(server, key
     trusted = worker.Task({'spec': spec(trusted=True), 'sig': jobs.sign(spec(trusted=True), k)})
     with pytest.raises(worker.Refused, match='trusted'):
         w.prepare(trusted, tmp_path / 'job')
+
+
+CPU = {'cores': 16, 'memory_gb': 15, 'gpus': []}
+LAPTOP_GPU = {'cores': 16, 'memory_gb': 15, 'gpus': [{'name': 'RTX 3050 Ti', 'memory_gb': 4}]}
+MAC = {'cores': 8, 'memory_gb': 16, 'gpus': [], 'mps': True}
+
+
+def test_a_job_goes_only_to_a_machine_that_has_what_it_needs(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1) | {'needs': {'gpu': True, 'gpu_memory_gb': 6}}, 'sig')
+    s.add(spec('b' * 12, added=2) | {'needs': {'gpu': False}}, 'sig')
+    s.add(spec('c' * 12, added=3) | {'needs': {'machine': 'Kelpie'}}, 'sig')
+    # a 4 GB card is a GPU but not enough of one; the Mac's shares its 16 GB
+    assert s.claim('Jellybean', True, specs=LAPTOP_GPU) is None
+    assert claimed(s, 'river-m3', True, specs=MAC)['spec']['id'] == 'a' * 12
+    assert claimed(s, 'Kelpie', True, specs=CPU)['spec']['id'] == 'b' * 12
+    assert s.claim('Dell2', True, specs=CPU) is None
+    assert claimed(s, 'Kelpie', True, specs=CPU)['spec']['id'] == 'c' * 12
+
+
+def test_a_worker_that_says_nothing_about_itself_gets_only_jobs_without_needs(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1) | {'needs': {'cores': 8}}, 'sig')
+    s.add(spec('b' * 12, added=2), 'sig')
+    assert claimed(s, 'old', True)['spec']['id'] == 'b' * 12
+    assert s.claim('old', True) is None
+
+
+def test_needs_are_checked_in_a_spec_and_in_a_batch(tmp_path):
+    for needs in ({}, {'gpu': 'yes'}, {'cores': True}, {'vram': 8}):
+        with pytest.raises(jobs.BadJob, match='needs'):
+            jobs.check(spec() | {'needs': needs})
+    jobs.check(spec() | {'needs': {'gpu': True, 'gpu_memory_gb': 5.5, 'cores': 4, 'memory_gb': 8, 'machine': 'K'}})
+    batch = tmp_path / 'grid.toml'
+    batch.write_text('world = "w"\ntrain = "t"\nneeds = { gpu = true }\n[[job]]\nname = "x"\n'
+                     '[[job]]\nname = "y"\nneeds = { gpus = 1 }\n')
+    with pytest.raises(jobs.BadJob, match="job y: unknown need 'gpus'"):
+        jobs.load_batch(batch)
+
+
+def test_a_brain_that_ends_its_own_run_fails_at_once_and_a_crash_gets_another_try(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1), 'sig')
+    s.add(spec('b' * 12, added=2), 'sig')
+    s.claim('pod1', True, now=100)
+    s.fail('a' * 12, 'pod1', 'stuck at update 40', kind='stuck', now=101)
+    a = s.read('a' * 12)
+    assert a['state'] == 'failed' and a['kind'] == 'stuck' and a['history'][-1][1] == 'stuck on pod1'
+    s.claim('pod1', True, now=102)
+    s.fail('b' * 12, 'pod1', 'training exited 1', now=103)
+    b = s.read('b' * 12)
+    assert b['state'] == 'pending' and b['kind'] == 'crash' and b['history'][-1][1] == 'failed on pod1'
+    s.claim('pod2', True, now=104)
+    s.expire(104 + LEASE + 1)
+    assert s.read('b' * 12)['kind'] == 'quiet'
+
+
+def test_the_coordinator_says_why_a_job_waits_and_what_failed_on_each_pod(server):
+    _, c = server
+    upload(c['admin'], spec('a' * 12, added=1) | {'needs': {'gpu': True}})
+    c['trusted'].json('POST', '/api/hello', {'specs': CPU})
+    [job] = c['admin'].json('GET', '/api/jobs')
+    assert job['unmet'] == 'no worker online with gpu = true'
+    c['trusted'].json('POST', '/api/hello', {'specs': MAC})
+    assert c['admin'].json('GET', '/api/jobs')[0]['unmet'] is None
+    assert c['admin'].json('GET', '/api/workers')['trusted']['info']['specs']['mps'] is True
+    assert c['trusted'].json('POST', '/api/claim', {'specs': MAC})['spec']['id'] == 'a' * 12
+    c['trusted'].json('POST', '/api/jobs/' + 'a' * 12 + '/fail', {'error': 'x', 'kind': 'give_up'})
+    assert c['admin'].json('GET', '/api/jobs')[0]['history'][-1][1] == 'gave up on trusted'
+
+
+def test_a_failed_run_says_whether_its_brain_ended_it(tmp_path):
+    task = worker.Task({'spec': spec(), 'sig': 's'})
+    assert worker.failure_kind(task) == 'setup'
+    task.state, task.run = 'training', tmp_path
+    (tmp_path / 'run.json').write_text(json.dumps({'stuck': 40}))
+    assert worker.failure_kind(task) == 'stuck'
+    (tmp_path / 'run.json').write_text(json.dumps({'gave_up': 40}))
+    assert worker.failure_kind(task) == 'give_up'
+    (tmp_path / 'run.json').write_text('{}')
+    assert worker.failure_kind(task) == 'crash'
+
+
+def test_a_synced_run_appears_whole(tmp_path):
+    s = spec()
+    data = result(name=f'20261024-120000-{jobs.run_name(s)}')
+    path = jobs.unpack(data, s, tmp_path / 'runs')
+    assert (path / 'run.json').exists() and (path / 'evals.json').exists()
+    assert sorted(p.name for p in (tmp_path / 'runs').iterdir()) == [path.name]
+
+
+def test_a_world_this_code_wont_load_is_refused_before_it_is_signed(tmp_path):
+    from terrarium import config
+    old = tmp_path / 'old.toml'
+    old.write_text(config.DEFAULT.read_text().replace('[tree]', '[treez]', 1))
+    with pytest.raises(jobs.BadJob, match='grid.toml job x'):
+        real_strict(old, config.TRAIN, 'grid.toml job x')
+    real_strict(config.DEFAULT, config.TRAIN, 'grid.toml job x')

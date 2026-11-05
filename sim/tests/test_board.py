@@ -103,7 +103,7 @@ def test_clean_keeps_known_fields_of_the_right_kinds():
 def test_a_worker_says_what_it_is_and_what_its_doing(tmp_path):
     w = worker.Worker(jobs.Client('http://127.0.0.1:1', 'x'), home=tmp_path, paused=True)
     info = w.info()
-    assert info['state'] == 'paused' and set(info['specs']) == {'os', 'cpu', 'cores', 'memory_gb', 'gpus'}
+    assert info['state'] == 'paused' and set(info['specs']) - {'mps'} == {'os', 'cpu', 'cores', 'memory_gb', 'gpus'}
     assert board.clean(info)['specs']['cores'] == info['specs']['cores']
     assert info['version'] == worker.VERSION
 

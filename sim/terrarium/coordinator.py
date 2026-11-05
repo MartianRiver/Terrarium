@@ -33,7 +33,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import admin, board, jobs
+from . import admin, board, jobs, store
 from .log import Logger
 from .store import Full, Gone, Store, sha256, write_atomic
 
@@ -167,11 +167,14 @@ class Queue:
         # jobs that failed on each pod, and jobs it finished: a pod whose jobs keep failing before any finishes is
         # likely a bad host (one couldn't install the code, 2026-11-02)
         failed = {name: sum(h[1] == f'failed on {name}' for j in every for h in j['history']) for name in pods}
+        # a brain that ended its own run (stuck, gave up) says nothing about the host
+        brain = {name: sum(h[1] in (f'stuck on {name}', f'gave up on {name}') for j in every for h in j['history'])
+                 for name in pods}
         finished = {name: sum(j['state'] == 'done' and last_claim(j) == name for j in every) for name in pods}
         return {'waiting': len(waiting), 'chained': sum(1 for j in every if j['state'] == 'pending'
                                                          and j['spec'].get('on') == 'rented' and not self.store.ready(j)),
                 'pods': {name: {'until': until, 'seen': seen[name], 'job': held.get(name), 'failed': failed[name],
-                                'finished': finished[name]} for name, until in pods.items()}}
+                                'failed_brain': brain[name], 'finished': finished[name]} for name, until in pods.items()}}
 
     def pod_token(self, name: str, hours: float) -> dict:
         if not name.startswith('pod-') or not jobs.NAME.match(name):
@@ -195,10 +198,32 @@ class Queue:
     def list(self) -> list[dict]:
         with self.store.lock:
             self.store.expire(time.time())
-        return [j | {'blocked': self.store.blocked(j), 'sig': None} for j in self.store.all()]
+        online = self.online()
+        return [j | {'blocked': self.store.blocked(j), 'unmet': self.unmet(j, online), 'sig': None}
+                for j in self.store.all()]
+
+    def online(self) -> dict[str, dict]:
+        """Each worker heard from lately, with what it says it is."""
+        now = time.time()
+        with self.lock:
+            return {name: {'role': w['role'], 'specs': (w.get('info') or {}).get('specs')}
+                    for name, w in self.workers.items() if now - (w.get('seen') or 0) < store.LEASE}
+
+    def unmet(self, job: dict, online: dict[str, dict]) -> str | None:
+        """Why a waiting job's needs keep it from every worker online, so a stuck job doesn't look like an empty
+        queue."""
+        needs = job['spec'].get('needs')
+        if job['state'] != 'pending' or not needs:
+            return None
+        on = job['spec'].get('on')
+        fits = [n for n, w in online.items() if on in (None, w['role']) and not store.unmet(needs, n, w['specs'])]
+        return None if fits else 'no worker online with ' + ', '.join(
+            f'{k} = {v}' if not isinstance(v, bool) else f'{k} = {str(v).lower()}' for k, v in needs.items())
 
     def claim(self, who: dict) -> dict | None:
-        job = self.store.claim(who['name'], trusted=who['role'] != 'donor', role=who['role'])
+        with self.lock:
+            specs = (self.workers.get(who['name'], {}).get('info') or {}).get('specs')
+        job = self.store.claim(who['name'], trusted=who['role'] != 'donor', role=who['role'], specs=specs)
         if job is None:
             return None
         return {'spec': job['spec'], 'sig': job['sig'], 'parent': self.store.parent_blob(job)}
@@ -328,8 +353,8 @@ def handler(queue: Queue, env=None):
                 case 'POST', ['api', 'pods', name, 'gone'] if who['role'] == 'pods':
                     self.json({'returned': queue.drop_pod(name)})
                 case 'POST', ['api', 'jobs', id, 'fail'] if worker:
-                    error = json.loads(self.body('json') or b'{}').get('error', '')
-                    queue.store.fail(id, who['name'], str(error))
+                    body = json.loads(self.body('json') or b'{}')
+                    queue.store.fail(id, who['name'], str(body.get('error', '')), kind=body.get('kind'))
                     self.json({'ok': True})
                 case _:
                     raise Refused(404, f'nothing at {method} {self.path} for a {who["role"]} token')

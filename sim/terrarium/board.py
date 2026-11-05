@@ -51,6 +51,8 @@ def clean(info: dict) -> dict:
                         'cores': number(specs.get('cores')), 'memory_gb': number(specs.get('memory_gb')),
                         'gpus': [{'name': text(g.get('name')), 'memory_gb': number(g.get('memory_gb'))}
                                  for g in gpus[:8] if isinstance(g, dict)]}
+        if specs.get('mps') is True:
+            out['specs']['mps'] = True
     # how hard it trains lately (terrarium.usage), for the admin page only: summary() never shows it
     if isinstance(got := info.get('usage'), dict):
         kept: dict[str, float | str] = {k: v for k in USAGE if (v := reading(got.get(k))) is not None}

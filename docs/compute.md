@@ -153,6 +153,8 @@ train = "train-full-more.toml"
 
 `parent` is a `.pt` file, `run:<run id>/<checkpoint>` from `runs/`, or `job:<name>` for the final checkpoint of an earlier job in the batch, which then waits for it. `chunk = N` splits a job into pieces of N samples (`name.1`, `name.2`, …), each starting from the last one's final checkpoint and playing its own episodes (seed + 1000 per piece), so a lent machine only ever holds a short job and one that goes away loses little. `job:<name>` then means the last piece. Each piece starts a fresh optimizer, like any run from a parent. `on = "rented"` keeps a job to rented machines (`"trusted"` to my own, `"donor"` to donated ones); without it, any machine allowed to run the job can take it. Which kind a machine is comes from its token, not from anything the worker says. I use it to test on a rented GPU while the Mac sits out. Parent files are sent byte for byte, so the run they came from can still be traced through the meta saved inside.
 
+`needs` keeps a job to machines that have what it needs, from what each worker says it is: `needs = { gpu = true, gpu_memory_gb = 6 }` for a big brain, `needs = { gpu = false }` for CPU work that should leave the GPUs free, `cores` and `memory_gb` as least amounts, and `machine = "Kelpie"` for one machine by name (a test, or a job only one machine should run). A Mac with Apple silicon counts as having a GPU, its memory shared with the machine's. Unlike `on`, this rests on what the worker reports, so it decides only where a job fits best, never who may run it. A job no machine online can meet waits, and the queue says why (`jobs list` prints it, e.g. "no worker online with gpu = true"). Without `needs`, any machine allowed to run the job can take it. `jobs add` reads each world and train file with this checkout's strict loader before signing, so a file written for older code is refused here rather than on every machine that takes it.
+
 ```
 uv run python -m terrarium.jobs add grid.toml     # signs with ~/.ssh/terrarium_jobs_ed25519
 uv run python -m terrarium.jobs list
@@ -165,7 +167,7 @@ The code is this checkout's HEAD. A dirty tree goes as an overlay (every changed
 
 ## Leases
 
-A worker claims a job for five minutes and renews the claim every minute, through training and the evals at the end. If a worker disappears, its job goes back in the queue when the claim runs out; a job that fails twice stays failed until retried. A job is done when its run has been uploaded, checked job by job. A worker that restarts hands back whatever the queue thought it held.
+A worker claims a job for five minutes and renews the claim every minute, through training and the evals at the end. If a worker disappears, its job goes back in the queue when the claim runs out; a job that fails twice stays failed until retried. A failure says what kind it was: `stuck` or `give_up` when training's own guards ended a collapsing seed (that fails the job at once, since another try with the same seed would only do it again), `crash` when training exited with an error, `setup` when the job couldn't be got ready (the code, its packages, its inputs), and `quiet` when the claim ran out. A job is done when its run has been uploaded, checked job by job. A worker that restarts hands back whatever the queue thought it held.
 
 ## Tokens
 
@@ -177,7 +179,7 @@ The queue is closed: every machine has a token I made for its handle, and the ha
 
 - asks the coordinator how many `on = "rented"` jobs are waiting and what each of its pods last said, with a token of role `pods`, which can see that and make and revoke its pods' tokens, and nothing else: it can't add, sign, read or cancel jobs;
 - rents a pod from the first provider in its list with a card under the price (RunPod: it asks what's in stock first, in the Community and Secure clouds both, and rents the cheapest; the console shows Secure prices, and Community stock for one card comes and goes by the minute), when more jobs wait than its pods can take, as long as the last 24 hours' spend plus the whole of the new pod's life stays under the day's cap;
-- destroys a pod that has failed two jobs without finishing one (a host that can't install the code), and won't rent that Vast machine again for a day;
+- destroys a pod that has failed two jobs without finishing one (a host that can't install the code), and won't rent that Vast machine again for a day; a brain that ended its own run doesn't count, since that says nothing about the host;
 - destroys a pod that hasn't said hello within 15 minutes, has gone quiet for 10, has sat 5 minutes with nothing to do and nothing waiting, or has reached its hours. Its token is revoked with it, and any job it held goes back in the queue at once instead of when its lease runs out;
 - destroys any pod of its own that its ledger doesn't know (one left over after a crash), and writes down every pod with its price, its machine, what its setup download cost, when it came and went, why, and the commit it ran (SQLite), plus a status file for the box's monitoring.
 

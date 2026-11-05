@@ -17,6 +17,8 @@
 # parent is a .pt path, "run:<run id>/<checkpoint>" from runs/, or
 # "job:<name>" for the final checkpoint of an earlier job in the same batch.
 # on = "rented" (or "trusted", "donor") keeps a job to that kind of machine.
+# needs = { gpu = true, gpu_memory_gb = 6, cores = 8, memory_gb = 8, machine = "Kelpie" } keeps it to machines
+# that say they have that (any of the keys; gpu = false for machines without one).
 # chunk = N splits a job into pieces of N samples, each carrying on from the
 # last, so a lent machine never holds more than a short job.
 
@@ -41,7 +43,7 @@ from typing import Any
 from . import snapshot
 from .log import Logger
 from .runs import ROOT
-from .store import sha256
+from .store import bad_needs, sha256
 
 log = Logger('jobs')
 
@@ -59,7 +61,7 @@ PEEK_LIMIT = 8_000_000
 AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
-FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int}
+FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int, 'needs': dict}
 # the kinds of machine a job can be kept to; a token's role says which one a worker is
 MACHINES = ('trusted', 'rented', 'donor')
 
@@ -148,6 +150,7 @@ def check(spec: dict):
     need(spec['trusted'] or not code.get('overlay'), 'an overlay job must be trusted')
     need(spec.get('on') in (None, *MACHINES), 'bad on')
     need(not (spec['trusted'] and spec.get('on') == 'donor'), 'a trusted job can never run on a donor')
+    need('needs' not in spec or bad_needs(spec['needs']) is None, f'bad needs: {bad_needs(spec.get("needs"))}')
     parent = spec.get('parent')
     need(parent is None or (isinstance(parent, dict) and (
         (set(parent) == {'blob', 'file'} and DIGEST.match(parent['blob']) and NAME.match(parent['file'])) or
@@ -179,6 +182,8 @@ def load_batch(path: Path) -> list[dict]:
                 raise BadJob(f'{path.name} job {name}: no {key}')
         if job.get('on') not in (None, *MACHINES):
             raise BadJob(f'{path.name} job {name}: on is one of {", ".join(MACHINES)}')
+        if 'needs' in job and (why := bad_needs(job['needs'])):
+            raise BadJob(f'{path.name} job {name}: {why}')
         if job.get('chunk', 1) < 1:
             raise BadJob(f'{path.name} job {name}: chunk is a number of samples')
         out.append(job)
@@ -212,6 +217,7 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
     ids, out = {}, []
     for job in load_batch(path):
         world, train = path.parent / job['world'], path.parent / job['train']
+        strict(world, train, f'{path.name} job {job["name"]}')
         text = train.read_text()
         samples = tomllib.loads(text).get('ppo', {}).get('samples')
         if not isinstance(samples, int):
@@ -231,12 +237,25 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
                     'train_file': train.name, 'parent': before,
                     # each piece plays its own episodes, not the first piece's again
                     'seed': job['seed'] + 1000 * i, 'samples': size, 'on': job.get('on')}
+            if 'needs' in job:
+                spec['needs'] = job['needs']
             ids[name] = spec['id']
             before = {'job': spec['id']}
             out.append(spec)
         # job:<name> means the last piece
         ids[job['name']] = out[-1]['id']
     return out, blobs
+
+
+def strict(world: Path, train: Path, where: str):
+    """Both files read by this checkout's own loader, which is the code the job sends: a world written for older
+    code (missing [jump] and [tree], 2026-11-02) fails here, not on every machine that takes it."""
+    from . import config
+    try:
+        config.load(world)
+        config.load_train(train)
+    except (config.ConfigError, tomllib.TOMLDecodeError, OSError) as e:
+        raise BadJob(f'{where}: {e}')
 
 
 def with_samples(text: str, samples: int) -> str:
@@ -351,8 +370,14 @@ def unpack(data: bytes, spec: dict, runs: Path) -> Path:
         if len(tops) != 1 or not next(iter(tops)).endswith('-' + run_name(spec)) or not NAME.match(next(iter(tops))):
             raise BadJob(f'result for {spec["id"]} is not one run folder named for it: {sorted(tops)[:5]}')
         runs.mkdir(parents=True, exist_ok=True)
-        tar.extractall(runs, filter='data')
+        # into a folder of its own first: a reader (the publisher, a scorer) seeing the run's folder before its
+        # run.json and checkpoints are all there took it for a finished run
+        part = runs / f'.part-{spec["id"]}'
+        shutil.rmtree(part, ignore_errors=True)
+        tar.extractall(part, filter='data')
     path = runs / next(iter(tops))
+    os.replace(part / path.name, path)
+    part.rmdir()
     log.info('run synced', id=spec['id'], run=path.name)
     return path
 
@@ -383,7 +408,9 @@ def main():
                 done = f'{p.get("samples", 0) / spec["samples"]:.0%}' if job['state'] == 'running' else ''
                 on = f'on {spec["on"]}' if spec.get('on') else ''
                 print(f'{spec["id"]}  {spec["batch"]:<16} {spec["name"]:<24} {job["state"]:<9} {done:>4}  '
-                      f'{on:<10} {job["worker"] or ""}{"  blocked" if job.get("blocked") else ""}')
+                      f'{on:<10} {job["worker"] or ""}{"  blocked" if job.get("blocked") else ""}'
+                      f'{"  " + job["unmet"] if job.get("unmet") else ""}'
+                      f'{"  " + job["kind"] if job["state"] == "failed" and job.get("kind") else ""}')
         case 'cancel' | 'retry':
             for id in args.ids:
                 client.json('POST', f'/api/jobs/{id}/{args.command}')
