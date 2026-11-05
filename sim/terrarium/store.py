@@ -1,9 +1,10 @@
 # The coordinator's state on disk: content-addressed blobs (code bundles,
 # overlays, configs, parent brains, results) and one JSON file per job. A job
 # goes pending → running → done, or back to pending when its lease runs out
-# or its worker gives up, and failed after MAX_ATTEMPTS. The coordinator never
-# looks inside a job beyond what scheduling needs: a job is signed on River's
-# machine and every worker checks that signature itself (jobs.py).
+# or its worker gives up, and failed after MAX_ATTEMPTS (at once when the
+# brain ended its own run). The coordinator never looks inside a job beyond
+# what scheduling needs: a job is signed on River's machine and every worker
+# checks that signature itself (jobs.py).
 
 import hashlib
 import io
@@ -22,6 +23,48 @@ log = Logger('store')
 LEASE = 300
 MAX_ATTEMPTS = 2
 STATES = ('pending', 'running', 'done', 'failed', 'cancelled')
+# why a job failed: the brain ending its own run (train's stuck and give_up guards), which another try with the
+# same seed would only repeat, or the machine: training crashed, the job couldn't be set up, or the worker went
+# quiet and its lease ran out
+KINDS = {'stuck': 'stuck', 'give_up': 'gave up', 'crash': 'failed', 'setup': 'failed', 'quiet': 'lease ran out'}
+BRAIN = ('stuck', 'give_up')
+# what a job can ask of the machine that runs it, checked against what the worker says it is; gpu = false keeps a
+# job off machines with a GPU, so CPU work leaves them free
+NEEDS = {'gpu': bool, 'gpu_memory_gb': (int, float), 'cores': int, 'memory_gb': (int, float), 'machine': str}
+
+
+def bad_needs(needs) -> str | None:
+    if not isinstance(needs, dict) or not needs:
+        return 'needs is a table of ' + ', '.join(NEEDS)
+    for key, value in needs.items():
+        if key not in NEEDS:
+            return f'unknown need {key!r}'
+        if not isinstance(value, NEEDS[key]) or (isinstance(value, bool) and NEEDS[key] is not bool):
+            return f'need {key} has the wrong type'
+    return None
+
+
+def unmet(needs: dict | None, name: str, specs: dict | None) -> str | None:
+    """The first need a machine doesn't meet, or None when it meets them all."""
+    if not needs:
+        return None
+    specs = specs or {}
+    gpus = specs.get('gpus') or []
+    # a Mac's GPU shares the machine's memory
+    gpu_memory = max([g.get('memory_gb') or 0 for g in gpus] + [specs.get('memory_gb') or 0 if specs.get('mps') else 0])
+    has_gpu = bool(gpus) or bool(specs.get('mps'))
+    if 'machine' in needs and needs['machine'] != name:
+        return f'machine {needs["machine"]}'
+    if needs.get('gpu') is True and not has_gpu:
+        return 'a GPU'
+    if needs.get('gpu') is False and has_gpu:
+        return 'no GPU'
+    if 'gpu_memory_gb' in needs and gpu_memory < needs['gpu_memory_gb']:
+        return f'gpu_memory_gb >= {needs["gpu_memory_gb"]:g}'
+    for key in ('cores', 'memory_gb'):
+        if key in needs and (specs.get(key) or 0) < needs[key]:
+            return f'{key} >= {needs[key]:g}'
+    return None
 
 
 class Gone(LookupError):
@@ -146,24 +189,26 @@ class Store:
     def expire(self, now: float):
         for job in self.all():
             if job['state'] == 'running' and job['lease'] < now:
-                self.release(job, now, 'lease ran out')
+                job['kind'] = 'quiet'
+                self.release(job, now, KINDS['quiet'])
 
-    def release(self, job: dict, now: float, why: str):
-        job['state'] = 'pending' if job['attempts'] < MAX_ATTEMPTS else 'failed'
+    def release(self, job: dict, now: float, why: str, again: bool = True):
+        job['state'] = 'pending' if again and job['attempts'] < MAX_ATTEMPTS else 'failed'
         job['history'].append([now, f'{why} on {job["worker"]}'])
         log.warn('job released', id=job['spec']['id'], worker=job['worker'], why=why, state=job['state'])
         job['worker'], job['lease'] = None, None
         self.save(job)
         self.unpeek(job['spec']['id'])
 
-    def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None) -> dict | None:
+    def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None,
+              specs: dict | None = None) -> dict | None:
         now = now or time.time()
         with self.lock:
             self.expire(now)
             for job in self.all():
                 if job['state'] != 'pending' or (job['spec']['trusted'] and not trusted) or not self.ready(job):
                     continue
-                if job['spec'].get('on') not in (None, role):
+                if job['spec'].get('on') not in (None, role) or unmet(job['spec'].get('needs'), worker, specs):
                     continue
                 job |= {'state': 'running', 'worker': worker, 'lease': now + LEASE, 'progress': None,
                         'attempts': job['attempts'] + 1}
@@ -202,7 +247,7 @@ class Store:
                 raise Full(f'results are over {self.results_cap} bytes; sync and prune them')
             final = final_checkpoint(result)
             job |= {'state': 'done', 'result': self.put(result), 'final': self.put(final), 'lease': None,
-                    'worker': worker, 'error': None}
+                    'worker': worker, 'error': None, 'kind': None}
             job['history'].append([now, f'done by {worker}'])
             self.save(job)
             self.unpeek(id)
@@ -223,12 +268,13 @@ class Store:
     def unpeek(self, id: str):
         (self.jobs / f'{id}.peek').unlink(missing_ok=True)
 
-    def fail(self, id: str, worker: str, error: str, now: float | None = None):
+    def fail(self, id: str, worker: str, error: str, kind: str | None = None, now: float | None = None):
         now = now or time.time()
+        kind = kind if kind in KINDS else 'crash'
         with self.lock:
             job = self.mine(id, worker)
-            job['error'] = error[-4000:]
-            self.release(job, now, 'failed')
+            job['error'], job['kind'] = error[-4000:], kind
+            self.release(job, now, KINDS[kind], again=kind not in BRAIN)
 
     def give_back(self, id: str, worker: str, now: float | None = None):
         """A worker that's stopping hands a job back; that doesn't count as an attempt."""

@@ -53,7 +53,7 @@ POLL = 30
 BEAT = 60
 # the run so far goes up this often while training, so the channel can show a run before it's done
 PEEK = 900
-VERSION = 8
+VERSION = 9
 
 
 def cpus() -> int:
@@ -73,8 +73,12 @@ def specs() -> dict:
         cpu, memory = runs.cpu(), runs.memory_gb()
     except (OSError, ValueError):
         cpu, memory = platform.processor(), None
-    return {'os': f'{platform.system()} {platform.release()}', 'cpu': cpu, 'cores': os.cpu_count(),
-            'memory_gb': memory, 'gpus': gpus}
+    out = {'os': f'{platform.system()} {platform.release()}', 'cpu': cpu, 'cores': os.cpu_count(),
+           'memory_gb': memory, 'gpus': gpus}
+    # an Apple-silicon Mac trains on its own GPU (torch's mps), which nvidia-smi doesn't see
+    if sys.platform == 'darwin' and platform.machine() == 'arm64':
+        out['mps'] = True
+    return out
 
 
 def torch_extra() -> list[str]:
@@ -111,6 +115,8 @@ class Task:
         self.paused_at: float | None = None
         self.paused = 0.0
         self.peeked = time.time()
+        # the coordinator has the run: a beat now would get 410 and read as the job taken away
+        self.uploaded = False
 
     def progress(self) -> dict:
         p = {'state': self.state, 'reason': self.reason, 'samples': 0, 'samples_per_second': None}
@@ -134,6 +140,22 @@ class Task:
     def summary(self) -> dict:
         return {'id': self.id, 'name': self.spec['name'], 'batch': self.spec['batch'], 'total': self.spec['samples'],
                 'since': self.started, **self.progress()}
+
+
+def failure_kind(task: Task) -> str:
+    """Whether a failed job's brain ended its own run (train's stuck and give_up guards) or the machine let it down,
+    so a pod isn't blamed for a seed that collapsed."""
+    if task.state == 'preparing':
+        return 'setup'
+    try:
+        record = json.loads((task.run / 'run.json').read_text()) if task.run else {}
+    except (OSError, ValueError):
+        record = {}
+    if 'stuck' in record:
+        return 'stuck'
+    if 'gave_up' in record:
+        return 'give_up'
+    return 'crash'
 
 
 class Worker:
@@ -230,6 +252,8 @@ class Worker:
 
     def beat(self):
         for task in list(self.tasks.values()):
+            if task.uploaded:
+                continue
             try:
                 self.client.json('POST', f'/api/jobs/{task.id}/beat', {'progress': task.progress()})
             except RuntimeError as e:
@@ -355,11 +379,12 @@ class Worker:
             shutil.rmtree(dir / 'inputs', ignore_errors=True)
             task.state = 'done'
         except Exception as e:
-            log.error('job failed', id=task.id, error=str(e)[:500])
+            kind = failure_kind(task)
+            log.error('job failed', id=task.id, kind=kind, error=str(e)[:500])
             task.state = 'failed'
             if not self.stopping.is_set() and not task.gone.is_set():
                 try:
-                    self.client.json('POST', f'/api/jobs/{task.id}/fail', {'error': scrub(str(e))})
+                    self.client.json('POST', f'/api/jobs/{task.id}/fail', {'error': scrub(str(e)), 'kind': kind})
                 except (urllib.error.URLError, OSError, RuntimeError):
                     pass
         finally:
@@ -450,6 +475,7 @@ class Worker:
             except (urllib.error.URLError, OSError) as e:
                 status, body = 0, str(e).encode()
             if status == 200:
+                task.uploaded = True
                 log.info('job uploaded', id=task.id, bytes=len(data))
                 return
             if status in (400, 410, 413):

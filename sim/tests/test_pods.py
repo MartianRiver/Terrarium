@@ -248,7 +248,7 @@ def test_a_pod_whose_jobs_keep_failing_goes_and_its_machine_is_skipped_for_the_d
         id = pod.json('POST', '/api/claim', {})['spec']['id']
         pod.json('POST', f'/api/jobs/{id}/fail', {'error': 'uv sync returned non-zero exit status 1'})
     assert c['pods'].json('GET', '/api/pods')['pods'][m.ledger.live()[0]['name']] | {'seen': 1} == \
-        {'until': pytest.approx(clock.t + 6 * 3600, abs=60), 'seen': 1, 'job': None, 'failed': 2, 'finished': 0}
+        {'until': pytest.approx(clock.t + 6 * 3600, abs=60), 'seen': 1, 'job': None, 'failed': 2, 'failed_brain': 0, 'finished': 0}
     clock.t += 60
     m.tick()
     assert provs['vast'].destroyed == ['100'] and m.ledger.bad(clock.t) == {'m100'}
