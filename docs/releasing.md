@@ -36,11 +36,19 @@ When everything listed for the stage in the roadmap is on `next`, or has been mo
 3. The benchmark is no slower than at the last release, or the slowdown is written down with the reason.
 4. Every sample replay, from every earlier version, plays in the viewer.
 5. There's a clip of what the stage was for.
-6. The roadmap, VISION.md and the changelog match what was built; the version is bumped in `viewer/package.json` (and the sim's `pyproject.toml` from 0.1).
+6. The roadmap, VISION.md and the changelog (with `changes/` folded in) match what was built; the version is bumped in `viewer/package.json` (and the sim's `pyproject.toml` from 0.1).
 7. The site matches the release: "Where it's at" in `site/index.md`, the hero still if the stage has a better one, and the replay it plays. Then it's rebuilt and deployed ([site.md](site.md)).
 
 Then merge `next` into `main` by pull request, as a merge commit, and tag it.
 
 ## Changelog
 
-Kept as we go: the top section, **Unreleased**, gets a few plain sentences from each branch before it's merged (what changed, what to watch for, anything a saved brain or replay needs). At release time it becomes the version's entry, checked against the commits on `next` since the last release (`git log --first-parent main..next`).
+Kept as we go, a file a branch: each branch writes its few plain sentences (what changed, what to watch for, anything a saved brain or replay needs) in `changes/<branch>.md`, and never edits CHANGELOG.md itself, so two branches open at once never conflict over its top. The **Unreleased** section holds what was written there before this started.
+
+At release time the fragments are folded into Unreleased in the order they landed on `next`, and deleted:
+
+```
+git log --reverse --diff-filter=A --format= --name-only main..next -- changes/
+```
+
+Unreleased then becomes the version's entry, checked against the commits on `next` since the last release (`git log --first-parent main..next`).
