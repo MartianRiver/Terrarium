@@ -17,6 +17,7 @@ import { readReplay, ReplayError, type Replay } from './replay';
 import { Sounds } from './sounds';
 import { createStage } from './stage';
 import type { Frame, WorldInfo } from './world';
+import { Vitals } from './vitals';
 import { WorldView } from './worldview';
 
 const log = createLogger('main');
@@ -130,6 +131,9 @@ function boot() {
   tag.hidden = true;
   document.body.append(tag);
   const above = new THREE.Vector3();
+  // the followed one's card: home, fed, tired, carrying, as its world has them
+  let vitals: Vitals | null = null;
+  const facing = new THREE.Vector3();
   let tick = 0;
   // the brain window (B): local only, it reads brains through the runs server
   const brain = SITE ? null : new BrainView(document.body, stage.scene, (url) => void open(`${url.pathname.split('/').pop()} (recorded here)`, () => fetchReplay(url), url));
@@ -161,6 +165,8 @@ function boot() {
     view.chosen = chosen;
     view.marked = !params.has('pick');
     director?.reset();
+    vitals ??= new Vitals(document.body, source.info);
+    vitals.reset(source.info);
     const first = source.step()!;
     view.push(first);
     cues.reset(source.info.nests);
@@ -499,6 +505,11 @@ function boot() {
     }
     const step = snap ? Infinity : paused ? 0 : dt;
     const scripted = look || ant || game;
+    const shown = view!.current;
+    const followed = cam === 'follow' && !scripted && !intro ? shown?.creatures.find((c) => c.id === view!.focusId) ?? null : null;
+    stage.camera.getWorldDirection(facing);
+    const flat = Math.hypot(facing.x, facing.z) || 1;
+    vitals!.show(followed, followed ? nameOf(followed.id) : '', shown, { x: facing.x / flat, z: facing.z / flat });
     const shot = !scripted && view!.current ? director?.shot(view!.current, paused ? 0 : dt) : null;
     view!.lead = director?.lead ?? null;
     if (intro) stage.track(null, step);
