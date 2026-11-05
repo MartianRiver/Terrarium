@@ -222,8 +222,9 @@ class Queue:
 
     def claim(self, who: dict) -> dict | None:
         with self.lock:
-            specs = (self.workers.get(who['name'], {}).get('info') or {}).get('specs')
-        job = self.store.claim(who['name'], trusted=who['role'] != 'donor', role=who['role'], specs=specs)
+            info = self.workers.get(who['name'], {}).get('info') or {}
+        job = self.store.claim(who['name'], trusted=who['role'] != 'donor', role=who['role'], specs=info.get('specs'),
+                               version=info.get('version'))
         if job is None:
             return None
         return {'spec': job['spec'], 'sig': job['sig'], 'parent': self.store.parent_blob(job)}
@@ -234,7 +235,7 @@ class Queue:
         for job in self.store.all():
             if job['state'] == 'running' and job['worker'] == who['name']:
                 spec = job['spec']
-                if digest in (spec['world'], spec['train'], self.store.parent_blob(job)):
+                if digest in (spec['world'], spec.get('train'), self.store.parent_blob(job)):
                     return True
         return False
 
