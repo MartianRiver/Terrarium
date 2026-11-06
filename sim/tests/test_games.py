@@ -4,8 +4,10 @@ from types import SimpleNamespace
 import numpy as np
 
 from terrarium import load
+from terrarium import games
 from terrarium.config import DEFAULT
 from terrarium.flags import Flags
+from terrarium.schema import ACTIONS
 from terrarium.world import World
 
 FLAG = load(DEFAULT.parent / 'nursery-flag.toml')
@@ -130,3 +132,67 @@ def test_hide_and_seek_points_sum_to_nothing():
     world.seek.step()
     points = world.seek.points(world.alive)
     assert abs(points.sum()) < 1e-12 and (points != 0).all()
+
+
+HOME = load(DEFAULT.parent / 'nursery-tree-home.toml')
+
+
+def in_nest(burrow=False):
+    cfg = replace(HOME, tree=replace(HOME.tree, burrow=burrow), episode=replace(HOME.episode, seconds=0.5))
+    world = World(cfg)
+    edge = world.nests[0] + np.array([cfg.colonies.nest_radius * 0.8, 0.0])
+    world.physics.place(np.array([0]), edge[None, None])
+    world.crop[:] = 1
+    return world
+
+
+def doing(**on):
+    out = np.full((1, 1, len(ACTIONS)), -1.0)
+    out[..., :2] = 0
+    for name in on:
+        out[..., ACTIONS.index(name)] = 1.0
+    return out
+
+
+def test_the_unload_wipe_fires_when_an_apple_is_stored_and_not_when_it_is_eaten_in_the_nest():
+    eating = in_nest()
+    eating.energy[:] = 0.2
+    wipe = games.unloads(eating)
+    eating.step(doing(eat=True))
+    assert eating.crop[0, 0] == 0 and eating.stored[0, 0] == 0
+    assert not wipe(eating).any()
+    storing = in_nest()
+    wipe = games.unloads(storing)
+    assert not wipe(storing).any()
+    storing.step(doing(unload=True))
+    assert storing.stored[0, 0] == 1
+    assert wipe(storing).all()
+    assert not wipe(storing).any()
+
+
+def test_the_unload_wipe_belongs_to_the_nestmate_that_stored_it():
+    cfg = replace(HOME, colonies=replace(HOME.colonies, size=2))
+    world = World(cfg)
+    wipe = games.unloads(world)
+    # one stores a load, the other is carrying its own and eats it in the nest
+    world.physics.place(np.array([0]), np.array([[world.nests[0], world.nests[0] + [0.3, 0.0]]]))
+    world.crop[:] = 1
+    world.energy[:] = [[1.0, 0.2]]
+    act = np.full((1, 2, len(ACTIONS)), -1.0)
+    act[..., :2] = 0
+    act[0, 0, ACTIONS.index('unload')] = 1.0
+    act[0, 1, ACTIONS.index('eat')] = 1.0
+    world.step(act)
+    assert world.crop.tolist() == [[0, 0]]
+    assert wipe(world).tolist() == [[True, False]]
+
+
+def test_the_burrows_carry_down_into_the_nest_is_not_walking():
+    def play(burrow):
+        def begin(w):
+            w.physics.place(np.array([0]), (w.nests[0] + [0.8, 0.0])[None, None])
+            w.crop[:] = 1
+        cfg = replace(HOME, tree=replace(HOME.tree, burrow=burrow), episode=replace(HOME.episode, seconds=0.5))
+        unload = lambda world: lambda w: doing(unload=True).repeat(w.arenas, 0)
+        return games.play(cfg, 2, 1, [(games.everyone, unload)], begin=begin)
+    assert np.allclose(play(True)[1], 0) and np.allclose(play(False)[1], 0)

@@ -23,7 +23,7 @@ class Tag:
     def reset(self, idx: np.ndarray):
         w = self.world
         for a in idx:
-            self.it[a] = w.rng.choice(np.flatnonzero(w.alive[a]))
+            self.it[a] = w.rngs[a].choice(np.flatnonzero(w.alive[a]))
         self.wait[idx] = self._cooldown()
         self.back[idx] = -1
         self.since[idx] = 0

@@ -101,14 +101,15 @@ class Peek:
             return
         room = cfg.arena.size / 2 - cfg.food.clearance
         half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2) + cfg.food.radius
-        i = w.rng.choice(alive)
+        rng = w.rngs[a]
+        i = rng.choice(alive)
         # the middle of the fan
         v = cfg.vision
         rays = angles(v)
         rays = rays[np.abs(rays) <= 0.3 * v.fov]
         for _ in range(TRIES):
-            t = w.heading[a, i] + w.rng.choice(rays)
-            r = w.rng.uniform(cfg.peek.near, cfg.peek.far)
+            t = w.heading[a, i] + rng.choice(rays)
+            r = rng.uniform(cfg.peek.near, cfg.peek.far)
             spot = w.pos[a, i] + r * np.array([np.cos(t), np.sin(t)])
             if (np.abs(spot) <= room).all() and not (len(half) and w._on_block(a, spot, half)):
                 w.food_pos[a, 0] = spot
@@ -119,7 +120,7 @@ class Peek:
 
     def _spin(self, a):
         w = self.world
-        turn = w.rng.uniform(-np.pi, np.pi, w.heading.shape[1])
+        turn = w.rngs[a].uniform(-np.pi, np.pi, w.heading.shape[1])
         w.heading[a] = (w.heading[a] + turn + np.pi) % (2 * np.pi) - np.pi
         w.physics.turn_velocity(a, turn)
 

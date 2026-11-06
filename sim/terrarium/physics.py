@@ -34,8 +34,9 @@ class Physics:
     def __init__(self, cfg: Config, creatures: np.ndarray):
         self.cfg = cfg
         self.arenas, self.creatures = creatures.shape[:2]
-        self.bodies: list[list[pymunk.Body]] = []
-        self.spaces = [self._build(creatures[a]) for a in range(self.arenas)]
+        built = [self._build(creatures[a]) for a in range(self.arenas)]
+        self.spaces = [space for space, _ in built]
+        self.bodies: list[list[pymunk.Body]] = [bodies for _, bodies in built]
         # batch rows are the dynamic bodies in the order added, then the space's static body
         self.rows = self.creatures + len(cfg.block) + 1
         self.data = np.zeros((self.arenas, self.rows * WIDTH))
@@ -52,7 +53,6 @@ class Physics:
         space = pymunk.Space()
         space.collision_slop = cfg.slop
         bodies = []
-        self.bodies.append(bodies)
         for x, y in creatures:
             body = pymunk.Body(cfg.creature.mass, float('inf'))
             body.position = (float(x), float(y))
@@ -85,7 +85,7 @@ class Physics:
             wall.friction = cfg.creature.friction
             wall.filter = pymunk.ShapeFilter(categories=WALL)
             space.add(wall)
-        return space
+        return space, bodies
 
     def read(self):
         for a, space in enumerate(self.spaces):
@@ -188,23 +188,13 @@ class Physics:
             self.spaces[a].remove(joint)
 
     def place(self, arenas, creatures: np.ndarray):
-        """Creatures to these positions (len(arenas), creatures, 2), standing still, and blocks back where they started."""
+        """Creatures to these positions (len(arenas), creatures, 2), standing still, and blocks back where they started.
+        Each arena gets a new space: moving the bodies back left contact and solver state from the game before, so
+        the first ticks of a reset arena differed from a fresh one's."""
         for a, pos in zip(arenas, creatures):
             for c in range(self.creatures):
                 self.let_go(a, c)
-            bodies = self.bodies[a]
-            for body, (x, y) in zip(bodies, pos):
-                body.position = (float(x), float(y))
-                body.velocity = (0, 0)
-                for shape in body.shapes:
-                    shape.filter = SOLID
-            for body, b in zip(bodies[self.creatures:], self.cfg.block):
-                body.position = (b.x, b.y)
-                body.angle = b.angle
-                body.velocity = (0, 0)
-                body.angular_velocity = 0
-                for shape in body.shapes:
-                    shape.filter = GROUNDED
+            self.spaces[a], self.bodies[a] = self._build(pos)
         self.read()
 
     def remove(self, creatures: np.ndarray):

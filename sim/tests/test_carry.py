@@ -129,6 +129,9 @@ def test_the_brain_feels_the_load_and_sees_the_berry_again_once_down():
     world = world_of()
     berry(world, 0, beside(world, gap=0.0))
     world.heading[:] = 0.0
+    # a full crop and no hunger walk over the berry once it's down: it is set down touching, where whether the
+    # float sum lands just inside reach or just outside depends on where the baby happened to start
+    world.crop[:] = world.cfg.crop.capacity
     step(world, YES)
     load = SELF.index('load')
     assert observe(world, np.zeros((1, 1, 2))).me[0, load] == 1

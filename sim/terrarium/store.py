@@ -33,6 +33,8 @@ BRAIN = ('stuck', 'give_up')
 NEEDS = {'gpu': bool, 'gpu_memory_gb': (int, float), 'cores': int, 'memory_gb': (int, float), 'machine': str}
 # the first worker version that knows a score job; an older one would take it and fail it
 SCORE_VERSION = 10
+# wiping a brain's notes on the game's event: an older worker would drop it and score with the notes kept
+SCORE_EVENT_VERSION = 13
 
 
 def scoring(spec: dict) -> bool:
@@ -219,7 +221,8 @@ class Store:
             return False
         if scoring(spec):
             # a pod is paid by the hour for its GPU: it scores only what's kept to rented machines
-            return (version or 0) >= SCORE_VERSION and (role != 'rented' or spec.get('on') == 'rented')
+            need = SCORE_EVENT_VERSION if spec['score'].get('wiped_on_event') else SCORE_VERSION
+            return (version or 0) >= need and (role != 'rented' or spec.get('on') == 'rented')
         return True
 
     def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None,

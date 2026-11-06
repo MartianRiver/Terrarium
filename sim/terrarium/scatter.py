@@ -34,12 +34,13 @@ def scatter(world, idx: np.ndarray):
     reach = cfg.colonies.spawn_ring + cfg.creature.radius + GAP
     every = list(range(len(cfg.block)))
     for a in idx:
+        rng = world.rngs[a]
         for _ in range(TRIES):
             placed = []
             for b in cfg.block:
                 for _ in range(TRIES):
-                    d, t = cfg.arena.scatter * np.sqrt(world.rng.uniform()), world.rng.uniform(0, 2 * np.pi)
-                    moved = replace(b, x=b.x + d * np.cos(t), y=b.y + d * np.sin(t), angle=world.rng.uniform(0, np.pi))
+                    d, t = cfg.arena.scatter * np.sqrt(rng.uniform()), rng.uniform(0, 2 * np.pi)
+                    moved = replace(b, x=b.x + d * np.cos(t), y=b.y + d * np.sin(t), angle=rng.uniform(0, np.pi))
                     box = corners(moved)
                     if ((np.abs(box) <= room).all() and (box_gap(world.nests, moved) > reach).all()
                             and all(apart(box, corners(p), GAP) for p in placed)):
@@ -63,9 +64,10 @@ def move(world, a: int, k: int) -> bool:
               for j, b in enumerate(cfg.block) if j != k]
     bodies = world.pos[a][world.alive[a]]
     b = cfg.block[k]
+    rng = world.rngs[a]
     for _ in range(TRIES):
-        d, t = cfg.arena.scatter * np.sqrt(world.rng.uniform()), world.rng.uniform(0, 2 * np.pi)
-        moved = replace(b, x=b.x + d * np.cos(t), y=b.y + d * np.sin(t), angle=world.rng.uniform(0, np.pi))
+        d, t = cfg.arena.scatter * np.sqrt(rng.uniform()), rng.uniform(0, 2 * np.pi)
+        moved = replace(b, x=b.x + d * np.cos(t), y=b.y + d * np.sin(t), angle=rng.uniform(0, np.pi))
         box = corners(moved)
         if ((np.abs(box) <= room).all() and (box_gap(world.nests, moved) > reach).all()
                 and (box_gap(bodies, moved) > cfg.creature.radius + GAP).all()

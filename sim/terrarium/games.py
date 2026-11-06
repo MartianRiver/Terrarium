@@ -3,10 +3,11 @@
 #   uv run python -m terrarium.games tag --brain A.pt B.pt [--config W.toml] [--episodes 128] [--held-out] [--out f.json]
 #
 # Every game plays the brain in each of its roles against fixed opponents (random walkers, or a scripted player that
-# knows everything), and against itself. Each arena is one episode, and every brain plays the same worlds (same seed,
-# same starts), so two brains can be compared episode by episode. Each number comes with a 95% interval (bootstrap
-# over episodes), and every brain after the first is set against it: the mean difference, its interval, and whether
-# the two can be told apart at all. A difference whose interval holds 0 is noise, however big it looks.
+# knows everything), and against itself. Each arena is one episode with its own random numbers from the seed, and every
+# brain plays the same worlds (same seed, same starts, game i the same game in any size of job), so two brains can be
+# compared episode by episode. Each number comes with a 95% interval (bootstrap over episodes), and every brain after
+# the first is set against it: the mean difference, its interval, and whether the two can be told apart at all.
+# A difference whose interval holds 0 is noise, however big it looks.
 #
 # This only covers the noise of scoring. Two training runs of the same setup can land far apart too, so a setup is
 # judged on its seeds together (several brains, each scored here), never on one brain.
@@ -67,11 +68,14 @@ def chaser(world: World):
 
 
 def play(cfg, episodes: int, seed: int, parts: list[tuple[Callable[[World], np.ndarray], Make]], watch=None,
-         brain: tuple[int, ...] = (0,)) -> tuple[World, np.ndarray]:
+         brain: tuple[int, ...] = (0,), begin=None) -> tuple[World, np.ndarray]:
     """Every arena through one episode, each creature steered by the first part whose mask (world → (arenas,
     creatures) bool, read every tick) holds it. watch(world, tick) runs after each tick. Also the metres a minute
-    walked by each arena's creatures in the brain's parts, on average."""
+    walked by each arena's creatures in the brain's parts, on average (the burrow's carry down into the nest isn't
+    walking). begin(world) runs once before the first tick."""
     w = World(cfg, episodes, seed)
+    if begin:
+        begin(w)
     acts = [(mask, padded(make)(w)) for mask, make in parts]
     walked, ticks = np.zeros(episodes), np.zeros(episodes)
     for t in range(w.episode_ticks):
@@ -86,7 +90,8 @@ def play(cfg, episodes: int, seed: int, parts: list[tuple[Callable[[World], np.n
         before = w.pos.copy()
         w.step(x)
         ours &= w.alive
-        walked += (np.hypot(*(w.pos - before).transpose(2, 0, 1)) * ours).sum(1)
+        moved = w.pos - before - (w.tree.jumped if w.tree else 0)
+        walked += (np.hypot(*moved.transpose(2, 0, 1)) * ours).sum(1)
         ticks += ours.sum(1)
         if watch:
             watch(w, t)
@@ -162,11 +167,19 @@ def maze_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarr
 
 
 def tree_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarray]:
-    w, walked = play(cfg, episodes, seed, [(everyone, player)])
+    visible = np.zeros(episodes)
+
+    def begin(w):
+        visible[:] = w.tree.seen_from_home()
+    w, walked = play(cfg, episodes, seed, [(everyone, player)], begin=begin)
+    assert w.tree
     minutes = cfg.episode.seconds / 60
     jumps = w.jumps.sum(1)
     out = {'apples_a_minute': w.meals.sum(1) / minutes, 'jumps_a_minute': jumps / minutes,
-           'apples_a_jump': w.meals.sum(1) / np.maximum(jumps, 1), 'walked': walked}
+           'apples_a_jump': w.meals.sum(1) / np.maximum(jumps, 1), 'walked': walked,
+           # what didn't go as set, and a start that gives the tree away: analyses can drop or split these games
+           'start_fell_back': w.tree.start_fell_back, 'moves_failed': w.tree.moves_failed,
+           'tree_seen_from_home': visible}
     if cfg.tree.home:
         out['home_a_minute'] = w.stored.sum(1) / minutes
     return out
@@ -378,14 +391,15 @@ def new_room(world):
 
 
 def unloads(world):
-    """A Terrikin emptying its crop in its nest since the last choice: wiped then, it sets off for the tree again with
-    no notes of where it was."""
-    was = world.crop.copy()
+    """A Terrikin storing an apple in its own nest since the last choice: wiped then, it sets off for the tree again
+    with no notes of where it was. Eating from the crop in the nest empties it too, but stores nothing, so it
+    doesn't count; `stored` is each creature's own count, so nestmates don't share an event."""
+    was = world.stored.copy()
 
     def now(w):
         nonlocal was
-        out = (w.crop < was) & (w.nest_at() == w.colony)
-        was = w.crop.copy()
+        out = w.stored > was
+        was = w.stored.copy()
         return out
     return now
 

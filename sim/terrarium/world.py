@@ -89,7 +89,10 @@ class World:
     def __init__(self, cfg: Config, arenas: int = 1, seed: int = 0):
         self.cfg = cfg
         self.arenas = arenas
-        self.rng = np.random.default_rng(seed)
+        self.seed = seed
+        # each arena draws from its own stream, so a game is the same whatever else is in the job: how many arenas
+        # there are, and what happens in the others, can't change it
+        self.rngs = [np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(a,))) for a in range(arenas)]
         self.tick = 0
 
         col = cfg.colonies
@@ -102,7 +105,8 @@ class World:
         n = len(self.colony)
         self._check_layout()
 
-        pos, self.heading = self._spawn(arenas)
+        # where everyone stands is set by reset() at the end, the same way every later game is
+        self.heading = np.zeros((arenas, n))
         self.energy = np.where(self.spare, 0.0, np.full((arenas, n), cfg.energy.start))
         self.alive = np.tile(~self.spare, (arenas, 1))
         # places nobody has been in yet this episode, which replays leave out
@@ -113,8 +117,7 @@ class World:
         # it's night in the arena: no food grows
         self.dark = np.zeros(arenas, bool)
         self.episode_ticks = round(cfg.episode.seconds * cfg.tick_hz)
-        self.physics = Physics(cfg, pos)
-        self.physics.remove(self.unborn)
+        self.physics = Physics(cfg, np.zeros((arenas, n, 2)))
         # how high each is off the ground and rising ([jump]), and its jumps since its arena started
         self.z = np.zeros((arenas, n))
         self.vz = np.zeros((arenas, n))
@@ -126,28 +129,17 @@ class World:
         self.block_id = np.arange(n + 1, n + len(cfg.block) + 1)
         self.next_id = np.full(arenas, n + len(cfg.block) + 1)
         self.patch_pos = np.zeros((arenas, cfg.food.patches, 2))
-        for a in range(arenas):
-            self._place_patches(a)
         # the food that grows, then a slot for every jelly the creatures could leave on the ground at once
         self.wild = cfg.food.count
         slots = self.wild + n * cfg.crop.capacity
         self.food_pos = np.zeros((arenas, slots, 2))
         # the ways between rooms in each arena's maze ([arena] maze)
         self.maze_open: list[set] = [set() for _ in range(arenas)]
-        # as reset() does, so the first episode isn't the one layout with every block where it's set (scoring plays
-        # only the first: until 2026-11-05 every scattered world was scored with its tree at its spot)
-        if cfg.arena.scatter:
-            scatter(self, np.arange(arenas))
-        if cfg.arena.maze:
-            carve(self, np.arange(arenas))
         self.food_id = np.zeros((arenas, slots), int)
         # ticks until a food grows back; 0 means it's there
         self.food_regrow = np.zeros((arenas, slots), int)
         self.food_regrow[:, self.wild:] = EMPTY
         self.tree = Tree(self) if cfg.tree.on else None
-        for a in range(arenas):
-            for f in range(self.wild):
-                self._grow(a, f)
         self.eaten = 0
         # food each creature has picked up where it grew (eaten or carried) since its arena started
         self.meals = np.zeros((arenas, n), int)
@@ -180,10 +172,8 @@ class World:
         self.flower_pos = np.zeros((arenas, fl.count, 2))
         self.flower_left = np.zeros((arenas, fl.count), int)
         self.flower_id = np.zeros((arenas, fl.count), int)
-        self.flower_due = self._flower_wait(arenas)
+        self.flower_due = np.zeros(arenas, int)
         self.flower_spots = np.zeros((arenas, fl.spots, 2))
-        for a in range(arenas):
-            self._place_spots(a)
         # ticks left of each creature's nectar boost, and the flowers each has drunk since its arena started
         self.nectar = np.zeros((arenas, n), int)
         # how much go each has left before it tires ([tired]; always 1 with it off)
@@ -215,12 +205,8 @@ class World:
         self.flags = Flags(self) if cfg.flag.on else None
         self.peek = Peek(self) if cfg.peek.on else None
         self.dung = Droppings(self) if cfg.dung.on else None
-        if cfg.young.start:
-            self.young[:] = np.where(self.spare, 0, round(cfg.young.seconds * cfg.tick_hz))
-        if self.tag:
-            self.tag.reset(np.arange(arenas))
-        if self.tree:
-            self.tree.start(np.arange(arenas))
+        # the first game starts the way every later one does, through the same draws in the same order
+        self.reset(np.ones(arenas, bool))
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
@@ -286,14 +272,14 @@ class World:
         if self.cfg.arena.maze:
             check_maze(self.cfg)
 
-    def _spawn(self, arenas):
+    def _spawn(self, idx: np.ndarray):
         """Each colony on an evenly spaced ring around its nest, turned a random amount per arena."""
         size = self.cfg.colonies.slots
         ring = np.arange(size) / size * 2 * np.pi
-        turn = self.rng.uniform(0, 2 * np.pi, (arenas, len(self.nests), 1))
-        a = (ring + turn).reshape(arenas, -1)
+        turn = np.stack([self.rngs[a].uniform(0, 2 * np.pi, (len(self.nests), 1)) for a in idx])
+        a = (ring + turn).reshape(len(idx), -1)
         pos = self.nests[self.colony] + np.stack([np.cos(a), np.sin(a)], -1) * self.cfg.colonies.spawn_ring
-        heading = self.rng.uniform(-np.pi, np.pi, a.shape)
+        heading = np.stack([self.rngs[a].uniform(-np.pi, np.pi, pos.shape[1]) for a in idx])
         return pos, heading
 
     def reset(self, arenas: np.ndarray):
@@ -301,7 +287,7 @@ class World:
         idx = np.flatnonzero(arenas)
         if not len(idx):
             return
-        pos, heading = self._spawn(len(idx))
+        pos, heading = self._spawn(idx)
         self.heading[idx] = heading
         self.physics.place(idx, pos)
         if self.cfg.arena.scatter:
@@ -316,6 +302,7 @@ class World:
             gone[idx] = self.spare
             self.physics.remove(gone)
         self.age[idx] = 0
+        self.clock[idx] = 0
         self.dark[idx] = False
         self.meals[idx] = 0
         self.crop[idx] = self.cfg.crop.start
@@ -332,7 +319,7 @@ class World:
         self.hatched[idx] = 0
         self.young[idx] = np.where(self.spare, 0, round(self.cfg.young.seconds * self.cfg.tick_hz)) if self.cfg.young.start else 0
         self.flower_left[idx] = 0
-        self.flower_due[idx] = self._flower_wait(len(idx))
+        self.flower_due[idx] = self._flower_wait(idx)
         self.nectar[idx] = 0
         self.stamina[idx] = 1
         self.z[idx] = 0
@@ -520,9 +507,8 @@ class World:
         np.add.at(self.meals, (arena[wild], who[wild]), 1)
         # two foods on one tick can overfill a crop; the extra is lost
         np.minimum(self.crop, cfg.crop.capacity, out=self.crop)
-        hz = self.cfg.tick_hz
-        lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)
-        self.food_regrow[arena, food] = np.where(wild, self.rng.integers(lo, hi + 1, len(arena)), EMPTY)
+        self.food_regrow[arena, food] = EMPTY
+        self.food_regrow[arena[wild], food[wild]] = self._regrow_wait(arena[wild])
         self.eaten += len(arena)
         log.trace('food eaten', tick=self.tick, count=len(arena))
 
@@ -667,7 +653,7 @@ class World:
             self.flower_left[a, f] = round(self.cfg.flowers.open * self.cfg.tick_hz)
             self.flower_id[a, f] = self.next_id[a]
             self.next_id[a] += 1
-            self.flower_due[a] = self._flower_wait(1)[0]
+            self.flower_due[a] = self._flower_wait([a])[0]
 
     def _place_spots(self, a):
         fl = self.cfg.flowers
@@ -687,14 +673,25 @@ class World:
         spots = self.flower_spots[a]
         taken = self.flower_pos[a][self.flowers_open[a]]
         free = [k for k in range(len(spots)) if not any(np.allclose(spots[k], t) for t in taken)]
-        return spots[free[self.rng.integers(len(free))]] if free else spots[self.rng.integers(len(spots))]
+        rng = self.rngs[a]
+        return spots[free[rng.integers(len(free))]] if free else spots[rng.integers(len(spots))]
 
-    def _flower_wait(self, count: int) -> np.ndarray:
+    def _flower_wait(self, arenas) -> np.ndarray:
+        """Ticks to the next flower in each of these arenas."""
         fl, hz = self.cfg.flowers, self.cfg.tick_hz
         # drawn only with flowers on, so worlds without them keep their food where it was
         if not fl.on:
-            return np.zeros(count, int)
-        return self.rng.integers(round(fl.every_min * hz), round(fl.every_max * hz) + 1, count)
+            return np.zeros(len(arenas), int)
+        return np.array([self.rngs[a].integers(round(fl.every_min * hz), round(fl.every_max * hz) + 1) for a in arenas], int)
+
+    def _regrow_wait(self, arena: np.ndarray) -> np.ndarray:
+        """Ticks until each food grows back, one per entry of arena (sorted), drawn from its own arena's stream."""
+        hz = self.cfg.tick_hz
+        lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)
+        if not len(arena):
+            return np.zeros(0, int)
+        ids, counts = np.unique(arena, return_counts=True)
+        return np.concatenate([self.rngs[a].integers(lo, hi + 1, c) for a, c in zip(ids, counts)])
 
     def nest_at(self) -> np.ndarray:
         """Which nest each creature is standing in, -1 for none, (arenas, creatures)."""
@@ -777,8 +774,8 @@ class World:
                 self.egg[lays, slot] = max(1, round(h.seconds * self.cfg.tick_hz))
                 self.store[lays, c] -= h.cost
                 # laid where it will hatch, somewhere in the nest
-                angle = self.rng.uniform(0, 2 * np.pi, len(lays))
-                r = self.cfg.colonies.nest_radius / 2 * np.sqrt(self.rng.uniform(size=len(lays)))
+                angle, r = np.array([(self.rngs[a].uniform(0, 2 * np.pi), np.sqrt(self.rngs[a].uniform())) for a in lays]).T
+                r = self.cfg.colonies.nest_radius / 2 * r
                 self.egg_pos[lays, slot] = self.nests[c] + np.stack([np.cos(angle), np.sin(angle)], -1) * r[:, None]
                 self.egg_id[lays, slot] = self.next_id[lays]
                 self.next_id[lays] += 1
@@ -787,7 +784,7 @@ class World:
         """Hatchlings in these (arenas, creatures) slots, where their eggs were."""
         a, i = np.nonzero(due)
         self.physics.revive(a, i, self.egg_pos[a, i])
-        self.heading[a, i] = self.rng.uniform(-np.pi, np.pi, len(a))
+        self.heading[a, i] = [self.rngs[x].uniform(-np.pi, np.pi) for x in a]
         self.energy[a, i] = self.cfg.energy.start
         self.alive[a, i] = True
         self.unborn[a, i] = False
@@ -830,9 +827,7 @@ class World:
         # flowers close at nightfall
         self.flower_left[fell] = 0
         standing = (self.food_regrow[:, :self.wild] == 0) & fell[:, None]
-        hz = self.cfg.tick_hz
-        lo, hi = round(self.cfg.food.regrow_min * hz), round(self.cfg.food.regrow_max * hz)
-        self.food_regrow[:, :self.wild][standing] = self.rng.integers(lo, hi + 1, int(standing.sum()))
+        self.food_regrow[:, :self.wild][standing] = self._regrow_wait(np.nonzero(standing)[0])
         self.food_by[:, :self.wild][standing] = -1
         log.debug('night fell', tick=self.tick, arenas=int(fell.sum()), food=int(standing.sum()))
 
@@ -860,15 +855,15 @@ class World:
 
     def _open_ground(self, a, around=None, margin=0.0):
         """A random spot clear of walls, nests and blocks: anywhere, or within patch_radius of around."""
-        cfg = self.cfg
+        cfg, rng = self.cfg, self.rngs[a]
         room = cfg.arena.size / 2 - cfg.food.clearance - margin
         nest_gap = cfg.colonies.nest_radius + cfg.food.clearance
         half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2) + cfg.food.radius
 
         def pick():
             if around is None:
-                return self.rng.uniform(-room, room, 2)
-            r, t = cfg.food.patch_radius * np.sqrt(self.rng.uniform()), self.rng.uniform(0, 2 * np.pi)
+                return rng.uniform(-room, room, 2)
+            r, t = cfg.food.patch_radius * np.sqrt(rng.uniform()), rng.uniform(0, 2 * np.pi)
             return around + r * np.array([np.cos(t), np.sin(t)])
 
         p = pick()

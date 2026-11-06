@@ -57,7 +57,8 @@ BEAT = 60
 PEEK = 900
 # the wait between looks when jobs are running and a free slot found nothing to claim
 BUSY = 5
-VERSION = 12
+# 13: score jobs can wipe on the game's event (a worker before it would score them with the notes kept)
+VERSION = 13
 
 
 def cpus() -> int:
@@ -554,6 +555,8 @@ class Worker:
             cmd.append('--wiped')
         if s.get('wiped_every'):
             cmd += ['--wiped-every', str(s['wiped_every'])]
+        if s.get('wiped_on_event'):
+            cmd.append('--wiped-on-event')
         return cap(cmd, 1, self.rules)
 
     def upload(self, task: Task, data: bytes):

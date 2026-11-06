@@ -300,6 +300,7 @@ def test_the_dead_leave_the_world_until_it_starts_over():
     world.reset(np.array([True]))
     place(world, 0, 0.0, 0.0)
     place(world, 1, 2.0, 0.0)
+    world.heading[:] = 0
     for _ in range(40):
         world.step(np.array([[[1.0, 0.0], [0.0, 0.0]]]))
     assert world.pos[0, 1, 0] > 2.05, 'solid again, so it gets pushed'

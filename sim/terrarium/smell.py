@@ -8,7 +8,7 @@ import numpy as np
 
 from .config import Smell
 
-# blocks move slowly, so where they stand is drawn onto the grid this often (ticks)
+# blocks move slowly, so where they stand is drawn onto the grid this often (ticks of the arena's own)
 REDRAW = 20
 # the weakest smell sensed, and the strongest that still reads differently: a scale of powers of ten
 FAINT, STRONG = 1e-4, 10.0
@@ -24,28 +24,32 @@ class Field:
         # each cell and the next one along x and along y, as much as the leakier of the two lets through
         self.passes = np.ones_like(self.smell)
         self.gaps = (np.ones_like(self.smell[:, 1:]), np.ones_like(self.smell[:, :, 1:]))
-        self.ticks = 0
+        # each arena counts its own ticks, so one that starts over draws its walls on its first step as a new world does
+        self.ticks = np.zeros(arenas, int)
 
     def reset(self, arenas: np.ndarray):
         self.smell[arenas] = 0
+        self.ticks[arenas] = 0
 
-    def _draw(self, block_pos: np.ndarray, block_angle: np.ndarray):
+    def _draw(self, idx: np.ndarray, block_pos: np.ndarray, block_angle: np.ndarray):
         c = (np.arange(self.n) + 0.5) * self.cfg.cell - self.size / 2
         x, y = c[None, :, None], c[None, None, :]
-        self.passes[:] = 1
+        passes = np.ones((len(idx), self.n, self.n), np.float32)
         for k, b in enumerate(self.blocks):
             dx, dy = x - block_pos[:, k, 0, None, None], y - block_pos[:, k, 1, None, None]
             cos, sin = np.cos(block_angle[:, k])[:, None, None], np.sin(block_angle[:, k])[:, None, None]
             # a cell counts as in the block when any of it is
             inside = ((np.abs(dx * cos + dy * sin) < b.w / 2 + self.cfg.cell / 2)
                       & (np.abs(-dx * sin + dy * cos) < b.h / 2 + self.cfg.cell / 2))
-            np.minimum(self.passes, np.where(inside, self.cfg.leak if k in self.leaky else 0.0, 1.0), out=self.passes)
-        p = self.passes
-        self.gaps = (np.minimum(p[:, 1:], p[:, :-1]), np.minimum(p[:, :, 1:], p[:, :, :-1]))
+            np.minimum(passes, np.where(inside, self.cfg.leak if k in self.leaky else 0.0, 1.0), out=passes)
+        self.passes[idx] = passes
+        self.gaps[0][idx] = np.minimum(passes[:, 1:], passes[:, :-1])
+        self.gaps[1][idx] = np.minimum(passes[:, :, 1:], passes[:, :, :-1])
 
     def step(self, food_pos: np.ndarray, present: np.ndarray, block_pos: np.ndarray, block_angle: np.ndarray):
-        if self.blocks and self.ticks % REDRAW == 0:
-            self._draw(block_pos, block_angle)
+        due = np.flatnonzero(self.ticks % REDRAW == 0) if self.blocks else ()
+        if len(due):
+            self._draw(due, block_pos[due], block_angle[due])
         self.ticks += 1
         s, p = self.smell, self.passes
         # to and from each neighbour along x, then y; nothing past the edge

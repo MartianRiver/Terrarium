@@ -17,8 +17,11 @@ import numpy as np
 
 from . import scatter
 from .config import ConfigError
+from .log import Logger
+from .vision import GAP, hit_boxes, reach
 
 TRIES = 50
+log = Logger('tree')
 
 
 class Tree:
@@ -34,23 +37,35 @@ class Tree:
         self.seen = np.zeros(world.alive.shape[0])
         self.hops = np.zeros(world.alive.shape)
         self.stored = np.zeros(world.alive.shape, int)
+        # what didn't go as set, per arena: [tree] start that fell back to the nest spawn (0 or 1), [tree] moves that
+        # found nowhere to go
+        self.start_fell_back = np.zeros(world.alive.shape[0], int)
+        self.moves_failed = np.zeros(world.alive.shape[0], int)
+        # how far the burrow carried each creature this step, so a score of metres walked can leave it out
+        self.jumped = np.zeros((*world.alive.shape, 2))
 
     def reset(self, idx: np.ndarray):
         self.seen[idx] = 0
         self.hops[idx] = 0
         self.stored[idx] = 0
+        self.start_fell_back[idx] = 0
+        self.moves_failed[idx] = 0
 
     def step(self):
         w, t = self.world, self.world.cfg.tree
+        self.jumped[:] = 0
         if t.burrow:
             self.burrow()
         if t.move <= 0:
             return
         ticks = max(round(t.move * w.cfg.tick_hz), 1)
         for a in np.nonzero((w.age > 0) & (w.age % ticks == 0))[0]:
-            if scatter.move(w, a, t.trunk):
+            if scatter.move(w, int(a), t.trunk):
                 for f in np.nonzero(w.food_present[a])[0]:
                     w._grow(a, f)
+            else:
+                self.moves_failed[a] += 1
+                log.warn('tree found nowhere to move to', arena=int(a), tick=w.tick)
 
     def start(self, idx: np.ndarray):
         """Stand each of these arenas' Terrikins round the trunk, `start` m off its edge and facing it, wherever the
@@ -68,9 +83,10 @@ class Tree:
         chord = 2 * dist * np.sin(np.pi / len(who)) if len(who) > 1 else np.inf
         arenas, creatures, at = [], [], []
         for a in idx:
+            before = len(arenas)
             middle = w.physics.block_pos[a, t.trunk]
             for _ in range(TRIES):
-                angle = w.rng.uniform(0, 2 * np.pi) + np.arange(len(who)) / len(who) * 2 * np.pi
+                angle = w.rngs[a].uniform(0, 2 * np.pi) + np.arange(len(who)) / len(who) * 2 * np.pi
                 spots = middle + dist * np.stack([np.cos(angle), np.sin(angle)], -1)
                 clear = (np.abs(spots) <= room).all() and chord >= 2 * cfg.creature.radius
                 clear = clear and all(not w._on_block(a, s, half) for s in spots)
@@ -82,6 +98,9 @@ class Tree:
                     creatures += list(who)
                     at += list(spots)
                     break
+            if len(arenas) == before:
+                self.start_fell_back[a] = 1
+                log.warn('tree start fell back to the nest spawn', arena=int(a))
         if arenas:
             w.physics.revive(arenas, creatures, np.array(at))
 
@@ -94,8 +113,35 @@ class Tree:
         if not down.any():
             return
         a, c = np.nonzero(down)
-        w.heading[a, c] = w.rng.uniform(-np.pi, np.pi, len(a))
-        w.physics.revive(a, c, w.nests[w.colony[c]])
+        w.heading[a, c] = [w.rngs[x].uniform(-np.pi, np.pi) for x in a]
+        to = w.nests[w.colony[c]]
+        self.jumped[a, c] = to - w.pos[a, c]
+        w.physics.revive(a, c, to)
+
+    def seen_from_home(self) -> np.ndarray:
+        """Per arena, whether a Terrikin at the middle of a nest could see the trunk now: it is within the rays' longest
+        range and some line to it runs clear of the other blocks (bodies, food and walls aside). Where it holds, the
+        tree can be found without remembering where it is."""
+        w, cfg = self.world, self.world.cfg
+        k, v = cfg.tree.trunk, cfg.vision
+        b = cfg.block[k]
+        side = np.linspace(-1, 1, 9)
+        edge = np.stack([np.stack([np.full(9, s * b.w / 2), side * b.h / 2], -1) for s in (-1, 1)]
+                        + [np.stack([side * b.w / 2, np.full(9, s * b.h / 2)], -1) for s in (-1, 1)]).reshape(-1, 2)
+        angle = w.physics.block_angle[:, k]
+        c, s = np.cos(angle)[:, None], np.sin(angle)[:, None]
+        points = w.physics.block_pos[:, k, None] + np.stack([c * edge[:, 0] - s * edge[:, 1], s * edge[:, 0] + c * edge[:, 1]], -1)
+        half = np.array([(x.w / 2, x.h / 2) for x in cfg.block]).reshape(-1, 2)
+        rest = [j for j in range(len(cfg.block)) if j != k]
+        out = np.zeros(w.arenas, bool)
+        for nest in w.nests:
+            way = points - nest
+            dirs = (way / np.hypot(way[..., 0], way[..., 1])[..., None])[:, None]
+            origin = np.broadcast_to(nest, (w.arenas, 1, 2))
+            trunk = hit_boxes(origin, dirs, w.physics.block_pos[:, [k]], w.physics.block_angle[:, [k]], half[[k]], cfg.creature.radius + GAP)
+            others = hit_boxes(origin, dirs, w.physics.block_pos[:, rest], w.physics.block_angle[:, rest], half[rest], cfg.creature.radius + GAP)
+            out |= ((trunk < reach(v).max()) & (trunk < others)).any((1, 2))
+        return out
 
     def reaching(self) -> np.ndarray:
         """Who is high enough to take an apple, and has room for it when apples go home, (arenas, creatures)."""
@@ -112,9 +158,10 @@ class Tree:
         # it may hang over its own trunk's corner, not over any other block
         half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2) + cfg.food.radius
         half[t.trunk] = 0
+        rng = w.rngs[a]
         for _ in range(TRIES):
-            angle = w.rng.uniform(-np.pi, np.pi)
-            spot = middle + w.rng.uniform(t.near, t.far) * np.array([np.cos(angle), np.sin(angle)])
+            angle = rng.uniform(-np.pi, np.pi)
+            spot = middle + rng.uniform(t.near, t.far) * np.array([np.cos(angle), np.sin(angle)])
             if (np.abs(spot) <= room).all() and not w._on_block(a, spot, half):
                 return spot
         return middle + t.far * np.array([1.0, 0.0])
