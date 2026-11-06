@@ -2,8 +2,9 @@
 # it, builds the job's code, runs terrarium.train in it (terrarium.games for a
 # score job) and uploads the run.
 #
-#   uv run python -m terrarium.worker --server URL [--slots 1] [--trusted] [--paused] [--anytime]
+#   uv run python -m terrarium.worker --server URL [--slots N] [--trusted] [--paused] [--anytime]
 #   uv run python -m terrarium.worker pause | resume | drain | status
+#   uv run python -m terrarium.worker calibrate   (how many jobs this machine should run at once)
 #
 # Before a job runs, every one of these has to hold (docs/compute.md):
 #   - its spec is signed by a key in sim/allowed_signers (this checkout's copy, not the server's)
@@ -41,7 +42,7 @@ from pathlib import Path
 
 import psutil
 
-from . import jobs, machine, runs, snapshot, usage
+from . import calibrate, jobs, machine, runs, snapshot, usage
 from .log import Logger
 from .store import scoring, sha256
 from .trust import KEEP_CODE, Refused, capped, check_lock, job_env, pin_signers, scrub, utc
@@ -54,12 +55,24 @@ POLL = 30
 BEAT = 60
 # the run so far goes up this often while training, so the channel can show a run before it's done
 PEEK = 900
-VERSION = 11
+# the wait between looks when jobs are running and a free slot found nothing to claim
+BUSY = 5
+VERSION = 12
 
 
 def cpus() -> int:
     # containers report the host's cores; the cgroup quota is what this one may use
     return runs.cpu_quota() or os.cpu_count() or 1
+
+
+def shares(slots: int, rules: machine.Rules, rollouts: int | None = None) -> tuple[int, int]:
+    """The threads and rollout processes each of `slots` jobs gets."""
+    share = max(1, int(cpus() * rules.cpu) // slots)
+    return share, rollouts or max(1, min(8, share - 1))
+
+
+def cap(cmd: list[str], slots: int, rules: machine.Rules) -> list[str]:
+    return capped(cmd, cpus() * rules.cpu / slots, cpus())
 
 
 def specs() -> dict:
@@ -115,6 +128,8 @@ class Task:
         self.started = time.time()
         self.paused_at: float | None = None
         self.paused = 0.0
+        # the most other jobs this one ran beside, for checking the machine's calibration against real jobs
+        self.beside = 0
         self.peeked = time.time()
         # the coordinator has the run: a beat now would get 410 and read as the job taken away
         self.uploaded = False
@@ -137,6 +152,9 @@ class Task:
         except (OSError, ValueError):
             record = {}
         return recent | {'held_back': usage.held_back(recent, record)} if recent else None
+
+    def job_record(self) -> dict:
+        return {'spec': self.spec, 'sig': self.sig, 'beside': self.beside}
 
     def summary(self) -> dict:
         return {'id': self.id, 'name': self.spec['name'], 'batch': self.spec['batch'], 'total': self.spec['samples'],
@@ -170,8 +188,10 @@ class Worker:
         self.rules, self.watch = rules, watch or machine.Watch(rules)
         self.awake = machine.Awake()
         self.verdict = machine.Verdict('go', '')
-        share = max(1, int(cpus() * rules.cpu) // slots)
-        self.threads, self.rollouts = share, rollouts or max(1, min(8, share - 1))
+        self.threads, self.rollouts = shares(slots, rules, rollouts)
+        # a score job has the whole machine to itself
+        self.whole = max(1, int(cpus() * rules.cpu))
+        self.score_waits = False
         self.max_load, self.instance, self.repo, self.signers = max_load, instance, repo, signers
         self.command, self.scorer = command or self.train_command, scorer or self.score_command
         self.tasks: dict[str, Task] = {}
@@ -198,16 +218,22 @@ class Worker:
                 last_beat = time.time()
             if self.draining and not self.tasks:
                 break
-            if self.wants_work():
+            asked = self.wants_work()
+            if asked:
                 try:
                     job = self.client.json('POST', '/api/claim', self.info())
                 except (urllib.error.URLError, OSError, RuntimeError) as e:
                     log.warn('claim failed', error=str(e))
                     job = None
+                if job and scoring(job['spec']) and self.tasks:
+                    # the queue can't tell it what's already running here, so a score job that arrives
+                    # beside a training one goes back, and nothing is claimed until the machine is empty
+                    self.hand_back(Task(job), 'a score job takes the whole machine')
+                    self.score_waits, job = True, None
                 if job:
                     self.start(job)
                     continue
-            self.stopping.wait(POLL if not self.tasks else 5)
+            self.stopping.wait(POLL if asked or not self.tasks else BUSY)
 
     def hello(self):
         while not self.stopping.is_set():
@@ -223,6 +249,13 @@ class Worker:
     def wants_work(self) -> bool:
         if self.paused or self.draining or len(self.tasks) >= self.slots or self.verdict.action != 'go':
             return False
+        # a score job has the machine: nothing else starts beside it, and it starts only on an empty one
+        if any(scoring(t.spec) for t in list(self.tasks.values())):
+            return False
+        if self.score_waits:
+            if self.tasks:
+                return False
+            self.score_waits = False
         # psutil's works on Windows too, where it's estimated from the processor queue
         if self.max_load is not None and (load := psutil.getloadavg()[0]) > self.max_load:
             log.debug('busy machine, not claiming', load=load, max=self.max_load)
@@ -344,6 +377,12 @@ class Worker:
         self.awake.hold(self.rules.keep_awake and any(t.state in ('preparing', 'training', 'scoring')
                                                       and not t.gone.is_set()
                                                       for t in list(self.tasks.values())))
+        self.note_beside()
+
+    def note_beside(self):
+        going = [t for t in list(self.tasks.values()) if t.state in ('training', 'scoring') and not t.gone.is_set()]
+        for t in going:
+            t.beside = max(t.beside, len(going) - 1)
 
     # one job
 
@@ -364,7 +403,7 @@ class Worker:
             if self.stopping.is_set() or task.gone.is_set():
                 return
             task.state = 'uploading'
-            (task.run / 'job.json').write_text(json.dumps({'spec': task.spec, 'sig': task.sig}, indent=1) + '\n')
+            (task.run / 'job.json').write_text(json.dumps(task.job_record(), indent=1) + '\n')
             if task.spec['code']['overlay']:
                 # diff.patch has tracked changes and untracked.txt only names; this is the code itself
                 (task.run / 'overlay.tar.gz').write_bytes(self.blob(task.spec['code']['overlay']))
@@ -424,7 +463,7 @@ class Worker:
         # games run one process per player and role, up to the cores this worker gives a job
         record = {'game': spec['score']['game'], 'seed': spec['seed'], 'episodes': spec['score']['episodes'],
                   'seconds': round(time.time() - started - task.paused, 1), 'paused': round(task.paused),
-                  'cores_given': self.threads, 'machine': box}
+                  'cores_given': self.whole, 'machine': box}
         (task.run / 'score.json').write_text(json.dumps(record, indent=1) + '\n')
 
     def prepare(self, task: Task, dir: Path) -> dict[str, Path]:
@@ -503,19 +542,19 @@ class Worker:
             cmd += ['--parent', str(inputs['parent'])]
         if spec['code']['overlay']:
             cmd.append('--scratch')
-        return capped(cmd, cpus() * self.rules.cpu / self.slots, cpus())
+        return cap(cmd, self.slots, self.rules)
 
     def score_command(self, spec: dict, inputs: dict[str, Path], sim: Path, out: Path) -> list[str]:
         # on the CPU, one thread a process: the same games on any machine
         s = spec['score']
         cmd = [str(python(sim)), '-m', 'terrarium.games', s['game'], '--config', str(inputs['world']),
                '--baseline', *s['baselines'], '--brain', str(inputs['parent']), '--episodes', str(s['episodes']),
-               '--seed', str(spec['seed']), '--processes', str(self.threads), '--out', str(out)]
+               '--seed', str(spec['seed']), '--processes', str(self.whole), '--out', str(out)]
         if s.get('wiped'):
             cmd.append('--wiped')
         if s.get('wiped_every'):
             cmd += ['--wiped-every', str(s['wiped_every'])]
-        return capped(cmd, cpus() * self.rules.cpu / self.slots, cpus())
+        return cap(cmd, 1, self.rules)
 
     def upload(self, task: Task, data: bytes):
         wait = 5
@@ -677,6 +716,29 @@ def status_server(worker: Worker, port: int) -> ThreadingHTTPServer:
     return server
 
 
+def run_calibration(args, rules: machine.Rules):
+    # a worker with a job running here would be measured along with the runs
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{args.port}/status', timeout=3) as r:
+            if json.loads(r.read()).get('jobs'):
+                sys.exit('a worker on this machine is running a job: pause and drain it (or stop it) first')
+    except (OSError, ValueError):
+        pass
+    sim = Path(__file__).resolve().parent.parent
+    py = python(sim)
+    if subprocess.run([str(py), '-c', 'import torch'], capture_output=True).returncode:
+        print('installing torch for the calibration runs...', flush=True)
+        sync(sim)
+    args.home.mkdir(parents=True, exist_ok=True)
+    # the runs start in sim/, so a path given here is made absolute from where this was run
+    chosen = {'world': args.world and str(Path(args.world).resolve()), 'train': args.train and str(Path(args.train).resolve()),
+              'memory': args.memory}
+    record = calibrate.run(args.home, sim, py, rules, specs(), lambda n: shares(n, rules, args.rollouts),
+                           lambda cmd, n: cap(cmd, n, rules), VERSION, **{k: v for k, v in chosen.items() if v is not None})
+    print(f'{record["slots"]} slot{"s" if record["slots"] > 1 else ""}: {record["why"]}')
+    print(f'saved to {args.home / calibrate.FILE}; `worker run` uses it unless --slots is given')
+
+
 def origin() -> str:
     return snapshot.git('remote', 'get-url', 'origin', check=False)
 
@@ -703,11 +765,15 @@ def token(path: Path) -> str:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', nargs='?', default='run', choices=['run', 'pause', 'resume', 'drain', 'status'])
+    parser.add_argument('command', nargs='?', default='run', choices=['run', 'pause', 'resume', 'drain', 'status', 'calibrate'])
     parser.add_argument('--server', default=jobs.SERVER)
     parser.add_argument('--home', type=Path, default=HOME)
     parser.add_argument('--token-file', type=Path, help='default: HOME/token')
-    parser.add_argument('--slots', type=int, default=1, help='jobs at once; the cores are split between them')
+    parser.add_argument('--slots', type=int, help='jobs at once, the cores split between them (default: what `calibrate` '
+                        'found for this machine, else 1)')
+    parser.add_argument('--world', help='calibrate: the world to train in (default: %s)' % calibrate.WORLD)
+    parser.add_argument('--train', help='calibrate: the training config (default: %s)' % calibrate.TRAIN)
+    parser.add_argument('--memory', type=int, help='calibrate: notes of memory to give the fresh brain (default: %d)' % calibrate.MEMORY)
     parser.add_argument('--rollouts', type=int, help='rollout processes per job (default: its share of cores, up to 8)')
     parser.add_argument('--trusted', action='store_true', help='also run uncommitted code (only on your own machines)')
     parser.add_argument('--paused', action='store_true', help='start without taking jobs; resume from the status page')
@@ -729,7 +795,7 @@ def main():
                         help='allowed_signers changed since the first run, and you have checked the change')
     parser.add_argument('--port', type=int, default=PORT)
     args = parser.parse_args()
-    if args.command != 'run':
+    if args.command not in ('run', 'calibrate'):
         method = 'GET' if args.command == 'status' else 'POST'
         req = urllib.request.Request(f'http://127.0.0.1:{args.port}/{args.command}', method=method, headers={LOCAL: '1'},
                                      data=b'' if method == 'POST' else None)
@@ -741,13 +807,17 @@ def main():
     else:
         rules = machine.load(args.home / 'settings.toml', cooldown=args.cooldown, battery=args.battery,
                              cpu=args.cpu, gpu_temp=args.gpu_temp, share_gpu=args.share_gpu)
+    if args.command == 'calibrate':
+        return run_calibration(args, rules)
     if why := jobs.can_verify(args.signers):
         sys.exit(f'{why}\nSee "Running a worker" in docs/compute.md.')
     if why := pin_signers(args.signers, args.home, args.trust_new_signers):
         sys.exit(why)
     machine.limit(rules)
     client = jobs.Client(args.server, token(args.token_file or args.home / 'token'))
-    worker = Worker(client, args.home, args.slots, args.trusted, args.paused, args.rollouts, args.max_load,
+    slots, why, fresh = calibrate.choose(args.slots, args.home, calibrate.identity(specs(), rules.cpu), VERSION)
+    (log.info if fresh else log.warn)('slots', n=slots, why=why)
+    worker = Worker(client, args.home, slots, args.trusted, args.paused, args.rollouts, args.max_load,
                     args.instance, args.repo, args.signers, rules=rules)
     # systemd and pods stop with SIGTERM, Windows consoles with Ctrl-Break; a background job may have
     # inherited SIGINT ignored
