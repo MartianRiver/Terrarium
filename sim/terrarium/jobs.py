@@ -24,7 +24,8 @@
 # A job with a score table and a brain (instead of train) is a score job: the
 # brain played in the world by terrarium.games on whichever machine is free,
 #   score = { game = "tree", episodes = 256, held_out = true, wiped_every = 3.0, baselines = ["picker"] }
-# (seed = N picks other games than held_out's or the default's). brain = "job:<name>" scores a training job of
+# (wiped_on_event = true blanks a memory brain's notes when the game asks for memory, as games --wiped-on-event;
+# seed = N picks other games than held_out's or the default's). brain = "job:<name>" scores a training job of
 # the same batch once it's done. Scores sync into runs/scores/.
 
 import argparse
@@ -69,7 +70,7 @@ DIGEST = re.compile(r'^[0-9a-f]{64}$')
 FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int, 'needs': dict,
           'score': dict, 'brain': str}
 SCORE = {'game': str, 'episodes': int, 'held_out': bool, 'seed': int, 'wiped': bool, 'wiped_every': (int, float),
-         'baselines': list}
+         'wiped_on_event': bool, 'baselines': list}
 MOST_EPISODES = 4096
 # the kinds of machine a job can be kept to; a token's role says which one a worker is
 MACHINES = ('trusted', 'rented', 'donor')
@@ -301,6 +302,8 @@ def score_spec(job: dict, path: Path, code: dict, runs: Path, ids: dict, blob, n
         raise BadJob(f'{where}: no game {score["game"]!r} (one of {", ".join(sorted(games.GAMES))})')
     if bad := [b for b in score.get('baselines', []) if b not in games.BASELINES]:
         raise BadJob(f'{where}: no baseline {bad[0]!r}')
+    if score.get('wiped_on_event') and score['game'] not in games.EVENTS:
+        raise BadJob(f'{where}: {score["game"]} has no event to wipe on (only {", ".join(games.EVENTS)})')
     world = path.parent / job['world']
     strict(world, None, where)
     # the games' own seed, written down, so the job says exactly which games it plays

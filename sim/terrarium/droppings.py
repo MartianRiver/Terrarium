@@ -53,7 +53,6 @@ class Droppings:
         self.last_trip = np.zeros((arenas, n), int)
         self.later_trips = np.zeros((arenas, n), int)
         self.gain = np.zeros((arenas, len(world.nests)))
-        self.reset(np.arange(arenas))
 
     def reset(self, idx: np.ndarray):
         for arr, v in ((self.left, 0), (self.held, False), (self.heaped, False), (self.since, 0), (self.digest, 0), (self.load, -1),
@@ -63,9 +62,9 @@ class Droppings:
         w, d = self.world, self.world.cfg.dung
         for a in idx:
             if d.spot > 0:
-                self.midden_at[a] = self._new_spot()
+                self.midden_at[a] = self._new_spot(a)
                 for _ in range(d.heap):
-                    r, t = d.spot * 0.5 * np.sqrt(w.rng.random()), w.rng.random() * 2 * np.pi
+                    r, t = d.spot * 0.5 * np.sqrt(w.rngs[a].random()), w.rngs[a].random() * 2 * np.pi
                     k = self._new(a, self.midden_at[a] + r * np.array([np.cos(t), np.sin(t)]))
                     if k >= 0:
                         self.heaped[a, k] = True
@@ -73,9 +72,9 @@ class Droppings:
                 for _ in range(d.start):
                     self._at_home(a, c)
 
-    def _new_spot(self) -> np.ndarray:
+    def _new_spot(self, a) -> np.ndarray:
         w, d = self.world, self.world.cfg.dung
-        bearing = np.radians(d.wander) * (2 * w.rng.random() - 1)
+        bearing = np.radians(d.wander) * (2 * w.rngs[a].random() - 1)
         spot = w.nests[0] + (w.cfg.colonies.nest_radius + d.midden) * np.array([np.cos(bearing), np.sin(bearing)])
         # a nest off the middle can point it past a wall: then it's as far out as the arena lets it be
         return np.clip(spot, -(w.cfg.arena.size / 2 - d.spot), w.cfg.arena.size / 2 - d.spot)
@@ -85,7 +84,7 @@ class Droppings:
         w, d = self.world, self.world.cfg.dung
         ticks = max(round(d.move * w.cfg.tick_hz), 1)
         for a in np.nonzero((w.age > 0) & (w.age % ticks == 0))[0]:
-            new = self._new_spot()
+            new = self._new_spot(a)
             on = self.heaped[a] & (self.left[a] > 0)
             self.pos[a, on] += new - self.midden_at[a]
             self.midden_at[a] = new
@@ -240,6 +239,6 @@ class Droppings:
     def _at_home(self, a, c):
         """A dropping somewhere in nest c."""
         w = self.world
-        r = w.cfg.colonies.nest_radius * np.sqrt(w.rng.random())
-        t = w.rng.random() * 2 * np.pi
+        r = w.cfg.colonies.nest_radius * np.sqrt(w.rngs[a].random())
+        t = w.rngs[a].random() * 2 * np.pi
         self._new(a, w.nests[c] + r * np.array([np.cos(t), np.sin(t)]))

@@ -82,6 +82,7 @@ def test_a_batch_can_score_its_own_training_job(repo, tmp_path):
     assert sc['score'] == {'game': 'tree', 'episodes': 16, 'wiped_every': 3.0, 'baselines': ['picker']}
     for bad, why in [('score = { game = "golf" }\nbrain = "job:t"', 'no game'),
                      ('score = { game = "tree", baselines = ["nobody"] }\nbrain = "job:t"', 'no baseline'),
+                     ('score = { game = "tree", wiped_on_event = true }\nbrain = "job:t"', 'no event'),
                      ('score = { game = "tree" }', 'a brain'),
                      ('score = { game = "tree", episodes = 0 }\nbrain = "job:t"', 'episodes')]:
         batch.write_text(head + f'[[job]]\nname = "s"\n{bad}\n')
@@ -145,3 +146,21 @@ def test_the_score_command_plays_the_games_the_spec_names(tmp_path):
     assert cmd[i + 1] == 'tree' and cmd[cmd.index('--seed') + 1] == '2001000'
     assert cmd[cmd.index('--baseline') + 1:cmd.index('--brain')] == ['picker', 'random']
     assert cmd[cmd.index('--wiped-every') + 1] == '3.0' and '--wiped' not in cmd
+
+
+def test_a_score_job_can_wipe_on_the_games_event_and_only_new_workers_get_it(tmp_path):
+    assert jobs.bad_score({'game': 'tree-home', 'wiped_on_event': True}) is None
+    assert 'wrong type' in jobs.bad_score({'game': 'tree-home', 'wiped_on_event': 1})
+    w = worker.Worker(None, tmp_path / 'home', trusted=True)  # type: ignore[arg-type]
+    s = score('a' * 12)
+    s['score'] |= {'game': 'tree-home', 'wiped_on_event': True}
+    cmd = w.score_command(s, {'world': tmp_path / 'w.toml', 'parent': tmp_path / 'b.pt'}, tmp_path, tmp_path / 'g.json')
+    assert '--wiped-on-event' in cmd and '--wiped' not in cmd
+    plain = w.score_command(score('b' * 12), {'world': tmp_path / 'w.toml', 'parent': tmp_path / 'b.pt'}, tmp_path,
+                            tmp_path / 'g.json')
+    assert '--wiped-on-event' not in plain
+    st = store(tmp_path)
+    st.put(b'brain')
+    st.add(s, 'sig')
+    assert st.claim('Kelpie', True, specs=CPU, version=12) is None
+    assert st.claim('Kelpie', True, specs=CPU, version=worker.VERSION)['spec']['id'] == 'a' * 12

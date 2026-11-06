@@ -54,6 +54,24 @@ SNATCH = 1.5
 Policy = Callable[[World], np.ndarray]
 
 
+class ActionNoise:
+    """A brain's sampled action noise, one stream per game from the game's seed and number, so two brains on a game
+    draw the same numbers, and a game's noise doesn't depend on how many games are in the job."""
+
+    def __init__(self, seed: int, arenas: int):
+        # key (a, 1): the world's own stream for the arena is key (a,)
+        self.rngs = [np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(a, 1))) for a in range(arenas)]
+
+    def normal(self, shape: tuple, dtype) -> np.ndarray:
+        """shape[0] rows are the arenas' creatures in turn, an equal share each."""
+        rows = shape[0] // len(self.rngs)
+        return np.concatenate([r.standard_normal((rows, *shape[1:]), dtype=dtype) for r in self.rngs])
+
+    def random(self, shape: tuple) -> np.ndarray:
+        rows = shape[0] // len(self.rngs)
+        return np.concatenate([r.random((rows, *shape[1:])) for r in self.rngs])
+
+
 def random_policy(world: World) -> Policy:
     act = RandomActions(world.arenas, len(world.colony), SEED)
     return lambda _: act()
@@ -216,7 +234,7 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
 
     def make(world: World) -> Policy:
         last = np.zeros((world.arenas, len(world.colony), 2))
-        noise = np.random.default_rng(SEED)
+        noise = ActionNoise(world.seed, world.arenas)
         held, ticks = None, 0
         notes = brain.blank(last.shape[0] * last.shape[1])
         every = max(1, round(wipe_every / (world.cfg.dt * repeat))) if wipe_every else 0
@@ -235,7 +253,7 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
                 mean, notes = brain.act(obs, sample=False, notes=before)
                 # the dead remember nothing, so a hatchling in their place starts blank
                 notes = notes * torch.from_numpy(w.alive.reshape(-1)).to(notes)[:, None]
-                mean = mean + spread * noise.standard_normal(mean.shape, dtype=mean.dtype)
+                mean = mean + spread * noise.normal(mean.shape, mean.dtype)
                 if coins is not None:
                     odds = mean[..., coins]
                     yes = odds > 0 if mode == 'mean' else noise.random(odds.shape) < 1 / (1 + np.exp(-odds))

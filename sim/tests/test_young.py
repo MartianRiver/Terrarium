@@ -45,6 +45,11 @@ def test_being_young_is_cheaper_and_slower():
     world.energy[0, :2] = 1.0
     go = np.zeros((1, len(world.colony), 6))
     go[0, :2, 0] = 1.0
+    # both walk the same way from open ground, clear of the blocks and the others (a hatchling comes out facing any way)
+    world.heading[0, :2] = -np.pi / 2
+    for c, x in enumerate((-8.0, 8.0)):
+        world.physics.bodies[0][c].position = (x, 4.0)
+    world.physics.read()
     ticks(world, 1.0, go)
     spent = 1.0 - world.energy[0, :2]
     assert spent[1] == pytest.approx(spent[0] * YOUNG.young.energy, rel=1e-6)

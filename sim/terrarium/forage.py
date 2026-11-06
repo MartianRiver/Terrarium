@@ -89,7 +89,7 @@ class Forage:
         self.staggered = train.start.staggered and cfg.night.on
         self._stagger(np.ones(arenas, bool))
         if train.start.spread:
-            self.world.age[:] = self.world.rng.integers(0, self.world.episode_ticks, arenas)
+            self.world.age[:] = [rng.integers(0, self.world.episode_ticks) for rng in self.world.rngs]
         self.reward = train.reward
         r = self.reward
         self.fun = Fun(self.world, r.novelty, r.variety) if r.novelty or r.variety else None
@@ -178,7 +178,9 @@ class Forage:
     def _stagger(self, arenas: np.ndarray):
         # a start in the dark loses its standing food on the first step, as at nightfall
         if self.staggered:
-            self.world.clock[arenas] = self.world.rng.uniform(0, self.world.cfg.night.cycle, int(arenas.sum()))
+            w = self.world
+            for a in np.flatnonzero(arenas):
+                w.clock[a] = w.rngs[a].uniform(0, w.cfg.night.cycle)
 
 
 

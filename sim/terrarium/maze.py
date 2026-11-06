@@ -52,7 +52,7 @@ def carve(world, idx: np.ndarray):
     every = list(range(len(world.cfg.block)))
     for a in idx:
         world.maze_open[a] = set()
-        w = walls(n, world.rng, world.maze_open[a])
+        w = walls(n, world.rngs[a], world.maze_open[a])
         to = np.array([(x * room - size / 2, y * room - size / 2) for x, y, _ in w])
         world.physics.shift([a], every, to, np.array([t for *_, t in w]))
 
