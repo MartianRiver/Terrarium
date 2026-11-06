@@ -1,5 +1,7 @@
 import threading
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -104,7 +106,7 @@ class Clock:
         return self.t
 
 
-def manager(tmp_path, c, settings='cap_usd_day = 5.0\nmax_pods = 2\nhours = 6.0\n', **fakes):
+def manager(tmp_path, c, settings='week_usd = 35.0\nmonth_usd = 150.0\nmax_pods = 2\nhours = 6.0\n', **fakes):
     state = tmp_path / 'state'
     state.mkdir(exist_ok=True)
     if settings is not None:
@@ -196,15 +198,44 @@ def test_orphans_are_destroyed_and_pods_gone_at_the_provider_are_marked_gone(ser
     assert m.ledger.db.execute('select why from pods').fetchone()[0] == 'gone at the provider'
 
 
-def test_the_days_cap_counts_running_pods_and_a_whole_new_one(server, tmp_path):
+def sydney(*when) -> float:
+    return datetime(*when, tzinfo=ZoneInfo('Australia/Sydney')).timestamp()
+
+
+def test_days_weeks_and_months_start_in_sydney():
+    day, week, month, left = pods.starts(sydney(2026, 11, 4, 0, 30), 'Australia/Sydney')
+    assert (day, week, month, left) == (sydney(2026, 11, 4), sydney(2026, 11, 2), sydney(2026, 11, 1), 5)
+    assert pods.starts(sydney(2026, 11, 8, 23), 'Australia/Sydney')[3] == 1
+
+
+def test_the_budget_rents_while_any_is_left_and_later_days_plan_smaller(server, tmp_path):
     url, c = server
-    m, provs, clock = manager(tmp_path, c, settings='cap_usd_day = 1.5\nmax_pods = 2\nhours = 6.0\nmax_dph = 0.3\n')
+    m, provs, clock = manager(tmp_path, c, settings='week_usd = 4.9\nmonth_usd = 22.4\nmax_pods = 2\nhours = 2.0\nmax_dph = 0.3\n')
+    clock.t = sydney(2026, 11, 2, 12)
+    m.ledger.add('pod-old', 'vast', '1', 0.3, clock.t - 3 * 3600, 'x')
+    m.ledger.gone('pod-old', clock.t - 3600, 'done')
+    cfg = pods.settings(m.state)
+    b = m.budget(cfg, clock.t)
+    assert b['share_today'] == pytest.approx(0.7) and b['room'] == pytest.approx(0.1)
+    # a little left is enough for a whole pod: the budget is soft
     upload(c['admin'], spec('a' * 12))
+    upload(c['admin'], spec('b' * 12, added=2))
     m.tick()
-    assert not provs['vast'].pods
-    m.ledger.add('pod-old', 'vast', '1', 0.25, clock.t - 3600 * 30, 'x')
-    m.ledger.gone('pod-old', clock.t - 3600 * 20, 'done')
-    assert m.ledger.spent(clock.t) == pytest.approx(0.25 * 4)
+    assert len(provs['vast'].pods) == 1
+    # but what the running one will still cost counts, so it doesn't rent a second
+    clock.t += 60
+    assert m.budget(cfg, clock.t)['held'] == pytest.approx(0.2 * (2 - 1 / 60))
+    m.tick()
+    assert len(provs['vast'].pods) == 1
+    # the next day's share is what's left of the week over six days
+    m.ledger.gone(m.ledger.live()[0]['name'], clock.t, 'done')
+    spent = m.ledger.spent(clock.t, sydney(2026, 11, 2))
+    assert m.budget(cfg, sydney(2026, 11, 3, 12))['share_today'] == pytest.approx((4.9 - spent) / 6)
+    # and the month's budget holds even with the week's untouched
+    m.ledger.add('pod-big', 'vast', '2', 0.3, sydney(2026, 11, 1, 1), 'x')
+    m.ledger.gone('pod-big', sydney(2026, 11, 1, 1) + 75 * 3600, 'done')
+    assert m.budget(cfg, sydney(2026, 11, 9, 12))['room'] < 0
+    assert m.budget(pods.SETTINGS, sydney(2026, 11, 9, 12))['room'] <= 0
 
 
 def test_settings_refuse_a_typo(tmp_path):
