@@ -261,13 +261,14 @@ class Ledger:
         rows = self.db.execute('select name, provider, id, dph, rented from pods where gone is null').fetchall()
         return [dict(zip(('name', 'provider', 'id', 'dph', 'rented'), r)) for r in rows]
 
-    def spent(self, now: float, since: float | None = None) -> float:
+    def spent(self, now: float, since: float | None = None, providers=None) -> float:
         """US$ since `since` (the last 24 h if not given), pods still running counted to now, each one's setup
-        download included."""
+        download included; only `providers`' pods if given."""
         since = now - 24 * 3600 if since is None else since
-        rows = self.db.execute('select dph, rented, coalesce(gone, ?), coalesce(setup, 0) from pods where coalesce(gone, ?) > ?',
-                               (now, now, since)).fetchall()
-        return sum(dph * (end - max(start, since)) / 3600 + (setup if start > since else 0) for dph, start, end, setup in rows)
+        rows = self.db.execute('select dph, rented, coalesce(gone, ?), coalesce(setup, 0), provider from pods '
+                               'where coalesce(gone, ?) > ?', (now, now, since)).fetchall()
+        return sum(dph * (end - max(start, since)) / 3600 + (setup if start > since else 0)
+                   for dph, start, end, setup, provider in rows if providers is None or provider in providers)
 
     def held(self, now: float, hours: float) -> float:
         """What pods still running will cost from now to the end of their hours."""
@@ -355,7 +356,9 @@ class Manager:
         """Spend today, this week and this month, today's share of the week, and the room left for one more pod:
         the least left of the three after what running pods will still cost."""
         day, week, month, days_left = starts(now, cfg['zone'])
-        spent = {k: self.ledger.spent(now, since) for k, since in (('today', day), ('week', week), ('month', month))}
+        # only the providers rented from now: spend elsewhere (a one-off balance used up) stays in the ledger, not the budget
+        spent = {k: self.ledger.spent(now, since, cfg['providers'])
+                 for k, since in (('today', day), ('week', week), ('month', month))}
         share = (cfg['week_usd'] - spent['week'] + spent['today']) / days_left
         held = self.ledger.held(now, cfg['hours'])
         room = min(share - spent['today'], cfg['week_usd'] - spent['week'], cfg['month_usd'] - spent['month']) - held

@@ -236,6 +236,8 @@ def test_the_budget_rents_while_any_is_left_and_later_days_plan_smaller(server, 
     m.ledger.gone('pod-big', sydney(2026, 11, 1, 1) + 75 * 3600, 'done')
     assert m.budget(cfg, sydney(2026, 11, 9, 12))['room'] < 0
     assert m.budget(pods.SETTINGS, sydney(2026, 11, 9, 12))['room'] <= 0
+    # spend with a provider off the list stays in the ledger but leaves the budget
+    assert m.budget(cfg | {'providers': ['runpod']}, sydney(2026, 11, 9, 12))['spend_month'] == 0
 
 
 def test_settings_refuse_a_typo(tmp_path):

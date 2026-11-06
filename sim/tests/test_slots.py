@@ -236,8 +236,10 @@ def test_slots_come_from_the_flag_then_a_calibration_for_this_machine_else_one(t
     other = calibrate.identity({'gpus': [], 'cores': 8, 'memory_gb': 16}, 0.5)
     slots, why, fresh = calibrate.choose(None, tmp_path, other, 12)
     assert (slots, fresh) == (1, False) and 'again' in why
-    assert calibrate.choose(None, tmp_path, calibrate.identity({'gpus': [{'name': 'RTX', 'memory_gb': 4}], 'cores': 16,
-                                                                 'memory_gb': 32}, 1.0), 12)[0] == 1
+    # the same machine at another cpu share names both, and the flags that set it
+    slots, why, fresh = calibrate.choose(None, tmp_path, calibrate.identity({'gpus': [{'name': 'RTX', 'memory_gb': 4}],
+                                                                           'cores': 16, 'memory_gb': 32}, 1.0), 12)
+    assert (slots, fresh) == (1, False) and 'share 0.5' in why and 'at 1.0' in why and '--anytime' in why
     # a newer worker keeps the number but says so
     slots, why, fresh = calibrate.choose(None, tmp_path, ident, 13)
     assert (slots, fresh) == (2, False) and 'by worker 12' in why
