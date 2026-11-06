@@ -12,15 +12,15 @@
 #   - destroys a pod that never said hello within `start` minutes, went quiet for `quiet` minutes, sat `idle` minutes
 #     with nothing to do and nothing waiting, or reached its hours; each one's token is revoked and any job it held
 #     goes back to the queue at once;
-#   - rents one more pod when jobs wait than pods can take, if the day's spend stays under the cap;
+#   - rents one more pod when jobs wait than pods can take, while any budget is left (see `budget`);
 #   - writes status.json for Athena's beacon.
 #
 # A pod boots itself, no ssh: its start script installs uv, checks out the commit the manager pinned when it rented
 # it, and runs the worker with its own token (role rented, gone after `hours`). If the worker ends, or the hours run
-# out, the pod stops itself with the provider's own per-pod key. Only pods named terrarium-q-… are ever touched, so
-# the Mac's own pod tools and these can't take each other's pods.
+# out, the pod destroys itself with the provider's own per-pod key (a stopped Vast pod still bills its disk). Only
+# pods named terrarium-q-… are ever touched, so the Mac's own pod tools and these can't take each other's pods.
 #
-# Settings are DIR/pods.toml (cap_usd_day, max_pods and the rest of SETTINGS); without it nothing is rented.
+# Settings are DIR/pods.toml (week_usd, month_usd, max_pods and the rest of SETTINGS); without it nothing is rented.
 
 import argparse
 import base64
@@ -33,14 +33,21 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from .log import Logger
 
 log = Logger('pods')
 
 SETTINGS = {
-    'cap_usd_day': 0.0,       # spend in any 24 h, rentals still running included; 0 rents nothing
+    # soft budgets, since leaving budget unused costs more than running over it: a pod is rented while anything is
+    # left of today's share, the week (Monday on) and the calendar month, so the last rental can run over;
+    # today's share is what's left of the week over its days left, so later days plan smaller. 0 rents nothing
+    'week_usd': 0.0,
+    'month_usd': 0.0,
+    'zone': 'Australia/Sydney',   # where days, weeks and months start
     'max_pods': 0,
     'max_dph': 0.40,          # most US$ an hour for one pod
     'providers': ['vast', 'runpod'],
@@ -90,8 +97,8 @@ def call(url: str, method: str = 'GET', body=None, headers: dict | None = None):
 
 
 def boot(server: str, token: str, repo: str, commit: str, hours: float) -> str:
-    """The pod's start script. Set -e stops at the first failure, which ends the worker's wait and stops the pod."""
-    stop = ('if [ -x /opt/instance-tools/bin/vastai ]; then /opt/instance-tools/bin/vastai stop instance '
+    """The pod's start script. Set -e stops at the first failure, which ends the worker's wait and destroys the pod."""
+    stop = ('if [ -x /opt/instance-tools/bin/vastai ]; then /opt/instance-tools/bin/vastai destroy instance '
             '"$CONTAINER_ID" --api-key "$CONTAINER_API_KEY"; '
             'elif command -v runpodctl >/dev/null; then runpodctl remove pod "$RUNPOD_POD_ID"; fi')
     return f'''#!/bin/bash
@@ -254,12 +261,17 @@ class Ledger:
         rows = self.db.execute('select name, provider, id, dph, rented from pods where gone is null').fetchall()
         return [dict(zip(('name', 'provider', 'id', 'dph', 'rented'), r)) for r in rows]
 
-    def spent(self, now: float, hours: float = 24) -> float:
-        """US$ over the last `hours`, pods still running counted to now, each one's setup download included."""
-        since = now - hours * 3600
+    def spent(self, now: float, since: float | None = None) -> float:
+        """US$ since `since` (the last 24 h if not given), pods still running counted to now, each one's setup
+        download included."""
+        since = now - 24 * 3600 if since is None else since
         rows = self.db.execute('select dph, rented, coalesce(gone, ?), coalesce(setup, 0) from pods where coalesce(gone, ?) > ?',
                                (now, now, since)).fetchall()
         return sum(dph * (end - max(start, since)) / 3600 + (setup if start > since else 0) for dph, start, end, setup in rows)
+
+    def held(self, now: float, hours: float) -> float:
+        """What pods still running will cost from now to the end of their hours."""
+        return sum(p['dph'] * max(0.0, p['rented'] + hours * 3600 - now) / 3600 for p in self.live())
 
     def bad(self, now: float, hours: float = 24) -> set[str]:
         """Machines whose pods went for failing jobs in the last `hours`, not to be rented again yet."""
@@ -287,8 +299,10 @@ class Manager:
             if why:
                 self.drop(pod, why, now)
         rented = self.maybe_rent(back, cfg, now)
+        b = self.budget(cfg, now)
         return {'updated_at_epoch': now, 'last_reconcile_epoch': self.reconciled,
-                'spend_24h_usd': round(self.ledger.spent(now), 4), 'spend_cap_usd': cfg['cap_usd_day'],
+                'spend_24h_usd': round(self.ledger.spent(now), 4), 'spend_cap_usd': round(b['share_today'], 4),
+                **{f'{k}_usd': round(v, 4) for k, v in b.items()},
                 'waiting': back['waiting'], 'orphans': orphans, 'rented': rented,
                 'pods': [{'provider': p['provider'], 'id': p['id'], 'name': p['name'], 'dph': p['dph'],
                           'job_id': (back['pods'].get(p['name']) or {}).get('job'),
@@ -337,13 +351,23 @@ class Manager:
         self.ledger.gone(pod['name'], now, why)
         self.idle_since.pop(pod['name'], None)
 
+    def budget(self, cfg: dict, now: float) -> dict:
+        """Spend today, this week and this month, today's share of the week, and the room left for one more pod:
+        the least left of the three after what running pods will still cost."""
+        day, week, month, days_left = starts(now, cfg['zone'])
+        spent = {k: self.ledger.spent(now, since) for k, since in (('today', day), ('week', week), ('month', month))}
+        share = (cfg['week_usd'] - spent['week'] + spent['today']) / days_left
+        held = self.ledger.held(now, cfg['hours'])
+        room = min(share - spent['today'], cfg['week_usd'] - spent['week'], cfg['month_usd'] - spent['month']) - held
+        return {f'spend_{k}': v for k, v in spent.items()} | {'share_today': share, 'held': held, 'room': room}
+
     def maybe_rent(self, back: dict, cfg: dict, now: float) -> str | None:
         pods = self.ledger.live()
         free = sum(1 for p in pods if not (back['pods'].get(p['name']) or {}).get('job'))
         if back['waiting'] <= free or len(pods) >= cfg['max_pods']:
             return None
-        if self.ledger.spent(now) + cfg['max_dph'] * cfg['hours'] + VAST_DOWN_GB * SETUP_GB > cfg['cap_usd_day']:
-            log.info('not renting: over the day\'s cap', spent=round(self.ledger.spent(now), 3), cap=cfg['cap_usd_day'])
+        if (b := self.budget(cfg, now))['room'] <= 0:
+            log.info('not renting: no budget left', **{k: round(v, 3) for k, v in b.items()})
             return None
         name = f'pod-{time.strftime("%m%d%H%M", time.gmtime(now))}-{secrets.token_hex(2)}'
         commit = self.commit(cfg)
@@ -362,6 +386,14 @@ class Manager:
         self.coordinator('POST', f'/api/pods/{name}/gone', {})
         log.warn('nothing rentable', providers=cfg['providers'])
         return None
+
+
+def starts(now: float, zone: str) -> tuple[float, float, float, int]:
+    """When today, this week (Monday) and this month began in `zone`, and the week's days left, today included."""
+    t = datetime.fromtimestamp(now, ZoneInfo(zone))
+    day = t.replace(hour=0, minute=0, second=0, microsecond=0)
+    week = day - timedelta(days=t.weekday())
+    return day.timestamp(), week.timestamp(), day.replace(day=1).timestamp(), 7 - t.weekday()
 
 
 def tip(cfg: dict) -> str:
