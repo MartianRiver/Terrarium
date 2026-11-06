@@ -733,6 +733,8 @@ def run_calibration(args, rules: machine.Rules):
         print('installing torch for the calibration runs...', flush=True)
         sync(sim)
     args.home.mkdir(parents=True, exist_ok=True)
+    # a calibration only counts for a worker run at the same cpu share, which a bare `calibrate` easily misses
+    print(f'cpu share {rules.cpu:g}: `worker run` needs the same (--anytime, --cpu or settings.toml) to use this', flush=True)
     # the runs start in sim/, so a path given here is made absolute from where this was run
     chosen = {'world': args.world and str(Path(args.world).resolve()), 'train': args.train and str(Path(args.train).resolve()),
               'memory': args.memory}

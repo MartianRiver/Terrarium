@@ -76,7 +76,12 @@ def choose(given: int | None, home: Path, ident: dict, version: int) -> tuple[in
     if saved is None:
         return 1, 'no calibration yet: `worker calibrate` finds out whether this machine gains from running two', False
     if saved.get('machine') != ident:
-        return 1, 'the saved calibration is for other hardware or another cpu share: run `worker calibrate` again', False
+        was = saved.get('machine') or {}
+        if {k: v for k, v in was.items() if k != 'cpu_share'} == {k: v for k, v in ident.items() if k != 'cpu_share'}:
+            return 1, (f'the saved calibration ran at cpu share {was.get("cpu_share")} and this worker runs at '
+                       f'{ident["cpu_share"]}: run `worker calibrate` with the rules `worker run` has '
+                       '(--anytime, --cpu or settings.toml)'), False
+        return 1, 'the saved calibration is for other hardware: run `worker calibrate` again', False
     why = f'calibrated {saved["date"]}: {saved["why"]}'
     if saved.get('version') != version:
         return saved['slots'], why + f' (by worker {saved.get("version")}, this is {version}: run `worker calibrate` again)', False
