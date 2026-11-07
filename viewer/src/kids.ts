@@ -138,7 +138,7 @@ async function boot() {
       fx.clear();
       snacks.clear();
       stage.setWorld(started.info);
-      view = new WorldView(stage.scene, started.info, false);
+      view = new WorldView(stage.scene, started.info, false, 0, false);
       view.chosen = started.you;
       view.marked = true;
       const look = progress.look;

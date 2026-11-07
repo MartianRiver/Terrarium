@@ -106,6 +106,15 @@ export interface FlagState {
   carrier: number;
 }
 
+// where a Terrikin's notes put the apple tree, in the world's frame, for as long as the sim shows it (the readout,
+// terrarium/ghost.py); not where the tree is. Only in replays recorded with a readout, from the moment it comes up out
+// of the nest after unloading an apple
+export interface GhostState {
+  id: number; // the Terrikin's
+  x: number;
+  y: number;
+}
+
 export interface Frame {
   tick: number;
   creatures: CreatureState[];
@@ -117,4 +126,5 @@ export interface Frame {
   flowers: FlowerState[]; // empty in worlds without flowers
   flags: FlagState[]; // empty in worlds without capture the flag and replays from before 0.4's flags
   dung?: DungState[]; // only in worlds with droppings; without, the viewer makes its own up from meals
+  ghosts?: GhostState[]; // only in replays recorded with a readout (--ghost), and only while one shows
 }

@@ -60,6 +60,13 @@ describe('reading', () => {
     expect(replay.frames.map((f) => f.creatures[0].holding)).toEqual([0, 1]);
   });
 
+  test('ghosts are read when there, and absent in replays without them', () => {
+    const later = { ...frame, ghosts: [{ id: 1, x: -4.25, y: 7.5 }] };
+    const replay = parseReplay(lines(header, frame, later, { ...frame, ghosts: [] }));
+    expect(replay.frames.map((f) => f.ghosts)).toEqual([undefined, [{ id: 1, x: -4.25, y: 7.5 }], []]);
+    refuses(lines(header, { ...later, ghosts: [{ id: 1, x: 'there', y: 0 }] }), /ghosts/);
+  });
+
   test('flowers, nectar and sprints are read when there, and none in worlds without them', () => {
     const later = { ...frame, creatures: [{ ...frame.creatures[0], nectar: 6.5, sprinting: 1 }], flowers: [{ id: 9, x: 5, y: -2 }] };
     const replay = parseReplay(lines(header, frame, later));

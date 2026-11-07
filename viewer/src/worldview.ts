@@ -10,6 +10,7 @@ import { type Box, Grips, type Holder } from './grips';
 import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
 import { Flags } from './flags';
+import { GhostTrees } from './ghosttree';
 import { Flowers } from './nectar';
 import { BlockView, FoodView } from './props';
 import type { Pose } from './sightfan';
@@ -64,8 +65,9 @@ export class WorldView {
   private flags: Flags;
   private dust: Dust;
   private pops: TagPops;
+  private ghosts: GhostTrees | null;
 
-  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true, cone = 0) {
+  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true, cone = 0, ghosts = true) {
     // made-up droppings every few meals, but not under the apple tree, where a meal comes every couple of seconds
     this.droppings = droppings && info.tree === null ? new Droppings(scene, info.tickHz) : null;
     this.tombstones = new Tombstones(scene, info.tickHz);
@@ -75,6 +77,7 @@ export class WorldView {
     this.flags = new Flags(scene);
     this.dust = new Dust(scene);
     this.pops = new TagPops(scene, cone);
+    this.ghosts = ghosts ? new GhostTrees(scene) : null;
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
     this.ring.position.y = 0.02;
@@ -109,6 +112,7 @@ export class WorldView {
     this.eggs.push(frame);
     this.flowers.push(frame);
     this.pops.push(frame, !this.prevCreatures.size, this.info.tickHz);
+    this.ghosts?.push(frame);
     for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
@@ -167,6 +171,7 @@ export class WorldView {
     this.flags.render(this.frame.flags, poses, time);
     this.dust.render(dt);
     this.pops.render(dt, poses, shownIt, time);
+    this.ghosts?.render(dt);
     for (const f of this.food.values()) f.update(dt);
     this.dyingFood = this.dyingFood.filter((f) => {
       const alive = f.update(dt);
@@ -202,6 +207,7 @@ export class WorldView {
     this.flags.clear();
     this.dust.clear();
     this.pops.dispose();
+    this.ghosts?.clear();
     this.grips.clear();
     this.scene.remove(this.ring);
     this.ring.geometry.dispose();
