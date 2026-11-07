@@ -27,3 +27,4 @@ Line 1 is `# NNNN Title`, line 3 is `date: … · status: … · seeds: … · b
 - [0009](0009-the-colony-exam-fails-before-memory-shows.md) The frozen colony exam fails on staying alive before memory can show. *hint*
 - [0010](0010-what-pays-for-a-meal-open.md) Nothing paid for a meal in the night forks. *open*
 - [0011](0011-ask-what-a-frozen-brain-can-show.md) Ask what a frozen brain can show before training a twin. *confirmed*
+- [0012](0012-the-night-brain-comes-home-by-the-light.md) The night-trained brain comes home by the light; the day-trained ones die whatever their start. *hint*
