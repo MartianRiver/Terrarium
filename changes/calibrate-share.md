@@ -1,2 +1,0 @@
-`worker calibrate` prints the cpu share it measures at, and a worker that finds a calibration made at another share says both shares and which flags set it (`--anytime`, `--cpu` or settings.toml), instead of only "other hardware or another cpu share".
-The pod budget counts only spend with the providers the manager rents from (`providers` in pods.toml): a provider taken off the list stays in the ledger but no longer uses up the week or the month.

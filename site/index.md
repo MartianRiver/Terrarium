@@ -15,11 +15,13 @@ The world grows a stage at a time, and every stage's brain starts from the last 
 
 **0.2 Clover, done: one Terrikin teaching itself to eat.** After 52 minutes of training on my MacBook Air, it eats 18.4 berries a minute and never starves in the tests. Moving at random gets 0.26. A scripted forager that heads straight for the nearest berry gets 13.8, so the brain beats that too.
 
-**0.3 Daisy, done: colonies.** Three colonies of six, a nest each. They carry food home in their crop, store it at the nest as jelly, get through three cold nights on it huddled up at home, and hatch new Terrikins from what's left, so a colony can end bigger than it started. They learned all of that by themselves. What they can't do yet is remember anything from one moment to the next.
+**0.3 Daisy, done: colonies.** Three colonies of six, a nest each. They carry food home in their crop, store it at the nest as jelly, get through three cold nights on it huddled up at home, and hatch new Terrikins from what's left, so a colony can end bigger than it started. They learned all of that by themselves. They couldn't remember anything from one moment to the next, though, and that's what 0.4 starts with.
+
+**0.4.0 Elderflower opened: memory that steers.** The Terrikins can carry notes from one moment to the next now. In a garden with an apple tree they can't see from home, it's those notes that take one back to it. To test it I froze a brain and changed only its notes: put in another game's notes and it gets pulled towards that game's tree, though not all the way. Wipe them each time it gets home and it brings home 4.6 apples a minute instead of 5.8. If the tree moves while it's underground, it walks to the empty spot first, twice as often with its notes as without. It's one Terrikin in one kind of garden so far, and the rest of 0.4 is still to come.
 
 ## What's next
 
-**0.4 Elderflower: growth and memory.** A little memory first, so a forager can find its way back to a patch it found and knows how long it's been out. Then hatchlings that start small and grow up on what their colony brings home, colonies as big as their food lets them get, and a brain for each colony, so they can stop all thinking alike and the ones that do best spread. Beside it, a world of mazes, a new one every time, which is how I'll know the memory works.
+**The rest of 0.4 Elderflower: growth.** Hatchlings that start small and grow up on what their colony brings home, colonies as big as their food lets them get, and a brain for each colony, so they can stop all thinking alike and the ones that do best spread. Memory goes into the colonies too, so a forager can find its way back to a patch it found.
 
 **0.5 Foxglove: the way home.** The smell of home to find the nest by, and the first danger: dust devils.
 
