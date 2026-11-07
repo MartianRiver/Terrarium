@@ -1,0 +1,1 @@
+Finding 0012, a hint: frozen and given set starts in the nights world, the night-trained brain dies far from home in the dark and leans on the light to come back; held at full light, none live. The day-trained brains die whatever their start. Seed block 8,108,000 is taken.
