@@ -4,6 +4,7 @@ import numpy as np
 
 from terrarium import load, replay
 from terrarium.record import record
+from terrarium.world import World
 
 TICKS = 400
 
@@ -48,3 +49,13 @@ def test_same_run_same_bytes(tmp_path):
     record(load(), a, 50, seed=2)
     record(load(), b, 50, seed=2)
     assert a.read_bytes() == b.read_bytes()
+
+
+def test_a_store_keeps_part_of_a_jelly():
+    # the young bite less than a whole jelly, and the frame shouldn't round what's left down
+    w = World(load(), 1, 3)
+    w.store[0, 0] = 2.375
+    assert replay.frame(w, 0)['stores'][0]['jelly'] == 2.375
+    w.store[0, 0] = 4.0
+    got = replay.frame(w, 0)['stores'][0]['jelly']
+    assert got == 4 and isinstance(got, int)

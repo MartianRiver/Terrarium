@@ -9,14 +9,14 @@ Gzipped JSON lines, `.jsonl.gz`. The viewer also reads it unzipped.
 Line 1 is the header:
 
 ```json
-{"format": "terrarium-replay", "version": 1,
+{"format": "terrarium-replay", "version": 2,
  "info": {"width": 26.0, "height": 26.0, "tickHz": 20, "maxSpeed": 2.4, "nests": [{"colony": 0, "x": 0.0, "y": 8.84, "radius": 1.6}]},
  "source": {"commit": "b969418", "seed": 0, "brain": "random", "arena": 0, "config": {}}}
 ```
 
 Every line after it is one `Frame`, one per tick, starting from the tick before the first step. `info` and `Frame` are the types in [viewer/src/world.ts](../viewer/src/world.ts). `source` says where the run came from (commit, with `-dirty` if the working tree had changes; seed; brain; the full config). The viewer logs it and never depends on it.
 
-From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store. Replays from before have neither; the viewer reads them as 0 and empty. Worlds with nights also give each frame `light`, from 1 by day to 0 at night; without it, it's always day. In worlds with grab on, each creature has `holding`, 1 while it grips a block (drawn as an arm reaching to it).
+From 0.3 each creature has `carrying` (food in its crop) and each frame has `stores`, a list of `{colony, jelly}` with the food in each colony's store (a whole number, or with part of one where the young take smaller bites; v1 replays round it down). Replays from before have neither; the viewer reads them as 0 and empty. Worlds with nights also give each frame `light`, from 1 by day to 0 at night; without it, it's always day. In worlds with grab on, each creature has `holding`, 1 while it grips a block (drawn as an arm reaching to it).
 
 A dead creature stays in the frames with `energy` 0 where it fell, and the viewer draws a tombstone there that fades after 20 s. From 0.3 the sim takes a dead body out of the world (nothing bumps into it or sees it); in older replays it could still be pushed, and its stone stays where it died.
 
@@ -30,6 +30,7 @@ Worlds with sprint give each creature `sprinting`, 1 mid-burst (drawn with dust 
 
 - New fields can be added without bumping the version. The viewer ignores fields it doesn't know, so new ones have to be optional when read.
 - Anything else (renaming, removing, changing what a field means) bumps `version`. The viewer keeps reading every older version, and turns down a newer one with a message saying so.
+- Versions so far: 1 (from 0.1) and 2 (0.4.0: a store's `jelly` can hold part of one, which a v1 viewer would refuse as not a whole number).
 - Each released version leaves a sample in `samples/`, named after the release. The viewer's tests load every sample in there, so an old format can't quietly stop working.
 
 ## Recording

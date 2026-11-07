@@ -12,7 +12,8 @@ import numpy as np
 from .world import World
 
 FORMAT = 'terrarium-replay'
-VERSION = 1
+# 2: a store's jelly can hold part of one (v1 rounded it down, and its viewers read it as a whole number)
+VERSION = 2
 # the viewer's blob is modelled at this radius, so a creature's size is its radius over this
 BLOB_RADIUS = 0.45
 # millimetres and milliradians: plenty for drawing, and a third of the file
@@ -108,7 +109,8 @@ def frame(world: World, a: int) -> dict:
     for i in np.flatnonzero(world.block_load[a] >= 0):
         block = blocks[world.block_load[a, i]]
         block.update(x=_r(world.pos[a, i, 0]), y=_r(world.pos[a, i, 1]), angle=_r(world.heading[a, i]), carried=1)
-    stores = [{'colony': c, 'jelly': int(j)} for c, j in enumerate(world.store[a])]
+    # the young take bites smaller than a jelly, so a store can hold part of one
+    stores = [{'colony': c, 'jelly': int(j) if float(j).is_integer() else round(float(j), 3)} for c, j in enumerate(world.store[a])]
     out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
     if cfg.night.on:
         out['light'] = _r(world.light()[a])

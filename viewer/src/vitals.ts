@@ -190,7 +190,7 @@ export class Vitals {
       } else if (row === 'jump') {
         line.text = c.z > 0.01 ? `${c.z.toFixed(1)} m up` : 'on the ground';
       } else if (row === 'store') {
-        line.text = `${jelly} jelly`;
+        line.text = `${Number.isInteger(jelly) ? jelly : jelly.toFixed(1)} jelly`;
       } else if (row === 'notes') {
         line.text = this.notes;
       } else continue;
