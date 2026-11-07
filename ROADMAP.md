@@ -77,7 +77,7 @@ Done when foragers go back to a patch they remember, Terrikins don't starve with
 
 It comes in milestones:
 
-- **0.4.0 Memory that steers (done, 7 November 2026).** In a nursery with an apple tree out of sight of home, a Terrikin's own notes hold where the tree is and take it back there. Notes from a game whose tree lay the other way pull it that way, and when the tree moves while it's underground, it walks to the empty spot first. Three brains, on seeds never used for choosing them ([notes](docs/notes/0.4.md), "A tree they go back to").
+- **0.4.0 Memory that steers (done, 7 November 2026).** In a nursery with an apple tree out of sight of home, a Terrikin's own notes hold where the tree is and take it back there. Notes from a game whose tree lay the other way pull it that way, and when the tree moves while it's underground, it walks to the empty spot first. Three brains, on seeds never used for choosing them ([finding 0004](docs/findings/0004-the-notes-hold-the-trees-place.md); [notes](docs/notes/0.4.md), "A tree they go back to").
 - The rest of the list above comes as the next 0.4 milestones.
 
 ## 0.5 Foxglove: The way home
