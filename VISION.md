@@ -8,11 +8,12 @@ This document is the shared picture. It describes **what** the world is and **wh
 
 ## 1. Guiding principles
 
-1. **Make things possible, never script them.** Farming, guarding, cooperation, deception and rogues are not taught. The world makes them possible and worth it, and we watch for them.
-2. **Every stage builds on the last.** New features are added so earlier training stays useful. Throwing away a trained brain should be rare and deliberate.
+1. **Make things possible, never script them.** Farming, guarding, cooperation, deception and rogues are not taught. The world makes them possible and worth it, and we watch for them. Possible isn't enough on its own, though: an action added and left to be found mostly isn't. Before a new mechanic or world, three questions. How well does a scripted creature do there, so there's room to learn? What shortcuts could a body take instead (a tree "out of sight" that wasn't, unloading at the rim so the body points back at the food)? And what pays at each step on the way? If a step pays for nothing, the world isn't ready.
+2. **Every stage builds on the last.** New features are added so earlier training stays useful, and starting from the last brain is the first thing to try. It isn't a rule: a fresh brain has beaten an inherited one more than once, so a fresh start is fine when it's measured and written down.
 3. **Small visible wins.** Every stage ends with something you can watch and, ideally, a clip worth sharing.
 4. **Simulation and looks are separate.** The brain lives in a cheap, flat, simple world. The renderer makes it cute and 3D. Changing the look never requires retraining.
 5. **Every balance number is a dial.** Costs, damage, reward blends and regrowth rates live in config, so tuning happens between stages without redesign.
+6. **A world that keeps going.** The point is creatures worth caring about, and that needs a world that's still there tomorrow: saved, picked up again later or on another machine, never wiped for an update. The sim is arrays and physics bodies, so this comes early (0.4), not at the end.
 
 ---
 
@@ -29,7 +30,7 @@ This document is the shared picture. It describes **what** the world is and **wh
 
 ### Scale (main world)
 - 3–4 colonies of 6–12 creatures each (roughly 20–50 creatures).
-- Every creature runs its own copy of the same brain, acting on what it senses. Each creature knows its own colony and body traits as inputs.
+- Every creature runs its own copy of its colony's brain, acting on what it senses. Until 0.7 every colony carries copies of the same one. Each creature knows its own colony and body traits as inputs.
 
 ---
 
@@ -45,6 +46,8 @@ This document is the shared picture. It describes **what** the world is and **wh
 - **Vision:** a fan of rays (lidar-style) returning distance and *what* was hit, including its colour category: food type, creature, colony tint, signal colour, queen, brood, block, wall, scent mark. Much cheaper than pixel vision and ideal for colour-based behaviour.
 - **Self-state:** energy, health, what it's carrying, colony ID, body traits.
 - A sense of distance and direction to its own nest, as ants keep track of the way home. It may get fuzzier later, so memory and scent trails have something to do.
+- **A compass:** which way it's facing in the world. It's what lets memory hold a place: the notes keep where the tree is in the world's frame, not relative to the body, and taken away the notes hold the place about three times more loosely ([finding 0013](docs/findings/0013-without-a-compass-the-notes-hold-the-place-loosely.md), a hint).
+- **Memory:** a few numbers the brain carries from one choice to the next, its notes. They hold where a hidden tree is and steer it back there ([finding 0004](docs/findings/0004-the-notes-hold-the-trees-place.md)).
 
 ### Actions
 - Move (direction + speed) and turn.
@@ -74,7 +77,7 @@ A blend of **self** (energy, health, survival) and **colony** (food stored, popu
 ## 4. Colonies, brood and the queen
 
 - Each colony has a **nest** and a **queen**.
-- The queen starts as a **scripted heart of the nest**: she stays in the nest and lays eggs when fed. She may become a thinking agent later.
+- The queen is a body with her own place in the colony, not a script: she lays the eggs, and what she does, and what the rest do about her, is learned.
 - **Brood:** eggs → larvae/pupae → hatchlings. Brood must be fed and protected. Rivals can attack or steal it.
 - **Hatchlings** start small and weak, which naturally keeps them near the nest tending brood before they grow into foragers. This gives honeybee-style age-based roles without castes.
 - **Losing the queen** is a crisis, not instant death. A queenless colony can raise a new queen by pouring jelly into one member over time, while defending the nest until she matures.
@@ -115,11 +118,11 @@ Starting suggestions, to be checked stage by stage, not decisions.
 - **Language/ML:** Python + PyTorch.
 - **Physics:** the 2.5D design probably doesn't need PyBullet. A lightweight 2D physics engine or a custom vectorised sim may train far faster. Evaluate early, because simulation speed is the biggest factor in training cost. (Measured in 0.1: pymunk, see [docs/physics.md](docs/physics.md).)
 - **Viewer:** a 3D renderer (e.g. a browser-based Three.js viewer) that plays back recorded episodes and, later, streams the live main world. Kept fully separate from the sim.
-- **Algorithm:** PPO-style multi-agent training with every agent running a copy of the same policy (parameter sharing). Self-play against past checkpoints once colonies compete, so brains don't overfit to one opponent.
+- **Algorithm:** PPO-style multi-agent training with every agent in a colony running a copy of its colony's policy (parameter sharing). Self-play against past checkpoints once colonies compete, so brains don't overfit to one opponent.
 - **Brain architecture built to grow:** an entity-based design (attention over "things I can see", each with a type) handles new object types, food kinds and creature types by adding new types rather than reshaping the network. This is the main way earlier training survives new features.
-- **Checkpoint discipline:** every stage starts from the previous stage's best checkpoint. New inputs/actions start disabled or zero-weighted, then switch on. Every curriculum dial (reward blend, friendly-fire scale, signal cost) lives in config.
+- **Checkpoint discipline:** a stage starts from the previous stage's best checkpoint by default, its old skills are checked on the old stage's world, and a fresh start is allowed when it's measured and written down in `brains.toml`. Each rung also tries a fresh brain on a world two or three rungs on, beside the fork, to see what can be skipped. New inputs/actions start disabled or zero-weighted, then switch on. Every curriculum dial (reward blend, friendly-fire scale, signal cost) lives in config.
 - **Compute:** early stages on the MacBook Air M3 (16GB). Move to RunPod GPUs when stages involve multiple colonies, self-play or long horizons.
-- **Persistence:** the main world's state (creatures, brood, food, objects) is saved separately from brain weights, so brains can be swapped without resetting the world.
+- **Persistence:** a world's state (creatures, brood, food, objects, every random stream) is saved separately from brain weights, so a world can be resumed exactly and brains swapped without resetting it. Saving and resuming comes in 0.4; the main world builds on it.
 
 ---
 
