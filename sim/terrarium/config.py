@@ -57,6 +57,7 @@ class Colonies:
 class Home:
     near: float      # the way home is felt in full within this far (m) of the nest's centre
     far: float       # and fades to nothing by here (0: felt everywhere)
+    compass: bool    # which way it faces in the world (off: compass_sin and compass_cos read 0)
 
 
 @dataclass(frozen=True)
@@ -533,7 +534,7 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
                   'spot': 0.0, 'heap': 0, 'wander': 0.0, 'move': 0.0},
          'jump': {'height': 0.0, 'energy': 0.0},
          'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False, 'move': 0.0, 'start': 0.0, 'burrow': False},
-         'home': {'near': 0.0, 'far': 0.0}}
+         'home': {'near': 0.0, 'far': 0.0, 'compass': True}}
 
 
 def upgrade(data: dict) -> dict:

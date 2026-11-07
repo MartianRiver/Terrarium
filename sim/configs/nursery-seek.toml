@@ -51,6 +51,7 @@ spawn_ring = 1.2
 # everywhere); home_felt tells the brain how much is left
 near = 0.0
 far = 0.0
+compass = true
 
 [food]
 count = 0
