@@ -9,7 +9,7 @@ import {
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
-export const REPLAY_VERSION = 1;
+export const REPLAY_VERSION = 2;
 
 export interface Replay {
   version: number;
@@ -119,7 +119,7 @@ function readFrame(o: Obj, where: string): Frame {
       id: int(b, 'id', w), x: num(b, 'x', w), y: num(b, 'y', w), angle: num(b, 'angle', w), w: num(b, 'w', w), h: num(b, 'h', w),
       carried: b.carried === undefined ? 0 : int(b, 'carried', w),
     })),
-    stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: int(s, 'jelly', w) })),
+    stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: num(s, 'jelly', w) })),
     light: o.light === undefined ? 1 : num(o, 'light', where),
     eggs: o.eggs === undefined ? [] : list(o, 'eggs', where, (e, w): EggState => ({
       id: int(e, 'id', w), colony: int(e, 'colony', w), x: num(e, 'x', w), y: num(e, 'y', w), progress: num(e, 'progress', w),
