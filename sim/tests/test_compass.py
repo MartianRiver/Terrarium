@@ -31,6 +31,18 @@ def test_the_compass_reads_the_world_heading_whichever_way_home_is():
     assert np.allclose(sense(world, 'compass_cos'), -1)
 
 
+def test_with_the_compass_off_it_reads_0_and_nothing_else_changes():
+    world = World(COLONY)
+    world.heading[0, :] = np.pi / 3
+    last = np.zeros((*world.alive.shape, 2))
+    on = observe(world, last).me
+    world.cfg = replace(COLONY, home=replace(COLONY.home, compass=False))
+    off = observe(world, last).me
+    dial = [SELF.index('compass_sin'), SELF.index('compass_cos')]
+    assert (off[..., dial] == 0).all() and (on[..., dial] != 0).any()
+    assert np.array_equal(np.delete(off, dial, -1), np.delete(on, dial, -1))
+
+
 def test_the_way_home_fades_with_distance_and_says_when_it_is_gone():
     cfg = replace(COLONY, home=replace(COLONY.home, near=1.0, far=3.0))
     world = World(cfg)

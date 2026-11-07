@@ -28,3 +28,4 @@ Line 1 is `# NNNN Title`, line 3 is `date: … · status: … · seeds: … · b
 - [0010](0010-what-pays-for-a-meal-open.md) Nothing paid for a meal in the night forks. *open*
 - [0011](0011-ask-what-a-frozen-brain-can-show.md) Ask what a frozen brain can show before training a twin. *confirmed*
 - [0012](0012-the-night-brain-comes-home-by-the-light.md) The night-trained brain comes home by the light; the day-trained ones die whatever their start. *hint*
+- [0013](0013-without-a-compass-the-notes-hold-the-place-loosely.md) Without a compass the notes hold the tree's place three times more loosely, and are worth less. *hint*

@@ -72,7 +72,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    *flag_senses(world, store.shape), world.stamina, *hearing.heard(world),
                    *dung_senses(world, store.shape), world.z / max(cfg.jump.height, 1e-9),
                    # which way it faces in the world, as an ant reads the sky
-                   np.sin(world.heading), np.cos(world.heading), felt], -1)
+                   np.sin(world.heading) * h.compass, np.cos(world.heading) * h.compass, felt], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape
