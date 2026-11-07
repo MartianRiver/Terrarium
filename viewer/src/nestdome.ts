@@ -1,5 +1,5 @@
 // A low woven dome over each nest in its colony's colour: legs that rise from the
-// stone ring to a crown, and a frosted cap above the Terrikins' heads, so the
+// stone ring to a crown, and a frosted cap above the nims' heads, so the
 // jelly and the huddle inside stay in view. Only a look: the sim's nest is still a
 // flat pad anyone walks across, so the cap leaves the bottom open to walk in under.
 // It fades as the camera comes close, so a close-up at the nest still reads.

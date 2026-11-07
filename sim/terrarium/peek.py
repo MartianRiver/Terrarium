@@ -1,5 +1,5 @@
 # Peekaboo, a nursery game for memory ([peek], show 0 is off). A berry turns up
-# in front of a Terrikin, in sight for `show` seconds, then goes out of sight but
+# in front of a nim, in sight for `show` seconds, then goes out of sight but
 # stays where it is. Finding it pays `points` to everyone (the first to touch it
 # eats it), and the next one turns up `gap` seconds later. One nobody finds in
 # `timeout` seconds after it hid goes somewhere else. With `spin`, everyone is
@@ -94,7 +94,7 @@ class Peek:
         return out
 
     def _place(self, a):
-        """In front of a Terrikin on one of its rays (between them, a berry this small can hide), on open ground."""
+        """In front of a nim on one of its rays (between them, a berry this small can hide), on open ground."""
         w, cfg = self.world, self.world.cfg
         alive = np.flatnonzero(w.alive[a])
         if not len(alive):

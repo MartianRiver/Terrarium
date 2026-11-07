@@ -1,5 +1,5 @@
 // A game of Catch them! on the kids server (sim kids.py, kidsserve.py), as a Source for the kids page: frames a few
-// ticks ahead, each request carrying where you're steering. You steer by pointing: your Terrikin walks to wherever
+// ticks ahead, each request carrying where you're steering. You steer by pointing: your nim walks to wherever
 // the mouse (or trackpad) is, no button needed, or a finger is, and keys and a gamepad's stick go by the screen, so
 // they stay right as the camera turns. A click, Space, Shift or the pad's A, a bumper or the right trigger is the
 // sprint where the world has one; with snacks it's turbo, held down while the bar lasts.

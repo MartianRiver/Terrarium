@@ -101,7 +101,7 @@ async function setup(size, demo) {
   return { gl, label, step };
 }
 
-// the followed Terrikin's senses card (src/vitals.ts) drawn on the clip: the page's card is DOM, which a clip never
+// the followed nim's senses card (src/vitals.ts) drawn on the clip: the page's card is DOM, which a clip never
 // holds, so this paints window.terrariumVitals.model() the same way. o: {scale, x, y} (px); the defaults are
 // landscape top left and portrait low, below the labels and clear of Instagram's bottom 20%
 function vitalsCard(ctx, model, W, H, o = {}) {
@@ -218,7 +218,7 @@ function press(canvas, { key, zoom }) {
 // (a mouse wheel turn on the canvas, + out, - in: portrait needs the overview pulled back to fit the arena);
 // hold: seconds to keep the last frame, showing end on the clock (the replay clock rounds down);
 // tag: a small label in a grid cell; demo: the scripted demo rather than a replay;
-// vitals: true draws the followed Terrikin's senses card on the clip under any camera (or {scale, x, y} in px);
+// vitals: true draws the followed nim's senses card on the clip under any camera (or {scale, x, y} in px);
 // top: the labels' first line y; clockAt: the clock's y, else under the labels; tags: [{text, from, to, x, y, size}]
 export async function clip({ name, shots, labels = [], keys = [], hold = 0, end, clock = false, size = [1080, 1920], tag, tags = [], top = 360, clockAt, demo = false, vitals = false }) {
   const [W, H] = size;

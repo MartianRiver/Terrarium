@@ -169,7 +169,7 @@ function addHedge(scene: THREE.Object3D, info: WorldInfo, rng: () => number) {
   scene.add(hedge);
 }
 
-// a nest is a flat pad of soil: Terrikins walk across it in the sim, so anything taller swallows their feet
+// a nest is a flat pad of soil: nims walk across it in the sim, so anything taller swallows their feet
 export const NEST_TOP = 0.04;
 
 function addNest(scene: THREE.Object3D, nest: NestInfo) {

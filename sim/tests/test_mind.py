@@ -40,7 +40,7 @@ def test_wiring_keeps_the_strongest_connections_into_each_unit():
     assert {t for t, _, _ in w['actions']} == set(range(len(ACTIONS))) and len(w['value']) == 9
 
 
-def test_a_mind_follows_its_terrikin_through_the_replay(tmp_path):
+def test_a_mind_follows_its_nim_through_the_replay(tmp_path):
     cfg = replace(COLONY, episode=replace(COLONY.episode, seconds=6.0))
     torch.manual_seed(0)
     save(Brain(32, 2, 4), tmp_path / 'b.pt', repeat=2)

@@ -1,9 +1,9 @@
-# Play as one Terrikin among a brain's own: one arena of a run's world, every other Terrikin steered by one of the
+# Play as one nim among a brain's own: one arena of a run's world, every other nim steered by one of the
 # run's checkpoints exactly as evals and replays steer it, and one, yours, steered by what the viewer sends. The game
 # only moves when the viewer asks for the next few ticks, so it plays at the viewer's pace and pauses with it.
 #
 # Scored like a game: points for every second alive, every berry picked up and every food brought home to the
-# nest, yours beside the worst, average and best of the brain's Terrikins that started with you. When yours dies,
+# nest, yours beside the worst, average and best of the brain's nims that started with you. When yours dies,
 # its place is the brain's again (a hatchling there is one of theirs, and isn't scored), and you watch to the end.
 
 import secrets
@@ -43,7 +43,7 @@ class Game:
         starters = np.flatnonzero((w.colony == 0) & ~w.spare)
         self.slot = int(starters[0])
         self.you = int(w.creature_id[0, self.slot])
-        # per Terrikin that started: ticks alive, berries picked up, food brought home
+        # per nim that started: ticks alive, berries picked up, food brought home
         self.started = [int(i) for i in w.creature_id[0, ~w.spare]]
         self.tally = {i: np.zeros(3) for i in self.started}
         self.controls = [a for a in ACTIONS[2:] if a in NEEDS and NEEDS[a](cfg)]

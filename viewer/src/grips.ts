@@ -1,4 +1,4 @@
-// A Terrikin holding a block (grab, from 0.3's vault) reaches out to it: a short
+// A nim holding a block (grab, from 0.3's vault) reaches out to it: a short
 // clay arm in its colony's colour, from its body to the nearest point on the
 // block. The sim holds it by a joint at the point it touched; nearest is close
 // enough to show who's pulling what.

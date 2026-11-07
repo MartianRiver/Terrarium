@@ -1,4 +1,4 @@
-# Where a Terrikin's notes put the tree. A memory brain's notes (the GRU state) hold a straight-line trace of where the
+# Where a nim's notes put the tree. A memory brain's notes (the GRU state) hold a straight-line trace of where the
 # tree is: at the first choice after it unloads an apple and comes up out of the nest, a ridge regression on the notes
 # gives the tree's offset from the nest to a metre or two, when the trunk isn't in sight. The readout is fitted on a
 # frozen brain playing a world, per brain, and the recorder (`record --ghost`) writes what it reads for the viewer to
@@ -23,7 +23,7 @@ from .world import World
 
 log = Logger('ghost')
 
-# seconds a ghost shows after the Terrikin comes up, if it hasn't an apple in its crop by then
+# seconds a ghost shows after the nim comes up, if it hasn't an apple in its crop by then
 SHOW = 20.0
 ALPHAS = np.logspace(-1, 4.5, 12)
 FOLDS = 5
@@ -152,7 +152,7 @@ def fit(brain: Path | str, cfg: Config, games: int, seed: int, world: str = '') 
 
 
 class Trail:
-    """Where the notes put the tree for each Terrikin that has come up out of its nest, from that choice until it has an
+    """Where the notes put the tree for each nim that has come up out of its nest, from that choice until it has an
     apple in its crop again or SHOW seconds pass: what a replay's `ghosts` hold."""
 
     def __init__(self, readout: Readout, world: World):

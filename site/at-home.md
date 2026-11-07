@@ -1,12 +1,12 @@
 ---
 title: Terrarium at Home
-description: Lend a spare NVIDIA GPU or Apple silicon Mac to train the Terrikins' brains. What it does on your machine, how to install it, and what lent machines have trained so far.
+description: Lend a spare NVIDIA GPU or Apple silicon Mac to train the nims' brains. What it does on your machine, how to install it, and what lent machines have trained so far.
 usd_per_billion: 3.88
 aud_per_usd: 1.424
 aud_date: 23 October 2026
 ---
 
-Every brain on this site learned by practice, and practice is samples: one Terrikin taking one step, billions of times over. So far that's been my MacBook Air and GPUs I rent by the hour, which have cost about A$5.53 (US$3.88) for every billion samples so far. A gaming PC sitting idle most of the day could do the same work.
+Every brain on this site learned by practice, and practice is samples: one nim taking one step, billions of times over. So far that's been my MacBook Air and GPUs I rent by the hour, which have cost about A$5.53 (US$3.88) for every billion samples so far. A gaming PC sitting idle most of the day could do the same work.
 
 If you have an NVIDIA GPU or an Apple silicon Mac that's often idle, you can lend it. A small program, the worker, takes training jobs from my queue while you're away from the computer, sends back the brain it trained, and gets out of the way when you come back. Every machine that does shows up on the board below, next to my Mac and the GPUs I've rented.
 
@@ -55,7 +55,7 @@ The first time, it asks for the token. The first job downloads PyTorch, about 2.
 
 ## Watching what your machine trains
 
-You can watch the Terrikins your GPU is training while it trains them. In a second window, in the same `sim` folder:
+You can watch the nims your GPU is training while it trains them. In a second window, in the same `sim` folder:
 
 ```
 uv run python -m terrarium.watch
@@ -63,9 +63,9 @@ uv run python -m terrarium.watch
 
 It opens the viewer in your browser on the brain your machine is working on, and each time a replay ends it moves on to the newest checkpoint, so you see it get better as you watch. The runs page beside it has the charts. It all stays on your machine.
 
-Play puts you in the world as one of the Terrikins, against the brain your machine is training: WASD or the arrows to walk and turn, or hold the mouse (or trackpad) to walk to a spot, and the keys for anything else that world has are on screen. You score a point a second alive, 10 a berry picked up and 20 a food brought home, and the panel puts you beside the brain's worst, average and best. Along the top are your energy, your sprint, how full your jelly belly is and how long till night, with a word popping up when something changes, since you can't feel hunger through a keyboard. The brain only sees what its rays show it and you can see the whole garden, so it's not quite a fair fight.
+Play puts you in the world as one of the nims, against the brain your machine is training: WASD or the arrows to walk and turn, or hold the mouse (or trackpad) to walk to a spot, and the keys for anything else that world has are on screen. You score a point a second alive, 10 a berry picked up and 20 a food brought home, and the panel puts you beside the brain's worst, average and best. Along the top are your energy, your sprint, how full your jelly belly is and how long till night, with a word popping up when something changes, since you can't feel hunger through a keyboard. The brain only sees what its rays show it and you can see the whole garden, so it's not quite a fair fight.
 
-Click a Terrikin to follow it, then press B for its brain window: what each of its rays sees, which of them it's paying attention to, how well it thinks things are going and what it's about to do. N shows the whole brain wired up, its units lighting up as it thinks.
+Click a nim to follow it, then press B for its brain window: what each of its rays sees, which of them it's paying attention to, how well it thinks things are going and what it's about to do. N shows the whole brain wired up, its units lighting up as it thinks.
 
 ## Versions
 

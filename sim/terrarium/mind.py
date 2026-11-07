@@ -1,9 +1,9 @@
-# One Terrikin's mind through an episode, for the viewer's brain window. The episode a replay was recorded from is
-# played again, and each time the Terrikin chooses, what its brain took in and made of it is written down: its
+# One nim's mind through an episode, for the viewer's brain window. The episode a replay was recorded from is
+# played again, and each time the nim chooses, what its brain took in and made of it is written down: its
 # senses, what each ray hit and how far, where its attention went (its own token's weights over itself and the rays,
 # in every layer and head), the summary it acts on, its guess at how well things are going, its actions and the
 # odds it gave each yes/no. Episodes repeat exactly on the machine that recorded them; each line carries the
-# Terrikin's position so the viewer can tell when one recorded elsewhere has parted from this.
+# nim's position so the viewer can tell when one recorded elsewhere has parted from this.
 #
 #   uv run python -m terrarium.mind OUT --brain X.pt --config configs/colony.toml --seed 0 --creature 3
 
@@ -137,7 +137,7 @@ def track(cfg: Config, brain_path: Path | str, path: Path | str, seed: int, crea
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Write one Terrikin's mind through an episode, for the viewer.")
+    parser = argparse.ArgumentParser(description="Write one nim's mind through an episode, for the viewer.")
     parser.add_argument('out')
     parser.add_argument('--brain', required=True)
     parser.add_argument('--config', default=None)

@@ -91,7 +91,7 @@ def events(path, pick=None):
                 ev.append(('found' if fid in hidden else 'bite', x, y))
         food = now
         hidden = {x['id'] for x in f['food'] if x.get('hidden')}
-        # tag: the it's bulb (signal 0) moving to a Terrikin it touched
+        # tag: the it's bulb (signal 0) moving to a nim it touched
         now_it = next((c for c in f['creatures'] if c['signal'] == 0), None)
         was = next((c for c in f['creatures'] if it and c['id'] == it), None)
         if now_it and was and now_it['id'] != it and (now_it['x'] - was['x']) ** 2 + (now_it['y'] - was['y']) ** 2 < 1.44:

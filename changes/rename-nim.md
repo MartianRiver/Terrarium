@@ -1,0 +1,1 @@
+The creatures are called nims now, not Terrikins: in the viewer, the kids' game, the pet page, the site and the docs, and in the sim's comments and config notes. Saved Catch them! choices that say "terrikin" load as a nim. Released changelog entries, published posts and the 0.3 reel files keep the old name.

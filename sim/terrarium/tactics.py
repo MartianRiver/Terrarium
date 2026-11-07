@@ -1,4 +1,4 @@
-# What the sprint and the flowers get used for, in evals. Away from its own nest, a Terrikin always has a best
+# What the sprint and the flowers get used for, in evals. Away from its own nest, a nim always has a best
 # reason it could sprint: a flower in view, food in view, a run home it needs (hungry with jelly there, a full crop,
 # or dusk falling, while facing home), or none of those (just getting about). How often it says yes when ready, and
 # which reason each sprint started under, show whether sprints go where they pay or get spent on travel; a sprint

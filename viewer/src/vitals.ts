@@ -1,7 +1,7 @@
 import './vitals.css';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
-// the followed Terrikin's card (top left): only the rows its world uses, worked out from the frames, since a replay's
+// the followed nim's card (top left): only the rows its world uses, worked out from the frames, since a replay's
 // config is never relied on for what the frames show. A row turns on the first time the episode shows it (energy
 // below full, stamina below full, something carried, a jump, jelly in the store) and stays on until the next
 // episode. The compass and notes rows come from the replay's header instead (see hasCompass, notesLabel).
@@ -25,7 +25,7 @@ export interface VitalsLine {
 }
 export interface VitalsModel { title: string; lines: VitalsLine[] }
 
-// ?vitals=1 / on / big forces the card on for the focused Terrikin under any camera (big: for clips); 0 / off forces it off
+// ?vitals=1 / on / big forces the card on for the focused nim under any camera (big: for clips); 0 / off forces it off
 export function vitalsAsk(search: string): { force: boolean | null; big: boolean } {
   const v = new URLSearchParams(search).get('vitals');
   if (v === null) return { force: null, big: false };
@@ -88,7 +88,7 @@ export class Vitals {
   constructor(parent: HTMLElement, private info: WorldInfo, meta: Meta = {}, big = false) {
     this.box.className = big ? 'vitals big' : 'vitals';
     this.box.hidden = true;
-    this.box.setAttribute('aria-label', 'The Terrikin you follow');
+    this.box.setAttribute('aria-label', 'The nim you follow');
     const list = document.createElement('ul');
     for (const row of ROWS) {
       const li = document.createElement('li');
@@ -145,7 +145,7 @@ export class Vitals {
     for (const { li } of this.rows.values()) li.hidden = true;
   }
 
-  // c: the followed Terrikin as drawn this frame (null hides the card); frame for the flags and the store
+  // c: the followed nim as drawn this frame (null hides the card); frame for the flags and the store
   show(c: CreatureState | null, name: string, frame: Frame | null, facing: Facing) {
     this.box.hidden = !c;
     if (!c) {

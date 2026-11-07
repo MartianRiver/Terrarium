@@ -173,7 +173,7 @@ def test_food_pays_when_eaten_not_when_picked_up():
 
 
 def carrying(at):
-    """A solo Terrikin with a full crop and no food about, standing this far east of its nest."""
+    """A solo nim with a full crop and no food about, standing this far east of its nest."""
     env = Forage(replace(SOLO, block=()), TRAIN, 1, seed=0)
     w = env.world
     w.food_regrow[:] = 1

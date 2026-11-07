@@ -1,23 +1,23 @@
 ---
 tagline: Little creatures teaching themselves to live in a garden under a glass dome on Mars.
-description: A colony of little AI creatures, the Terrikins, learning by trial and error to live in a garden under a glass dome on Mars. Watch them, and read what was tried along the way.
+description: A colony of little AI creatures, the nims, learning by trial and error to live in a garden under a glass dome on Mars. Watch them, and read what was tried along the way.
 ---
 
 ## What this is
 
-My pet project, quite literally: a colony of little AI creatures called Terrikins, living in a garden under a glass dome on Mars.
+My pet project, quite literally: a colony of little AI creatures called nims, living in a garden under a glass dome on Mars. I called them Terrikins until November 2026.
 
-Nothing they do is scripted. Each one sees the world through 16 rays, and a small neural network turns what it sees into moves. Every Terrikin has its own copy of the same brain, and it learns by trial and error from what it's rewarded for: staying fed, bringing food home, getting through the night.
+Nothing they do is scripted. Each one sees the world through 16 rays, and a small neural network turns what it sees into moves. Every nim has its own copy of the same brain, and it learns by trial and error from what it's rewarded for: staying fed, bringing food home, getting through the night.
 
 The world grows a stage at a time, and every stage's brain starts from the last one's, so each one builds on what the last one learned.
 
 ## Where it's at
 
-**0.2 Clover, done: one Terrikin teaching itself to eat.** After 52 minutes of training on my MacBook Air, it eats 18.4 berries a minute and never starves in the tests. Moving at random gets 0.26. A scripted forager that heads straight for the nearest berry gets 13.8, so the brain beats that too.
+**0.2 Clover, done: one nim teaching itself to eat.** After 52 minutes of training on my MacBook Air, it eats 18.4 berries a minute and never starves in the tests. Moving at random gets 0.26. A scripted forager that heads straight for the nearest berry gets 13.8, so the brain beats that too.
 
-**0.3 Daisy, done: colonies.** Three colonies of six, a nest each. They carry food home in their crop, store it at the nest as jelly, get through three cold nights on it huddled up at home, and hatch new Terrikins from what's left, so a colony can end bigger than it started. They learned all of that by themselves. They couldn't remember anything from one moment to the next, though, and that's what 0.4 starts with.
+**0.3 Daisy, done: colonies.** Three colonies of six, a nest each. They carry food home in their crop, store it at the nest as jelly, get through three cold nights on it huddled up at home, and hatch new nims from what's left, so a colony can end bigger than it started. They learned all of that by themselves. They couldn't remember anything from one moment to the next, though, and that's what 0.4 starts with.
 
-**0.4.0 Elderflower opened: memory that steers.** The Terrikins can carry notes from one moment to the next now. In a garden with an apple tree they can't see from home, it's those notes that take one back to it. To test it I froze a brain and changed only its notes: put in another game's notes and it gets pulled towards that game's tree, though not all the way. Wipe them each time it gets home and it brings home 4.6 apples a minute instead of 5.8. If the tree moves while it's underground, it walks to the empty spot first, twice as often with its notes as without. It's one Terrikin in one kind of garden so far, and the rest of 0.4 is still to come.
+**0.4.0 Elderflower opened: memory that steers.** The nims can carry notes from one moment to the next now. In a garden with an apple tree they can't see from home, it's those notes that take one back to it. To test it I froze a brain and changed only its notes: put in another game's notes and it gets pulled towards that game's tree, though not all the way. Wipe them each time it gets home and it brings home 4.6 apples a minute instead of 5.8. If the tree moves while it's underground, it walks to the empty spot first, twice as often with its notes as without. It's one nim in one kind of garden so far, and the rest of 0.4 is still to come.
 
 ## What's next
 

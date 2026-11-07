@@ -1,5 +1,5 @@
 // Eggs on a nest, from the replay's `eggs` (worlds with hatching). An egg sits
-// where its Terrikin will hatch, rocks more as it gets close, then cracks: the
+// where its nim will hatch, rocks more as it gets close, then cracks: the
 // shell's two halves spring apart and fade, and the hatchling (which takes the
 // egg's id) swells from small to full size. An egg that goes without hatching
 // (its colony died out) just shrinks away. Timed in sim ticks, like

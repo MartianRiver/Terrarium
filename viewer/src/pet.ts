@@ -8,36 +8,36 @@ app.innerHTML = `
   <header><a class="wordmark" href="/pet.html">Terrarium<span>A little life, in your care</span></a>
     <div class="edition">THE PET NURSERY <span>Local prototype · 01</span></div></header>
   <div class="layout">
-    <section class="garden" aria-label="Nim's interactive terrarium">
+    <section class="garden" aria-label="Your nim's interactive terrarium">
       <div id="world"></div>
-      <div class="garden-title"><span class="eyebrow">YOUR LITTLE CORNER OF MARS</span><h1>Nim’s nursery</h1></div>
+      <div class="garden-title"><span class="eyebrow">YOUR LITTLE CORNER OF MARS</span><h1>Your nim’s nursery</h1></div>
       <button id="home" class="view-button" aria-label="Reset garden camera">Garden view ↗</button>
       <div class="garden-caption"><span class="live-dot"></span><span id="activity">A garden waiting for a little life.</span></div>
-      <p class="gesture">Drag to look around · scroll to zoom · tap Nim to say hello</p>
+      <p class="gesture">Drag to look around · scroll to zoom · tap your nim to say hello</p>
       <div id="welcome" class="welcome"><span class="eyebrow">MEET YOUR NIM</span><h2>A small world.<br>A little responsibility.</h2>
-        <p>Feed it. Play together. Clean up the inevitable.<br>This little one depends on you.</p><button id="adopt" class="primary">Bring Nim home <span>↗</span></button>
+        <p>Feed it. Play together. Clean up the inevitable.<br>This little one depends on you.</p><button id="adopt" class="primary">Bring your nim home <span>↗</span></button>
         <small>Needs keep changing while you’re away.</small></div>
-      <div id="farewell" class="welcome" hidden><span class="eyebrow">NIM HAS GONE</span><h2>Nim has gone to rest.</h2>
+      <div id="farewell" class="welcome" hidden><span class="eyebrow">YOUR NIM HAS GONE</span><h2>Your nim has gone to rest.</h2>
         <p>Thank you for looking after it. Little ones need a meal, a tidy garden, company and medicine when they’re ill; a new egg can try again.</p><button id="again" class="primary">Hatch a new egg <span>↗</span></button></div>
     </section>
-    <aside aria-label="Care for Nim">
+    <aside aria-label="Care for your nim">
       <div class="identity"><div class="avatar" aria-hidden="true">n.</div><div><span class="eyebrow">YOUR NIM</span><h2 id="mood">A new beginning</h2><p id="age">Ready when you are.</p></div></div>
-      <div id="needs" aria-label="Nim's needs">
+      <div id="needs" aria-label="Your nim's needs">
         ${[['fullness', 'Tummy', 'A meal when hungry'], ['happiness', 'Happiness', 'Play & a little attention'], ['health', 'Wellbeing', 'Regular care keeps it well']].map(([id, label, help]) => `
           <div class="need"><div><label for="${id}">${label}</label><output id="${id}-value">—</output></div>
           <meter id="${id}" min="0" max="100" low="25" optimum="100" value="0">0</meter><small>${help}</small></div>`).join('')}
       </div>
-      <div class="care-actions"><button data-care="feed"><span class="action-icon">◒</span><span>Feed Nim<small>A little meal</small></span><span>↗</span></button>
+      <div class="care-actions"><button data-care="feed"><span class="action-icon">◒</span><span>Feed your nim<small>A little meal</small></span><span>↗</span></button>
         <button data-care="play"><span class="action-icon">◉</span><span>Play together<small>Chase the golden ball</small></span><span>↗</span></button>
         <button data-care="clean"><span class="action-icon">✳</span><span>Clean up<small id="mess-count">A fresh little garden</small></span><span>↗</span></button>
         <button data-care="stroke"><span class="action-icon">♡</span><span>Say hello<small>A little affection</small></span><span>↗</span></button>
-        <button data-care="medicine" class="wide"><span class="action-icon">✚</span><span>Medicine<small>Only when Nim is ill</small></span><span>↗</span></button></div>
+        <button data-care="medicine" class="wide"><span class="action-icon">✚</span><span>Medicine<small>Only when your nim is ill</small></span><span>↗</span></button></div>
       <p id="message" role="status" aria-live="polite">Opening your saved nursery…</p>
       <button id="retry" hidden>Retry opening saved nursery</button>
       <div class="journal"><span class="eyebrow">LITTLE MOMENTS</span><ol id="journal"></ol></div>
       <details><summary>About this little prototype</summary><p>Your nursery saves in this browser on this Mac. Needs catch up when you return, even if the tab or computer was closed.</p>
-        <p>Prototype rhythm: a full tummy lasts about 8 hours; a meal becomes a poop after 30 minutes. Mess and hunger make happiness fall faster. Neglect lowers wellbeing. Nim sleeps from 20:00 to 07:30 and its needs barely move then. Left unfed, unplayed with or in a mess for 8 hours it falls ill, and without medicine it dies 12 hours later.</p>
-        <p>Nim’s movements are scripted for this demo. Your care changes its needs; it doesn’t train a brain.</p>
+        <p>Prototype rhythm: a full tummy lasts about 8 hours; a meal becomes a poop after 30 minutes. Mess and hunger make happiness fall faster. Neglect lowers wellbeing. Your nim sleeps from 20:00 to 07:30 and its needs barely move then. Left unfed, unplayed with or in a mess for 8 hours it falls ill, and without medicine it dies 12 hours later.</p>
+        <p>Your nim’s movements are scripted for this demo. Your care changes its needs; it doesn’t train a brain.</p>
         <button id="export">Download nursery save</button></details>
       ${debug ? `<div class="debug"><span class="eyebrow">DEBUG TIME</span><div>
         <button data-skip="${HOUR / 2}">+30 min</button><button data-skip="${HOUR}">+1 h</button><button data-skip="${8 * HOUR}">+8 h</button>
@@ -68,7 +68,7 @@ function persist() {
     lastSave = Date.now();
   } catch {
     failed = true;
-    message('Your browser could not save Nim. Download the save below before closing, then retry.', true);
+    message('Your browser could not save your nim. Download the save below before closing, then retry.', true);
     el('retry').hidden = false;
   }
 }
@@ -81,8 +81,8 @@ function open() {
     if (current) advance(current, now());
     failed = false;
     el('retry').hidden = true;
-    greeting = away >= 60_000 ? `Welcome back. ${Math.floor(away / 60_000)} minutes passed; Nim’s needs have caught up.` : 'Your nursery is saved here. A little care goes a long way.';
-    message(current?.dead ? 'Nim has gone.' : current ? greeting : 'Your first little Nim is waiting to come home.');
+    greeting = away >= 60_000 ? `Welcome back. ${Math.floor(away / 60_000)} minutes passed; your nim’s needs have caught up.` : 'Your nursery is saved here. A little care goes a long way.';
+    message(current?.dead ? 'Your nim has gone.' : current ? greeting : 'Your first little nim is waiting to come home.');
     if (current) persist();
   } catch (error) {
     failed = true;
@@ -107,9 +107,9 @@ function refresh() {
     el(`${key}-value`).textContent = `${Math.round(current[key])}%`;
   }
   el('mess-count').textContent = current.mess.length ? `${current.mess.length} little poop${current.mess.length === 1 ? '' : 's'} to clear` : 'All clean';
-  el('activity').textContent = current.dead ? 'Nim has gone.' : stage(current) === 'very ill' ? 'Nim is very ill. Medicine, quickly.'
-    : stage(current) === 'ill' ? 'Nim is ill and needs medicine.' : stage(current) === 'poorly' ? 'Nim is not feeling well. Some care would help.'
-    : isAsleep(current, current.updated) ? `Nim is asleep until ${clock(current.wake)}.` : current.mess.length ? 'A little cleanup would be lovely.' : current.fullness < 25 ? 'Someone’s ready for a meal.' : current.happiness < 30 ? 'A little company would be lovely.' : 'Pottering around, making this place its own.';
+  el('activity').textContent = current.dead ? 'Your nim has gone.' : stage(current) === 'very ill' ? 'Your nim is very ill. Medicine, quickly.'
+    : stage(current) === 'ill' ? 'Your nim is ill and needs medicine.' : stage(current) === 'poorly' ? 'Your nim is not feeling well. Some care would help.'
+    : isAsleep(current, current.updated) ? `Your nim is asleep until ${clock(current.wake)}.` : current.mess.length ? 'A little cleanup would be lovely.' : current.fullness < 25 ? 'Someone’s ready for a meal.' : current.happiness < 30 ? 'A little company would be lovely.' : 'Pottering around, making this place its own.';
   if (debug) el('demo-time').textContent = `${new Date(current.updated).toLocaleString()} · neglect ${(current.neglect / HOUR).toFixed(1)} h · ill ${(current.sickFor / HOUR).toFixed(1)} h · demo +${(current.offset / HOUR).toFixed(1)} h`;
   const list = el('journal');
   list.replaceChildren(...current.history.slice(0, 4).map(item => {
@@ -135,7 +135,7 @@ el('adopt').addEventListener('click', () => {
   if (failed) return;
   current = hatch(Date.now());
   persist(); refresh();
-  if (!failed) message('Welcome home, Nim. Try a meal or a little game together.');
+  if (!failed) message('Welcome home. Try a meal or a little game together.');
 });
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-care]')) {
   button.addEventListener('click', () => act(button.dataset.care as CareAction));
@@ -144,7 +144,7 @@ function jump(ms: number, text: string) {
   if (!current || failed || current.dead) return;
   current.offset += ms;
   advance(current, now()); persist(); refresh();
-  if (!failed) message(current.dead ? 'Nim has gone.' : text);
+  if (!failed) message(current.dead ? 'Your nim has gone.' : text);
 }
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-skip]')) {
   button.addEventListener('click', () => jump(Number(button.dataset.skip), `${button.textContent} passed. Care catches up through the same rules as real time.`));
@@ -156,7 +156,7 @@ el('again').addEventListener('click', () => {
   if (failed) return;
   current = hatch(Date.now());
   persist(); refresh();
-  if (!failed) message('A new egg hatched. Welcome home, Nim.');
+  if (!failed) message('A new egg hatched. Welcome home.');
 });
 el('export').addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([current ? JSON.stringify(current, null, 2) : rawSave ?? ''], { type: 'application/json' }));
@@ -187,7 +187,7 @@ window.addEventListener('pagehide', () => { if (current && !failed) { advance(cu
 window.addEventListener('storage', e => {
   if (e.key === SAVE_KEY) {
     failed = true;
-    message('This nursery changed in another tab. Reload this page before caring for Nim.', true);
+    message('This nursery changed in another tab. Reload this page before caring for your nim.', true);
     refresh();
   }
 });

@@ -2,9 +2,9 @@
 
 date: 2026-11-06 · status: confirmed · seeds: 8,104,000 · brains: mid2-s1, s2, s3 (one family, from lam99-s2)
 
-**Question.** If the tree moves while a Terrikin is down in the burrow, and its notes hold the old place, does it walk back to an empty spot?
+**Question.** If the tree moves while a nim is down in the burrow, and its notes hold the old place, does it walk back to an empty spot?
 
-**World and brains.** Rung A's world, tree centred (as in 0004). While the Terrikin is down storing an apple, the tree moves at least 6 m, somewhere it can't be seen from home. The last checkpoints of `mid2`-s1, s2 and s3, frozen.
+**World and brains.** Rung A's world, tree centred (as in 0004). While the nim is down storing an apple, the tree moves at least 6 m, somewhere it can't be seen from home. The last checkpoints of `mid2`-s1, s2 and s3, frozen.
 
 **Method.** 512 games each from seed 8,104,000; 57 games have the tree in sight from home and never move, and are left out. Three ways to play each game: the tree stays, the tree moves, the tree moves and the notes are wiped as it stores. "To the old spot" means within 1.5 m of where the tree was, before it sees the new tree.
 

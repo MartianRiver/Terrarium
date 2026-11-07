@@ -1,6 +1,6 @@
 // &preview: make-believe nectar flowers and sprints laid over an old replay, to
 // judge how they look before the sim has them. Nothing here comes from a brain:
-// flowers open at random by day (often near the first Terrikin, so the follow
+// flowers open at random by day (often near the first nim, so the follow
 // camera sees them), whoever walks into an open one drinks it, and anyone
 // heading fast at one within sight is drawn sprinting.
 

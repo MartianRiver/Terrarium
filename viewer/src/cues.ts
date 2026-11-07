@@ -13,7 +13,7 @@ export interface Cue {
 }
 
 const IT = 0; // the it's signal in tag
-const NEAR = 1.0; // squared metres: food gone this close to a live Terrikin was bitten
+const NEAR = 1.0; // squared metres: food gone this close to a live nim was bitten
 const TOUCH = 1.44; // squared: the bulb moving this short a way is a tag (tagpop.ts)
 
 export class Cues {

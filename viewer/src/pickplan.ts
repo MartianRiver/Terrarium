@@ -13,8 +13,8 @@ const LIVE_MS = 40 * 60_000;
 
 export type Group = 'colonies' | 'nursery' | 'experiments';
 const GROUPS: { key: Group; title: string; text: string }[] = [
-  { key: 'colonies', title: 'Colonies', text: 'The main world: colonies that forage, store food, get through the nights and hatch new Terrikins.' },
-  { key: 'nursery', title: 'The nursery', text: 'Small worlds where baby Terrikins learn one thing at a time: kids’ games, chores and looking after themselves.' },
+  { key: 'colonies', title: 'Colonies', text: 'The main world: colonies that forage, store food, get through the nights and hatch new nims.' },
+  { key: 'nursery', title: 'The nursery', text: 'Small worlds where baby nims learn one thing at a time: kids’ games, chores and looking after themselves.' },
   { key: 'experiments', title: 'Experiments', text: 'Tried on the side: holes they found, dead ends, and setups that aren’t the main line.' },
 ];
 

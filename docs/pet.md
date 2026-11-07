@@ -4,9 +4,9 @@ From `viewer/`, run `npm run dev -- --host 127.0.0.1 --port 5188 --strictPort`
 and open `http://127.0.0.1:5188/pet.html`. This uses the existing viewer dependencies.
 The pet entry is included in the normal local build, excluded from the public-site build.
 
-Bring Nim home, then feed, play, offer attention and clean up. During ball play,
-click somewhere in the garden to move the ball; Nim chases it autonomously.
-Tap Nim itself for affection. Dragging orbits the camera; Garden view resets it.
+Bring your nim home, then feed, play, offer attention and clean up. During ball play,
+click somewhere in the garden to move the ball; your nim chases it autonomously.
+Tap your nim for affection. Dragging orbits the camera; Garden view resets it.
 
 Care saves under `terrarium.pet.v1` in this browser's local storage, scoped to the
 origin (including port). It is a local pet on this browser, not a synced account.

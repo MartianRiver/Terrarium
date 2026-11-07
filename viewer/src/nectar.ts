@@ -11,7 +11,7 @@ const CLOSE = 0.8; // seconds to fold shut and sink
 const GULP = 0.35; // seconds to be hoovered up
 const HEAD = 0.42;
 const PETALS = 6;
-// petals reach 0.34 m, the sim's flower radius, so a Terrikin eats it the moment it touches the petals
+// petals reach 0.34 m, the sim's flower radius, so a nim eats it the moment it touches the petals
 const SIZE = 1.0;
 
 const stemGeo = new THREE.CylinderGeometry(0.018, 0.026, HEAD, 6).translate(0, HEAD / 2, 0);
@@ -52,7 +52,7 @@ export class Flowers {
     for (const [id, f] of this.flowers) {
       if (now.has(id)) continue;
       this.flowers.delete(id);
-      // a Terrikin beside it that's just got its boost ate it
+      // a nim beside it that's just got its boost ate it
       const { x, z } = f.root.position;
       const eater = frame.creatures.find((c) => c.nectar > 0 && (c.x - x) ** 2 + (c.y - z) ** 2 < 1.5);
       const mouth = eater ? new THREE.Vector3(eater.x + Math.cos(eater.heading) * 0.3, 0.2, eater.y + Math.sin(eater.heading) * 0.3) : null;
@@ -97,7 +97,7 @@ export class Flowers {
     f.head.rotation.y = Math.sin(time * 0.8 + f.seed) * 0.15;
   }
 
-  // eaten: hoovered up, sliding and spinning into the Terrikin's mouth as it shrinks away
+  // eaten: hoovered up, sliding and spinning into the nim's mouth as it shrinks away
   private hoover(f: Flower, t: number, from: THREE.Vector3, mouth: THREE.Vector3) {
     f.halo.material.opacity = 0;
     const pull = t * t;

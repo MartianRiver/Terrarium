@@ -55,7 +55,7 @@ def scatter(world, idx: np.ndarray):
 
 def move(world, a: int, k: int) -> bool:
     """Draw block k somewhere new in arena a mid-game, as scatter would, clear of the other blocks where they are
-    now and of every Terrikin; False when nowhere fits and it stays put."""
+    now and of every nim; False when nowhere fits and it stays put."""
     from .world import box_gap
     cfg, ph = world.cfg, world.physics
     room = cfg.arena.size / 2 - GAP

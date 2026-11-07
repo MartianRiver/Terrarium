@@ -106,7 +106,7 @@ export class NetView {
     if (!this.track || !t) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.font = '13px system-ui';
-      ctx.fillText(this.track ? 'Not born yet, or no choice made yet.' : 'Open the brain window on a Terrikin first (B).', 16, 28);
+      ctx.fillText(this.track ? 'Not born yet, or no choice made yet.' : 'Open the brain window on a nim first (B).', 16, 28);
       return;
     }
     if (t !== this.last) {

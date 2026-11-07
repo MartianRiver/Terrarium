@@ -1,6 +1,6 @@
 # The apple tree, a nursery game for jumping ([tree], points 0 is off). One
 # block is a tree's trunk, and every apple grows hanging from its branches
-# somewhere round it, `reach` metres above what a Terrikin standing under it can
+# somewhere round it, `reach` metres above what a nim standing under it can
 # get to: it has to go and stand under one and jump ([jump]). Each apple taken
 # pays `points` to everyone in the arena, hungry or not, and another grows on the
 # tree as food grows back. Rays see a hanging apple where it hangs, as food. Each
@@ -9,7 +9,7 @@
 # With `home`, an apple taken goes in the crop, so one with a full crop can't take
 # another, and it pays only once it's unloaded in the nest: carried home. With `move`, the tree goes somewhere new
 # every so often in a game (where [arena] scatter would draw it), its apples growing round it there, so where it
-# stands has to be found again and remembered afresh. With `start`, each episode starts with the Terrikins ringed
+# stands has to be found again and remembered afresh. With `start`, each episode starts with the nims ringed
 # round the trunk, facing it, so the first find is free and only the trips after it need remembering. With
 # `burrow`, unloading at home takes the carrier into the nest and back up at its middle turned any way, so the way
 # back out can't be read off where it came in.
@@ -68,7 +68,7 @@ class Tree:
                 log.warn('tree found nowhere to move to', arena=int(a), tick=w.tick)
 
     def start(self, idx: np.ndarray):
-        """Stand each of these arenas' Terrikins round the trunk, `start` m off its edge and facing it, wherever the
+        """Stand each of these arenas' nims round the trunk, `start` m off its edge and facing it, wherever the
         blocks have ended up. An arena with no clear ring in a few tries keeps the nest spawn."""
         w, cfg = self.world, self.world.cfg
         t = cfg.tree
@@ -119,7 +119,7 @@ class Tree:
         w.physics.revive(a, c, to)
 
     def seen_from_home(self) -> np.ndarray:
-        """Per arena, whether a Terrikin at the middle of a nest could see the trunk now: it is within the rays' longest
+        """Per arena, whether a nim at the middle of a nest could see the trunk now: it is within the rays' longest
         range and some line to it runs clear of the other blocks (bodies, food and walls aside). Where it holds, the
         tree can be found without remembering where it is."""
         w, cfg = self.world, self.world.cfg

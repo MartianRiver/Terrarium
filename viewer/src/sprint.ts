@@ -1,4 +1,4 @@
-// Puffs of dust kicked up behind a sprinting Terrikin, rainbow-flecked while it's
+// Puffs of dust kicked up behind a sprinting nim, rainbow-flecked while it's
 // on nectar. Purely cosmetic and timed on the wall clock, like the waddle.
 
 import * as THREE from 'three';

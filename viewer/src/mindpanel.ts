@@ -1,4 +1,4 @@
-// The brain window (B): one Terrikin's brain as the replay plays, from its mind track (mindtrack.ts). What it sees
+// The brain window (B): one nim's brain as the replay plays, from its mind track (mindtrack.ts). What it sees
 // as a fan of rays lit by attention, every head's attention, its senses, the summary it acts on, how things look to
 // it over the episode, and what it does. Any part can be clicked for what it means (mindtext.ts).
 

@@ -1,5 +1,5 @@
 // The kids page's screens around a game: the pictures to pick from (with each game's levels as numbered stones, stars
-// under each, locked ones shut, and who you are: a costume, or a Terrikin in a colour), the stars lit as a game goes,
+// under each, locked ones shut, and who you are: a costume, or a nim in a colour), the stars lit as a game goes,
 // and how a round went. A stick or the arrow keys move along one row at a time (the game, who, the colour).
 import { COLONY_COLOURS } from './palette';
 import { key, opened, type Look, type Progress, type Round } from './kidsprogress';
@@ -31,9 +31,9 @@ export class Menu {
       b.addEventListener('click', () => paint(Number(b.dataset.colour))));
   }
 
-  // the rows a stick moves between: the colours only for a Terrikin
+  // the rows a stick moves between: the colours only for a nim
   rows(p: Progress): Row[] {
-    return p.look === 'terrikin' ? ['game', 'look', 'colour'] : ['game', 'look'];
+    return p.look === 'nim' ? ['game', 'look', 'colour'] : ['game', 'look'];
   }
 
   private progress: Progress | null = null;
@@ -57,7 +57,7 @@ export class Menu {
     this.progress = p;
     $('#pick').dataset.row = focus;
     document.body.style.setProperty('--you', `#${COLONY_COLOURS[p.colour].getHexString()}`);
-    $('.colours').hidden = p.look !== 'terrikin';
+    $('.colours').hidden = p.look !== 'nim';
     document.querySelectorAll<HTMLButtonElement>('[data-colour]').forEach((b) =>
       b.setAttribute('aria-pressed', String(Number(b.dataset.colour) === p.colour)));
     $('#stars-total').textContent = String(p.total);

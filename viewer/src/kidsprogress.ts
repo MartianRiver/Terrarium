@@ -1,10 +1,10 @@
 // How a child is getting on at Catch them!, kept in this browser: stars for each level (one for any catch, two and
-// three for the level's targets), the best catch count, the stars caught in all, who they are (a Terrikin in a colour,
+// three for the level's targets), the best catch count, the stars caught in all, who they are (a nim in a colour,
 // or a costume). Two stars on a level opens the next.
 
-export const LOOKS = ['terrikin', 'dino', 'dragon', 'panda', 'penguin', 'cheetah', 'kelpie', 'frenchie', 'kitten'] as const;
+export const LOOKS = ['nim', 'dino', 'dragon', 'panda', 'penguin', 'cheetah', 'kelpie', 'frenchie', 'kitten'] as const;
 export type Look = (typeof LOOKS)[number];
-// a Terrikin can be any colony's colour but the runners' (colony 0)
+// a nim can be any colony's colour but the runners' (colony 0)
 export const COLOURS = [1, 2, 3] as const;
 
 export interface Progress {
@@ -30,16 +30,18 @@ const OPENS = 2;
 export const key = (mode: string, level: number) => `${mode}:${level}`;
 
 export function fresh(): Progress {
-  return { best: {}, stars: {}, total: 0, rounds: 0, look: 'terrikin', colour: COLOURS[0] };
+  return { best: {}, stars: {}, total: 0, rounds: 0, look: 'nim', colour: COLOURS[0] };
 }
 
 export function load(): Progress {
   try {
     const got = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    // saves from before the rename (Nov 2026) say 'terrikin'
+    if (got.look === 'terrikin') got.look = 'nim';
     // a costume or colour this page doesn't have (yet, or any more) is the plain one
     return {
       ...fresh(), ...got,
-      look: LOOKS.includes(got.look) ? got.look : 'terrikin',
+      look: LOOKS.includes(got.look) ? got.look : 'nim',
       colour: (COLOURS as readonly number[]).includes(got.colour) ? got.colour : COLOURS[0],
     };
   } catch {

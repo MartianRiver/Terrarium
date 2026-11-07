@@ -50,7 +50,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
     store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
     # with [home] far, it fades with distance and is gone past it: home_felt says how much is left, so a lost
-    # Terrikin's 0 can't be mistaken for standing in the middle of its nest
+    # nim's 0 can't be mistaken for standing in the middle of its nest
     away = np.hypot(home[..., 0], home[..., 1])
     h = cfg.home
     felt = np.clip((h.far - away) / max(h.far - h.near, 1e-9), 0, 1) if h.far > 0 else np.ones_like(away)

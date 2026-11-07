@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { COLONY_COLOURS } from './palette';
 
-// metres, like the sim: nose to tail about a Terrikin and a half
+// metres, like the sim: nose to tail about a nim and a half
 const HIP = 0.3; // thorax height standing
 const COXA = 0.07;
 const FEMUR = 0.3;
@@ -82,7 +82,7 @@ export class AntStudy {
     this.gaster.add(part(ball, skin, [-0.24, 0.04, 0], [0.27, 0.19, 0.2]));
     this.body.add(this.gaster);
 
-    // a round, Terrikin-like face: big dark eyes with a glint, small mandibles
+    // a round, nim-like face: big dark eyes with a glint, small mandibles
     this.head.position.set(0.24, 0.06, 0);
     this.head.add(part(ball, skin, [0.07, 0, 0], [0.15, 0.13, 0.14]));
     for (const side of [-1, 1]) {
@@ -164,7 +164,7 @@ export class AntStudy {
       <p><b>Senses</b>: each joint's angle and speed, which feet touch (green), and the thorax's tilt and spin, like an inner ear.</p>
       <p><b>Balance</b>: the green outline is what the feet down hold up; the dot under the dashed line is the centre of mass. Outside the outline, it tips.</p>
       <p class="live"></p>
-      <p class="small">The tripod gait here is made by hand to show the body. A trained ant would find its own, paid for moving and for staying upright, in a 3D physics sim: the one the Terrikins live in is flat. J hides the markers.</p>`;
+      <p class="small">The tripod gait here is made by hand to show the body. A trained ant would find its own, paid for moving and for staying upright, in a 3D physics sim: the one the nims live in is flat. J hides the markers.</p>`;
     this.readout = this.panel.querySelector('.live')!;
     document.body.append(this.panel);
   }

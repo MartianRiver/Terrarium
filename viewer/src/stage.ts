@@ -219,7 +219,7 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
         offset.subVectors(camera.position, controls.target).lerp(close ? closeUp : OVERVIEW, 1 - Math.exp(-dt * SWING_RATE));
         camera.position.addVectors(controls.target, offset);
       }
-      // close behind a Terrikin by the edge, closer in rather than out through the glass
+      // close behind a nim by the edge, closer in rather than out through the glass
       if (!at || !close) return;
       offset.subVectors(camera.position, controls.target);
       const length = offset.length();

@@ -32,11 +32,11 @@ export const SENSES: Record<string, Words> = {
 export const KINDS: Record<string, Words & { colour: string }> = {
   nothing: { label: 'nothing', colour: '#9aa3ad', text: 'The ray reached as far as it can see (8 m) without hitting anything.' },
   wall: { label: 'wall', colour: '#6b5a4a', text: 'The garden wall.' },
-  creature: { label: 'Terrikin', colour: '#d0569e', text: 'Another Terrikin: a nestmate (ringed) or one from another colony.' },
+  creature: { label: 'nim', colour: '#d0569e', text: 'Another nim: a nestmate (ringed) or one from another colony.' },
   food: { label: 'food', colour: '#e0473c', text: 'Food: berries growing, or jelly dropped on the ground.' },
   block: { label: 'block', colour: '#c89b5e', text: 'A wooden block. It can be pushed.' },
   flower: { label: 'flower', colour: '#ffb21f', text: 'An open nectar flower: rare, rich, and gone in 15 s.' },
-  dung: { label: 'dropping', colour: '#8a5a2b', text: 'A dropping on the ground. Being close to one makes a Terrikin a little sick.' },
+  dung: { label: 'dropping', colour: '#8a5a2b', text: 'A dropping on the ground. Being close to one makes a nim a little sick.' },
   flag: { label: 'flag', colour: '#3d7bd9', text: 'A colony’s flag, on its nest or lying where it was put down. A carried one shows as its carrier.' },
   heap: { label: 'heap', colour: '#5c3a1a', text: 'A dropping on the midden’s heap, where they’re put. It stays there: it can’t be picked up again.' },
 };

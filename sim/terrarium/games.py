@@ -272,7 +272,7 @@ def in_view(w: World, points: np.ndarray) -> np.ndarray:
 def searcher(world: World, remember: bool = False):
     """The picker knowing only what it can see and where trees usually stand: heads for the tree's set spot (what a
     brain's weights can learn) and wanders at random from there until an apple is in view, picks it, takes a full crop
-    home (it feels the way, as a Terrikin does). With remember it also keeps where it last saw the tree and goes back
+    home (it feels the way, as a nim does). With remember it also keeps where it last saw the tree and goes back
     there instead, forgetting the spot if no apple's in view when it gets there. The two apart are what remembering
     the tree is worth in a world; a brain using its notes should land near the second."""
     jump, unload = ACTIONS.index('jump'), ACTIONS.index('unload')
@@ -377,7 +377,7 @@ def hides(world):
 
 
 def new_room(world):
-    """A Terrikin walking into another room of the maze since the last choice: wiped then, it has no map but
+    """A nim walking into another room of the maze since the last choice: wiped then, it has no map but
     what it can see."""
     n, size = world.cfg.arena.maze, world.cfg.arena.size
     was = np.full((*world.alive.shape, 2), -1)
@@ -391,7 +391,7 @@ def new_room(world):
 
 
 def unloads(world):
-    """A Terrikin storing an apple in its own nest since the last choice: wiped then, it sets off for the tree again
+    """A nim storing an apple in its own nest since the last choice: wiped then, it sets off for the tree again
     with no notes of where it was. Eating from the crop in the nest empties it too, but stores nothing, so it
     doesn't count; `stored` is each creature's own count, so nestmates don't share an event."""
     was = world.stored.copy()

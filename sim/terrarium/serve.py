@@ -9,9 +9,9 @@
 #   GET /api/runs/<id>  (with what went into its brain, per machine)
 #   GET /api/compute    (every run and rental so far, per machine)
 #   GET /api/runs/<id>/replay/<checkpoint.pt | random>?seed=0[&here]  (here: recorded again on this machine)
-#   GET /api/runs/<id>/mind/<checkpoint.pt>?seed=0&creature=ID  (one Terrikin's mind through that episode, mind.py)
+#   GET /api/runs/<id>/mind/<checkpoint.pt>?seed=0&creature=ID  (one nim's mind through that episode, mind.py)
 #   GET /api/runs/<id>/wiring/<checkpoint.pt>  (its strongest connections, for drawing it wired up)
-#   POST /api/play {run, checkpoint, seed}  (a game as one Terrikin among a brain's, play.py; all optional: by default
+#   POST /api/play {run, checkpoint, seed}  (a game as one nim among a brain's, play.py; all optional: by default
 #                                           the newest checkpoint of the newest live run)
 #   POST /api/play/<game> {ticks, thrust, turn, yes}  (the next few ticks, with what you're doing in them)
 #
@@ -146,7 +146,7 @@ class Runs:
         return wiring(brain)
 
     def mind(self, id: str, checkpoint: str, seed: int, creature: int) -> Path:
-        """One Terrikin's mind through the episode of that replay (mind.py), recorded once."""
+        """One nim's mind through the episode of that replay (mind.py), recorded once."""
         run = self.find(id)
         if checkpoint not in {c['file'] for c in checkpoints(run)}:
             raise NotFound(f'{id} has no checkpoint {checkpoint}')

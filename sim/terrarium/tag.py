@@ -1,4 +1,4 @@
-# Tag, a nursery game ([tag], reach 0 is off). One Terrikin in each arena is it, and
+# Tag, a nursery game ([tag], reach 0 is off). One nim in each arena is it, and
 # touching another (bodies within `reach` of each other) passes it on. The new one
 # can't tag anyone for `cooldown` seconds, and the one who tagged it for `back` seconds
 # (never, if negative): with only the cooldown, two babies stood together and passed it

@@ -1,7 +1,7 @@
-// Play as one Terrikin (local only, ?play[=run id]): a game on the runs server (sim play.py) in a run's world, the
+// Play as one nim (local only, ?play[=run id]): a game on the runs server (sim play.py) in a run's world, the
 // rest steered by its newest brain. Frames come a few ticks at a time, each request carrying what you're doing, so
 // the game runs at the viewer's pace and stops when it pauses. A bar along the top shows your energy and points, and a
-// panel the controls this world has and how you're doing next to the brain's worst, average and best Terrikins. Under
+// panel the controls this world has and how you're doing next to the brain's worst, average and best nims. Under
 // the bar, what's hard to see on the body (a full crop, the sprint's rest, nectar, nightfall), with a word as each changes.
 import * as THREE from 'three';
 import { clock } from './clock';
@@ -284,7 +284,7 @@ export class Game {
     if (this.failed) state = `<p class="play-error">The game stopped: ${esc(this.failed)}. R starts a new one.</p>`;
     else if (s.over || !you.alive) {
       const how = !best || !worst || !average ? ''
-        : you.points > best.points ? 'You beat every one of the brain\'s Terrikins!'
+        : you.points > best.points ? 'You beat every one of the brain\'s nims!'
         : you.points >= average.points ? 'Better than the brain\'s average.'
         : you.points >= worst.points ? 'Below the brain\'s average.'
         : 'Even the brain\'s worst did better.';

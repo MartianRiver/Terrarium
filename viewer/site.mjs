@@ -164,7 +164,7 @@ for (const [name, text] of unfinished) {
   if (!review && hit) throw new Error(`site/${name} has something unfinished ("${hit}"), so it can't be published`);
 }
 const hero = `<section class="hero">
-  <img src="/hero.jpg" width="1600" height="900" alt="A garden under a glass dome on a red plain. On the lawn inside, little round Terrikins in three colours gather berries around their nests.">
+  <img src="/hero.jpg" width="1600" height="900" alt="A garden under a glass dome on a red plain. On the lawn inside, little round nims in three colours gather berries around their nests.">
   <div class="pitch">
     <h1>Terrarium</h1>
     <p>${escape(home.meta.tagline)}</p>
@@ -249,7 +249,7 @@ function nursery(c) {
     }
     return card(ks.length > 1 ? family : g.name, g.kind, g.goal + ' ' + g.setup, more, watch(ks));
   });
-  return '<h2>In the nursery</h2><p>Small worlds where baby Terrikins can’t go hungry, learning kids’ games. Each one tests one thing a brain needs, like memory, away from the work of staying alive. '
+  return '<h2>In the nursery</h2><p>Small worlds where baby nims can’t go hungry, learning kids’ games. Each one tests one thing a brain needs, like memory, away from the work of staying alive. '
     + (keys.some((k) => c.games[k].training ?? live) ? 'Training now, updated ' + ago(c.updated) + '. ' : c.note ? esc(c.note[0].toUpperCase() + c.note.slice(1)) + ' (updated ' + ago(c.updated) + '). ' : '') + 'Watch shows its newest brains in turn, with a card saying what’s going on.</p><ol class="brains now">' + cards.join('') + '</ol>';
 }
 Promise.all([get('/replays/gallery/index.json'), get('/replays/nursery/index.json')]).then(([g, c]) => {
@@ -294,10 +294,10 @@ Promise.all([get('/replays/gallery/index.json'), get('/replays/nursery/index.jso
 </script>`;
 write('brains', page({
   title: 'Brains',
-  description: 'What the Terrikins are learning right now, and every brain they’ve had, from the first that learned to eat. Watch any of them.',
+  description: 'What the nims are learning right now, and every brain they’ve had, from the first that learned to eat. Watch any of them.',
   path: '/brains/',
   body: `<h1>Brains</h1>
-<p>Each Terrikin has its own copy of the same brain, and a brain is what training makes: a set of numbers that turns what a Terrikin senses into what it does. Here’s what’s training now, then every step that got the colonies’ brain to where it is. Watch plays one in the world it trained in. Numbers are its own test results there, and the worlds got harder as they went, so compare within a step more than across them.</p>
+<p>Each nim has its own copy of the same brain, and a brain is what training makes: a set of numbers that turns what a nim senses into what it does. Here’s what’s training now, then every step that got the colonies’ brain to where it is. Watch plays one in the world it trained in. Numbers are its own test results there, and the worlds got harder as they went, so compare within a step more than across them.</p>
 <div id="gallery"><p>Loading…</p></div>
 ${BRAINS}`,
 }));
@@ -423,7 +423,7 @@ writeFileSync(join(out, '404.html'), page({
   title: 'Not here',
   description: 'Nothing at this address.',
   path: '/404.html',
-  body: '<h1>Nothing here</h1>\n<p>That page doesn’t exist. Try <a href="/">the start</a> or <a href="/watch/">watching the Terrikins</a>.</p>',
+  body: '<h1>Nothing here</h1>\n<p>That page doesn’t exist. Try <a href="/">the start</a> or <a href="/watch/">watching the nims</a>.</p>',
 }));
 if (review) writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 

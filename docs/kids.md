@@ -1,6 +1,6 @@
 # Catch them!
 
-A game of tag for children against a tag brain's Terrikins. You're always it, with a ring under you, and faster than them; touch one and it's a catch: it gets knocked away with a boing, spins dizzy under a ring of stars for a moment, and can't be caught again straight away, so you go after another. A round is 90 seconds. Nothing needs reading: pictures to pick a game, a star count, a bar running down, and at the end your catches, the stars they earned, your best, and one big button to go again.
+A game of tag for children against a tag brain's nims. You're always it, with a ring under you, and faster than them; touch one and it's a catch: it gets knocked away with a boing, spins dizzy under a ring of stars for a moment, and can't be caught again straight away, so you go after another. A round is 90 seconds. Nothing needs reading: pictures to pick a game, a star count, a bar running down, and at the end your catches, the stars they earned, your best, and one big button to go again.
 
 It runs on one machine at home, the game and the viewer both, against a brain on disk. Nobody else can reach it: the server listens on that machine only.
 
@@ -16,7 +16,7 @@ Every round earns up to three stars: one for any catch, two and three for the le
 
 Every game watches how it's going. A while without a catch (5 s in little, 6–8 in big) slows the runners a little every second, down to the level's floor; quick catches speed them back up. So a round settles where catches keep coming without being free. The settings are `MODES` in `sim/terrarium/kids.py`.
 
-Under the pictures is who you are: a Terrikin in blue, purple or green (any colony's colour but the runners'), a baby dinosaur (brown, with mint spikes down its back and mint spots), a baby dragon (horns, spikes, bat wings that flap as it walks, and a roar for a honk), a panda, a baby penguin, a baby cheetah, a black kelpie pup (tan eyebrows, muzzle and legs, pricked ears), a brindle French bulldog pup (bat ears, a dark flat muzzle) or a ginger kitten (whiskers, a ringed tail). Costumes are in `viewer/src/costumes.ts`: each recolours a Terrikin and adds to it, so it still walks, blinks and lights its antenna like the rest.
+Under the pictures is who you are: a nim in blue, purple or green (any colony's colour but the runners'), a baby dinosaur (brown, with mint spikes down its back and mint spots), a baby dragon (horns, spikes, bat wings that flap as it walks, and a roar for a honk), a panda, a baby penguin, a baby cheetah, a black kelpie pup (tan eyebrows, muzzle and legs, pricked ears), a brindle French bulldog pup (bat ears, a dark flat muzzle) or a ginger kitten (whiskers, a ringed tail). Costumes are in `viewer/src/costumes.ts`: each recolours a nim and adds to it, so it still walks, blinks and lights its antenna like the rest.
 
 ## Snacks and turbo
 
@@ -35,7 +35,7 @@ The little room has three snacks on the floor at a time, berries or sheets of se
 | pause | | P | Menu (A, a click or any key goes on) |
 | back to the pictures | the small ✕ | Esc | View, while paused |
 
-On the picture screens, up and down move between the rows (the games, who you are, and a Terrikin's colour) and left and right along one (Little, then each open level of Big; each character; each colour); Enter, Space or A starts, and X or B goes to the next character. Keys or a stick take over from the pointer until the mouse moves again, since on a laptop the cursor is always somewhere over the room. A game goes fullscreen when it starts (`?window` keeps it in the window), and pauses itself if the window's hidden. A gamepad buzzes at every catch, where the browser can make it.
+On the picture screens, up and down move between the rows (the games, who you are, and a nim's colour) and left and right along one (Little, then each open level of Big; each character; each colour); Enter, Space or A starts, and X or B goes to the next character. Keys or a stick take over from the pointer until the mouse moves again, since on a laptop the cursor is always somewhere over the room. A game goes fullscreen when it starts (`?window` keeps it in the window), and pauses itself if the window's hidden. A gamepad buzzes at every catch, where the browser can make it.
 
 ## Setting it up on Windows
 

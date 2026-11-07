@@ -1,6 +1,6 @@
-// The ghost tree: a faint see-through tree where a Terrikin's notes put the tree, from the sim's readout of its memory
+// The ghost tree: a faint see-through tree where a nim's notes put the tree, from the sim's readout of its memory
 // (terrarium/ghost.py, a replay's `ghosts`), not where the tree is. The sim only writes it for the moment after the
-// Terrikin comes up from unloading an apple, which is the only moment the readout was checked; this just draws what's
+// nim comes up from unloading an apple, which is the only moment the readout was checked; this just draws what's
 // there, fading in as it appears and out as it goes, with a small label so nobody takes it for the real tree.
 
 import * as THREE from 'three';

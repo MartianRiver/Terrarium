@@ -66,7 +66,7 @@ const appleGeo = new THREE.SphereGeometry(0.13, 20, 14).scale(1, 0.92, 1);
 const appleMat = new THREE.MeshPhysicalMaterial({ color: 0xe23b2e, roughness: 0.35, clearcoat: 0.6, sheen: 0.3 });
 const stalkGeo = new THREE.CylinderGeometry(0.012, 0.016, 0.1, 5);
 
-// one apple, as carried home on a Terrikin's head
+// one apple, as carried home on a nim's head
 export const appleProp = () => buildApple(new THREE.Group());
 
 // hanging from its stalk, its bottom at the group's origin
@@ -83,7 +83,7 @@ function buildApple(g: THREE.Group): THREE.Group {
   return g;
 }
 
-// an apple hangs over a standing Terrikin's head; everything else lies on the ground
+// an apple hangs over a standing nim's head; everything else lies on the ground
 function rise(s: FoodState): number {
   return s.kind === 'apple' ? REACH + s.z : 0;
 }
@@ -152,7 +152,7 @@ export class FoodView {
   }
 }
 
-// how high a carried block rides: just above a Terrikin's bulb
+// how high a carried block rides: just above a nim's bulb
 const CARRY_HEIGHT = 1.05;
 
 export class BlockView {
