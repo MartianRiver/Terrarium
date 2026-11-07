@@ -1,4 +1,4 @@
-# Fun ([reward] novelty and variety, in training only): what a Terrikin gets out of the world moving because of it
+# Fun ([reward] novelty and variety, in training only): what a nim gets out of the world moving because of it
 # (each metre a block moves while it's touching or holding it), and out of doing something it hasn't done lately
 # (a yes to an action it rarely says yes to). Both wear off the more it's done, as boredom, and come back once it's
 # been a while, so pushing the same block back and forth soon stops paying.

@@ -1,7 +1,7 @@
 // Catch them!, the kids page (kids.html, served by sim kidsserve.py): pick a game by its picture, a 3-2-1, ninety
 // seconds of being it, then how many you caught, the stars that earned, and one big button to go again. Nothing needs
 // reading. The camera holds still over the room unless a gamepad's right stick (or Q and E) turns it, so pointing at
-// a Terrikin is walking to it. A gamepad does everything: the left stick walks (and on the picture screen moves along
+// a nim is walking to it. A gamepad does everything: the left stick walks (and on the picture screen moves along
 // the game, who you are and your colour), A starts, A, a bumper or the right trigger sprints (turbo in the little
 // room, where snacks fill it), X honks, Y puts the camera back, Menu pauses. A game goes fullscreen (&window keeps it
 // in the window). Progress (stars, levels, who you are) stays in this browser.
@@ -142,7 +142,7 @@ async function boot() {
       view.chosen = started.you;
       view.marked = true;
       const look = progress.look;
-      if (look !== 'terrikin') view.dress = (id, blob) => id === started.you && wear(blob, look);
+      if (look !== 'nim') view.dress = (id, blob) => id === started.you && wear(blob, look);
       const first = started.step()!;
       view.push(first);
       lastTick = first.tick;

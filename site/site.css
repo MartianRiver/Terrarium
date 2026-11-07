@@ -6,7 +6,7 @@
   font-display: swap;
 }
 
-/* colours from the garden (viewer/src/palette.ts): lawn, Mars plain, Terrikin tints; night for dark mode */
+/* colours from the garden (viewer/src/palette.ts): lawn, Mars plain, nim tints; night for dark mode */
 :root {
   --bg: #fbf6ee;
   --card: #fffdf8;

@@ -12,7 +12,7 @@ NO_BACKS = replace(TAG, tag=replace(TAG.tag, back=-1.0))
 
 
 def game(spots, cfg=NO_BACKS):
-    """A tag game in one arena with Terrikins standing at spots, the first one it and ready to tag."""
+    """A tag game in one arena with nims standing at spots, the first one it and ready to tag."""
     world = SimpleNamespace(cfg=cfg, alive=np.ones((1, len(spots)), bool), pos=np.array([spots], float),
                             rng=np.random.default_rng(0))
     tag = Tag(world)

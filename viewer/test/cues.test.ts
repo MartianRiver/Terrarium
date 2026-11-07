@@ -36,7 +36,7 @@ const frame = (tick: number, creatures: CreatureState[], food: Frame['food'] = [
 const berry = (id: number, x: number, y: number, hidden = false) => ({ id, kind: 'common', x, y, hidden }) as Frame['food'][number];
 
 describe('cues', () => {
-  test('a tag is the bulb moving to a Terrikin it touched, not one far off', () => {
+  test('a tag is the bulb moving to a nim it touched, not one far off', () => {
     const cues = new Cues();
     cues.reset([]);
     cues.next(frame(0, [blob(1, 0, 0, { signal: 0 }), blob(2, 1, 0), blob(3, 9, 9)]));

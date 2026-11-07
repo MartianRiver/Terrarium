@@ -1,5 +1,5 @@
 // Who to watch in a nursery game and from where, so the camera shows the chase rather than whoever happens to be
-// first: `lead` is the one Terrikin Follow stays on, and a shot is what Action frames. It reads the roles off the frames: tag's it lights its bulb (signal 0), seekers glow
+// first: `lead` is the one nim Follow stays on, and a shot is what Action frames. It reads the roles off the frames: tag's it lights its bulb (signal 0), seekers glow
 // while they count (signal 2, then colony 1 seeks and colony 0 hides), and peekaboo's berry is marked hidden. A shot is a spot to look at, how far apart its subjects are (the camera pulls
 // back to fit them) and the way to look from (behind the one acting, across to what it's after). It sticks with a
 // pair for a while rather than flicking between near-equal ones. Anything that isn't a game: null, and Follow takes the first.
@@ -26,7 +26,7 @@ const TURN_FROM = 2;
 const TOGETHER = 5;
 
 export class Director {
-  // the one Terrikin most worth following right now (whoever's it, the seeker closing in, the one nearest the berry,
+  // the one nim most worth following right now (whoever's it, the seeker closing in, the one nearest the berry,
   // a hider during the count), or null outside a game
   lead: number | null = null;
   private game: Game = null;

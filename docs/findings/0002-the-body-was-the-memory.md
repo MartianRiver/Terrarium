@@ -4,7 +4,7 @@ date: 2026-11-05 · status: held-out · seeds: held-out 64 · brains: fs-parent,
 
 **Question.** With the tree up to ±12 m away and the first find free, a trained brain scored the same with its notes wiped. Where did the way back to the tree come from?
 
-**World and brains.** The far tree (32 m arena, sight 4 m, 90 s games) with `[tree] start` 1.5: each game begins with the Terrikins ringed 1.5 m off the trunk's edge, facing it. Two brains: the lineage's parent (`fs-parent`) and the same brain trained at GAE `lam` 0.99 (`lam99-s2`). Then `[tree] burrow`: an apple unloaded at home takes the carrier into the nest, and it comes back up at the nest's middle, turned any way. Frozen, no training here.
+**World and brains.** The far tree (32 m arena, sight 4 m, 90 s games) with `[tree] start` 1.5: each game begins with the nims ringed 1.5 m off the trunk's edge, facing it. Two brains: the lineage's parent (`fs-parent`) and the same brain trained at GAE `lam` 0.99 (`lam99-s2`). Then `[tree] burrow`: an apple unloaded at home takes the carrier into the nest, and it comes back up at the nest's middle, turned any way. Frozen, no training here.
 
 **Method.** 64 held-out games, apples home a minute, notes kept / wiped on unloading (wiping resets the notes every time it unloads at the nest). Baselines: picker, `searcher` and `tree_seen`.
 

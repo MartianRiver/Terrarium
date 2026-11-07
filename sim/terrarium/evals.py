@@ -292,7 +292,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     emptied = np.zeros((episodes, len(colonies)), bool)
     at_end = np.zeros((episodes, len(colonies)), bool)
     hatched = np.zeros((episodes, len(colonies)), int)
-    # Terrikins alive in each colony at the end, and the most it had at once
+    # nims alive in each colony at the end, and the most it had at once
     size_end = np.zeros((episodes, len(colonies)), int)
     size_peak = np.zeros((episodes, len(colonies)), int)
     dawned = np.zeros(episodes, bool)

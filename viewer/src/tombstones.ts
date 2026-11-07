@@ -1,4 +1,4 @@
-// A small tombstone where a Terrikin fell. The sim takes a dead body out of the
+// A small tombstone where a nim fell. The sim takes a dead body out of the
 // world (nothing bumps into it or sees it), so the stone is only a marker: it
 // stands a while, then fades. Timed in sim ticks, like droppings, so a replay
 // leaves the same ones however fast it's played.

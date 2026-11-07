@@ -149,7 +149,7 @@ class World:
         # energy it has kept from any meal, a store's jelly too, since its arena started (what `needs` pays)
         self.nourished = np.zeros((arenas, n))
         # jelly in each colony's store, food unloaded into it and jelly eaten from it per creature
-        # jelly, in grown Terrikins' bites (the young take smaller ones)
+        # jelly, in grown nims' bites (the young take smaller ones)
         self.store = np.zeros((arenas, len(self.nests)))
         self.stored = np.zeros((arenas, n), int)
         self.jelly = np.zeros((arenas, n))

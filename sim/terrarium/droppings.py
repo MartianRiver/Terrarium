@@ -1,11 +1,11 @@
-# Droppings ([dung], every 0 is off). Every `every` meals, a Terrikin leaves a
+# Droppings ([dung], every 0 is off). Every `every` meals, a nim leaves a
 # dropping just behind it `after` seconds later. Each lies `lasts` seconds (up to
 # `slots` at once in an arena) and makes anyone within `near` of it (from their
 # edge) sick, `sick` energy a second, as `away` of that outside every nest.
 #
 # Carry picks one up as it does a berry, whichever is nearer, and puts it down
 # in front. Droppings lying within `pile` of each other make a pile, and a pile
-# is only as bad as one dropping: what one Terrikin carries off its own patch
+# is only as bad as one dropping: what one nim carries off its own patch
 # stops its own sickness, but only piling them all in one place, a midden like
 # ants keep, takes the sickness off everyone.
 #

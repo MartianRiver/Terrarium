@@ -4,7 +4,7 @@
     "start": 1,
     "seconds": 12,
     "width": 960,
-    "alt": "Close up, a peach Terrikin picks up a berry, drops it straight behind itself and goes for the next, over and over."
+    "alt": "Close up, a peach nim picks up a berry, drops it straight behind itself and goes for the next, over and over."
   },
   "clover-gen0": {
     "from": "0.2/reels/2026-10-23-first/clips/04-gen0.mp4",
@@ -12,7 +12,7 @@
     "seconds": 8.4,
     "width": 480,
     "crop": "1080:1080:0:260",
-    "alt": "Generation 0, no practice: a peach Terrikin moves at random, turns grey and stops. It starved after 1 minute 11."
+    "alt": "Generation 0, no practice: a peach nim moves at random, turns grey and stops. It starved after 1 minute 11."
   },
   "clover-gen1": {
     "from": "0.2/reels/2026-10-23-first/clips/05-gen1.mp4",
@@ -20,7 +20,7 @@
     "seconds": 15,
     "width": 480,
     "crop": "1080:1080:0:260",
-    "alt": "Generation 1, 23 hours of practice: the Terrikin finds berries, then wanders off along the hedge and loses track of them."
+    "alt": "Generation 1, 23 hours of practice: the nim finds berries, then wanders off along the hedge and loses track of them."
   },
   "clover-gen2": {
     "from": "0.2/reels/2026-10-23-first/clips/06-gen2.mp4",
@@ -28,7 +28,7 @@
     "seconds": 8.4,
     "width": 480,
     "crop": "1080:1080:0:260",
-    "alt": "Generation 2, 46 hours of practice: sped up, the Terrikin goes berry to berry and survives all 3 minutes, 49 berries."
+    "alt": "Generation 2, 46 hours of practice: sped up, the nim goes berry to berry and survives all 3 minutes, 49 berries."
   },
   "clover-final": {
     "from": "0.2/reels/2026-10-23-first/clips/07-final.mp4",
@@ -36,7 +36,7 @@
     "seconds": 10,
     "width": 480,
     "crop": "1080:1080:0:260",
-    "alt": "Generation 13, the 0.2 brain after 11.6 days of practice: the Terrikin heads for each berry it sees. It never starved in 64 tests."
+    "alt": "Generation 13, the 0.2 brain after 11.6 days of practice: the nim heads for each berry it sees. It never starved in 64 tests."
   },
   "hoovering-overview": {
     "from": "0.3/moments/2026-10-23-reward-hack-hoovering/landscape-raw.mp4",
@@ -51,7 +51,7 @@
     "seconds": 8,
     "width": 480,
     "crop": "1080:1080:0:280",
-    "alt": "Sped up: three colonies with jelly piling up in their nests, while Terrikins starve right beside it."
+    "alt": "Sped up: three colonies with jelly piling up in their nests, while nims starve right beside it."
   },
   "nights-first": {
     "from": "0.3/reels/2026-10-25-nights/clips/04-first-night.mp4",
@@ -59,7 +59,7 @@
     "seconds": 18.2,
     "width": 480,
     "crop": "1080:1080:0:280",
-    "alt": "Night falls on the first night brain. The Terrikins stay out in the dark and all 18 of them freeze."
+    "alt": "Night falls on the first night brain. The nims stay out in the dark and all 18 of them freeze."
   },
   "nights-now": {
     "from": "0.3/reels/2026-10-25-nights/clips/06-now.mp4",
@@ -67,7 +67,7 @@
     "seconds": 35,
     "width": 480,
     "crop": "1080:1080:0:280",
-    "alt": "The RL-only brain after the automated forks: at dusk every Terrikin heads home, they huddle on the nest and spin all night, and at first light they head out again."
+    "alt": "The RL-only brain after the automated forks: at dusk every nim heads home, they huddle on the nest and spin all night, and at first light they head out again."
   },
   "colonies-timelapse": {
     "from": "0.3/reels/2026-10-27-wrap-up/clips/timelapse.mp4",
@@ -75,7 +75,7 @@
     "seconds": 23.9,
     "width": 480,
     "crop": "1080:1140:0:500",
-    "alt": "The 0.3 brain's whole six minutes at 15 times speed: three days and three nights. By day the colonies spread out to forage, at dusk they crowd onto their nests, and new Terrikins hatch in the dark. They start as 18 and end as 19."
+    "alt": "The 0.3 brain's whole six minutes at 15 times speed: three days and three nights. By day the colonies spread out to forage, at dusk they crowd onto their nests, and new nims hatch in the dark. They start as 18 and end as 19."
   },
   "colonies-hatch": {
     "from": "0.3/reels/2026-10-27-wrap-up/clips/hatch.mp4",
@@ -83,7 +83,7 @@
     "seconds": 12.5,
     "width": 480,
     "crop": "1080:1080:0:540",
-    "alt": "Sped up, two eggs sit on a purple colony's nest while its Terrikins come and go. Back at normal speed, an egg cracks and a small Terrikin comes out and grows to full size."
+    "alt": "Sped up, two eggs sit on a purple colony's nest while its nims come and go. Back at normal speed, an egg cracks and a small nim comes out and grows to full size."
   },
   "colonies-flower": {
     "from": "0.3/reels/2026-10-27-wrap-up/clips/nectar.mp4",
@@ -91,7 +91,7 @@
     "seconds": 9.7,
     "width": 480,
     "crop": "1080:1080:0:540",
-    "alt": "A rainbow nectar flower opens on the lawn among a crowd of Terrikins. One sprints at it, kicking up a trail of dust, and eats it whole, in slow motion at the end."
+    "alt": "A rainbow nectar flower opens on the lawn among a crowd of nims. One sprints at it, kicking up a trail of dust, and eats it whole, in slow motion at the end."
   },
   "colonies-turbo": {
     "from": "0.3/reels/2026-10-27-wrap-up/clips/nectar-turbo.mp4",
@@ -99,7 +99,7 @@
     "seconds": 9.3,
     "width": 480,
     "crop": "1080:1080:0:540",
-    "alt": "Turbo mode: the Terrikin that ate the flower runs off sparkling, faster than the others, its face toward the camera, then on past its nest."
+    "alt": "Turbo mode: the nim that ate the flower runs off sparkling, faster than the others, its face toward the camera, then on past its nest."
   },
   "colonies-starve": {
     "from": "0.3/reels/2026-10-27-wrap-up/clips/death.mp4",
@@ -107,7 +107,7 @@
     "seconds": 8,
     "width": 480,
     "crop": "1080:1080:0:540",
-    "alt": "Just after the third dawn, a purple Terrikin out on the lawn slows, greys and starves, and a small tombstone is left where it fell."
+    "alt": "Just after the third dawn, a purple nim out on the lawn slows, greys and starves, and a small tombstone is left where it fell."
   },
   "nursery-tag": {
     "from": "0.4/reels/2026-10-31-nursery/clips/tag.mp4",
@@ -115,7 +115,7 @@
     "seconds": 6.5,
     "width": 480,
     "crop": "1080:1080:0:460",
-    "alt": "Five baby Terrikins play tag among wooden blocks. The one who's it glows yellow underneath; one sprints, kicking up dust."
+    "alt": "Five baby nims play tag among wooden blocks. The one who's it glows yellow underneath; one sprints, kicking up dust."
   },
   "nursery-blindspot": {
     "from": "0.4/reels/2026-10-31-nursery/clips/blind.mp4",
@@ -176,20 +176,20 @@
     "seconds": 7.0,
     "width": 480,
     "crop": "1080:1080:0:460",
-    "alt": "A baby Terrikin beside its nest picks up a dropping, sets it down a little further out, and picks it up again until it's past the dashed line."
+    "alt": "A baby nim beside its nest picks up a dropping, sets it down a little further out, and picks it up again until it's past the dashed line."
   },
   "tree-remembered": {
     "from": "0.4/moments/2026-11-06-tree-remembered-vs-wiped/tree-sbs-land-full.mp4",
     "start": 0,
     "seconds": 36,
     "width": 960,
-    "alt": "Side by side, the same game twice. On the left a Terrikin comes up from its burrow and walks straight back to an apple tree it can't see, again and again. On the right its memory is wiped each time it goes home, and it wanders."
+    "alt": "Side by side, the same game twice. On the left a nim comes up from its burrow and walks straight back to an apple tree it can't see, again and again. On the right its memory is wiped each time it goes home, and it wanders."
   },
   "tree-moved": {
     "from": "0.4/moments/2026-11-06-tree-moved/tree-moved-sbs-land-full.mp4",
     "start": 0,
     "seconds": 31.5,
     "width": 960,
-    "alt": "Side by side, the same game twice. On the left the tree stays put. On the right the tree moves while the Terrikin is in its burrow; it walks to the empty spot where the tree was, looks about, then crosses the garden and finds the tree in its new place."
+    "alt": "Side by side, the same game twice. On the left the tree stays put. On the right the tree moves while the nim is in its burrow; it walks to the empty spot where the tree was, looks about, then crosses the garden and finds the tree in its new place."
   }
 }

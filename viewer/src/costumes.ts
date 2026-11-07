@@ -1,5 +1,5 @@
-// Costumes for Catch them!: what the child can be, put on a Terrikin when it's made. Each only adds to or recolours
-// the clay; the walk, eyes and antenna stay a Terrikin's, so it moves like everyone else.
+// Costumes for Catch them!: what the child can be, put on a nim when it's made. Each only adds to or recolours
+// the clay; the walk, eyes and antenna stay a nim's, so it moves like everyone else.
 import * as THREE from 'three';
 import { ball, BlobView, DEPTH, eggRadius, hornGeo, mesh, seat } from './blob';
 

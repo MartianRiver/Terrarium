@@ -5,7 +5,7 @@
 export const SIGNAL_COUNT = 5;
 export const SIGNAL_OFF = -1;
 
-// jelly is what a Terrikin leaves when it unloads its crop outside a nest (0.3 on)
+// jelly is what a nim leaves when it unloads its crop outside a nest (0.3 on)
 // and an apple grows on a tree, hanging up out of reach ([tree])
 export type FoodKind = 'common' | 'jelly' | 'apple';
 
@@ -35,8 +35,8 @@ export interface FoodState {
   kind: FoodKind;
   x: number;
   y: number;
-  hidden: boolean; // peekaboo's berry, out of the Terrikins' sight but still there
-  z: number; // an apple: metres above a standing Terrikin's reach it hangs; 0 for food on the ground
+  hidden: boolean; // peekaboo's berry, out of the nims' sight but still there
+  z: number; // an apple: metres above a standing nim's reach it hangs; 0 for food on the ground
 }
 
 export interface BlockState {
@@ -46,7 +46,7 @@ export interface BlockState {
   angle: number;
   w: number;
   h: number;
-  carried: number; // 1 while a Terrikin carries it on its head (carry); 0 in replays from before 0.4
+  carried: number; // 1 while a nim carries it on its head (carry); 0 in replays from before 0.4
 }
 
 export interface NestInfo {
@@ -74,7 +74,7 @@ export interface StoreState {
   jelly: number;
 }
 
-// an egg on its colony's nest; the Terrikin that hatches from it takes its id (worlds with hatching)
+// an egg on its colony's nest; the nim that hatches from it takes its id (worlds with hatching)
 export interface EggState {
   id: number;
   colony: number;
@@ -106,11 +106,11 @@ export interface FlagState {
   carrier: number;
 }
 
-// where a Terrikin's notes put the apple tree, in the world's frame, for as long as the sim shows it (the readout,
+// where a nim's notes put the apple tree, in the world's frame, for as long as the sim shows it (the readout,
 // terrarium/ghost.py); not where the tree is. Only in replays recorded with a readout, from the moment it comes up out
 // of the nest after unloading an apple
 export interface GhostState {
-  id: number; // the Terrikin's
+  id: number; // the nim's
   x: number;
   y: number;
 }

@@ -96,7 +96,7 @@ def frame(world: World, a: int) -> dict:
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
             for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
     if world.tree:
-        # the tree's berries are apples, hanging this far above a standing Terrikin's reach
+        # the tree's berries are apples, hanging this far above a standing nim's reach
         for f in food:
             if f['kind'] == 'common':
                 f.update(kind='apple', z=cfg.tree.reach)

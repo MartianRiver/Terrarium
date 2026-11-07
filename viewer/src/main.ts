@@ -112,7 +112,7 @@ function boot() {
   let source!: Source;
   let view: WorldView | undefined;
   let paused = false;
-  // the camera: the whole arena (wide), close behind the Terrikin that matters most (follow), or cutting between the
+  // the camera: the whole arena (wide), close behind the nim that matters most (follow), or cutting between the
   // shots that matter like a match on TV (action); &cam= picks one, &follow is follow
   type Cam = 'wide' | 'follow' | 'action';
   const CAMS: Cam[] = ['wide', 'follow', 'action'];
@@ -120,15 +120,15 @@ function boot() {
   let cam: Cam = 'wide';
   // &intro circles outside the dome until the first camera change
   let intro = false;
-  // the Terrikin picked by clicking it (or by &pick), kept across restarts; null follows the first one
+  // the nim picked by clicking it (or by &pick), kept across restarts; null follows the first one
   let chosen: number | null = params.has('pick') ? Number(params.get('pick')) : null;
-  // &look=x,y,heading: the close-up held on one spot instead of a Terrikin (a reel's shot of a nest)
+  // &look=x,y,heading: the close-up held on one spot instead of a nim (a reel's shot of a nest)
   const [lx, ly, lh] = (params.get('look') ?? '').split(',').map(Number);
   const look = params.has('look') ? { x: lx, y: ly, heading: lh || 0 } : null;
   let nameOf = namesFor('demo');
-  // ?play: you're one of the Terrikins (play.ts)
+  // ?play: you're one of the nims (play.ts)
   let game: Game | null = null;
-  // the picked Terrikin's name, above it
+  // the picked nim's name, above it
   const tag = document.createElement('div');
   tag.className = 'nametag';
   tag.hidden = true;
@@ -263,7 +263,7 @@ function boot() {
       opening = false;
     }
   }
-  // ids only name the same Terrikins in the same episode: a run's replay recorded again here is that
+  // ids only name the same nims in the same episode: a run's replay recorded again here is that
   let playing = '';
   function newReplay(url: URL | null) {
     const same = url ? `${url.pathname}?seed=${url.searchParams.get('seed')}` : '';
@@ -272,7 +272,7 @@ function boot() {
     return changed;
   }
 
-  // a click (not a drag) on a Terrikin follows it
+  // a click (not a drag) on a nim follows it
   const pointer = { x: 0, y: 0, at: 0 };
   const caster = new THREE.Raycaster();
   stage.renderer.domElement.addEventListener('pointerdown', (e) => Object.assign(pointer, { x: e.clientX, y: e.clientY, at: performance.now() }));
@@ -283,7 +283,7 @@ function boot() {
     const id = view.pick(caster);
     if (id === null) return;
     chosen = view.chosen = id;
-    log.info('following a Terrikin', { id });
+    log.info('following a nim', { id });
     if (cam !== 'follow') setCam('follow');
   });
 

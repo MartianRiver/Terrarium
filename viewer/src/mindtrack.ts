@@ -1,4 +1,4 @@
-// Reads a mind track (sim/terrarium/mind.py): one Terrikin's brain through the episode a replay plays, a line each
+// Reads a mind track (sim/terrarium/mind.py): one nim's brain through the episode a replay plays, a line each
 // time it chose. Local only: the runs server records one on request, for the brain window (mindpanel.ts).
 
 import type { Frame } from './world';
@@ -57,7 +57,7 @@ export class MindTrack {
     return best < 0 ? null : this.thoughts[best];
   }
 
-  // the first tick where the replay has the Terrikin somewhere else than the mind does, or null if they agree
+  // the first tick where the replay has the nim somewhere else than the mind does, or null if they agree
   partsFrom(frames: Frame[]): number | null {
     const byTick = new Map(frames.map((f) => [f.tick, f]));
     for (const t of this.thoughts) {

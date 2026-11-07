@@ -1,4 +1,4 @@
-// One creature's look: a clay Terrikin. Everything here is procedural animation
+// One creature's look: a clay nim. Everything here is procedural animation
 // layered on top of the sim state; none of it feeds back into the sim.
 
 import * as THREE from 'three';

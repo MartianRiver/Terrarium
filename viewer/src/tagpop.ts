@@ -1,6 +1,6 @@
 // Tag, drawn: a soft glow on the ground under whoever's it, so it reads at a glance (the bulb alone is small on a
 // phone), and at a tag a ring and a puff of sparkles in the bulb's colour where the two touched. Read off the frames
-// (the bulb moving from one Terrikin to another), so it's look only; timed on the wall clock like the dust. With a
+// (the bulb moving from one nim to another), so it's look only; timed on the wall clock like the dust. With a
 // cone (degrees), the it also shows how much it can see as a fan on the ground, so its blind spot shows.
 
 import * as THREE from 'three';
@@ -12,7 +12,7 @@ const IT = 0; // the it's signal in tag (replay.py)
 const LIFE = 0.7;
 const TOUCH = 1.2; // centres closer than this: they touched (two bodies of 0.45 m), so the bulb moving is a tag
 const SPARKS = 9;
-// a bulb lit this long on one Terrikin means a game of tag (the demo flashes the same colour for a second)
+// a bulb lit this long on one nim means a game of tag (the demo flashes the same colour for a second)
 const GAME = 1.5;
 const sparkGeo = new THREE.OctahedronGeometry(0.075);
 const CONE_REACH = 2.4; // the fan is drawn this far out, well short of what it really sees

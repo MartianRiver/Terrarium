@@ -1,4 +1,4 @@
-// A name for every Terrikin, drawn from a list by its id and the episode it lives in, so the same Terrikin has the
+// A name for every nim, drawn from a list by its id and the episode it lives in, so the same nim has the
 // same name every time that episode plays, and a hatchling gets one of its own. Purely for showing.
 
 const NAMES = [
@@ -31,8 +31,8 @@ function hash(text: string) {
   return h >>> 0;
 }
 
-// names for the Terrikins of one episode, keyed by what makes it that episode (its brain and seed): the list is
-// walked from a start and in steps both picked by the episode, so no two of its Terrikins share a name until the
+// names for the nims of one episode, keyed by what makes it that episode (its brain and seed): the list is
+// walked from a start and in steps both picked by the episode, so no two of its nims share a name until the
 // list runs out
 export function namesFor(episode: string): (id: number) => string {
   const n = NAMES.length;

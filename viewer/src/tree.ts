@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GARDEN } from './palette';
 import type { BlockState, FoodState } from './world';
 
-// where a standing Terrikin's head gets to: an apple's `z` is how far above this it hangs
+// where a standing nim's head gets to: an apple's `z` is how far above this it hangs
 export const REACH = 0.78;
 const TRUNK = 2.2;
 // where the branches leave the trunk, and how far above an apple's top its branch ends

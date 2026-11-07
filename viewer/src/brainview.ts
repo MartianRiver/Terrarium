@@ -1,5 +1,5 @@
 // Ties the brain window to what's playing: which run checkpoint the replay came from (only those have a brain to
-// read, through the local runs server), which Terrikin is followed, loading its mind track once, and checking the
+// read, through the local runs server), which nim is followed, loading its mind track once, and checking the
 // replay is the episode the mind was played in.
 
 import type * as THREE from 'three';
@@ -39,8 +39,8 @@ export class BrainView {
   private said = '';
   private net: NetView;
   private wirings = new Map<string, Promise<Wiring>>();
-  // the name of each Terrikin in what's playing (names.ts)
-  name: (id: number) => string = (id) => `Terrikin ${id}`;
+  // the name of each nim in what's playing (names.ts)
+  name: (id: number) => string = (id) => `Nim ${id}`;
 
   // again: open the same replay recorded on this machine
   constructor(parent: HTMLElement, private scene: THREE.Scene, private again: (url: URL) => void) {
@@ -75,7 +75,7 @@ export class BrainView {
     this.wanted = null;
   }
 
-  // every drawn frame: the Terrikin followed, where it is and the tick
+  // every drawn frame: the nim followed, where it is and the tick
   frame(id: number | null, at: Pose | null, tick: number) {
     if (!this.open) return;
     if (!this.playing) {
@@ -83,7 +83,7 @@ export class BrainView {
       return;
     }
     if (id === null) {
-      this.show(null, 'Brain', 'Click a Terrikin to see its brain.');
+      this.show(null, 'Brain', 'Click a nim to see its brain.');
       return;
     }
     const key = `${this.playing.run}/${this.playing.checkpoint}/${this.playing.seed}/${id}`;
@@ -148,7 +148,7 @@ export class BrainView {
   }
 
   private panelTitle(track: MindTrack) {
-    return `${this.name(track.head.creature)} · Terrikin ${track.head.creature}`;
+    return `${this.name(track.head.creature)} · Nim ${track.head.creature}`;
   }
 
   // the checkpoint's strongest connections, once per checkpoint

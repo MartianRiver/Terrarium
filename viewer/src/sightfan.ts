@@ -1,4 +1,4 @@
-// The followed Terrikin's rays drawn in the world while the brain window is open: a ribbon on the ground out along
+// The followed nim's rays drawn in the world while the brain window is open: a ribbon on the ground out along
 // each ray to whatever it hit, in that thing's colour, wider and stronger the more the brain is listening to it.
 
 import * as THREE from 'three';
@@ -52,7 +52,7 @@ export class SightFan {
       const [dx, dy] = [Math.cos(a), Math.sin(a)];
       const w = THIN + (WIDE - THIN) * share;
       const d = t.dist[i] * range;
-      // two corners at the Terrikin, two at the end of the ray
+      // two corners at the nim, two at the end of the ray
       const ends = [[0, -w], [0, w], [d, -w], [d, w]];
       ends.forEach(([along, side], k) => {
         this.positions.set([at.x + dx * along - dy * side, HEIGHT, at.y + dy * along + dx * side], (i * 4 + k) * 3);

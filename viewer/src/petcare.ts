@@ -45,7 +45,7 @@ export function hatch(now: number): Care {
   return { version: 1, born: now, updated: now, offset: 0, fullness: 55,
     happiness: 65, health: 100, meals: [], mess: [], serial: 0,
     lastPlay: now - HOUR, lastStroke: now - HOUR,
-    history: [{ at: now, text: 'Nim moved into the nursery.' }],
+    history: [{ at: now, text: 'Your nim moved into the nursery.' }],
     bed: RULES.bed, wake: RULES.wake, neglect: 0, sick: false, sickFor: 0, dead: false, died: 0 };
 }
 
@@ -86,9 +86,9 @@ function settle(c: Care) {
 }
 
 const warnings: Partial<Record<Stage, string>> = {
-  poorly: 'Nim is feeling poorly.',
-  ill: 'Nim is ill. Medicine will help.',
-  'very ill': 'Nim is very ill and needs medicine now.',
+  poorly: 'Your nim is feeling poorly.',
+  ill: 'Your nim is ill. Medicine will help.',
+  'very ill': 'Your nim is very ill and needs medicine now.',
 };
 
 // Integrate between events (meals, bedtime/wake, a need hitting a threshold, the
@@ -131,7 +131,7 @@ export function advance(c: Care, to: number): void {
     if (!c.sick && c.neglect >= RULES.illAfter - 1) { c.sick = true; c.sickFor = 0; c.neglect = RULES.illAfter; }
     if (c.sick && c.sickFor >= RULES.deadAfter - 1) {
       c.dead = true; c.died = end; c.sickFor = RULES.deadAfter;
-      note(c, 'Nim has gone. Thank you for looking after it.', end);
+      note(c, 'Your nim has gone. Thank you for looking after it.', end);
     }
     const due = c.meals.filter(m => m <= end);
     c.meals = c.meals.filter(m => m > end);
@@ -150,17 +150,17 @@ export function advance(c: Care, to: number): void {
 
 export type CareAction = 'feed' | 'clean' | 'play' | 'stroke' | 'medicine';
 export function care(c: Care, action: CareAction): { ok: boolean; text: string } {
-  if (c.dead) return { ok: false, text: 'Nim has gone. You can hatch a new egg.' };
+  if (c.dead) return { ok: false, text: 'Your nim has gone. You can hatch a new egg.' };
   if (action !== 'clean' && action !== 'medicine' && isAsleep(c, c.updated)) {
-    return { ok: false, text: `Shh, Nim is asleep until ${clock(c.wake)}. Medicine and tidying up are still fine.` };
+    return { ok: false, text: `Shh, your nim is asleep until ${clock(c.wake)}. Medicine and tidying up are still fine.` };
   }
   let text: string;
   if (action === 'feed') {
-    if (c.fullness > 85) return { ok: false, text: 'Nim is full. Save the next meal for later.' };
+    if (c.fullness > 85) return { ok: false, text: 'Your nim is full. Save the next meal for later.' };
     c.fullness = Math.min(100, c.fullness + 30);
     c.happiness = Math.min(100, c.happiness + 4);
     c.meals.push(c.updated + RULES.digest);
-    text = 'A meal for Nim. A poop will follow in about 30 minutes.';
+    text = 'A meal for your nim. A poop will follow in about 30 minutes.';
   } else if (action === 'clean') {
     if (!c.mess.length) return { ok: false, text: 'All clean already.' };
     const count = c.mess.length;
@@ -168,16 +168,16 @@ export function care(c: Care, action: CareAction): { ok: boolean; text: string }
     c.happiness = Math.min(100, c.happiness + Math.min(12, count * 4));
     text = `Cleaned up ${count === 1 ? 'a poop' : `${count} poops`}. A fresh little garden.`;
   } else if (action === 'medicine') {
-    if (!c.sick) return { ok: false, text: 'Nim isn’t ill. A meal, a game and a tidy garden keep it well.' };
+    if (!c.sick) return { ok: false, text: 'Your nim isn’t ill. A meal, a game and a tidy garden keep it well.' };
     c.sick = false; c.sickFor = 0; c.neglect = 0;
-    text = 'Medicine given. Nim is on the mend.';
+    text = 'Medicine given. Your nim is on the mend.';
   } else {
     const key = action === 'play' ? 'lastPlay' : 'lastStroke';
     const cooldown = action === 'play' ? 60_000 : 30_000;
-    if (c.updated - c[key] < cooldown) return { ok: false, text: 'Nim is still enjoying that. Give it a moment.' };
+    if (c.updated - c[key] < cooldown) return { ok: false, text: 'Your nim is still enjoying that. Give it a moment.' };
     c[key] = c.updated;
     c.happiness = Math.min(100, c.happiness + (action === 'play' ? 18 : 6));
-    text = action === 'play' ? 'A game of chase! Nim is happier.' : 'A little attention goes a long way.';
+    text = action === 'play' ? 'A game of chase! Your nim is happier.' : 'A little attention goes a long way.';
   }
   settle(c);
   note(c, text);
@@ -186,7 +186,7 @@ export function care(c: Care, action: CareAction): { ok: boolean; text: string }
 
 export function mood(c: Care): string {
   const s = stage(c);
-  if (s === 'dead') return 'Nim has gone';
+  if (s === 'dead') return 'Your nim has gone';
   if (s === 'very ill') return 'Very ill. Needs medicine now';
   if (s === 'ill') return 'Ill. Needs medicine';
   if (s === 'poorly') return isAsleep(c, c.updated) ? 'Asleep, but poorly' : 'Feeling poorly';
@@ -194,7 +194,7 @@ export function mood(c: Care): string {
   if (c.fullness <= RULES.hungry) return 'Hungry';
   if (c.mess.length >= 3) return 'Needs a cleanup';
   if (c.happiness < 25) return 'Wants some company';
-  if (c.happiness > 75) return 'Happy little Nim';
+  if (c.happiness > 75) return 'Happy little nim';
   return 'Making itself at home';
 }
 

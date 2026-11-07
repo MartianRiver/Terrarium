@@ -83,7 +83,7 @@ hunger = 0.6
 
 [hatch]
 # a colony with an empty place (someone lost, or [colonies] room to grow) and at least `threshold` jelly in its
-# store pays `cost` of it for an egg in the nest, which hatches a full-grown Terrikin in that place after `seconds`.
+# store pays `cost` of it for an egg in the nest, which hatches a full-grown nim in that place after `seconds`.
 # An egg needs someone left to tend it: a colony with nobody alive loses its eggs. cost 0 is off
 cost = 0
 threshold = 10
@@ -96,7 +96,7 @@ seconds = 20.0
 seconds = 600.0
 speed = 1.0
 energy = 0.01
-# the Terrikins an episode starts with are young too, not only hatchlings
+# the nims an episode starts with are young too, not only hatchlings
 start = true
 
 [night]
@@ -179,7 +179,7 @@ fade = 0.0
 leak = 0.0
 
 [hearing]
-# each hears the nearest other Terrikin within `range` metres, all the way round and through blocks, as a child hears
+# each hears the nearest other nim within `range` metres, all the way round and through blocks, as a child hears
 # footsteps behind them: how close (1 touching, 0 at the edge) and which way off its heading. 0 is off
 range = 0.0
 
@@ -260,14 +260,14 @@ again = 0.0
 flash = 0.0
 
 [jump]
-# a yes to jump while standing lifts a Terrikin this high (m) and gravity brings it down; each jump costs `energy`.
+# a yes to jump while standing lifts a nim this high (m) and gravity brings it down; each jump costs `energy`.
 # 0 is off
 height = 0.8
 energy = 0.01
 
 [tree]
 # a nursery game for jumping: block `trunk` is a tree, every apple hangs `near`-`far` m from its middle and `reach` m
-# above what a Terrikin standing under it can get to, and each one taken is worth `points` (0 is off); each jump
+# above what a nim standing under it can get to, and each one taken is worth `points` (0 is off); each jump
 # costs `hop` points; with `home`, an apple taken goes in the crop and pays only once it's unloaded in the nest
 trunk = 0
 near = 0.8
@@ -278,7 +278,7 @@ hop = 0.2
 home = true
 # the tree moves every this many seconds, where [arena] scatter would draw it (0: never)
 move = 0.0
-# every episode starts with each Terrikin this far (m) from the trunk, facing it (0: at the nest)
+# every episode starts with each nim this far (m) from the trunk, facing it (0: at the nest)
 start = 0.0
 # unloading an apple at home takes the carrier down into the nest, and it comes back up at the middle turned any way
 burrow = false

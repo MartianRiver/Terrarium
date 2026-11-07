@@ -43,15 +43,26 @@ test('levels of other games are their own', () => {
   expect(p.stars['big:1']).toBe(0);
 });
 
-test('a costume or colour this page no longer has comes back as a blue Terrikin, the rest kept', () => {
+test('a costume or colour this page no longer has comes back as a blue nim, the rest kept', () => {
   const stored = new Map<string, string>();
   stored.set('terrarium.kids.progress', JSON.stringify({ ...fresh(), total: 9, look: 'unicorn', colour: 0 }));
   const was = globalThis.localStorage;
   globalThis.localStorage = { getItem: (k: string) => stored.get(k) ?? null } as Storage;
   try {
-    expect(load()).toMatchObject({ total: 9, look: 'terrikin', colour: 1 });
+    expect(load()).toMatchObject({ total: 9, look: 'nim', colour: 1 });
     stored.set('terrarium.kids.progress', JSON.stringify({ ...fresh(), look: 'dino', colour: 3 }));
     expect(load()).toMatchObject({ look: 'dino', colour: 3 });
+  } finally {
+    globalThis.localStorage = was;
+  }
+});
+
+test('a save from when the nims were called terrikins still loads as a nim', () => {
+  const was = globalThis.localStorage;
+  const saved = JSON.stringify({ ...fresh(), total: 4, look: 'terrikin', colour: 2 });
+  globalThis.localStorage = { getItem: () => saved } as unknown as Storage;
+  try {
+    expect(load()).toMatchObject({ total: 4, look: 'nim', colour: 2 });
   } finally {
     globalThis.localStorage = was;
   }

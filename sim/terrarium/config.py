@@ -101,7 +101,7 @@ class Young:
     seconds: float
     speed: float
     energy: float
-    start: bool     # the Terrikins an episode starts with are young too, not only hatchlings
+    start: bool     # the nims an episode starts with are young too, not only hatchlings
 
     @property
     def on(self) -> bool:
@@ -315,7 +315,7 @@ class Peek:
 
 @dataclass(frozen=True)
 class Jump:
-    height: float    # metres a jump from standing lifts a Terrikin (0: it can't jump)
+    height: float    # metres a jump from standing lifts a nim (0: it can't jump)
     energy: float    # each jump costs this
 
     @property
@@ -328,12 +328,12 @@ class Tree:
     trunk: int       # the block that is its trunk
     near: float      # apples hang between these distances (m) from the trunk's middle
     far: float
-    reach: float     # how high (m) a Terrikin has to jump to take one (0: from the ground)
+    reach: float     # how high (m) a nim has to jump to take one (0: from the ground)
     points: float    # for each apple taken (0 is off)
     hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
     home: bool       # an apple taken goes in the crop, and pays only once it's unloaded in the nest
     move: float      # the tree moves every this many seconds, where [arena] scatter would put it (0: never)
-    start: float     # every episode starts with each Terrikin this far (m) from the trunk, facing it (0: at the nest)
+    start: float     # every episode starts with each nim this far (m) from the trunk, facing it (0: at the nest)
     burrow: bool     # unloading an apple at home takes the carrier down into the nest, back up at its middle turned any way
 
     def __post_init__(self):

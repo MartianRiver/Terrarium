@@ -1,4 +1,4 @@
-// An egg sits where it was laid until its Terrikin hatches, then cracks and the hatchling (the egg's id) grows from
+// An egg sits where it was laid until its nim hatches, then cracks and the hatchling (the egg's id) grows from
 // small to full size; an egg nobody hatches shrinks away; going back in time forgets them all.
 
 import * as THREE from 'three';
@@ -12,7 +12,7 @@ const blob: CreatureState = { id: 40, colony: 1, x: 2, y: -1, heading: 0, speed:
 const frame = (tick: number, eggs: EggState[], creatures: CreatureState[] = []): Frame =>
   ({ tick, creatures, food: [], blocks: [], stores: [], light: 1, eggs, flowers: [], flags: [] });
 
-test('an egg hatches into the Terrikin with its id, which grows to full size', () => {
+test('an egg hatches into the nim with its id, which grows to full size', () => {
   const scene = new THREE.Scene();
   const eggs = new Eggs(scene, HZ);
   eggs.push(frame(0, [egg]));

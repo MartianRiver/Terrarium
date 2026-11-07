@@ -1,11 +1,11 @@
-# Hearing ([hearing], range 0 is off): the nearest other Terrikin within range, all the way round. Sight covers
+# Hearing ([hearing], range 0 is off): the nearest other nim within range, all the way round. Sight covers
 # only what's in front, so in tag a runner could sit just behind whoever's it, out of its view, and circle with it
 # for as long as it liked; footsteps that close are heard.
 import numpy as np
 
 
 def heard(world) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """How close the nearest other Terrikin is (1 touching, 0 at `range` metres apart or none), and the sin and cos
+    """How close the nearest other nim is (1 touching, 0 at `range` metres apart or none), and the sin and cos
     of which way it is off the heading (0 when none), each (arenas, creatures)."""
     h = world.cfg.hearing
     shape = world.energy.shape

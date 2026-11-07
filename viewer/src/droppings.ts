@@ -1,5 +1,5 @@
 // Little droppings. In worlds with [dung] they're the sim's own, from each frame:
-// they make whoever's near sick, and a Terrikin can carry one off. Elsewhere the
+// they make whoever's near sick, and a nim can carry one off. Elsewhere the
 // viewer makes them up a while after real meals, for the look of it. Timed in sim
 // ticks, so a replay leaves the same ones however fast it's played.
 

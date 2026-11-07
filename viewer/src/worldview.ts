@@ -44,13 +44,13 @@ export class WorldView {
   private prevCreatures = new Map<number, CreatureState>();
   private prevBlocks = new Map<number, Frame['blocks'][number]>();
   private frame: Frame | null = null;
-  // the Terrikin picked by clicking it (null: the first one), and where the followed one was last drawn
+  // the nim picked by clicking it (null: the first one), and where the followed one was last drawn
   chosen: number | null = null;
   // who to follow when nobody's chosen (the director's pick in a game; null: the first one)
   lead: number | null = null;
   // the ring under a chosen one; a reel's &pick follows without it
   marked = true;
-  // a costume for some Terrikins, put on as each is first drawn (the kids' game's panda)
+  // a costume for some nims, put on as each is first drawn (the kids' game's panda)
   dress: ((id: number, blob: BlobView) => void) | null = null;
   focus: Pose | null = null;
   focusId: number | null = null;
@@ -123,7 +123,7 @@ export class WorldView {
     const holders: Holder[] = [];
     const poses = new Map<number, Pose>();
     let shownIt = -1;
-    // a chosen Terrikin that has left the world (its place taken by a hatchling) can't be followed
+    // a chosen nim that has left the world (its place taken by a hatchling) can't be followed
     if (this.chosen !== null && !this.blobs.has(this.chosen)) this.chosen = null;
     const followed = this.chosen ?? (this.lead !== null && this.blobs.has(this.lead) ? this.lead : this.frame.creatures[0]?.id);
     for (const c of this.frame.creatures) {
@@ -180,7 +180,7 @@ export class WorldView {
     });
   }
 
-  // the Terrikin under a ray from the camera, or null
+  // the nim under a ray from the camera, or null
   pick(ray: THREE.Raycaster): number | null {
     const roots = new Map<THREE.Object3D, number>();
     for (const [id, blob] of this.blobs) if (blob.root.visible) roots.set(blob.root, id);

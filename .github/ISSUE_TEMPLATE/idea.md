@@ -1,6 +1,6 @@
 ---
 name: Idea
-about: Something you'd like the Terrikins or the world to do
+about: Something you'd like the nims or the world to do
 labels: enhancement
 ---
 
