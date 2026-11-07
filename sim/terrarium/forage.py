@@ -123,7 +123,7 @@ class Forage:
         A sample is done when its creature dies or its arena ends."""
         w, r = self.world, self.reward
         actions = np.clip(actions, -1, 1).reshape(*self.last.shape[:2], -1)
-        before = {k: getattr(w, k).copy() for k in ('fed', 'spent', 'stored', 'jelly', 'hatched', 'alive')}
+        before = {k: getattr(w, k).copy() for k in ('fed', 'nourished', 'spent', 'stored', 'jelly', 'hatched', 'alive')}
         alive = before['alive']
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
@@ -151,8 +151,9 @@ class Forage:
                 snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
         self.last = actions[..., :2].copy()
         gain = w.fed - before['fed']
-        # hunger before the meal squared, less after: gain × (2 × hunger after + gain)
-        needs = r.needs * gain * (2 * (1 - w.energy) + gain)
+        # hunger before the meal squared, less after: nourished × (2 × hunger after + nourished); a store's jelly counts
+        kept = w.nourished - before['nourished']
+        needs = r.needs * kept * (2 * (1 - w.energy) + kept)
         own = ((r.food * gain - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)
