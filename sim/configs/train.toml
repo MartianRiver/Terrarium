@@ -30,9 +30,10 @@ hatch = 0.0
 # yes to unload, eat, sprint or grab; each wears off the more that creature has done it lately, and comes back
 novelty = 0.0
 variety = 0.0
-# eating as a need: times how much the square of hunger (1 - energy) falls, so a meal pays more the hungrier it
-# finds a Terrikin and nothing once it's full (an apple from 0.6 energy pays 0.16 of this, from 0.3 0.4). Only the
-# fall pays: charging hunger as it rises would make dying a way out of what's still to come
+# eating as a need: times how much the square of hunger (1 - energy) falls, so a meal (an apple, a flower or a bite
+# from the store) pays more the hungrier it finds a Terrikin and nothing once it's full (an apple from 0.6 energy
+# pays 0.16 of this, from 0.3 0.4). Only the fall pays: charging hunger as it rises would make dying a way out
+# of what's still to come
 needs = 0.0
 
 [ppo]

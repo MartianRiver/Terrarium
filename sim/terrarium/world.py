@@ -146,6 +146,8 @@ class World:
         self.crop = np.full((arenas, n), cfg.crop.start)
         # energy each creature has got from food (not jelly) since its arena started
         self.fed = np.zeros((arenas, n))
+        # energy it has kept from any meal, a store's jelly too, since its arena started (what `needs` pays)
+        self.nourished = np.zeros((arenas, n))
         # jelly in each colony's store, food unloaded into it and jelly eaten from it per creature
         # jelly, in grown Terrikins' bites (the young take smaller ones)
         self.store = np.zeros((arenas, len(self.nests)))
@@ -307,6 +309,7 @@ class World:
         self.meals[idx] = 0
         self.crop[idx] = self.cfg.crop.start
         self.fed[idx] = 0
+        self.nourished[idx] = 0
         self.store[idx] = 0
         self.stored[idx] = 0
         self.jelly[idx] = 0
@@ -503,6 +506,7 @@ class World:
         np.add.at(self.energy, (arena[eats], who[eats]), np.where(wild, cfg.energy.food, cfg.jelly.energy)[eats])
         np.clip(self.energy, 0, 1, out=self.energy)
         self.fed += self.energy - before
+        self.nourished += self.energy - before
         np.add.at(self.crop, (arena[~eats], who[~eats]), 1)
         np.add.at(self.meals, (arena[wild], who[wild]), 1)
         # two foods on one tick can overfill a crop; the extra is lost
@@ -637,6 +641,7 @@ class World:
             hungry = self.energy[arena, who] <= 1 - cfg.energy.food
             self.energy[arena[hungry], who[hungry]] += cfg.energy.food
             self.fed[arena[hungry], who[hungry]] += cfg.energy.food
+            self.nourished[arena[hungry], who[hungry]] += cfg.energy.food
             room = ~hungry & (self.crop[arena, who] < cfg.crop.capacity)
             self.crop[arena[room], who[room]] += 1
         log.trace('flowers drunk', tick=self.tick, count=len(arena))
@@ -734,6 +739,7 @@ class World:
         own = eat & (self.crop > 0) & (self.energy <= 1 - cfg.energy.food)
         self.energy += cfg.energy.food * own
         self.fed += cfg.energy.food * own
+        self.nourished += cfg.energy.food * own
         self.crop[own] -= 1
         young = self.young > 0
         # the young eat from it whenever they aren't full, hungry or not, but a bite their size: everything costs them
@@ -742,6 +748,7 @@ class World:
         wants = eat & (self.crop == 0) & (self.nest_at() == self.colony) & (self.energy < hunger)
         bite = np.where(young, np.minimum(1.0, (1 - self.energy) / cfg.jelly.energy) * cfg.young.energy, 1.0)
         gain = np.where(young, np.minimum(1 - self.energy, cfg.jelly.energy), cfg.jelly.energy)
+        sated = self.energy.copy()
         for c in range(len(self.nests)):
             # a bite each, lowest index first, while the store lasts; the last one takes what's left (a young one's
             # bites can leave part of a jelly)
@@ -755,6 +762,7 @@ class World:
             self.energy[gets] += (gain * np.divide(took, bite, out=np.zeros_like(took), where=gets))[gets]
             self.jelly[gets] += took[gets]
         np.clip(self.energy, 0, 1, out=self.energy)
+        self.nourished += self.energy - sated
 
     def _hatch(self):
         h = self.cfg.hatch
