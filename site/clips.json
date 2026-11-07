@@ -177,5 +177,19 @@
     "width": 480,
     "crop": "1080:1080:0:460",
     "alt": "A baby Terrikin beside its nest picks up a dropping, sets it down a little further out, and picks it up again until it's past the dashed line."
+  },
+  "tree-remembered": {
+    "from": "0.4/moments/2026-11-06-tree-remembered-vs-wiped/tree-sbs-land-full.mp4",
+    "start": 0,
+    "seconds": 36,
+    "width": 960,
+    "alt": "Side by side, the same game twice. On the left a Terrikin comes up from its burrow and walks straight back to an apple tree it can't see, again and again. On the right its memory is wiped each time it goes home, and it wanders."
+  },
+  "tree-moved": {
+    "from": "0.4/moments/2026-11-06-tree-moved/tree-moved-sbs-land-full.mp4",
+    "start": 0,
+    "seconds": 31.5,
+    "width": 960,
+    "alt": "Side by side, the same game twice. On the left the tree stays put. On the right the tree moves while the Terrikin is in its burrow; it walks to the empty spot where the tree was, looks about, then crosses the garden and finds the tree in its new place."
   }
 }
