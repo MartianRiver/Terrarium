@@ -1,1 +1,0 @@
-What's waiting for a release goes in `changes/<branch>.md`, a file a branch, instead of each branch editing the top of CHANGELOG.md, so two branches open at once no longer conflict there; the fragments are folded into the changelog at release, in the order they landed ([docs/releasing.md](../docs/releasing.md#changelog)).

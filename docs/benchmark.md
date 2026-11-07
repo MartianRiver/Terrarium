@@ -19,6 +19,7 @@ Ticks a second for the whole batch, arena-ticks a second in brackets. Real time 
 | 0.2.0 release | meal counts, nothing else on the step path | 20,475 | 5,032 (80,505) | 1,486 (95,093) |
 | 0.3, jelly | crop, stores, unload and eat, dropped food, food patches, nights (off here) | 10,860 | 3,634 (58,145) | 1,150 (73,624) |
 | 0.3.0 release | sprint, grab, smell, hatching, room to grow, flowers (all off here); on battery | 9,405 | 3,418 (54,688) | 1,106 (70,795) |
+| 0.4.0 release | hearing, jump, droppings, tired, flags, tree, compass and the rest of 0.4 (off here); on battery | 6,825 | 2,840 (45,436) | 954 (61,026) |
 
 The step alone is about 5% slower at one arena from the death bookkeeping; the rest of that drop is the per-tick reset check, which training pays too.
 
@@ -33,6 +34,7 @@ The same, with every creature casting its rays each tick (16 rays over 200°, ou
 | 0.3, colony-senses | rays also see nests and nestmates; circle tests keep x and y apart | 3,712 | 482 (7,715) | 118 (7,562) |
 | 0.3, jelly | as above | 2,829 | 359 (5,751) | 86 (5,491) |
 | 0.3.0 release | rays test for flowers too, even with none | 2,601 | 351 (5,618) | 86 (5,498) |
+| 0.4.0 release | rays also tell a dropping on a heap from a loose one, and flags (more kinds for the rays to test); on battery | 2,190 | 305 (4,879) | 77 (4,930) |
 
 With vision, jelly's slowdown is food slots: an arena holds room for every crop to be dropped as jelly on the ground (28 growing plus 18 × 2), and the rays test all 64, present or not; with no crop (28 slots) vision takes 7.2 ms a tick at 64 arenas against 10.3. Testing only the food that's there would win that back. The step alone barely cares about slots (1.26 against 1.34 ms); its drop is the rest of jelly's bookkeeping. It's not urgent: training is about 90% PPO update. Nights cost nothing measurable (1.90 against 1.89 ms a step at 64 arenas with the night code stubbed out).
 
@@ -51,9 +53,14 @@ It still doesn't, with colonies: training 12 creatures per arena, the PPO update
 | 0.2.0 release | nothing on the step path | 24,144 | 2,829 (181,085) | 736 (188,528) | 8,846 | 1,600 (102,409) | 453 (115,854) |
 | 0.3, colony-senses | rays also see nests and nestmates | 24,361 | 2,786 (178,289) | 734 (187,932) | 7,295 | 1,597 (102,233) | 468 (119,876) |
 | 0.3.0 release | as above; on battery | 11,701 | 2,373 (151,866) | 668 (170,889) | 4,968 | 1,400 (89,601) | 434 (111,074) |
+| 0.4.0 release | as above; on battery | 8,357 | 2,030 (129,899) | 575 (147,234) | 3,832 | 1,191 (76,196) | 370 (94,626) |
 
 One arena with vision is about 18% slower from 0.3: seeing nests is more numpy calls a tick, a fixed cost that's gone by 64 arenas.
 
 The 0.3.0 release is slower again where the cost per tick is fixed: one solo arena loses half its speed without vision and a third with it, 64 colony arenas 4%. Every feature 0.3 added to the step is checked each tick whether it's on or not, and the rays test for flowers on every tick even in worlds without any (a fourth set of circle tests). Nobody trains on one arena, and training is about 90% PPO update, so it's written down rather than fixed: skipping what's off is the fix if collecting ever matters. These were measured on battery, which may cost a little on its own.
 
 Two runs in a row of the same code differed by up to 7% at 64 arenas (1,388 then 1,486), so a change smaller than that needs a few runs before it means anything.
+
+### 0.4.0 is slower
+
+The 0.4.0 release is slower than 0.3.0 everywhere, both measured on battery with the Mac otherwise quiet. Colony world, without vision: 27% slower at one arena (9,405 to 6,825), 17% at 16 arenas, 14% at 64. With vision: 16%, 13% and 10%. Solo: 29% slower at one arena without vision (11,701 to 8,357), 14% at 64 and 256; with vision 23%, 15% and 15%. As in 0.3, the cost is a fixed one per tick, so it shrinks as arenas are added: 0.4 put hearing, a jump, droppings, stamina, flags, the tree, a compass and a young colony's bites on the step path, each checked every tick whether the world uses it or not, and the rays test for more kinds of thing. This wasn't profiled, so which of them costs most isn't known. Training is still about 90% PPO update and the 64-arena numbers lost the least, so it's written down rather than fixed; skipping what a world doesn't use is the fix, and a profile of the step comes first. Three runs in a row of the colony world gave 6,578 to 6,897 at one arena, 2,732 to 2,888 at 16 and 940 to 954 at 64; solo at 256 arenas with vision gave 248 and 370 in two runs, so that one number is noise.
