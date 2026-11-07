@@ -173,7 +173,7 @@ function boot() {
     source = make();
     if (newWorld) stage.setWorld(source.info);
     // &cone=<degrees>: tag's it shows how much it can see, as a fan on the ground (for reels)
-    view = new WorldView(stage.scene, source.info, !params.has('nodroppings'), Number(params.get('cone') ?? 0));
+    view = new WorldView(stage.scene, source.info, !params.has('nodroppings'), Number(params.get('cone') ?? 0), !params.has('noghost'));
     view.chosen = chosen;
     view.marked = !params.has('pick');
     director?.reset();

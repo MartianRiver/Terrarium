@@ -43,6 +43,7 @@ A brain can carry notes from one choice to the next: a GRU (Cho et al. 2014) aft
 - `terrarium.games` scores nursery games with `--wiped` the same way.
 - `evals --wiped` scores a brain with its notes blanked before every choice. A brain that gains from memory should drop back toward the same brain without it; one that doesn't drop isn't using its notes.
 - Widening a brain with memory isn't written yet: widen first, then add memory.
+- **A readout of where it thinks the tree is** (`terrarium/ghost.py`): in the tree nursery a ridge regression on the notes at the first choice after a deposit gives the tree's offset from the nest (world frame, features standardised on the fit set, alpha by 5-fold CV over whole games, fitted only where no block is in sight). `python -m terrarium.ghost fit` plays frozen games of one brain in one world and saves it, with the brain's id, the world it was fitted in and its error on a fifth of the games held out; `record --ghost` writes what it reads into a replay and the viewer draws a faint tree there. Its limits: it was checked only at that one moment (just after unloading, when nothing else tells the Terrikin where the tree is), so it's shown only then; it's a linear read of one brain's notes, so a readout is for the brain it was fitted to (a different brain, or the same one after more training, needs a new fit); and it says where the notes put the tree on average, to a metre or two, not what the Terrikin intends. mid2-s1 in its training world: median 1.2 m and 7° off on held-out games.
 
 ## Sort of on the level of
 
