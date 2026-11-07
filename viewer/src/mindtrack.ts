@@ -16,7 +16,8 @@ export interface MindHeader {
     shape: { width: number; layers: number; heads: number };
     schema: { self: string[]; ray: string[]; kinds: string[]; actions: string[] };
   };
-  rays: { count: number; fov: number; range: number };
+  // angles: each ray's angle off the heading (older tracks don't have it: rays were spread evenly)
+  rays: { count: number; fov: number; range: number; angles?: number[] };
   tickHz: number;
 }
 

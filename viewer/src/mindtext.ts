@@ -26,6 +26,7 @@ export const SENSES: Record<string, Words> = {
   smell_sin: { label: 'smell: side', text: 'Which side the smell gets stronger on.' },
   smell_cos: { label: 'smell: ahead', text: 'Whether the smell gets stronger ahead or behind.' },
   nectar: { label: 'nectar', text: 'How much of a nectar boost it has left: a flower’s nectar makes it faster for 8 s.' },
+  load: { label: 'carrying', text: '1 while it carries a berry in its jaws, on top of its head. That berry isn’t eaten: it stays a berry until it’s put down.' },
 };
 
 export const KINDS: Record<string, Words & { colour: string }> = {
@@ -35,15 +36,19 @@ export const KINDS: Record<string, Words & { colour: string }> = {
   food: { label: 'food', colour: '#e0473c', text: 'Food: berries growing, or jelly dropped on the ground.' },
   block: { label: 'block', colour: '#c89b5e', text: 'A wooden block. It can be pushed.' },
   flower: { label: 'flower', colour: '#ffb21f', text: 'An open nectar flower: rare, rich, and gone in 15 s.' },
+  dung: { label: 'dropping', colour: '#8a5a2b', text: 'A dropping on the ground. Being close to one makes a Terrikin a little sick.' },
+  flag: { label: 'flag', colour: '#3d7bd9', text: 'A colony’s flag, on its nest or lying where it was put down. A carried one shows as its carrier.' },
+  heap: { label: 'heap', colour: '#5c3a1a', text: 'A dropping on the midden’s heap, where they’re put. It stays there: it can’t be picked up again.' },
 };
 
 export const ACTIONS: Record<string, Words> = {
   thrust: { label: 'push', text: 'How hard it pushes forward, from −1 (backing up) to 1 (full speed).' },
   turn: { label: 'turn', text: 'How hard it turns: positive is left, negative is right. Turning hard costs energy.' },
-  unload: { label: 'unload', text: 'Yes/no: empty its crop. At home that fills the store; away it drops the food on the ground.' },
+  unload: { label: 'unload', text: 'Yes/no: empty its crop. At home that fills the store; away it drops it on the ground as jelly.' },
   eat: { label: 'eat', text: 'Yes/no: eat from its crop, or from the store when it’s home and hungry.' },
   sprint: { label: 'sprint', text: 'Yes/no: a burst at twice its speed for 1.5 s. It costs energy and then it must rest.' },
   grab: { label: 'grab', text: 'Yes/no: grip a block within reach. Off in this world.' },
+  carry: { label: 'carry', text: 'Yes/no: pick up a berry within reach, or put down the one it carries. Carrying slows it a little and costs a little energy.' },
 };
 
 export const PARTS: Record<string, Words> = {

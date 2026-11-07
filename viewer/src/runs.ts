@@ -183,7 +183,9 @@ function generations(d: RunDetail) {
   const watches: [HTMLAnchorElement, string, string][] = [];
   const cards = [...first, ...d.checkpoints].map((c, i) => {
     const gen = i + 1 - first.length;
-    const label = gen ? `gen ${gen} · ${compact(c.samples)} samples` : 'gen 0 · random';
+    // a run saves the brain it starts as (0 samples): untrained, or its parent
+    const start = c.file !== 'random' && c.samples === 0 ? (d.run.parent ? 'start · the parent' : 'start · untrained') : '';
+    const label = start || (gen ? `gen ${gen} · ${compact(c.samples)} samples` : 'gen 0 · random');
     const score = gen === 0 && evals ? fmt(evals.random) : evals?.checkpoint === c.file ? fmt(evals.brain) : '';
     const watch = el('a', { className: 'watch', textContent: 'Watch', target: '_blank' });
     watch.setAttribute('aria-label', `Watch ${label}`);

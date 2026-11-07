@@ -8,10 +8,13 @@
 # eating what it carries once it can without waste. Carrier is greedy that takes
 # its crop home and unloads it once it's full, and goes home to eat when it's
 # hungry and there's jelly in the store. Nester is carrier that heads home when
-# the light starts to fade and waits in the nest until it's full day.
+# the light starts to fade and waits in the nest until it's full day. Chaser is
+# carrier that runs for any flower it sees; spotter is chaser that knows where
+# flowers open (spots.toml) and waits at the nearest spot when there's nothing
+# else to do: the ceiling for what remembering the spots could be worth.
 #
 #   uv run python -m terrarium.evals --policy random greedy --config configs/solo.toml [--brain X.pt] [--modes drawn mean sampled]
-#                                    [--device cuda]
+#                                    [--device cuda] [--wiped] [--wipe-every S...]
 #
 # Each policy (and each brain in each mode) is scored in its own process, side by side.
 
@@ -33,8 +36,10 @@ from .random_actions import RandomActions
 from .runs import cpu_quota
 from .schema import YES_NO
 from .tactics import REASONS, Tactics, flower_in_view
-from .vision import FOOD, NOTHING, look
-from .world import World
+from .vision import FLOWER, FOOD, NOTHING, look
+from . import vision
+from .maze import mapped_policy, wall_policy
+from .world import CARRIED, World
 
 log = Logger('evals')
 
@@ -49,6 +54,24 @@ SNATCH = 1.5
 Policy = Callable[[World], np.ndarray]
 
 
+class ActionNoise:
+    """A brain's sampled action noise, one stream per game from the game's seed and number, so two brains on a game
+    draw the same numbers, and a game's noise doesn't depend on how many games are in the job."""
+
+    def __init__(self, seed: int, arenas: int):
+        # key (a, 1): the world's own stream for the arena is key (a,)
+        self.rngs = [np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(a, 1))) for a in range(arenas)]
+
+    def normal(self, shape: tuple, dtype) -> np.ndarray:
+        """shape[0] rows are the arenas' creatures in turn, an equal share each."""
+        rows = shape[0] // len(self.rngs)
+        return np.concatenate([r.standard_normal((rows, *shape[1:]), dtype=dtype) for r in self.rngs])
+
+    def random(self, shape: tuple) -> np.ndarray:
+        rows = shape[0] // len(self.rngs)
+        return np.concatenate([r.random((rows, *shape[1:])) for r in self.rngs])
+
+
 def random_policy(world: World) -> Policy:
     act = RandomActions(world.arenas, len(world.colony), SEED)
     return lambda _: act()
@@ -56,7 +79,7 @@ def random_policy(world: World) -> Policy:
 
 def greedy_policy(world: World) -> Policy:
     v = world.cfg.vision
-    angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+    angles = vision.angles(v)
     ahead = np.abs(angles) < 0.5
 
     def act(w: World) -> np.ndarray:
@@ -108,7 +131,47 @@ def nester_policy(world: World) -> Policy:
     return act
 
 
-POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'carrier': carrier_policy, 'nester': nester_policy}
+def chaser_policy(world: World) -> Policy:
+    """Carrier that runs for any open flower it sees."""
+    carrier = carrier_policy(world)
+    v = world.cfg.vision
+    angles = vision.angles(v)
+
+    def act(w: World) -> np.ndarray:
+        action = carrier(w)
+        sight = look(w)
+        flower = np.where(sight.kind == FLOWER, sight.dist, np.inf)
+        sees = np.isfinite(flower.min(-1))
+        action[..., 0] = np.where(sees, 1.0, action[..., 0])
+        action[..., 1] = np.where(sees, np.clip(angles[flower.argmin(-1)] * 3, -1, 1), action[..., 1])
+        return action
+    return act
+
+
+def spotter_policy(world: World) -> Policy:
+    """Chaser that knows where flowers open (the world's spots, as perfect memory would): with nothing to eat or
+    run for in view, it goes to the nearest spot and waits there. The most remembering the spots could be worth."""
+    chaser = chaser_policy(world)
+
+    def act(w: World) -> np.ndarray:
+        action = chaser(w)
+        if not w.cfg.flowers.spots:
+            return action
+        sight = look(w)
+        idle = ~((sight.kind == FOOD) | (sight.kind == FLOWER)).any(-1)
+        idle &= (w.crop < w.cfg.crop.capacity) & (w.energy >= w.cfg.jelly.hunger)
+        gap = w.flower_spots[:, None] - w.pos[:, :, None]                       # A,N,S,2
+        d = np.hypot(gap[..., 0], gap[..., 1])
+        near = np.take_along_axis(gap, d.argmin(-1)[..., None, None], 2)[:, :, 0]
+        bearing = (np.arctan2(near[..., 1], near[..., 0]) - w.heading + np.pi) % (2 * np.pi) - np.pi
+        action[..., 0] = np.where(idle, np.where(d.min(-1) < 1.0, 0.0, 1.0), action[..., 0])
+        action[..., 1] = np.where(idle, np.clip(bearing * 3, -1, 1), action[..., 1])
+        return action
+    return act
+
+
+POLICIES = {'random': random_policy, 'greedy': greedy_policy, 'mapped': mapped_policy, 'wall': wall_policy, 'carrier': carrier_policy, 'nester': nester_policy,
+            'chaser': chaser_policy, 'spotter': spotter_policy}
 
 # where a yes/no action is worth watching: (who's in that spot, the action's index)
 CONTEXTS = {
@@ -120,6 +183,17 @@ CONTEXTS = {
     'sprint_ready': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on, 4),
     'grab_block': (lambda w, nest, mine: w.touching_block() & w.cfg.grab.on, 5),
     'sprint_flower': (lambda w, nest, mine: (w.sprinting == 0) & (w.resting == 0) & w.cfg.sprint.on & flower_in_view(w), 4),
+    'carry_berry': (lambda w, nest, mine: w.berry_in_reach(), 6),
+    'carry_block': (lambda w, nest, mine: w.block_in_reach(), 6),
+    # a yes while carrying puts it down
+    'carry_laden': (lambda w, nest, mine: w.load >= 0, 6),
+    # a dropping in reach, and a yes while carrying one (puts it down)
+    'carry_dung': (lambda w, nest, mine: w.dung.in_reach() if w.dung else np.zeros_like(w.alive), 6),
+    'carry_dung_laden': (lambda w, nest, mine: w.dung.load >= 0 if w.dung else np.zeros_like(w.alive), 6),
+    # only heaped ones in reach, which can't be picked up: a yes there is a try at the impossible
+    'carry_heap': (lambda w, nest, mine: w.dung.in_reach(heap=True) & ~w.dung.in_reach() if w.dung else np.zeros_like(w.alive), 6),
+    # the young may eat in the nest whenever they aren't full
+    'eat_young_home': (lambda w, nest, mine: (nest == w.colony) & (w.young > 0) & (w.energy < 1) & (mine > 0), 3),
 }
 
 
@@ -136,10 +210,13 @@ MODES = ('drawn', 'mean', 'sampled')
 
 
 def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
-                 watch: Callable[[Observation, np.ndarray], None] | None = None) -> Callable[[World], Policy]:
+                 watch: Callable[[Observation, np.ndarray, torch.Tensor], None] | None = None,
+                 wiped: bool = False, wipe_every: float = 0.0,
+                 wipe_on: Callable[[World], Callable[[World], np.ndarray]] | None = None) -> Callable[[World], Policy]:
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
     by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat. watch,
-    if given, sees each observation it chose from and the actions it chose (mind.py)."""
+    if given, sees each observation it chose from and the actions it chose (mind.py). wipe_on(world) makes a check,
+    run at each choice, of whose notes to blank then, (arenas, creatures): an event in a game."""
     brain, meta = load_brain(path)
     brain.eval().to(device)
     # it chooses every `repeat` ticks, as it did in training, and holds its choice in between
@@ -157,15 +234,26 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
 
     def make(world: World) -> Policy:
         last = np.zeros((world.arenas, len(world.colony), 2))
-        noise = np.random.default_rng(SEED)
+        noise = ActionNoise(world.seed, world.arenas)
         held, ticks = None, 0
+        notes = brain.blank(last.shape[0] * last.shape[1])
+        every = max(1, round(wipe_every / (world.cfg.dt * repeat))) if wipe_every else 0
+        event = wipe_on(world) if wipe_on else None
 
         def act(w: World) -> np.ndarray:
-            nonlocal last, held, ticks
+            nonlocal last, held, ticks, notes
             if ticks % repeat == 0:
                 obs = observe(w, last)
-                mean = brain.act(obs, sample=False)
-                mean = mean + spread * noise.standard_normal(mean.shape, dtype=mean.dtype)
+                # wiped, a brain with memory forgets everything before each choice, which it never met in training
+                # and which can freeze it; wiped every few seconds, it gets to write its notes again in between
+                blank = wiped or (every and ticks // repeat % every == 0)
+                before = brain.blank(len(notes)) if blank else notes
+                if event is not None:
+                    before = before * ~torch.from_numpy(event(w).reshape(-1)).to(before.device)[:, None]
+                mean, notes = brain.act(obs, sample=False, notes=before)
+                # the dead remember nothing, so a hatchling in their place starts blank
+                notes = notes * torch.from_numpy(w.alive.reshape(-1)).to(notes)[:, None]
+                mean = mean + spread * noise.normal(mean.shape, mean.dtype)
                 if coins is not None:
                     odds = mean[..., coins]
                     yes = odds > 0 if mode == 'mean' else noise.random(odds.shape) < 1 / (1 + np.exp(-odds))
@@ -173,7 +261,7 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
                 held = np.clip(mean, -1, 1).reshape(*last.shape[:2], -1)
                 last = held[..., :2]
                 if watch:
-                    watch(obs, held)
+                    watch(obs, held, before)
             ticks += 1
             assert held is not None
             return held
@@ -186,7 +274,14 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     world = World(cfg, episodes, seed)
     policy = make(world)
     shape = world.alive.shape
-    lived, meals, stored, jelly, drunk = (np.zeros(shape, int) for _ in range(5))
+    lived, meals, stored, drunk = (np.zeros(shape, int) for _ in range(4))
+    jelly = np.zeros(shape)
+    picked, put_home, given, given_hungry, lifted = (np.zeros(shape, int) for _ in range(5))
+    # with [dung] on: droppings made, picked up, taken out past the midden, metres moved further from home, and how
+    # many lie near each living one (a pile as one) and within 3 m of a nest, summed over ticks
+    made, dung_picked, taken, first_trip, later_trips = (np.zeros(shape, int) for _ in range(5))
+    tidied = np.zeros(shape)
+    dirt, lived_ticks, nest_dung, all_dung = 0.0, 0, 0, 0
     # deaths in each slot: with hatching, one slot can die more than once
     died, jelly_at_home, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
     # dawns each creature lived to see, and the colonies with anyone left at the first one
@@ -234,9 +329,17 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         growing = world.food_present & (f < world.wild)
         pos, food_pos = world.pos.copy(), world.food_pos.copy()
         world.step(action)
+        if world.dung:
+            dirt += (world.dung.dirt() * before).sum()
+            lived_ticks += before.sum()
+            lying = world.dung.lying() & ~done[:, None]
+            gap = world.dung.pos[:, :, None] - world.nests[None, None]
+            nest_dung += (lying & (np.hypot(gap[..., 0], gap[..., 1]) < 3.0).any(-1)).sum()
+            all_dung += lying.sum()
         tactics.after(world, done)
         # food goes at nightfall too; only count it eaten on other ticks
-        eaten = growing & ~world.food_present & ~(world.dark & ~was_dark)[:, None] & ~done[:, None]
+        eaten = (growing & ~world.food_present & (world.food_regrow != CARRIED) & ~(world.dark & ~was_dark)[:, None]
+                 & ~done[:, None])
         from_middle += (eaten & middle).sum(1)
         for a, i in zip(*np.nonzero(eaten)):
             d = np.where(before[a], np.hypot(*(pos[a] - food_pos[a, i]).T), np.inf)
@@ -266,6 +369,18 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         stored[finished] = world.stored[finished]
         jelly[finished] = world.jelly[finished]
         drunk[finished] = world.drunk[finished]
+        picked[finished] = world.picked[finished]
+        put_home[finished] = world.put_home[finished]
+        lifted[finished] = world.lifted[finished]
+        given[finished] = world.given[finished]
+        given_hungry[finished] = world.given_hungry[finished]
+        if world.dung:
+            made[finished] = world.dung.made[finished]
+            dung_picked[finished] = world.dung.picked[finished]
+            taken[finished] = world.dung.taken[finished]
+            first_trip[finished] = world.dung.first_trip[finished]
+            later_trips[finished] = world.dung.later_trips[finished]
+            tidied[finished] = world.dung.tidied[finished]
         moved[finished] = np.hypot(*(world.block_pos[finished] - start).transpose(2, 0, 1))
         hatched[finished] = world.hatched[finished]
         size_end[finished] = counts[finished]
@@ -303,14 +418,33 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'blocks_moved': summary((moved > 0.5).sum(1)[:, None]),
         # what sprints and flowers get used for (tactics.py)
         **tactics.result(),
+        # with [carry] on, per creature: berries picked up, put down at its own nest, and put down ones a nestmate took
+        # (also counted for a hungry nestmate), and blocks lifted
+        **({'carry': {'picked': summary(picked[:, starters]), 'put_home': summary(put_home[:, starters]),
+                      'given': summary(given[:, starters]), 'given_hungry': summary(given_hungry[:, starters]),
+                      'lifted': summary(lifted[:, starters])}}
+           if cfg.carry.on else {}),
+        **({'dung': {'made': summary(made[:, starters]), 'picked': summary(dung_picked[:, starters]),
+                     'taken_out': summary(taken[:, starters]), 'moved_away': summary(tidied[:, starters]),
+                     'near_each': dirt / max(lived_ticks, 1), 'near_nest_share': nest_dung / max(all_dung, 1),
+                     **trips(taken[:, starters], first_trip[:, starters], later_trips[:, starters], cfg.tick_hz)}}
+           if cfg.dung.on else {}),
     }
 
 
+def trips(taken: np.ndarray, first: np.ndarray, later: np.ndarray, hz: float) -> dict:
+    """Seconds to the first one taken out, and between later ones, over those that took any out (that many more)."""
+    some, more = taken >= 1, taken >= 2
+    return {'first_trip': float(first[some].mean() / hz) if some.any() else None,
+            'later_trip': float(later[more].sum() / (taken[more] - 1).sum() / hz) if more.any() else None}
+
+
 def score(cfg: Config, policy: str | None = None, brain: Path | str | None = None, mode: str = 'drawn',
-          episodes: int = EPISODES, seed: int = SEED, device: str = 'cpu', threads: int = 1) -> dict:
-    """One eval, of a scripted policy by name or of a brain in one of MODES."""
+          episodes: int = EPISODES, seed: int = SEED, device: str = 'cpu', threads: int = 1,
+          wiped: bool = False, wipe_every: float = 0.0) -> dict:
+    """One eval, of a scripted policy by name or of a brain in one of MODES, its memory wiped or not."""
     torch.set_num_threads(threads)
-    make = brain_policy(brain, mode, device) if brain else POLICIES[policy or 'random']
+    make = brain_policy(brain, mode, device, wiped=wiped, wipe_every=wipe_every) if brain else POLICIES[policy or 'random']
     return run(cfg, make, episodes, seed)
 
 
@@ -352,6 +486,9 @@ def main():
     parser.add_argument('--config', default=str(DEFAULT))
     parser.add_argument('--brain', nargs='*', default=[], help='checkpoints to score alongside the policies')
     parser.add_argument('--modes', nargs='+', choices=MODES, default=['drawn'], help='how each brain picks its actions')
+    parser.add_argument('--wiped', action='store_true', help='also score each brain with its memory wiped before every choice')
+    parser.add_argument('--wipe-every', type=float, nargs='*', default=[], metavar='S',
+                        help='also score each brain with its memory wiped every S seconds (the tidy game: do later trips still get faster?)')
     parser.add_argument('--held-out', action='store_true', help=f'the promotion worlds (seed {HELD_OUT}) instead of {SEED}')
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--device', default='cpu', help="where the brains run; the worlds are always on the CPU")
@@ -361,9 +498,16 @@ def main():
     seed = HELD_OUT if args.held_out else SEED
 
     jobs: dict[str, dict] = {name: {'policy': name} for name in args.policy}
+    names = [Path(b).name for b in args.brain]
     for b in args.brain:
         for mode in args.modes:
-            jobs[Path(b).name + ('' if mode == 'drawn' else f' {mode}')] = {'brain': b, 'mode': mode}
+            # runs' checkpoints share file names, so where two do, the whole path tells them apart
+            name = (Path(b).name if names.count(Path(b).name) == 1 else b) + ('' if mode == 'drawn' else f' {mode}')
+            jobs[name] = {'brain': b, 'mode': mode}
+            if args.wiped:
+                jobs[f'{name} wiped'] = {'brain': b, 'mode': mode, 'wiped': True}
+            for every in args.wipe_every:
+                jobs[f'{name} wiped {every:g} s'] = {'brain': b, 'mode': mode, 'wipe_every': every}
     results = side_by_side(cfg, jobs, args.episodes, seed, args.device)
     print(f'{Path(args.config).name}, {args.episodes} episodes of up to {cfg.episode.seconds:g} s, seed {seed}; ± over arenas')
     width = max(8, *map(len, jobs))
@@ -405,6 +549,23 @@ def main():
             print(f'{name:<{width}}  {fl["opened"]:6}  ' + '  '.join(f'{"–" if v is None else f"{v:.0%}":>{n}}'
                                                              for v, n in ((fl['drunk'], 5), (fl['chased'], 18)))
                   + '  ' + f'{" · ".join("–" if v is None else f"{v:.1f}" for v in r["nectar"].values()):>27}')
+    if cfg.carry.on:
+        print(f'\n{"carrying, each":<{width}}  {"picked up":>9}  {"put down home":>13}  {"to a nestmate":>13}  {"to a hungry one":>15}'
+              f'  {"blocks lifted":>13}')
+        for name, r in results.items():
+            ca = r['carry']
+            print(f'{name:<{width}}  ' + '  '.join(f'{ca[k]["mean"]:{n}.2f}' for k, n in
+                                                  (('picked', 9), ('put_home', 13), ('given', 13), ('given_hungry', 15),
+                                                   ('lifted', 13))))
+    if cfg.dung.on:
+        print(f'\n{"droppings, each":<{width}}  {"made":>5}  {"picked up":>9}  {"taken out":>9}  {"m moved away":>12}'
+              f'  {"lying near":>10}  {"by a nest":>9}  {"first trip s":>12}  {"later trips s":>13}')
+        for name, r in results.items():
+            du = r['dung']
+            print(f'{name:<{width}}  ' + '  '.join(f'{du[k]["mean"]:{n}.2f}' for k, n in
+                                                  (('made', 5), ('picked', 9), ('taken_out', 9), ('moved_away', 12)))
+                  + f'  {du["near_each"]:10.2f}  {du["near_nest_share"]:9.0%}'
+                  + ''.join(f'  {"–" if du[k] is None else f"{du[k]:.1f}":>{n}}' for k, n in (('first_trip', 12), ('later_trip', 13))))
     if args.out:
         Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
 

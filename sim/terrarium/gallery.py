@@ -162,7 +162,7 @@ class Gallery:
             if s := scores(p, checkpoint_of(p, None)):
                 found.append((s[w['score']]['mean'], p.name, note))
         best = sorted(found, reverse=True)[:w['show']]
-        return {'title': w['title'], 'text': w['text'],
+        return {'title': w['title'], 'text': w['text'], **({'group': w['group']} if 'group' in w else {}),
                 'brains': [{**self.entry(run, checkpoint_of(self.lineage.runs[run], None)), 'note': note}
                            for _, run, note in best]}
 
@@ -187,8 +187,8 @@ class Gallery:
             'training': [self.entry(p.name, checkpoint_of(p, None)) for p in live],
             'latest': [{**self.entry(p.name, checkpoint_of(p, None)), 'finished': compute.read_run(p)['finished']}
                        for p in latest],
-            'asides': [{'title': a['title'], 'text': a['text'], **self.entry(a['run'], a['checkpoint'], a.get('replay'))}
-                       for a in self.steps.get('aside', [])],
+            'asides': [{'title': a['title'], 'text': a['text'], **({'group': a['group']} if 'group' in a else {}),
+                        **self.entry(a['run'], a['checkpoint'], a.get('replay'))} for a in self.steps.get('aside', [])],
             'working': [self.working(w) for w in self.steps.get('working', [])],
         }
         wanted = {'index.json'} | {b['replay'] for s in index['steps'] for b in s['brains']} \

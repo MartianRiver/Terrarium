@@ -9,11 +9,14 @@ import { Eggs } from './eggs';
 import { type Box, Grips, type Holder } from './grips';
 import { createLogger } from './lib/logger';
 import { JellyPile } from './jelly';
+import { Flags } from './flags';
 import { Flowers } from './nectar';
 import { BlockView, FoodView } from './props';
 import type { Pose } from './sightfan';
 import { Dust } from './sprint';
+import { TagPops } from './tagpop';
 import { Tombstones } from './tombstones';
+import { TreeView } from './tree';
 import type { CreatureState, Frame, WorldInfo } from './world';
 
 const log = createLogger('worldview');
@@ -35,33 +38,43 @@ export class WorldView {
   private blobs = new Map<number, BlobView>();
   private food = new Map<number, FoodView>();
   private dyingFood: FoodView[] = [];
-  private blocks = new Map<number, BlockView>();
+  private blocks = new Map<number, BlockView | TreeView>();
+  private tree: TreeView | null = null;
   private prevCreatures = new Map<number, CreatureState>();
   private prevBlocks = new Map<number, Frame['blocks'][number]>();
   private frame: Frame | null = null;
   // the Terrikin picked by clicking it (null: the first one), and where the followed one was last drawn
   chosen: number | null = null;
+  // who to follow when nobody's chosen (the director's pick in a game; null: the first one)
+  lead: number | null = null;
   // the ring under a chosen one; a reel's &pick follows without it
   marked = true;
+  // a costume for some Terrikins, put on as each is first drawn (the kids' game's panda)
+  dress: ((id: number, blob: BlobView) => void) | null = null;
   focus: Pose | null = null;
   focusId: number | null = null;
   private ring: THREE.Mesh;
   private droppings: Droppings | null;
-  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0 };
+  private scratch: CreatureState = { id: 0, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0, nectar: 0, sprinting: 0, load: 0, young: 0, stamina: 1, dung: 0, z: 0 };
   private piles = new Map<number, JellyPile>();
   private tombstones: Tombstones;
   private grips: Grips;
   private eggs: Eggs;
   private flowers: Flowers;
+  private flags: Flags;
   private dust: Dust;
+  private pops: TagPops;
 
-  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true) {
-    this.droppings = droppings ? new Droppings(scene, info.tickHz) : null;
+  constructor(private scene: THREE.Scene, private info: WorldInfo, droppings = true, cone = 0) {
+    // made-up droppings every few meals, but not under the apple tree, where a meal comes every couple of seconds
+    this.droppings = droppings && info.tree === null ? new Droppings(scene, info.tickHz) : null;
     this.tombstones = new Tombstones(scene, info.tickHz);
     this.grips = new Grips(scene);
     this.eggs = new Eggs(scene, info.tickHz);
     this.flowers = new Flowers(scene, info.tickHz);
+    this.flags = new Flags(scene);
     this.dust = new Dust(scene);
+    this.pops = new TagPops(scene, cone);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
     this.ring.position.y = 0.02;
@@ -71,10 +84,16 @@ export class WorldView {
       const pile = new JellyPile(nest);
       this.piles.set(nest.colony, pile);
       scene.add(pile.root);
+      if (info.midden > 0) scene.add(middenLine(nest.x, nest.y, nest.radius + info.midden));
     }
+    if (info.middenSpot) scene.add(middenLine(info.middenSpot.x, info.middenSpot.y, info.middenSpot.radius));
   }
 
   // call once per sim tick
+  get current(): Frame | null {
+    return this.frame;
+  }
+
   push(frame: Frame) {
     if (this.frame) {
       this.prevCreatures = new Map(this.frame.creatures.map((c) => [c.id, c]));
@@ -84,10 +103,12 @@ export class WorldView {
     this.syncCreatures(frame);
     this.syncFood(frame);
     this.syncBlocks(frame);
+    this.tree?.apples(frame.food);
     this.droppings?.push(frame);
     this.tombstones.push(frame);
     this.eggs.push(frame);
     this.flowers.push(frame);
+    this.pops.push(frame, !this.prevCreatures.size, this.info.tickHz);
     for (const [colony, pile] of this.piles) pile.update(frame.stores.find((s) => s.colony === colony)?.jelly ?? 0);
   }
 
@@ -96,9 +117,11 @@ export class WorldView {
     if (!this.frame) return;
     this.eggs.render(this.frame.tick, alpha, time);
     const holders: Holder[] = [];
+    const poses = new Map<number, Pose>();
+    let shownIt = -1;
     // a chosen Terrikin that has left the world (its place taken by a hatchling) can't be followed
     if (this.chosen !== null && !this.blobs.has(this.chosen)) this.chosen = null;
-    const followed = this.chosen ?? this.frame.creatures[0]?.id;
+    const followed = this.chosen ?? (this.lead !== null && this.blobs.has(this.lead) ? this.lead : this.frame.creatures[0]?.id);
     for (const c of this.frame.creatures) {
       const p = this.prevCreatures.get(c.id) ?? c;
       const s = this.scratch;
@@ -108,6 +131,11 @@ export class WorldView {
       s.heading = lerpAngle(p.heading, c.heading, alpha);
       s.speed = lerp(p.speed, c.speed, alpha);
       s.energy = lerp(p.energy, c.energy, alpha);
+      s.z = lerp(p.z, c.z, alpha);
+      // a signal changes where the bodies arrive, not as they set off: a tag lights the new it's bulb when they touch
+      s.signal = p.signal;
+      if (s.signal === 0) shownIt = c.id;
+      // drawn the size of its body, so bumping and tagging look like touching (the young too: their bodies are full size)
       s.size = c.size * this.eggs.growth(c.id, this.frame.tick, alpha);
       if (c.id === followed) {
         this.focus = { x: s.x, y: s.y, heading: s.heading };
@@ -119,8 +147,10 @@ export class WorldView {
       // the dead are a tombstone now
       blob.root.visible = !this.tombstones.isDead(c.id);
       if (blob.root.visible) blob.update(s, this.info.maxSpeed, dt, time);
+      if (blob.root.visible && this.info.tree !== null) blob.holdApple(s.carrying, dt);
       if (blob.root.visible && blob.sprinting) this.dust.kick(c.id, s.x, s.y, s.heading, dt, time, c.nectar > 0);
       if (c.holding && blob.root.visible) holders.push({ x: s.x, y: s.y, colony: c.colony });
+      poses.set(c.id, { x: s.x, y: s.y, heading: s.heading });
     }
     const boxes: Box[] = [];
     for (const b of this.frame.blocks) {
@@ -134,7 +164,9 @@ export class WorldView {
     this.droppings?.render(this.frame.tick, alpha);
     this.tombstones.render(this.frame.tick, alpha);
     this.flowers.render(this.frame.tick, alpha, time);
+    this.flags.render(this.frame.flags, poses, time);
     this.dust.render(dt);
+    this.pops.render(dt, poses, shownIt, time);
     for (const f of this.food.values()) f.update(dt);
     this.dyingFood = this.dyingFood.filter((f) => {
       const alive = f.update(dt);
@@ -167,7 +199,9 @@ export class WorldView {
     this.tombstones.clear();
     this.eggs.clear();
     this.flowers.clear();
+    this.flags.clear();
     this.dust.clear();
+    this.pops.dispose();
     this.grips.clear();
     this.scene.remove(this.ring);
     this.ring.geometry.dispose();
@@ -192,6 +226,7 @@ export class WorldView {
       seen.add(c.id);
       if (this.blobs.has(c.id)) continue;
       const blob = new BlobView(c.colony);
+      this.dress?.(c.id, blob);
       this.blobs.set(c.id, blob);
       this.scene.add(blob.root);
       log.trace('creature added', { id: c.id, colony: c.colony });
@@ -209,7 +244,11 @@ export class WorldView {
     const seen = new Set<number>();
     for (const f of frame.food) {
       seen.add(f.id);
-      if (this.food.has(f.id)) continue;
+      const known = this.food.get(f.id);
+      if (known) {
+        known.sync(f);
+        continue;
+      }
       const view = new FoodView(f);
       this.food.set(f.id, view);
       this.scene.add(view.root);
@@ -218,7 +257,7 @@ export class WorldView {
       if (seen.has(id)) continue;
       // food only goes when it's eaten, so the nearest creature had it
       const eater = nearest(frame.creatures, view.state);
-      if (eater) this.droppings?.meal(eater.id, frame.tick);
+      if (eater && !frame.dung) this.droppings?.meal(eater.id, frame.tick);
       view.despawn();
       this.dyingFood.push(view);
       this.food.delete(id);
@@ -228,10 +267,23 @@ export class WorldView {
   private syncBlocks(frame: Frame) {
     for (const b of frame.blocks) {
       if (this.blocks.has(b.id)) continue;
-      const view = new BlockView(b);
+      const view = b.id === this.info.tree ? (this.tree = new TreeView(b)) : new BlockView(b);
       this.blocks.set(b.id, view);
       this.scene.add(view.root);
     }
     // blocks don't get destroyed in any stage yet
   }
+}
+
+// the tidy nursery's line: a dropping put down past it counts as taken out (or a ring round the midden's spot)
+function middenLine(x: number, y: number, r: number): THREE.Group {
+  const root = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0x6b4a2f, transparent: true, opacity: 0.55, depthWrite: false });
+  const dashes = Math.max(12, Math.round(r * 6));
+  for (let k = 0; k < dashes; k++) {
+    const dash = new THREE.Mesh(new THREE.RingGeometry(r - 0.04, r + 0.04, 6, 1, (k / dashes) * Math.PI * 2, (Math.PI / dashes)).rotateX(-Math.PI / 2), mat);
+    root.add(dash);
+  }
+  root.position.set(x, 0.015, y);
+  return root;
 }

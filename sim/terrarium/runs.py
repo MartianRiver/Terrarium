@@ -4,6 +4,7 @@
 # it keeps the diff so it can be understood, and can never be promoted.
 
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -65,6 +66,22 @@ def cpu_quota(cgroup: Path = Path('/sys/fs/cgroup')) -> int | None:
         return None
 
 
+def rental(environ: Path = Path('/proc/1/environ')) -> dict:
+    """Which rented pod this is, so samples a dollar can be told apart by host: Vast and RunPod set it in the
+    container's first process, which an ssh session doesn't inherit."""
+    env = dict(os.environ)
+    try:
+        env |= dict(e.split('=', 1) for e in environ.read_bytes().decode(errors='replace').split('\0') if '=' in e)
+    except OSError:
+        pass
+    # Vast gives every instance its own CONTAINER_API_KEY (never recorded); its id is the instance's
+    if 'CONTAINER_ID' in env and 'CONTAINER_API_KEY' in env:
+        return {'provider': 'vast', 'instance': env.get('CONTAINER_ID')}
+    if 'RUNPOD_POD_ID' in env:
+        return {'provider': 'runpod', 'instance': env['RUNPOD_POD_ID']}
+    return {}
+
+
 def memory_gb() -> int:
     # here, not at the top: the coordinator imports this module and runs on a bare python
     import psutil
@@ -100,7 +117,7 @@ class Run:
             'id': self.id, 'started': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
             'commit': git('rev-parse', 'HEAD'), 'dirty': is_dirty, 'scratch': scratch,
             'machine': {'platform': platform.platform(), 'processor': platform.processor() or platform.machine(),
-                        'cpu': cpu(), 'memory_gb': memory_gb()},
+                        'cpu': cpu(), 'memory_gb': memory_gb(), **rental()},
             'versions': {'python': sys.version.split()[0],
                          **{p: version(p) for p in ('numpy', 'pymunk', 'torch')}},
             **record,

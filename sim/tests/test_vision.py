@@ -6,7 +6,7 @@ import pytest
 
 from terrarium import World, load
 from terrarium.random_actions import RandomActions
-from terrarium.vision import BLOCK, CREATURE, FOOD, GAP, NOTHING, WALL, directions, look
+from terrarium.vision import BLOCK, CREATURE, FOOD, GAP, NOTHING, WALL, angles, directions, look, reach
 
 CFG = load()
 R = CFG.creature.radius
@@ -136,10 +136,10 @@ def test_standing_on_the_nest_sees_it_straight_away():
 
 
 def test_fan_spreads_across_fov():
-    d = directions(np.zeros((1, 1)), CFG.vision.rays, CFG.vision.fov)
-    angles = np.arctan2(d[0, 0, :, 1], d[0, 0, :, 0])
-    assert angles[0] == pytest.approx(-CFG.vision.fov / 2) and angles[-1] == pytest.approx(CFG.vision.fov / 2)
-    assert np.diff(angles) == pytest.approx(np.full(CFG.vision.rays - 1, CFG.vision.fov / (CFG.vision.rays - 1)))
+    d = directions(np.zeros((1, 1)), angles(CFG.vision))
+    fan = np.arctan2(d[0, 0, :, 1], d[0, 0, :, 0])
+    assert fan[0] == pytest.approx(-CFG.vision.fov / 2) and fan[-1] == pytest.approx(CFG.vision.fov / 2)
+    assert np.diff(fan) == pytest.approx(np.full(CFG.vision.rays - 1, CFG.vision.fov / (CFG.vision.rays - 1)))
 
 
 def test_agrees_with_pymunk():
@@ -150,7 +150,7 @@ def test_agrees_with_pymunk():
         world.step(act())
     world.food_regrow[:] = 1
     dist, kind = seen(world)
-    dirs = directions(world.heading, CFG.vision.rays, CFG.vision.fov)
+    dirs = directions(world.heading, angles(CFG.vision))
     start = R + GAP
     for a, space in enumerate(world.physics.spaces):
         for i, (x, y) in enumerate(world.pos[a]):
@@ -160,3 +160,79 @@ def test_agrees_with_pymunk():
                 want = RANGE if hit is None else start + hit.alpha * (RANGE - start)
                 assert dist[a, i, r] == pytest.approx(want, abs=1e-6)
                 assert (kind[a, i, r] == NOTHING) == (hit is None)
+
+
+def ahead(cover, distance):
+    """Whether 16 rays over the fov see a berry dead ahead at distance (an even count has no centre ray)."""
+    world = alone(rays=16)
+    world.cfg = replace(world.cfg, vision=replace(world.cfg.vision, cover=cover))
+    world.food_regrow[0, 0] = 0
+    world.food_pos[0, 0] = (distance, 0.0)
+    return (look(world).kind[0, 0] == FOOD).any()
+
+
+def test_wide_rays_see_a_berry_dead_ahead():
+    assert ahead(0.0, 2.0) and not ahead(0.0, 4.0)
+    assert ahead(1.0, 4.0) and ahead(1.0, 7.5)
+
+
+def test_spread_packs_rays_towards_the_middle_and_side_sees_less_far():
+    v = replace(CFG.vision, spread=2.0, side=0.5)
+    a = angles(v)
+    assert a[0] == pytest.approx(-v.fov / 2) and a[-1] == pytest.approx(v.fov / 2)
+    assert np.abs(np.diff(a))[v.rays // 2 - 1] < np.abs(np.diff(a))[0]
+    r = reach(v)
+    assert r[0] == pytest.approx(v.range / 2) and r.max() < v.range and r.min() == pytest.approx(v.range / 2)
+
+
+def test_a_flag_is_seen_on_its_nest_but_not_once_someone_carries_it():
+    from terrarium.config import DEFAULT
+    from terrarium.forage import flag_senses
+    from terrarium.vision import FLAG, FLAG_RADIUS
+    sight = load(DEFAULT.parent / 'nursery-flag-sight.toml')
+    cfg = replace(sight, block=(), colonies=replace(sight.colonies, count=2, size=1),
+                  vision=replace(sight.vision, rays=1, fov=0.0))
+    world = World(cfg)
+    nest = world.nests[1]
+    spot = nest + np.array([0.0, -3.0]) * np.sign(nest[1] or 1)
+    world.physics.bodies[0][0].position = tuple(spot)
+    # the other colony's baby stands aside, out of the ray's way
+    world.physics.bodies[0][1].position = (nest[0] + 3.0, nest[1])
+    world.physics.read()
+    to = nest - world.pos[0, 0]
+    world.heading[0, 0] = np.arctan2(to[1], to[0])
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == FLAG and dist[0, 0, 0] == pytest.approx(np.hypot(*to) - FLAG_RADIUS, abs=1e-6)
+    # carried, it's its carrier the rays see
+    world.flags.carrier[0, 1] = 1
+    assert seen(world)[1][0, 0, 0] != FLAG
+    # with the compass off, the flag senses say who carries what, and nothing of where
+    world.flags.carrier[0, 1] = -1
+    senses = np.array(flag_senses(world, world.alive.shape))
+    assert not senses[[1, 2, 3, 6, 7, 8]].any()
+    on = replace(cfg, flag=replace(cfg.flag, sense=True))
+    world.cfg = on
+    assert np.array(flag_senses(world, world.alive.shape))[1].any()
+
+
+def test_a_dropping_on_the_heap_is_its_own_kind():
+    from terrarium.config import DEFAULT
+    from terrarium.vision import DUNG, HEAP
+    tidy = load(DEFAULT.parent / 'nursery-tidy-wander.toml')
+    cfg = replace(tidy, block=(), colonies=replace(tidy.colonies, count=1, size=1),
+                  vision=replace(tidy.vision, rays=1, fov=0.0))
+    world = World(cfg)
+    world.physics.bodies[0][0].position = (0, 0)
+    world.physics.read()
+    world.heading[:] = 0
+    d = world.dung
+    d.left[:], d.held[:], d.heaped[:] = 0, False, False
+    d.left[0, 0], d.pos[0, 0] = 100, (2.0, 0)
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == DUNG and dist[0, 0, 0] == pytest.approx(2.0 - cfg.dung.radius)
+    d.heaped[0, 0] = True
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == HEAP and dist[0, 0, 0] == pytest.approx(2.0 - cfg.dung.radius)
+    # a loose one in front of the heap is the one seen
+    d.left[0, 1], d.pos[0, 1] = 100, (1.0, 0)
+    assert seen(world)[1][0, 0, 0] == DUNG

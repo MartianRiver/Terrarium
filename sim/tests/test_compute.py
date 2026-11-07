@@ -123,6 +123,8 @@ def test_a_run_that_names_its_instance_is_matched_by_it():
     pod = {'started': '2026-10-24T10:30:00+1100', 'device': 'cuda', 'gpu': 'NVIDIA A10', 'machine': POD | {'instance': 2}}
     window = {'started': '2026-10-24T10:00:00+11:00', 'ended': '2026-10-24T11:00:00+11:00', 'gpu': 'A10'}
     assert [rented_on(pod, window | {'instance': i}) for i in (1, 2)] == [False, True]
+    # as a pod's run.json records it
+    assert rented_on(pod | {'machine': POD | {'instance': '2'}}, window | {'instance': 2})
 
 
 def test_a_pod_whose_cpu_differs_is_another_rental():
@@ -160,9 +162,16 @@ def test_the_board_gets_my_machines_and_rented_gpus_but_not_what_the_queue_count
     (runs / 'lent' / 'job.json').write_text('{}')
     sessions = tmp_path / 'compute.toml'
     sessions.write_text('[[machine]]\ncpu = "Apple M3"\nmemory_gb = 16\nname = "MacBook Air"\nhandle = "river-m3"\n'
-                        '[gpu_memory]\n"RTX 3060" = 12\n')
+                        '[gpu_memory]\n"RTX 3060" = 12\n'
+                        '[[session]]\nprovider = "vast"\ninstance = 1\ngpu = "RTX 3060"\ncpu = "EPYC 7662"\n'
+                        'started = "2026-10-23T23:00:00+00:00"\nended = "2026-10-24T01:00:00+00:00"\ndollars = 0.25\n'
+                        '[[session]]\nprovider = "vast"\ninstance = 2\ngpu = "RTX 3060"\ncpu = "EPYC 7662"\n'
+                        'started = "2026-10-25T23:00:00+00:00"\nended = "2026-10-26T01:00:00+00:00"\ndollars = 0.125\n')
     rows = {r['name']: r for r in board(runs, sessions)}
     assert sorted(rows) == ['rented RTX 3060 12 GB', 'rented RTX 4060 Ti', 'river-m3']
-    assert rows['river-m3'] == {'name': 'river-m3', 'kind': 'mine', 'gpu': 'Apple M3', 'samples': 400, 'hours': 1.5,
+    assert rows['river-m3'] == {'name': 'river-m3', 'kind': 'admin', 'gpu': 'Apple M3', 'samples': 400, 'hours': 1.5,
                                 'runs': 2, 'last_active': '2026-10-24'}
     assert rows['rented RTX 3060 12 GB']['kind'] == 'rented' and rows['rented RTX 3060 12 GB']['samples'] == 200
+    # every rental of it costs, the one that trained nothing here too
+    assert rows['rented RTX 3060 12 GB']['dollars'] == 0.38 and rows['rented RTX 3060 12 GB']['last_active'] == '2026-10-26'
+    assert 'dollars' not in rows['river-m3'] and 'dollars' not in rows['rented RTX 4060 Ti']

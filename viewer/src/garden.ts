@@ -1,16 +1,17 @@
 // Everything that depends on the world's layout: the sun's shadow box, the lawn,
-// the hedge on the walls, nests, the glass dome over them on a red plain, and
-// seeded decoration. Decoration is purely visual and stays outside the hedge (or
+// the hedge on the walls, nests and their domes (nestdome.ts), the glass dome over
+// them on a red plain, and seeded decoration. Decoration is purely visual and stays outside the hedge (or
 // flat inside it), so nothing looks like an obstacle the sim ignores.
 
 import * as THREE from 'three';
+import { addNestDome } from './nestdome';
 import { COLONY_COLOURS, GARDEN } from './palette';
 import type { NestInfo, WorldInfo } from './world';
 
 // how far rocks reach past the dome, metres
 const REACH = 45;
 // the glass wall's height; the dome rises from its top
-const WALL = 1.1;
+export const WALL = 1.1;
 
 function seeded(seed: number) {
   return () => {
@@ -29,18 +30,26 @@ export function buildGarden(info: WorldInfo) {
   addGround(group, info);
   addHedge(group, info, rng);
   for (const nest of info.nests) addNest(group, nest);
+  const domes = info.nests.map((nest) => addNestDome(group, nest));
   const sway = addGrass(group, info, rng);
   addPebbles(group, info, rng);
   addTrees(group, info, rng);
   addFlowers(group, info, rng);
-  addDome(group, info);
+  const frame = addDome(group, info);
   addRocks(group, info, rng);
   addMesas(group, rng);
-  return { group, tick: (time: number) => (sway.value = time) };
+  return {
+    group,
+    tick(time: number, camera: THREE.Camera) {
+      sway.value = time;
+      for (const fade of domes) fade(camera);
+      frame(camera);
+    },
+  };
 }
 
 // the dome covers the arena's corners with a planted bed to spare
-const domeRadius = (info: WorldInfo) => Math.hypot(info.width, info.height) / 2 + 2.5;
+export const domeRadius = (info: WorldInfo) => Math.hypot(info.width, info.height) / 2 + 2.5;
 
 // a random spot in the bed: under the dome, outside the hedge (plus margin)
 function inBed(rng: () => number, info: WorldInfo, margin: number) {
@@ -270,7 +279,10 @@ function addFlowers(scene: THREE.Object3D, info: WorldInfo, rng: () => number) {
   }));
 }
 
-// glass wall and dome on a white frame; the glass is front faces only, so a camera under it sees straight out
+// glass wall and dome on a white frame; the glass is front faces only, so a camera under it sees straight out.
+// From outside, looking down more steeply than FADE_FROM (radians), the frame fades, almost gone by FADE_TO
+const FADE_FROM = 0.45;
+const FADE_TO = 0.65;
 function addDome(scene: THREE.Object3D, info: WorldInfo) {
   const r = domeRadius(info);
   const glass = new THREE.MeshStandardMaterial({ color: GARDEN.glass, transparent: true, opacity: 0.08, roughness: 0.35, depthWrite: false });
@@ -301,6 +313,18 @@ function addDome(scene: THREE.Object3D, info: WorldInfo) {
   }
   for (const p of parts) p.castShadow = true;
   scene.add(...parts, wall, dome);
+  // looking down on the dome from outside (the wide shot), its frame would cross the whole view: it fades to a trace,
+  // and a low look from outside (the &intro opener) still shows it whole
+  const top = new THREE.Vector3(0, WALL, 0);
+  return (camera: THREE.Camera) => {
+    const off = camera.position.clone().sub(top);
+    const steep = off.length() > r ? Math.atan2(off.y, Math.hypot(off.x, off.z)) : 0;
+    const opacity = 1 - 0.85 * THREE.MathUtils.smoothstep(steep, FADE_FROM, FADE_TO);
+    if (Math.abs(opacity - frame.opacity) < 0.01) return;
+    frame.opacity = opacity;
+    frame.transparent = opacity < 1;
+    frame.depthWrite = opacity >= 1;
+  };
 }
 
 // boulders and pebbles on the plain, thinning out with distance

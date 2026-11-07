@@ -198,8 +198,35 @@ def idle() -> float | None:
     if sys.platform == 'darwin':
         found = re.search(r'"HIDIdleTime" = (\d+)', run(['ioreg', '-c', 'IOHIDSystem', '-d', '4']))
         return int(found.group(1)) / 1e9 if found else None
-    # X and Wayland have no one way to ask; Linux machines count as idle
-    return None
+    return logind_idle(run)
+
+
+GRAPHICAL = ('x11', 'wayland', 'mir')
+
+
+def logind_idle(read=None, now: float | None = None) -> float | None:
+    """Linux: X and Wayland have no one way to ask, but systemd-logind keeps an idle hint for every session, which
+    desktops (GNOME, KDE) set. No graphical session at all is a server nobody sits at: idle. A desktop session that
+    isn't marked idle counts as in use, even if its desktop never sets the hint, since we can't tell it's free. No
+    logind: can't tell (None)."""
+    read = read or run
+    now = time.time() if now is None else now
+    if not shutil.which('loginctl') and read is run:
+        return None
+    listed = read(['loginctl', 'list-sessions', '--no-legend'])
+    ids = [line.split()[0] for line in listed.splitlines() if line.split()]
+    desks = []
+    for sid in ids:
+        props = dict(line.split('=', 1) for line in read(['loginctl', 'show-session', sid, '-p', 'Type', '-p', 'IdleHint',
+                                                          '-p', 'IdleSinceHint']).splitlines() if '=' in line)
+        if props.get('Type') in GRAPHICAL:
+            desks.append(props)
+    if not desks:
+        return float('inf')
+    if any(d.get('IdleHint') != 'yes' for d in desks):
+        return 0.0
+    since = max(int(d.get('IdleSinceHint') or 0) for d in desks) / 1e6
+    return max(0.0, now - since) if since else 0.0
 
 
 def plugged() -> bool | None:

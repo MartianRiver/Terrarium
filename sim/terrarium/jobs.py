@@ -17,8 +17,16 @@
 # parent is a .pt path, "run:<run id>/<checkpoint>" from runs/, or
 # "job:<name>" for the final checkpoint of an earlier job in the same batch.
 # on = "rented" (or "trusted", "donor") keeps a job to that kind of machine.
+# needs = { gpu = true, gpu_memory_gb = 6, cores = 8, memory_gb = 8, machine = "Kelpie" } keeps it to machines
+# that say they have that (any of the keys; gpu = false for machines without one).
 # chunk = N splits a job into pieces of N samples, each carrying on from the
 # last, so a lent machine never holds more than a short job.
+# A job with a score table and a brain (instead of train) is a score job: the
+# brain played in the world by terrarium.games on whichever machine is free,
+#   score = { game = "tree", episodes = 256, held_out = true, wiped_every = 3.0, baselines = ["picker"] }
+# (wiped_on_event = true blanks a memory brain's notes when the game asks for memory, as games --wiped-on-event;
+# seed = N picks other games than held_out's or the default's). brain = "job:<name>" scores a training job of
+# the same batch once it's done. Scores sync into runs/scores/.
 
 import argparse
 import io
@@ -41,7 +49,7 @@ from typing import Any
 from . import snapshot
 from .log import Logger
 from .runs import ROOT
-from .store import sha256
+from .store import bad_needs, sha256
 
 log = Logger('jobs')
 
@@ -52,10 +60,18 @@ SIGNERS = Path(__file__).resolve().parent.parent / 'allowed_signers'
 HOME = Path.home() / '.terrarium'
 KEY = Path.home() / '.ssh' / 'terrarium_jobs_ed25519'
 SERVER = os.environ.get('TERRARIUM_JOBS', 'http://127.0.0.1:5194')
+# the biggest result the coordinator takes; Atlas's nginx takes 64 MB on that path, Cloudflare 100 MB at most
+RESULT_LIMIT = 64_000_000
+# a running job's run so far (worker.peek): run.json, metrics and a few checkpoints
+PEEK_LIMIT = 8_000_000
 AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
-FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int}
+FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int, 'needs': dict,
+          'score': dict, 'brain': str}
+SCORE = {'game': str, 'episodes': int, 'held_out': bool, 'seed': int, 'wiped': bool, 'wiped_every': (int, float),
+         'wiped_on_event': bool, 'baselines': list}
+MOST_EPISODES = 4096
 # the kinds of machine a job can be kept to; a token's role says which one a worker is
 MACHINES = ('trusted', 'rented', 'donor')
 
@@ -130,11 +146,18 @@ def check(spec: dict):
             raise BadJob(f'job {spec.get("id")!r}: {what}')
     need(isinstance(spec, dict) and spec.get('format') == FORMAT, f'format is not {FORMAT}')
     need(isinstance(spec.get('id'), str) and re.fullmatch(r'[0-9a-f]{12}', spec['id']), 'bad id')
-    for key in ('batch', 'name', 'world_file', 'train_file'):
+    scores = spec.get('kind') == 'score'
+    need(spec.get('kind') in (None, 'score'), 'bad kind')
+    for key in ('batch', 'name', 'world_file', *(() if scores else ('train_file',))):
         need(isinstance(spec.get(key), str) and NAME.match(spec[key]), f'bad {key}')
-    for key in ('world', 'train'):
+    for key in ('world', *(() if scores else ('train',))):
         need(isinstance(spec.get(key), str) and DIGEST.match(spec[key]), f'bad {key} digest')
     need(isinstance(spec.get('seed'), int) and isinstance(spec.get('samples'), int), 'bad seed or samples')
+    if scores:
+        need('train' not in spec and spec['samples'] == 0 and spec.get('parent'), 'a score job has a brain, no train')
+        need(bad_score(spec.get('score')) is None, f'bad score: {bad_score(spec.get("score"))}')
+        # a score is what we decide on, so it comes only from our own machines: a donor could send back any numbers
+        need(spec['trusted'], 'a score job is only for trusted machines')
     need(isinstance(spec.get('trusted'), bool), 'bad trusted')
     code = spec.get('code') or {}
     need(isinstance(code, dict) and isinstance(code.get('commit'), str) and re.fullmatch(r'[0-9a-f]{40}', code['commit']),
@@ -144,10 +167,28 @@ def check(spec: dict):
     need(spec['trusted'] or not code.get('overlay'), 'an overlay job must be trusted')
     need(spec.get('on') in (None, *MACHINES), 'bad on')
     need(not (spec['trusted'] and spec.get('on') == 'donor'), 'a trusted job can never run on a donor')
+    need('needs' not in spec or bad_needs(spec['needs']) is None, f'bad needs: {bad_needs(spec.get("needs"))}')
     parent = spec.get('parent')
     need(parent is None or (isinstance(parent, dict) and (
         (set(parent) == {'blob', 'file'} and DIGEST.match(parent['blob']) and NAME.match(parent['file'])) or
         (set(parent) == {'job'} and re.fullmatch(r'[0-9a-f]{12}', parent['job'])))), 'bad parent')
+
+
+def bad_score(score) -> str | None:
+    """What's wrong with a score table, by shape only: whether the game and baselines exist is for the scorer."""
+    if not isinstance(score, dict) or not isinstance(score.get('game'), str):
+        return 'score is a table with a game'
+    for key, value in score.items():
+        if key not in SCORE:
+            return f'unknown score key {key!r}'
+        if not isinstance(value, SCORE[key]) or (isinstance(value, bool) and SCORE[key] is not bool):
+            return f'score {key} has the wrong type'
+    if not NAME.match(score['game']) or not all(isinstance(b, str) and NAME.match(b) for b in score.get('baselines', [])):
+        return 'game and baselines are names'
+    if not 0 < score.get('episodes', 1) <= MOST_EPISODES or score.get('wiped_every', 0) < 0 \
+            or len(score.get('baselines', [])) > 8:
+        return f'episodes 1 to {MOST_EPISODES}, wiped_every 0 or more, at most 8 baselines'
+    return None
 
 
 def run_name(spec: dict) -> str:
@@ -170,11 +211,18 @@ def load_batch(path: Path) -> list[dict]:
             raise BadJob(f'{path.name}: job {i} needs a unique name of letters, digits, - _ .')
         names.add(name)
         job = {'name': name, 'parent': '', 'seed': 0} | defaults | take(entry, f'{path.name} job {name}')
-        for key in ('world', 'train'):
+        if 'score' in job:
+            # a batch's train and parent are for its training jobs
+            job['parent'] = entry.get('brain') or defaults.get('brain', '')
+            if (why := bad_score(job['score'])) or not job['parent'] or 'chunk' in entry:
+                raise BadJob(f'{path.name} job {name}: {why or "a score job has a brain and no chunk"}')
+        for key in ('world', *(() if 'score' in job else ('train',))):
             if key not in job:
                 raise BadJob(f'{path.name} job {name}: no {key}')
         if job.get('on') not in (None, *MACHINES):
             raise BadJob(f'{path.name} job {name}: on is one of {", ".join(MACHINES)}')
+        if 'needs' in job and (why := bad_needs(job['needs'])):
+            raise BadJob(f'{path.name} job {name}: {why}')
         if job.get('chunk', 1) < 1:
             raise BadJob(f'{path.name} job {name}: chunk is a number of samples')
         out.append(job)
@@ -203,16 +251,27 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
     commit = snapshot.commit(repo)
     extra = snapshot.overlay(repo)
     code = {'commit': commit, 'bundle': blob(snapshot.bundle(repo)), 'overlay': extra and blob(extra)}
-    trusted = extra is not None or not snapshot.public(commit, repo)
-    ids, out = {}, []
+    # donors only run what's on main or next; anything else is for my own machines
+    trusted = extra is not None or not snapshot.public(commit, repo, only=snapshot.RELEASED)
+    ids, out, scored = {}, [], set()
     for job in load_batch(path):
+        if 'score' in job:
+            if job['parent'].startswith('job:') and job['parent'][4:] in scored:
+                raise BadJob(f'{path.name} job {job["name"]}: a score job has no brain to score')
+            out.append(score_spec(job, path, code, runs, ids, blob, len(out)))
+            ids[job['name']] = out[-1]['id']
+            scored.add(job['name'])
+            continue
         world, train = path.parent / job['world'], path.parent / job['train']
+        strict(world, train, f'{path.name} job {job["name"]}')
         text = train.read_text()
         samples = tomllib.loads(text).get('ppo', {}).get('samples')
         if not isinstance(samples, int):
             raise BadJob(f'{train.name}: no [ppo] samples')
         chunk = job.get('chunk') or samples
         pieces = -(-samples // chunk)
+        if job['parent'].startswith('job:') and job['parent'][4:] in scored:
+            raise BadJob(f'{path.name} job {job["name"]}: its parent is a score job, which makes no brain')
         before = parent(job['parent'], path.parent, runs, ids, blob)
         for i in range(pieces):
             name = job['name'] if pieces == 1 else f'{job["name"]}.{i + 1}'
@@ -226,12 +285,49 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
                     'train_file': train.name, 'parent': before,
                     # each piece plays its own episodes, not the first piece's again
                     'seed': job['seed'] + 1000 * i, 'samples': size, 'on': job.get('on')}
+            if 'needs' in job:
+                spec['needs'] = job['needs']
             ids[name] = spec['id']
             before = {'job': spec['id']}
             out.append(spec)
         # job:<name> means the last piece
         ids[job['name']] = out[-1]['id']
     return out, blobs
+
+
+def score_spec(job: dict, path: Path, code: dict, runs: Path, ids: dict, blob, n: int) -> dict:
+    from . import evals, games
+    where, score = f'{path.name} job {job["name"]}', dict(job['score'])
+    if score['game'] not in games.GAMES:
+        raise BadJob(f'{where}: no game {score["game"]!r} (one of {", ".join(sorted(games.GAMES))})')
+    if bad := [b for b in score.get('baselines', []) if b not in games.BASELINES]:
+        raise BadJob(f'{where}: no baseline {bad[0]!r}')
+    if score.get('wiped_on_event') and score['game'] not in games.EVENTS:
+        raise BadJob(f'{where}: {score["game"]} has no event to wipe on (only {", ".join(games.EVENTS)})')
+    world = path.parent / job['world']
+    strict(world, None, where)
+    # the games' own seed, written down, so the job says exactly which games it plays
+    seed = score.pop('seed', evals.HELD_OUT if score.pop('held_out', False) else evals.SEED)
+    spec = {'format': FORMAT, 'id': secrets.token_hex(6), 'batch': path.stem, 'name': job['name'],
+            'added': time.time() + n * 1e-3, 'code': code, 'trusted': True, 'kind': 'score',
+            'world': blob(world.read_bytes()), 'world_file': world.name,
+            'parent': parent(job['parent'], path.parent, runs, ids, blob), 'seed': seed, 'samples': 0,
+            'on': job.get('on'), 'score': {'episodes': games.EPISODES, 'baselines': ['random']} | score}
+    if 'needs' in job:
+        spec['needs'] = job['needs']
+    return spec
+
+
+def strict(world: Path, train: Path | None, where: str):
+    """Both files read by this checkout's own loader, which is the code the job sends: a world written for older
+    code (missing [jump] and [tree], 2026-11-02) fails here, not on every machine that takes it."""
+    from . import config
+    try:
+        config.load(world)
+        if train:
+            config.load_train(train)
+    except (config.ConfigError, tomllib.TOMLDecodeError, OSError) as e:
+        raise BadJob(f'{where}: {e}')
 
 
 def with_samples(text: str, samples: int) -> str:
@@ -313,17 +409,30 @@ def add(client: Client, path: Path, key: Path = KEY, runs: Path = ROOT, repo: Pa
 
 
 def sync(client: Client, runs: Path = ROOT) -> list[Path]:
-    """Every done job's run, unpacked into runs/ unless it's there already."""
+    """Every done job's run, unpacked into runs/ (a score job's into runs/scores/) unless it's there already."""
     got = []
     for job in client.json('GET', '/api/jobs'):
         spec = job['spec']
-        if job['state'] != 'done' or any(runs.glob(f'*-{run_name(spec)}')):
+        into = runs / 'scores' if spec.get('kind') == 'score' else runs
+        if job['state'] != 'done' or any(into.glob(f'*-{run_name(spec)}')):
             continue
         status, data = client.call('GET', f'/api/results/{spec["id"]}')
         if status != 200:
             log.warn('result not fetched', id=spec['id'], status=status)
             continue
-        got.append(unpack(data, spec, runs))
+        got.append(unpack(data, spec, into))
+    return got
+
+
+def peeks(client: Client, into: Path) -> list[Path]:
+    """Each running job's run so far, unpacked into into/ over the one before."""
+    got = []
+    for job in client.json('GET', '/api/jobs'):
+        if job['state'] != 'running':
+            continue
+        status, data = client.call('GET', f'/api/jobs/{job["spec"]["id"]}/peek')
+        if status == 200:
+            got.append(unpack(data, job['spec'], into))
     return got
 
 
@@ -334,8 +443,14 @@ def unpack(data: bytes, spec: dict, runs: Path) -> Path:
         if len(tops) != 1 or not next(iter(tops)).endswith('-' + run_name(spec)) or not NAME.match(next(iter(tops))):
             raise BadJob(f'result for {spec["id"]} is not one run folder named for it: {sorted(tops)[:5]}')
         runs.mkdir(parents=True, exist_ok=True)
-        tar.extractall(runs, filter='data')
+        # into a folder of its own first: a reader (the publisher, a scorer) seeing the run's folder before its
+        # run.json and checkpoints are all there took it for a finished run
+        part = runs / f'.part-{spec["id"]}'
+        shutil.rmtree(part, ignore_errors=True)
+        tar.extractall(part, filter='data')
     path = runs / next(iter(tops))
+    os.replace(part / path.name, path)
+    part.rmdir()
     log.info('run synced', id=spec['id'], run=path.name)
     return path
 
@@ -363,10 +478,13 @@ def main():
         case 'list':
             for job in client.json('GET', '/api/jobs'):
                 spec, p = job['spec'], job['progress'] or {}
-                done = f'{p.get("samples", 0) / spec["samples"]:.0%}' if job['state'] == 'running' else ''
+                done = f'{p.get("samples", 0) / spec["samples"]:.0%}' if job['state'] == 'running' and spec['samples'] \
+                    else ''
                 on = f'on {spec["on"]}' if spec.get('on') else ''
                 print(f'{spec["id"]}  {spec["batch"]:<16} {spec["name"]:<24} {job["state"]:<9} {done:>4}  '
-                      f'{on:<10} {job["worker"] or ""}{"  blocked" if job.get("blocked") else ""}')
+                      f'{on:<10} {job["worker"] or ""}{"  blocked" if job.get("blocked") else ""}'
+                      f'{"  " + job["unmet"] if job.get("unmet") else ""}'
+                      f'{"  " + job["kind"] if job["state"] == "failed" and job.get("kind") else ""}')
         case 'cancel' | 'retry':
             for id in args.ids:
                 client.json('POST', f'/api/jobs/{id}/{args.command}')

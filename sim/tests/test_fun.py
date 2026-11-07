@@ -61,3 +61,17 @@ def test_a_new_action_is_fun_until_it_isnt():
 
 def test_off_unless_asked_for():
     assert Forage(VAULT, load_train(), 1, 0).fun is None
+
+
+def test_a_block_carried_off_the_ground_and_set_down_again_is_no_fun():
+    cfg = load(DEFAULT.parent / 'nursery-seek.toml')
+    world = World(cfg, 1, seed=0)
+    fun = Fun(world, novelty=1.0, variety=0.0)
+    k = int(np.flatnonzero([b.carry for b in cfg.block])[0])
+    world.block_load[0, 0] = k
+    world.block_pos[0, k] = (10_000.0, 10_000.0)
+    world.pos[0, 0] = (0.0, 0.0)
+    assert fun.step(np.zeros((1, len(world.colony), 7)))[0, 0] == 0
+    world.block_load[0, 0] = -1
+    world.block_pos[0, k] = (0.0, 0.7)
+    assert fun.step(np.zeros((1, len(world.colony), 7)))[0, 0] == 0

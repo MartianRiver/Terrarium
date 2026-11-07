@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tarfile
 import threading
+import time
 import tomllib
 
 import pytest
@@ -14,6 +15,15 @@ from terrarium import coordinator, jobs, snapshot, worker
 from terrarium.store import LEASE, Gone, Store, sha256
 
 needs_ssh = pytest.mark.skipif(not shutil.which('ssh-keygen'), reason='no ssh-keygen')
+
+
+real_strict = jobs.strict
+
+
+@pytest.fixture(autouse=True)
+def loose_configs(monkeypatch):
+    # the small repos here have stub world and train files, not ones this code's loader takes
+    monkeypatch.setattr(jobs, 'strict', lambda world, train, where: None)
 
 
 @pytest.fixture(autouse=True)
@@ -79,8 +89,9 @@ def store(tmp_path) -> Store:
     return s
 
 
-def claimed(s: Store, worker: str, trusted: bool, now: float | None = None, role: str | None = None) -> dict:
-    job = s.claim(worker, trusted, now, role)
+def claimed(s: Store, worker: str, trusted: bool, now: float | None = None, role: str | None = None,
+            specs: dict | None = None) -> dict:
+    job = s.claim(worker, trusted, now, role, specs)
     assert job is not None
     return job
 
@@ -243,32 +254,42 @@ def commit_on(repo, branch: str, text: str) -> str:
     return snapshot.commit(repo)
 
 
-def test_public_code_is_what_a_branch_of_the_repo_holds_and_not_a_pull_request(repo, tmp_path):
+def test_public_code_is_what_main_or_next_holds_and_not_another_branch_or_a_pull_request(repo, tmp_path):
     # repo stands in for GitHub: its branches are what was pushed, refs/pull/ what forks offer
     mirror = tmp_path / 'home' / 'mirror.git'
     mirror.parent.mkdir()
     snapshot.from_public(tmp_path / 'ok', mirror, str(repo), snapshot.commit(repo))
     assert (tmp_path / 'ok' / 'sim' / 'a.py').exists()
     pushed = commit_on(repo, 'jelly', 'a = 3\n')
-    snapshot.from_public(tmp_path / 'jelly', mirror, str(repo), pushed)
-    assert (tmp_path / 'jelly' / 'sim' / 'a.py').read_text() == 'a = 3\n'
+    with pytest.raises(PermissionError, match='main or next'):
+        snapshot.from_public(tmp_path / 'jelly', mirror, str(repo), pushed)
     fork = commit_on(repo, 'fork', 'a = 4\n')
     git(repo, 'update-ref', 'refs/pull/1/head', fork)
     git(repo, 'switch', '-q', 'next')
     git(repo, 'branch', '-q', '-D', 'fork')
     with pytest.raises(PermissionError):
         snapshot.from_public(tmp_path / 'no', mirror, str(repo), fork)
-    assert (mirror / 'refs' / 'pull').exists() or 'refs/pull/1/head' in (mirror / 'packed-refs').read_text()
+    # the mirror holds branches only, so a fork's commits never even land here
+    assert not (mirror / 'refs' / 'pull').exists()
     with pytest.raises(PermissionError):
         snapshot.from_public(tmp_path / 'no', mirror, str(repo), 'f' * 40)
 
 
-def test_a_job_is_trusted_unless_its_commit_is_on_an_origin_branch(repo):
+def test_an_old_full_mirror_is_replaced_by_one_of_branches_only(repo, tmp_path):
+    mirror = tmp_path / 'mirror.git'
+    git(tmp_path, 'clone', '-q', '--mirror', str(repo), str(mirror))
+    snapshot.from_public(tmp_path / 'ok', mirror, str(repo), snapshot.commit(repo))
+    fetch = subprocess.run(['git', 'config', '--get-all', 'remote.origin.fetch'], cwd=mirror, capture_output=True, text=True)
+    assert fetch.stdout.strip() == '+refs/heads/*:refs/heads/*'
+
+
+def test_a_job_is_trusted_unless_its_commit_is_on_main_or_next_of_origin(repo):
     assert snapshot.public(snapshot.commit(repo), repo)
     local = commit_on(repo, 'local', 'a = 5\n')
     assert not snapshot.public(local, repo)
     git(repo, 'update-ref', 'refs/remotes/origin/local', 'HEAD')
     assert snapshot.public(local, repo)
+    assert not snapshot.public(local, repo, only=snapshot.RELEASED)
 
 
 def test_a_batch_file_becomes_specs_with_every_input_named_by_hash(repo, tmp_path):
@@ -347,6 +368,49 @@ def test_a_donor_gets_public_jobs_and_only_their_blobs(server, tmp_path, monkeyp
     assert (path / 'evals.json').exists() and jobs.sync(c['admin'], runs) == []
 
 
+def test_a_running_job_shows_its_run_so_far_until_it_ends(server, tmp_path):
+    httpd, c = server
+    upload(c['admin'], spec('d' * 12, trusted=True))
+    c['trusted'].json('POST', '/api/claim', {})
+    name = f'20261103-120000-nddd-{"d" * 12}'
+    assert c['lab'].call('GET', f'/api/jobs/{"d" * 12}/peek')[0] == 404
+    assert c['rented'].call('PUT', f'/api/jobs/{"d" * 12}/peek', result(name))[0] == 410
+    c['trusted'].json('PUT', f'/api/jobs/{"d" * 12}/peek', result(name, weights=b'halfway'))
+    assert c['donor'].call('GET', f'/api/jobs/{"d" * 12}/peek')[0] == 404
+    [path] = jobs.peeks(c['lab'], tmp_path / 'peeks')
+    assert (path / 'checkpoints' / '00000000064.pt').read_bytes() == b'halfway'
+    c['trusted'].json('PUT', f'/api/jobs/{"d" * 12}/result', result(name))
+    assert c['lab'].call('GET', f'/api/jobs/{"d" * 12}/peek')[0] == 404
+
+
+def test_the_lab_token_manages_jobs_but_never_works_them(server):
+    httpd, c = server
+    upload(c['lab'], spec('e' * 12, trusted=True))
+    assert [j['spec']['id'] for j in c['lab'].json('GET', '/api/jobs')] == ['e' * 12]
+    assert c['lab'].call('GET', '/api/pods')[0] == 200
+    assert c['lab'].call('POST', '/api/claim', {})[0] == 404
+    assert c['lab'].call('PUT', f'/api/jobs/{"e" * 12}/peek', b'x')[0] == 404
+
+
+def test_a_peek_carries_the_newest_finished_checkpoint_and_the_rest_while_they_fit(tmp_path):
+    run = tmp_path / '20261103-120000-run'
+    (run / 'checkpoints').mkdir(parents=True)
+    (run / 'run.json').write_text('{}')
+    old = time.time() - 60
+    for n in (0, 16, 32, 48, 64):
+        ck = run / 'checkpoints' / f'{n:011d}.pt'
+        ck.write_bytes(os.urandom(20_000))
+        os.utime(ck, (old, old))
+    (run / 'checkpoints' / f'{80:011d}.pt').write_bytes(b'being written')
+
+    def names(data):
+        with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tar:
+            return sorted(m.name.rsplit('/', 1)[1] for m in tar.getmembers() if '/checkpoints/' in m.name)
+
+    assert names(worker.peek(run)) == ['00000000016.pt', '00000000032.pt', '00000000064.pt']
+    assert names(worker.peek(run, limit=30_000)) == ['00000000064.pt']
+
+
 def test_a_long_job_can_go_out_in_pieces_that_carry_on_from_each_other(repo, tmp_path):
     (repo / 'sim' / 'train.toml').write_text('[ppo]\nsamples = 1_000  # all of it\nlr = 3e-4\n[reward]\nsamples = 2\n')
     git(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'longer')
@@ -415,6 +479,7 @@ def test_a_trusted_worker_runs_a_signed_job_on_uncommitted_code(server, repo, ke
     batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n[[job]]\nname = "one"\n')
     [s] = jobs.add(c['admin'], batch, k, tmp_path / 'runs', repo)
     monkeypatch.setattr(worker, 'sync', lambda sim: None)
+    monkeypatch.setattr(worker, 'check_lock', lambda lock: None)
 
     def command(spec, inputs, sim):
         return [sys.executable, '-c', FAKE_TRAIN, jobs.run_name(spec), str(inputs['world'])]
@@ -450,3 +515,101 @@ def test_workers_refuse_unsigned_jobs_and_donors_refuse_trusted_ones(server, key
     trusted = worker.Task({'spec': spec(trusted=True), 'sig': jobs.sign(spec(trusted=True), k)})
     with pytest.raises(worker.Refused, match='trusted'):
         w.prepare(trusted, tmp_path / 'job')
+
+
+CPU = {'cores': 16, 'memory_gb': 15, 'gpus': []}
+LAPTOP_GPU = {'cores': 16, 'memory_gb': 15, 'gpus': [{'name': 'RTX 3050 Ti', 'memory_gb': 4}]}
+MAC = {'cores': 8, 'memory_gb': 16, 'gpus': [], 'mps': True}
+
+
+def test_a_job_goes_only_to_a_machine_that_has_what_it_needs(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1) | {'needs': {'gpu': True, 'gpu_memory_gb': 6}}, 'sig')
+    s.add(spec('b' * 12, added=2) | {'needs': {'gpu': False}}, 'sig')
+    s.add(spec('c' * 12, added=3) | {'needs': {'machine': 'Kelpie'}}, 'sig')
+    # a 4 GB card is a GPU but not enough of one; the Mac's shares its 16 GB
+    assert s.claim('Jellybean', True, specs=LAPTOP_GPU) is None
+    assert claimed(s, 'river-m3', True, specs=MAC)['spec']['id'] == 'a' * 12
+    assert claimed(s, 'Kelpie', True, specs=CPU)['spec']['id'] == 'b' * 12
+    assert s.claim('Dell2', True, specs=CPU) is None
+    assert claimed(s, 'Kelpie', True, specs=CPU)['spec']['id'] == 'c' * 12
+
+
+def test_a_worker_that_says_nothing_about_itself_gets_only_jobs_without_needs(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1) | {'needs': {'cores': 8}}, 'sig')
+    s.add(spec('b' * 12, added=2), 'sig')
+    assert claimed(s, 'old', True)['spec']['id'] == 'b' * 12
+    assert s.claim('old', True) is None
+
+
+def test_needs_are_checked_in_a_spec_and_in_a_batch(tmp_path):
+    for needs in ({}, {'gpu': 'yes'}, {'cores': True}, {'vram': 8}):
+        with pytest.raises(jobs.BadJob, match='needs'):
+            jobs.check(spec() | {'needs': needs})
+    jobs.check(spec() | {'needs': {'gpu': True, 'gpu_memory_gb': 5.5, 'cores': 4, 'memory_gb': 8, 'machine': 'K'}})
+    batch = tmp_path / 'grid.toml'
+    batch.write_text('world = "w"\ntrain = "t"\nneeds = { gpu = true }\n[[job]]\nname = "x"\n'
+                     '[[job]]\nname = "y"\nneeds = { gpus = 1 }\n')
+    with pytest.raises(jobs.BadJob, match="job y: unknown need 'gpus'"):
+        jobs.load_batch(batch)
+
+
+def test_a_brain_that_ends_its_own_run_fails_at_once_and_a_crash_gets_another_try(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1), 'sig')
+    s.add(spec('b' * 12, added=2), 'sig')
+    s.claim('pod1', True, now=100)
+    s.fail('a' * 12, 'pod1', 'stuck at update 40', kind='stuck', now=101)
+    a = s.read('a' * 12)
+    assert a['state'] == 'failed' and a['kind'] == 'stuck' and a['history'][-1][1] == 'stuck on pod1'
+    s.claim('pod1', True, now=102)
+    s.fail('b' * 12, 'pod1', 'training exited 1', now=103)
+    b = s.read('b' * 12)
+    assert b['state'] == 'pending' and b['kind'] == 'crash' and b['history'][-1][1] == 'failed on pod1'
+    s.claim('pod2', True, now=104)
+    s.expire(104 + LEASE + 1)
+    assert s.read('b' * 12)['kind'] == 'quiet'
+
+
+def test_the_coordinator_says_why_a_job_waits_and_what_failed_on_each_pod(server):
+    _, c = server
+    upload(c['admin'], spec('a' * 12, added=1) | {'needs': {'gpu': True}})
+    c['trusted'].json('POST', '/api/hello', {'specs': CPU})
+    [job] = c['admin'].json('GET', '/api/jobs')
+    assert job['unmet'] == 'no worker online with gpu = true'
+    c['trusted'].json('POST', '/api/hello', {'specs': MAC})
+    assert c['admin'].json('GET', '/api/jobs')[0]['unmet'] is None
+    assert c['admin'].json('GET', '/api/workers')['trusted']['info']['specs']['mps'] is True
+    assert c['trusted'].json('POST', '/api/claim', {'specs': MAC})['spec']['id'] == 'a' * 12
+    c['trusted'].json('POST', '/api/jobs/' + 'a' * 12 + '/fail', {'error': 'x', 'kind': 'give_up'})
+    assert c['admin'].json('GET', '/api/jobs')[0]['history'][-1][1] == 'gave up on trusted'
+
+
+def test_a_failed_run_says_whether_its_brain_ended_it(tmp_path):
+    task = worker.Task({'spec': spec(), 'sig': 's'})
+    assert worker.failure_kind(task) == 'setup'
+    task.state, task.run = 'training', tmp_path
+    (tmp_path / 'run.json').write_text(json.dumps({'stuck': 40}))
+    assert worker.failure_kind(task) == 'stuck'
+    (tmp_path / 'run.json').write_text(json.dumps({'gave_up': 40}))
+    assert worker.failure_kind(task) == 'give_up'
+    (tmp_path / 'run.json').write_text('{}')
+    assert worker.failure_kind(task) == 'crash'
+
+
+def test_a_synced_run_appears_whole(tmp_path):
+    s = spec()
+    data = result(name=f'20261024-120000-{jobs.run_name(s)}')
+    path = jobs.unpack(data, s, tmp_path / 'runs')
+    assert (path / 'run.json').exists() and (path / 'evals.json').exists()
+    assert sorted(p.name for p in (tmp_path / 'runs').iterdir()) == [path.name]
+
+
+def test_a_world_this_code_wont_load_is_refused_before_it_is_signed(tmp_path):
+    from terrarium import config
+    old = tmp_path / 'old.toml'
+    old.write_text(config.DEFAULT.read_text().replace('[tree]', '[treez]', 1))
+    with pytest.raises(jobs.BadJob, match='grid.toml job x'):
+        real_strict(old, config.TRAIN, 'grid.toml job x')
+    real_strict(config.DEFAULT, config.TRAIN, 'grid.toml job x')

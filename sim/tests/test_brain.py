@@ -69,11 +69,26 @@ def test_a_brain_from_shorter_lists_acts_the_same(tmp_path):
     grown, _ = load_brain(tmp_path / 'old.pt')
 
     me, kinds, rays = observation(kinds=3)
-    mean, value = brain(me[:, :3], kinds, rays[..., :2])
-    mean2, value2 = grown(me, kinds, rays)
+    mean, value, _ = brain(me[:, :3], kinds, rays[..., :2])
+    mean2, value2, _ = grown(me, kinds, rays)
     assert torch.allclose(value, value2, atol=1e-6)
     assert torch.allclose(mean, mean2[:, :1], atol=1e-6)
     assert (mean2[:, 1] == 0).all()
+
+
+def test_a_kind_carved_out_of_an_older_one_starts_as_a_copy(tmp_path):
+    """A brain from before heaped droppings were their own kind sees them as it saw every dropping."""
+    torch.manual_seed(2)
+    now = schema.current()
+    old = now | {'kinds': [k for k in now['kinds'] if k != 'heap']}
+    save(Brain(**SHAPE, lists=old), tmp_path / 'old.pt')
+    grown, _ = load_brain(tmp_path / 'old.pt')
+    rows = grown.kind.weight
+    assert torch.equal(rows[schema.KINDS.index('heap')], rows[schema.KINDS.index('dung')])
+    # one that already knew heaps keeps its own
+    rows[schema.KINDS.index('heap')].data.zero_()
+    save(grown, tmp_path / 'new.pt')
+    assert not load_brain(tmp_path / 'new.pt')[0].kind.weight[schema.KINDS.index('heap')].any()
 
 
 def test_a_new_yes_no_action_is_tried_now_and_then(tmp_path):
@@ -84,11 +99,11 @@ def test_a_new_yes_no_action_is_tried_now_and_then(tmp_path):
     save(brain, tmp_path / 'old.pt')
     grown, _ = load_brain(tmp_path / 'old.pt')
     obs = Forage(SOLO, TRAIN, 64, seed=0).observe()
-    yes = np.concatenate([grown.act(obs) for _ in range(50)]) > 0
+    yes = np.concatenate([grown.act(obs)[0] for _ in range(50)]) > 0
     for name in schema.YES_NO:
         i = schema.ACTIONS.index(name)
         assert 0.03 < yes[:, i].mean() < 0.07
-        assert (grown.act(obs, sample=False)[:, i] < 0).all()
+        assert (grown.act(obs, sample=False)[0][:, i] < 0).all()
 
 
 def test_not_a_brain_is_refused(tmp_path):
@@ -104,7 +119,7 @@ def test_forage_observes_every_creature():
     assert obs.me.shape == (3, len(schema.SELF)) and obs.kinds.shape == (3, rays)
     assert obs.rays.shape == (3, rays, len(schema.RAY)) and obs.me.dtype == obs.rays.dtype == np.float32
     assert (obs.rays[..., 0] <= 1).all() and (obs.me[:, 0] == SOLO.energy.start).all()
-    mean, value = Brain(**SHAPE)(*tensors(obs, 'cpu'))
+    mean, value, _ = Brain(**SHAPE)(*tensors(obs, 'cpu'))
     assert mean.shape == (3, len(schema.ACTIONS)) and value.shape == (3,)
 
 
@@ -239,9 +254,9 @@ def test_an_action_can_start_over(tmp_path):
         brain.policy.weight[eat] = 1.0
         brain.policy.bias[eat] = 3.0
     obs = Forage(SOLO, TRAIN, 2, seed=0).observe()
-    before = brain.act(obs, sample=False)
+    before, _ = brain.act(obs, sample=False)
     brain.restart(('eat',))
-    after = brain.act(obs, sample=False)
+    after, _ = brain.act(obs, sample=False)
     assert np.allclose(after[:, eat], -1.0) and np.allclose(after[:, :eat], before[:, :eat])
     with pytest.raises(ValueError):
         brain.restart(('fly',))
@@ -286,3 +301,42 @@ def test_evals_take_a_brain(tmp_path):
     short = replace(SOLO, episode=replace(SOLO.episode, seconds=5.0))
     r = run(short, brain_policy(tmp_path / 'b.pt'), 2)
     assert 0 < r['seconds_alive']['mean'] <= 5.0
+
+
+def test_the_coin_bonus_keeps_a_coin_from_settling_on_never():
+    from terrarium import ppo
+    torch.manual_seed(0)
+    brain = Brain(32, 1, 2, yes_no='bernoulli')
+    eat = schema.ACTIONS.index('eat')
+    with torch.no_grad():
+        brain.policy.bias[eat] = -3.0
+    me, kinds, rays = torch.zeros(64, len(schema.SELF)), torch.zeros(64, 4, dtype=torch.long), torch.zeros(64, 4, len(schema.RAY))
+    mean, value, _ = brain(me, kinds, rays)
+    dist = brain.dist(mean)
+    coins = brain.coins()
+    assert torch.allclose(dist.coin_entropy(), torch.where(coins, dist.coin.entropy(), 0.0).sum(-1))
+    actions = dist.sample().detach()
+    old = dist.log_prob(actions).sum(-1).detach()
+    zero = torch.zeros(64)
+    opt = torch.optim.Adam(brain.parameters(), lr=1e-2)
+    for _ in range(20):
+        mean, value, _ = brain(me, kinds, rays)
+        ppo.step(brain, opt, replace(TRAIN.ppo, coins=0.1), {k: [] for k in ('policy_loss', 'value_loss', 'entropy', 'kl', 'clipped')},
+                 mean, value.squeeze(-1), actions, old, zero, zero)
+    assert brain.policy.bias[eat] > -2.9
+    # aimed at one coin, the bonus leaves the others alone
+    sprint = schema.ACTIONS.index('sprint')
+    assert torch.allclose(dist.coin_entropy(brain.named(('sprint',))), dist.coin.entropy()[..., sprint])
+
+
+def test_sense_skips_the_last_layers_other_tokens_and_says_the_same():
+    torch.manual_seed(3)
+    for width, layers, heads in ((64, 2, 4), (128, 2, 8), (32, 1, 4)):
+        b = Brain(width, layers, heads).eval()
+        n, s = 5, b.schema
+        me, rays = torch.randn(n, len(s['self'])), torch.randn(n, 16, len(s['ray']))
+        kinds = torch.randint(0, len(s['kinds']), (n, 16))
+        tokens = torch.cat([b.me(me)[:, None], b.kind(kinds) + b.ray(rays)], 1)
+        with torch.no_grad():
+            whole = b.norm(b.encoder(tokens)[:, 0])
+            assert torch.allclose(b.sense(me, kinds, rays), whole, atol=1e-5)

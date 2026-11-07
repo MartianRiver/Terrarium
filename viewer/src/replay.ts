@@ -5,11 +5,11 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type EggState, type FlowerState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
+  type BlockState, type CreatureState, type DungState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type NestInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
-export const REPLAY_VERSION = 1;
+export const REPLAY_VERSION = 2;
 
 export interface Replay {
   version: number;
@@ -68,6 +68,12 @@ function parseLine(line: string, n: number): Obj {
   return obj(value, `line ${n}`);
 }
 
+function spot(v: unknown, where: string) {
+  if (typeof v !== 'object' || v === null) throw new ReplayError(`${where}: not an object`);
+  const o = v as Obj;
+  return { x: num(o, 'x', where), y: num(o, 'y', where), radius: num(o, 'radius', where) };
+}
+
 function readInfo(o: Obj): WorldInfo {
   const where = 'line 1: info';
   return {
@@ -78,6 +84,9 @@ function readInfo(o: Obj): WorldInfo {
     nests: list(o, 'nests', where, (n, w): NestInfo => ({
       colony: int(n, 'colony', w), x: num(n, 'x', w), y: num(n, 'y', w), radius: num(n, 'radius', w),
     })),
+    midden: o.midden === undefined ? 0 : num(o, 'midden', where),
+    ...(o.middenSpot === undefined ? {} : { middenSpot: spot(o.middenSpot, `${where}.middenSpot`) }),
+    tree: o.tree === undefined ? null : int(o, 'tree', where),
   };
 }
 
@@ -94,21 +103,32 @@ function readFrame(o: Obj, where: string): Frame {
         holding: c.holding === undefined ? 0 : int(c, 'holding', w),
         nectar: c.nectar === undefined ? 0 : num(c, 'nectar', w),
         sprinting: c.sprinting === undefined ? 0 : int(c, 'sprinting', w),
+        load: c.load === undefined ? 0 : int(c, 'load', w),
+        young: c.young === undefined ? 0 : num(c, 'young', w),
+        stamina: c.stamina === undefined ? 1 : num(c, 'stamina', w),
+        dung: c.dung === undefined ? 0 : int(c, 'dung', w),
+        z: c.z === undefined ? 0 : num(c, 'z', w),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {
-      if (f.kind !== 'common' && f.kind !== 'jelly') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
-      return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w) };
+      if (f.kind !== 'common' && f.kind !== 'jelly' && f.kind !== 'apple') throw new ReplayError(`${w}.kind: unknown food ${JSON.stringify(f.kind)}`);
+      return { id: int(f, 'id', w), kind: f.kind, x: num(f, 'x', w), y: num(f, 'y', w), hidden: f.hidden === undefined ? false : int(f, 'hidden', w) > 0,
+        z: f.z === undefined ? 0 : num(f, 'z', w) };
     }),
     blocks: list(o, 'blocks', where, (b, w): BlockState => ({
       id: int(b, 'id', w), x: num(b, 'x', w), y: num(b, 'y', w), angle: num(b, 'angle', w), w: num(b, 'w', w), h: num(b, 'h', w),
+      carried: b.carried === undefined ? 0 : int(b, 'carried', w),
     })),
-    stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: int(s, 'jelly', w) })),
+    stores: o.stores === undefined ? [] : list(o, 'stores', where, (s, w): StoreState => ({ colony: int(s, 'colony', w), jelly: num(s, 'jelly', w) })),
     light: o.light === undefined ? 1 : num(o, 'light', where),
     eggs: o.eggs === undefined ? [] : list(o, 'eggs', where, (e, w): EggState => ({
       id: int(e, 'id', w), colony: int(e, 'colony', w), x: num(e, 'x', w), y: num(e, 'y', w), progress: num(e, 'progress', w),
     })),
     flowers: o.flowers === undefined ? [] : list(o, 'flowers', where, (f, w): FlowerState => ({ id: int(f, 'id', w), x: num(f, 'x', w), y: num(f, 'y', w) })),
+    flags: o.flags === undefined ? [] : list(o, 'flags', where, (f, w): FlagState => ({
+      colony: int(f, 'colony', w), x: num(f, 'x', w), y: num(f, 'y', w), down: int(f, 'down', w) > 0, carrier: int(f, 'carrier', w),
+    })),
+    ...(o.dung === undefined ? {} : { dung: list(o, 'dung', where, (d, w): DungState => ({ id: int(d, 'id', w), x: num(d, 'x', w), y: num(d, 'y', w) })) }),
   };
 }
 

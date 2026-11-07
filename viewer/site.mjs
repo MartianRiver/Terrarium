@@ -5,8 +5,9 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { marked } from 'marked';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -195,69 +196,115 @@ write('blog', page({
 }));
 
 // the gallery itself (/replays/gallery/index.json and its replays) is published apart from the site, every 15 min
-// while training runs (python -m terrarium.gallery), so the page reads it when it opens
+// while training runs (python -m terrarium.gallery), and so is the nursery channel (/replays/nursery/index.json), so
+// the page reads both when it opens: what's training now first, then the steps the line took, newest first
 const BRAINS = `<script>
 const box = document.getElementById('gallery');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 90 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
-function brain(b, i, extra = '') {
-  const n = b.numbers, bits = [];
+const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 90 ? Math.max(m, 1) + ' min ago' : m < 2160 ? Math.round(m / 60) + ' h ago' : new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+const pct = (v) => Math.round(v * 100) + '%';
+const get = (url) => fetch(url, { cache: 'no-cache' }).then((r) => r.ok ? r.json() : null).catch(() => null);
+function numbers(b) {
+  const n = b.numbers || {}, bits = [];
   if (n.alive !== undefined) bits.push(n.alive + ' s alive');
   if (n.food_per_minute !== undefined) bits.push(n.food_per_minute + ' food a minute');
   if (n.stored !== undefined) bits.push(n.stored + ' stored');
   if (n.through_first_night) bits.push(n.through_first_night[0] + ' of ' + n.through_first_night[1] + ' colonies through night 1');
   if (n.from_middle !== undefined) bits.push(n.from_middle + ' food from the room, ' + n.blocks_moved + ' doors moved, per episode');
-  const tested = n.episodes ? ' <span class="when">tested over ' + n.episodes + ' episodes</span>' : '';
-  return '<li><a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(b.replay) + '&follow&gallery=' + i + '">Watch</a> <b>' + esc(b.name) + '</b>'
-    + ' <span class="when">' + esc(b.world) + ' · ' + (b.samples / 1e6).toFixed(1) + 'M samples, ' + Math.round(b.total / 1e6) + 'M in all' + extra + '</span>'
-    + (bits.length ? '<span class="nums">' + esc(bits.join(' · ')) + '</span>' + tested : '') + '</li>';
+  return bits.join(' · ');
 }
-fetch('/replays/gallery/index.json', { cache: 'no-cache' }).then((r) => {
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}).then((g) => {
-  let i = 0, html = '';
-  const flat = [];
-  for (const s of g.steps) {
-    html += '<h2>' + esc(s.title) + '</h2>' + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + '<ol class="brains">';
-    for (const b of s.brains) html += brain(b, i++);
-    html += '</ol>';
+function brain(b, i, extra = '') {
+  const nums = numbers(b);
+  return '<li><a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(b.replay) + '&follow&gallery=' + i + '">Watch</a> <b>' + esc(b.name) + '</b>'
+    + ' <span class="when">' + esc(b.world) + ' · ' + Math.round(b.total / 1e6) + 'M samples of training in all' + extra + '</span>'
+    + (nums ? '<span class="nums">' + esc(nums) + (b.numbers && b.numbers.episodes ? ' <span class="when">(tested over ' + b.numbers.episodes + ' episodes)</span>' : '') + '</span>' : '') + '</li>';
+}
+function card(title, tag, text, more, href) {
+  return '<li class="now-card"><a class="play" href="' + href + '">Watch</a><b>' + esc(title) + '</b> <span class="tag">' + esc(tag) + '</span>'
+    + '<p>' + esc(text) + '</p>' + (more ? '<p class="when">' + more + '</p>' : '') + '</li>';
+}
+function nursery(c) {
+  if (!c || !c.items || !c.items.length) return '';
+  // the publisher rewrites the index every 10 min while anything trains (older indexes don't say per game)
+  const live = Date.now() - new Date(c.updated) < 40 * 60e3;
+  const keys = [...new Set(c.items.map((i) => i.game).filter((k) => k && c.games && c.games[k]))];
+  const watch = (ks) => '/watch/?channel=/replays/nursery/index.json&game=' + ks.map(encodeURIComponent).join(',');
+  // setups of the same game (family) share a card, each one a link of its own
+  const families = new Map();
+  for (const k of keys) {
+    const f = c.games[k].family || c.games[k].name;
+    families.set(f, (families.get(f) || []).concat(k));
   }
+  const cards = [...families].map(([family, ks]) => {
+    const g = c.games[ks[0]];
+    const best = c.items.filter((i) => i.game === ks[0]).sort((a, b) => (b.samples || 0) - (a.samples || 0))[0];
+    let more = '';
+    if (best.score) {
+      more = 'Newest brain: ' + esc(best.score.label.toLowerCase()) + ' <b>' + pct(best.score.value) + '</b>'
+        + (best.score.marks || []).map((m) => ' · ' + esc(m[0]) + ' ' + pct(m[1])).join('');
+    }
+    if (ks.length > 1) {
+      more += (more ? '<br>' : '') + 'Setups: ' + ks.map((k) => '<a href="' + watch([k]) + '">' + esc(c.games[k].variant || c.games[k].name) + '</a>'
+        + (c.games[k].training ?? live ? ' (training now)' : '')).join(' · ');
+    }
+    return card(ks.length > 1 ? family : g.name, g.kind, g.goal + ' ' + g.setup, more, watch(ks));
+  });
+  return '<h2>In the nursery</h2><p>Small worlds where baby Terrikins can’t go hungry, learning kids’ games. Each one tests one thing a brain needs, like memory, away from the work of staying alive. '
+    + (keys.some((k) => c.games[k].training ?? live) ? 'Training now, updated ' + ago(c.updated) + '. ' : c.note ? esc(c.note[0].toUpperCase() + c.note.slice(1)) + ' (updated ' + ago(c.updated) + '). ' : '') + 'Watch shows its newest brains in turn, with a card saying what’s going on.</p><ol class="brains now">' + cards.join('') + '</ol>';
+}
+Promise.all([get('/replays/gallery/index.json'), get('/replays/nursery/index.json')]).then(([g, c]) => {
+  let html = nursery(c);
+  if (!g) {
+    box.innerHTML = (html || '') + '<p>The gallery isn’t up right now. The <a href="/watch/">latest brain</a> still plays.</p>';
+    return;
+  }
+  // numbered in the order viewer/src/gallery.ts flattens them, so &gallery=N steps through the same list
+  const at = new Map();
+  let i = 0;
+  for (const s of g.steps) for (const b of s.brains) at.set(b, i++);
   const now = g.training.concat(g.latest);
-  if (now.length) {
-    html = '<h2>Training now</h2><p>The newest brains from the forks training right now, as they come back from the GPUs they train on.</p><ol class="brains">'
-      + now.map((b) => brain(b, i++, b.finished ? ' · finished ' + ago(b.finished) : ' · training')).join('') + '</ol>' + html;
-  }
-  if (g.asides.length) {
-    html += '<h2>On the side</h2><ol class="brains">' + g.asides.map((b) => brain(b, i++).replace('</b>', '</b> <span class="aside">' + esc(b.title) + '</span>')
-      .replace('</li>', '<p>' + esc(b.text) + '</p></li>')).join('') + '</ol>';
-  }
-  // what's being worked on goes first on the page, numbered last so older links still land on the same brain
-  let working = '';
+  for (const b of now) at.set(b, i++);
+  for (const b of g.asides) at.set(b, i++);
+  for (const w of g.working || []) for (const b of w.brains) at.set(b, i++);
+  let main = '';
   for (const w of g.working || []) {
     if (!w.brains.length) continue;
-    working += '<h2>Working on now: ' + esc(w.title) + '</h2><p>' + esc(w.text) + '</p><ol class="brains">'
-      + w.brains.map((b) => brain(b, i++).replace('</li>', '<p>' + esc(b.note) + '</p></li>')).join('') + '</ol>';
+    main += '<h3>Working on: ' + esc(w.title) + '</h3><p>' + esc(w.text) + '</p><ol class="brains">'
+      + w.brains.map((b) => brain(b, at.get(b)).replace('</li>', '<p>' + esc(b.note) + '</p></li>')).join('') + '</ol>';
   }
-  html = working + html;
-  box.innerHTML = html + '<p class="when">Updated ' + ago(g.updated) + '.</p>';
-}).catch(() => {
-  box.innerHTML = '<p>The gallery isn’t up right now. The <a href="/watch/">latest brain</a> still plays.</p>';
+  if (now.length) {
+    main += '<ol class="brains">' + now.map((b) => brain(b, at.get(b), b.finished ? ' · finished ' + ago(b.finished) : ' · training now')).join('') + '</ol>';
+  }
+  html += '<h2>The main line</h2><p>The brain the colonies run on: each new one starts from the last.</p>' + main;
+  html += '<h2>How they got here</h2><p>Every step the main line took, newest first. Open one for what changed and every brain in it.</p>';
+  const steps = g.steps.map((s, n) => [s, n + 1]).reverse();
+  for (const [s, n] of steps) {
+    const last = s.brains[s.brains.length - 1];
+    if (!last) continue;
+    html += '<details class="step"><summary><span class="step-n">' + n + '</span> ' + esc(s.title)
+      + ' <a class="play" href="/watch/?replay=/replays/gallery/' + encodeURIComponent(last.replay) + '&follow&gallery=' + at.get(last) + '">Watch</a></summary>'
+      + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + '<ol class="brains">' + s.brains.map((b) => brain(b, at.get(b))).join('') + '</ol></details>';
+  }
+  if (g.asides.length) {
+    html += '<h2>On the side</h2><ol class="brains">' + g.asides.map((b) => brain(b, at.get(b)).replace('</b>', '</b> <span class="aside">' + esc(b.title) + '</span>')
+      .replace('</li>', '<p>' + esc(b.text) + '</p></li>')).join('') + '</ol>';
+  }
+  box.innerHTML = html + '<p class="when">Brains updated ' + ago(g.updated) + '.</p>';
 });
 </script>`;
 write('brains', page({
   title: 'Brains',
-  description: 'Every brain the Terrikins have had, from the first that learned to eat to the ones training now. Watch any of them.',
+  description: 'What the Terrikins are learning right now, and every brain they’ve had, from the first that learned to eat. Watch any of them.',
   path: '/brains/',
   body: `<h1>Brains</h1>
-<p>Every brain the one training now came from, back to the first, and a few side experiments. Watch plays one for three minutes in the world it trained in, in the same garden each time. The numbers are its own test results in that world, and the worlds got harder as they went, so they compare within a step more than across them.</p>
+<p>Each Terrikin has its own copy of the same brain, and a brain is what training makes: a set of numbers that turns what a Terrikin senses into what it does. Here’s what’s training now, then every step that got the colonies’ brain to where it is. Watch plays one in the world it trained in. Numbers are its own test results there, and the worlds got harder as they went, so compare within a step more than across them.</p>
 <div id="gallery"><p>Loading…</p></div>
 ${BRAINS}`,
 }));
 // Terrarium at Home: the page, the reviews of the worker's code (site/reviews/, each a model's review pasted in
 // whole, with the commit it read) and the board, read live from the job queue
 const atHome = read(join(SITE, 'at-home.md'));
-for (const key of ['title', 'description', 'usd_per_billion', 'rate_from', 'aud_per_usd', 'aud_date']) {
+for (const key of ['title', 'description', 'usd_per_billion', 'aud_per_usd', 'aud_date']) {
   if (!atHome.meta[key]) throw new Error(`site/at-home.md has no ${key}`);
 }
 const reviews = existsSync(join(SITE, 'reviews')) ? readdirSync(join(SITE, 'reviews')).filter((f) => f.endsWith('.md')).sort().reverse().map((f) => {
@@ -296,11 +343,17 @@ fetch(BOARD_URL).then((r) => {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }).then((b) => {
-  const lent = b.totals.lent;
-  let html = lent.samples
-    ? '<p class="saved">Lent machines have trained <b>' + samples(lent.samples) + ' samples</b> over ' + lent.hours.toFixed(1)
-      + ' hours: about <b>' + money(lent.samples / 1e9 * PER_BILLION) + '</b> of rented GPU time.</p>'
-    : '<p class="saved">No lent machine has finished a job yet.</p>';
+  // every machine but a rented one costs me nothing, so it's worth what renting its samples would have cost
+  const none = { samples: 0, hours: 0, dollars: 0 };
+  const free = ['admin', 'trusted', 'donor'].map((k) => b.totals[k] ?? none).reduce((t, k) => ({ samples: t.samples + k.samples, hours: t.hours + k.hours }), none);
+  const rented = { ...none, ...b.totals.rented };
+  // what rented GPUs have cost a sample so far (the page's own rate until there are any)
+  const perBillion = rented.samples ? rented.dollars / rented.samples * 1e9 : PER_BILLION;
+  const worth = (n) => n / 1e9 * perBillion;
+  let html = '<p class="saved">Machines that cost me nothing, my Mac and the ones lent to me, have trained <b>' + samples(free.samples) + ' samples</b> over '
+    + free.hours.toFixed(1) + ' hours: about <b>' + money(worth(free.samples)) + '</b> saved on rented GPU time.</p>'
+    + '<p class="saved">Rented GPUs have trained <b>' + samples(rented.samples) + ' samples</b> over ' + rented.hours.toFixed(1)
+    + ' hours, for <b>' + money(rented.dollars) + '</b> paid.</p>';
   if (!b.machines.length) {
     box.innerHTML = html + '<p>No machines on it yet.</p>';
     return;
@@ -309,10 +362,14 @@ fetch(BOARD_URL).then((r) => {
   // a rented row is named for its GPU, which has a column of its own; on a phone the GPU goes under the name instead
   const machine = (m) => (m.kind === 'rented' ? 'Rented' : esc(m.name)) + '<span class="gpu-under">' + gpu(m) + '</span>';
   const day = (d) => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '–';
-  html += '<div class="board"><table><thead><tr><th>Machine</th><th class="gpu">GPU</th><th class="n">Samples</th><th class="n">Hours</th><th class="n">Jobs</th><th class="n last">Last active</th></tr></thead><tbody>'
+  const aud = (usd) => 'A$' + (usd * AUD).toFixed(2);
+  const cost = (m) => m.kind === 'rented' ? '<span class="paid">' + aud(m.dollars ?? 0) + ' paid</span>' : '<span class="free">' + aud(worth(m.samples)) + ' saved</span>';
+  html += '<div class="board"><table><thead><tr><th>Machine</th><th class="gpu">GPU</th><th class="n">Samples</th><th class="n hours">Hours</th><th class="n">Jobs</th><th class="n">Paid or saved</th><th class="n last">Last active</th></tr></thead><tbody>'
     + b.machines.map((m) => '<tr><td>' + machine(m) + '</td><td class="gpu">' + gpu(m) + '</td><td class="n">' + samples(m.samples)
-      + '</td><td class="n">' + m.hours.toFixed(1) + '</td><td class="n">' + m.jobs + '</td><td class="n last">' + day(m.last_active) + '</td></tr>').join('')
-    + '</tbody></table></div>';
+      + '</td><td class="n hours">' + m.hours.toFixed(1) + '</td><td class="n">' + m.jobs + '</td><td class="n">' + cost(m) + '</td><td class="n last">' + day(m.last_active) + '</td></tr>').join('')
+    + '</tbody></table></div>'
+    + '<p class="when">Saved is what renting the same samples would have cost, at what my rented GPUs have cost per sample so far: US$' + perBillion.toFixed(2)
+    + ' a billion, at A$' + AUD + ' to the US dollar (the ECB’s rate on ${escape(atHome.meta.aud_date)}). It leaves out the power your machine uses. Paid is every rental, setup and idle time included, so a GPU that never got going still cost something.</p>';
   box.innerHTML = html;
 }).catch(() => {
   box.innerHTML = '<p>The board isn’t answering right now. The queue may be restarting; try again in a minute.</p>';
@@ -321,12 +378,11 @@ fetch(BOARD_URL).then((r) => {
 for (const mark of ['<!-- reviews -->', '<!-- board -->']) {
   if (!atHome.body.includes(mark)) throw new Error(`site/at-home.md has no ${mark}`);
 }
-const rate = `<p class="when">Rented time is what my rented GPUs have cost per sample: US$${escape(atHome.meta.usd_per_billion)} a billion, from ${escape(atHome.meta.rate_from)}, at A$${escape(atHome.meta.aud_per_usd)} to the US dollar (the ECB’s rate on ${escape(atHome.meta.aud_date)}). It leaves out the power your machine uses.</p>`;
 write('at-home', page({
   title: atHome.meta.title,
   description: atHome.meta.description,
   path: '/at-home/',
-  body: `<article>\n<h1>${escape(atHome.meta.title)}</h1>\n${marked(atHome.body).replace('<!-- reviews -->', () => reviewed).replace('<!-- board -->', () => BOARD + rate)}</article>`,
+  body: `<article>\n<h1>${escape(atHome.meta.title)}</h1>\n${marked(atHome.body).replace('<!-- reviews -->', () => reviewed).replace('<!-- board -->', () => BOARD)}</article>`,
 }));
 
 // a review build shows the gallery as built on this machine (SITE_GALLERY)
@@ -392,6 +448,33 @@ for (const name of used) {
   mkdirSync(join(out, 'media'), { recursive: true });
   cpSync(`${cached}.mp4`, join(out, 'media', `${name}.mp4`));
   cpSync(`${cached}.jpg`, join(out, 'media', `${name}.jpg`));
+}
+
+// the viewer a lent machine runs to watch its own runs (sim/terrarium/watch.py), listed with each file's sha256 and
+// fetched as one gzipped bundle: Cloudflare adds its analytics script to HTML on the way, so pages fetched one by one
+// never match their sha256
+const viewer = join(out, 'at-home', 'viewer');
+const own = new Set(['files.json', 'bundle.json.gz']);
+if (existsSync(viewer)) {
+  const files = {};
+  const data = {};
+  const walk = (dir) => {
+    for (const f of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, f.name);
+      const name = relative(viewer, path).split(sep).join('/');
+      if (f.isDirectory()) walk(path);
+      else if (!own.has(name)) {
+        const bytes = readFileSync(path);
+        files[name] = createHash('sha256').update(bytes).digest('hex');
+        data[name] = bytes.toString('base64');
+      }
+    }
+  };
+  walk(viewer);
+  const bundle = gzipSync(JSON.stringify({ files: data }), { level: 9 });
+  writeFileSync(join(viewer, 'bundle.json.gz'), bundle);
+  const digest = createHash('sha256').update(bundle).digest('hex');
+  writeFileSync(join(viewer, 'files.json'), JSON.stringify({ files, bundle: digest }, null, 1) + '\n');
 }
 
 console.log(`site: ${notes.length} posts${review ? ` (${notes.filter((n) => n.draft).length} drafts)` : ''}, ${used.size} clips → ${out}`);

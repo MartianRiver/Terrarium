@@ -26,6 +26,7 @@ class Fun:
         self.moved = np.zeros(world.alive.shape)
         self.said = np.zeros(world.alive.shape + (4,))
         self.fade = 0.5 ** (cfg.dt / FORGET)
+        self.was_lifted = self.world.blocks_carried
 
     def touching(self) -> np.ndarray:
         """Which blocks each creature is touching or close enough to hold, (arenas, creatures, blocks)."""
@@ -41,7 +42,11 @@ class Fun:
         w = self.world
         out = np.zeros(w.alive.shape)
         if len(self.half):
-            shifted = np.hypot(*(w.block_pos - self.blocks).transpose(2, 0, 1))
+            # a block carried off the ground waits far outside the arena, so the ticks it's lifted and set down
+            # aren't moves
+            lifted = w.blocks_carried
+            shifted = np.hypot(*(w.block_pos - self.blocks).transpose(2, 0, 1)) * ~(lifted | self.was_lifted)
+            self.was_lifted = lifted
             mine = (self.touching() * shifted[:, None]).sum(-1) * w.alive
             out += self.novelty * mine * 0.5 ** (self.moved / BORED_METRES)
             self.moved += mine
@@ -60,3 +65,4 @@ class Fun:
         self.moved[arenas] = 0
         self.said[arenas] = 0
         self.blocks[arenas] = self.world.block_pos[arenas]
+        self.was_lifted[arenas] = self.world.blocks_carried[arenas]

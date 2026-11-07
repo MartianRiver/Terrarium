@@ -55,14 +55,14 @@ def cut_off(bootstrap: bool):
     torch.manual_seed(0)
     actor = Brain(**SHAPE)
     first = env.observe()
-    roll, _ = collect(env, actor, 2, first, Episodes(env.samples, cfg.dt))
+    roll, _, _ = collect(env, actor, 2, first, Episodes(env.samples, cfg.dt), actor.blank(env.samples))
     return env, actor, roll
 
 
 def test_the_time_limit_carries_on_the_value():
     env, actor, roll = cut_off(bootstrap=True)
     assert env.cut.all() and env.final is not None and roll.dones[1].all()
-    _, value = actor(*tensors(env.final, 'cpu'))
+    _, value, _ = actor(*tensors(env.final, 'cpu'))
     plain = cut_off(bootstrap=False)[2]
     # same world, same actions: the only difference is the value of where they got to
     assert np.allclose(roll.rewards[0], plain.rewards[0])
@@ -88,12 +88,13 @@ def test_dirty_tree_needs_scratch(tmp_path, monkeypatch):
     assert (run.dir / 'diff.patch').exists() and set(record['versions']) == {'python', 'numpy', 'pymunk', 'torch'}
 
 
-def short(tmp_path):
+def short(tmp_path, **more):
     """A world with 3 s episodes and a few hundred samples of training on the CPU, so a whole run takes seconds."""
     world = tmp_path / 'world.toml'
     world.write_text((DEFAULT.parent / 'solo.toml').read_text().replace('seconds = 180.0', 'seconds = 3.0'))
     text = TRAIN.read_text()
-    for key, value in (('samples', 256), ('arenas', 4), ('steps', 16), ('minibatches', 2), ('checkpoint_every', 2)):
+    for key, value in (('samples', 256), ('arenas', 4), ('steps', 16), ('minibatches', 2), ('checkpoint_every', 2),
+                       *more.items()):
         text = '\n'.join(f'{key} = {value}' if line.startswith(f'{key} =') else line for line in text.splitlines())
     trainer = tmp_path / 'train.toml'
     trainer.write_text(text + '\n')
@@ -108,7 +109,10 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
     assert record['samples'] == 256 and record['parent'] is None and 'finished' in record and record['id'] == run.id
     rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
     assert [r['update'] for r in rows] == [1, 2, 3, 4] and all(np.isfinite(r['policy_loss']) for r in rows)
-    assert sorted(p.name for p in (run.dir / 'checkpoints').iterdir()) == ['00000000128.pt', '00000000256.pt']
+    assert all(0 < r['live_samples'] <= r['samples'] and 0 < r['live_share'] <= 1 for r in rows)
+    # the brain it started as comes first
+    assert sorted(p.name for p in (run.dir / 'checkpoints').iterdir()) == ['00000000000.pt', '00000000128.pt',
+                                                                            '00000000256.pt']
     evals = json.loads((run.dir / 'evals.json').read_text())
     assert set(evals) == {'checkpoint', 'random', 'brain', 'mean', 'sampled'}
 
@@ -119,6 +123,10 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
     assert child_record['parent']['id'] == record['brain'] and child_record['id'] == child.id
     _, meta = load_brain(child.dir / 'checkpoints' / '00000000256.pt')
     assert meta['parent'] == record['brain'] and meta['run'] == child.id and meta['scratch']
+    # a child's start is its parent
+    start, _ = load_brain(child.dir / 'checkpoints' / '00000000000.pt')
+    parent, _ = load_brain(run.dir / 'checkpoints' / '00000000256.pt')
+    assert torch.equal(start.policy.weight, parent.policy.weight)
 
 
 def test_training_changes_the_brain(tmp_path):
@@ -129,6 +137,42 @@ def test_training_changes_the_brain(tmp_path):
     torch.manual_seed(0)
     fresh = Brain(**SHAPE)
     assert not torch.equal(trained.policy.weight, fresh.policy.weight)
+
+
+def test_kl_stop_cuts_an_update_short(tmp_path):
+    world, trainer = short(tmp_path)
+    full = train('full', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', score=False)
+    world, trainer = short(tmp_path, kl_stop=1e-9)
+    cut = train('cut', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu', score=False)
+    steps = lambda run: [json.loads(line)['steps_taken'] for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
+    epochs = load_train(trainer).ppo.epochs
+    assert steps(full) == [epochs * 2] * 4
+    # the first minibatch is the brain that collected (KL about 0), so it steps; the next one has moved past
+    assert all(1 <= n < epochs * 2 for n in steps(cut))
+
+
+def test_a_run_with_no_reward_gives_up(tmp_path):
+    world, trainer = short(tmp_path, give_up=2)
+    text, section = [], None
+    for line in trainer.read_text().splitlines():
+        section = line if line.startswith('[') else section
+        text.append(line.split('=')[0] + '= 0.0' if section == '[reward]' and '=' in line and not line.startswith('#') else line)
+    trainer.write_text('\n'.join(text) + '\n')
+    run = train('dead', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
+    record = json.loads((run.dir / 'run.json').read_text())
+    assert record['gave_up'] == 2 and record['samples'] == 128 and record['checkpoint'] == '00000000128.pt'
+    assert not (run.dir / 'evals.json').exists()
+
+
+def test_a_run_whose_episodes_stay_short_stops_as_stuck(tmp_path):
+    world, trainer = short(tmp_path, stuck=4, stuck_seconds=100.0)
+    run = train('young-deaths', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
+    record = json.loads((run.dir / 'run.json').read_text())
+    assert record['stuck'] == 4 and record['samples'] == 256 and 'gave_up' not in record
+    assert not (run.dir / 'evals.json').exists()
+    world, trainer = short(tmp_path, stuck=4, stuck_seconds=1.0)
+    run = train('lived', world, trainer, scratch=True, root=tmp_path / 'runs', device='cpu')
+    assert 'stuck' not in json.loads((run.dir / 'run.json').read_text())
 
 
 def test_workers_split_the_arenas(tmp_path):
@@ -205,9 +249,34 @@ def test_rivals_learn_beside_the_parent(tmp_path):
     assert all(np.isfinite(row[f'policy_loss_{k}']) for k in range(3)) and row['policy_loss'] == row['policy_loss_0']
 
 
+def test_a_pool_plays_the_brain_against_its_own_past_checkpoints(tmp_path):
+    world, trainer = short(tmp_path, samples=1536 * 6)
+    world.write_text((DEFAULT.parent / 'colony.toml').read_text().replace('seconds = 360.0', 'seconds = 3.0'))
+    save(Brain(**SHAPE), tmp_path / 'parent.pt')
+    run = train('pool', world, trainer, tmp_path / 'parent.pt', scratch=True, root=tmp_path / 'runs', device='cpu',
+                gpu_collect=True, pool=2)
+    assert json.loads((run.dir / 'run.json').read_text())['pool'] == 2 and not (run.dir / 'rivals').exists()
+    rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
+    assert len(rows) == 6 and rows[0]['opponent'] == 0
+    # drawn from the parent or the last two checkpoints before it, and never learning itself
+    for row in rows:
+        assert row['opponent'] in {0, *(r['samples'] for r in rows if r['update'] % 2 == 0)}
+        assert row['opponent'] < row['samples'] and 'policy_loss_1' not in row and 'episodes_1' in row
+
+
 def test_rivals_need_gpu_collect(tmp_path):
     world, trainer = short(tmp_path)
     save(Brain(**SHAPE), tmp_path / 'b.pt')
     with pytest.raises(ValueError, match='gpu-collect'):
         train('x', world, trainer, tmp_path / 'b.pt', scratch=True, root=tmp_path / 'runs', device='cpu',
               rivals=[tmp_path / 'b.pt'])
+
+
+def test_a_rented_pod_is_named_in_the_record(tmp_path):
+    from terrarium.runs import rental
+    first = tmp_path / 'environ'
+    first.write_bytes(b'PATH=/bin\0CONTAINER_ID=58471544\0CONTAINER_API_KEY=secret\0')
+    assert rental(first) == {'provider': 'vast', 'instance': '58471544'}
+    first.write_bytes(b'RUNPOD_POD_ID=12iu15qz2qh8mf\0')
+    assert rental(first) == {'provider': 'runpod', 'instance': '12iu15qz2qh8mf'}
+    assert rental(tmp_path / 'missing') == {}

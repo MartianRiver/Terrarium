@@ -21,6 +21,7 @@ from .brain import Brain, brain_id, load as load_brain
 from .config import Config, load
 from .evals import brain_policy
 from .forage import Observation
+from .vision import angles
 from .log import Logger
 from .schema import YES_NO
 from .world import World
@@ -32,10 +33,11 @@ VERSION = 1
 DIGITS = 3
 
 
-def think(brain: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor):
+def think(brain: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tensor, notes: torch.Tensor | None = None):
     """The brain's forward pass for a batch, step by step: attention from the self token (layers, batch, heads,
     tokens), the self token's units as it enters and after each layer (layers + 1, batch, width), the summary the
-    heads read (batch, width), mean actions and value. Matches Brain.forward."""
+    heads read (batch, width; with memory, after its notes are read back in), mean actions and value. Matches
+    Brain.forward with the notes it had going in."""
     x = torch.cat([brain.me(me)[:, None], brain.kind(kinds) + brain.ray(rays)], 1)
     attention, units = [], [x[:, 0]]
     for layer in brain.encoder.layers:
@@ -46,7 +48,7 @@ def think(brain: Brain, me: torch.Tensor, kinds: torch.Tensor, rays: torch.Tenso
         x = x + layer._ff_block(layer.norm2(x))
         attention.append(weights[:, :, 0])
         units.append(x[:, 0])
-    summary = brain.norm(x[:, 0])
+    summary, _ = brain.remember(brain.norm(x[:, 0]), brain.blank(len(me)) if notes is None else notes)
     return torch.stack(attention), torch.stack(units), summary, brain.policy(summary), brain.value(summary).squeeze(-1)
 
 
@@ -98,15 +100,15 @@ def track(cfg: Config, brain_path: Path | str, path: Path | str, seed: int, crea
     lines: list[dict] = []
     state = {'seen': False}
 
-    def watch(obs: Observation, held: np.ndarray):
+    def watch(obs: Observation, held: np.ndarray, notes: torch.Tensor):
         slot = np.flatnonzero((world.creature_id[0] == creature) & ~world.unborn[0])
         if not slot.size or not world.alive[0, slot[0]]:
             return
         i = int(slot[0])
         state['seen'] = True
         with torch.no_grad():
-            attention, units, summary, mean, value = think(brain, *(torch.from_numpy(x[i:i + 1]) for x in
-                                                              (obs.me, obs.kinds, obs.rays)))
+            me, kinds, rays = (torch.from_numpy(x[i:i + 1]) for x in (obs.me, obs.kinds, obs.rays))
+            attention, units, summary, mean, value = think(brain, me, kinds, rays, notes[i:i + 1])
         lines.append({'tick': world.tick, 'x': _r(world.pos[0, i, 0]), 'y': _r(world.pos[0, i, 1]),
                       'self': _r(obs.me[i]), 'kinds': obs.kinds[i].tolist(), 'dist': _r(obs.rays[i, :, 0]),
                       'nestmate': obs.rays[i, :, 3].astype(int).tolist(),
@@ -124,7 +126,8 @@ def track(cfg: Config, brain_path: Path | str, path: Path | str, seed: int, crea
     head = {'format': FORMAT, 'version': VERSION, 'creature': creature, 'seed': seed,
             'brain': {'id': brain_id(brain_path), 'file': Path(brain_path).name, 'shape': brain.shape,
                       'yes_no': brain.yes_no, 'repeat': meta.get('repeat', 1), 'schema': brain.schema},
-            'rays': {'count': cfg.vision.rays, 'fov': cfg.vision.fov, 'range': cfg.vision.range},
+            'rays': {'count': cfg.vision.rays, 'fov': cfg.vision.fov, 'range': cfg.vision.range,
+                     'angles': [round(float(a), 4) for a in angles(cfg.vision)]},
             'tickHz': cfg.tick_hz}
     with gzip.GzipFile(path, 'wb', mtime=0) as f:
         for line in (head, *lines):

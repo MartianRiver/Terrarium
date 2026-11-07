@@ -14,6 +14,8 @@ TRAIN = DEFAULT.parent / 'train.toml'
 @dataclass(frozen=True)
 class Arena:
     size: float
+    scatter: float
+    maze: int       # rooms a side of a maze its blocks make anew each episode (0: no maze)
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,12 @@ class Colonies:
     @property
     def slots(self) -> int:
         return self.size + self.room
+
+
+@dataclass(frozen=True)
+class Home:
+    near: float      # the way home is felt in full within this far (m) of the nest's centre
+    far: float       # and fades to nothing by here (0: felt everywhere)
 
 
 @dataclass(frozen=True)
@@ -88,6 +96,18 @@ class Hatch:
 
 
 @dataclass(frozen=True)
+class Young:
+    seconds: float
+    speed: float
+    energy: float
+    start: bool     # the Terrikins an episode starts with are young too, not only hatchlings
+
+    @property
+    def on(self) -> bool:
+        return self.seconds > 0
+
+
+@dataclass(frozen=True)
 class Night:
     cycle: float
     length: float
@@ -100,6 +120,19 @@ class Night:
     @property
     def on(self) -> bool:
         return self.cycle > 0 and self.length > 0
+
+
+@dataclass(frozen=True)
+class Tired:
+    drain: float
+    rest: float
+    still: float
+    below: float
+    slowest: float
+
+    @property
+    def on(self) -> bool:
+        return self.drain > 0
 
 
 @dataclass(frozen=True)
@@ -124,6 +157,8 @@ class Flowers:
     food: int
     boost: float
     speed: float
+    spots: int
+    spot_gap: float
 
     @property
     def on(self) -> bool:
@@ -143,6 +178,43 @@ class Grab:
 
 
 @dataclass(frozen=True)
+class Carry:
+    reach: float
+    slow: float
+    energy: float
+    stoop: float
+    lift: float
+
+    @property
+    def on(self) -> bool:
+        return self.reach > 0
+
+
+@dataclass(frozen=True)
+class Dung:
+    every: int
+    after: float
+    lasts: float
+    slots: int
+    radius: float
+    near: float
+    sick: float
+    away: float
+    pile: float
+    start: int
+    midden: float
+    points: float
+    spot: float
+    heap: int
+    wander: float
+    move: float      # the spot moves somewhere new every this many seconds, its heap with it (0: never)
+
+    @property
+    def on(self) -> bool:
+        return self.every > 0 or self.start > 0
+
+
+@dataclass(frozen=True)
 class Smell:
     cell: float
     spread: float
@@ -152,6 +224,15 @@ class Smell:
     @property
     def on(self) -> bool:
         return self.spread > 0
+
+
+@dataclass(frozen=True)
+class Hearing:
+    range: float
+
+    @property
+    def on(self) -> bool:
+        return self.range > 0
 
 
 @dataclass(frozen=True)
@@ -168,6 +249,103 @@ class Block:
     h: float
     mass: float
     friction: float
+    # small enough to pick up and carry (with [carry] on), as a berry is
+    carry: bool
+    # seconds after a carried block is put down that it goes back where it started, once that's clear (a door that
+    # swings shut); 0: it stays where it's put
+    shut: float
+
+
+@dataclass(frozen=True)
+class Tag:
+    reach: float
+    cooldown: float
+    points: float
+    speed: float    # it runs at this share of top speed (more than 1 gives the chaser a chance in the open)
+    back: float     # seconds before the new it can tag the one who tagged it (negative: never)
+
+    @property
+    def on(self) -> bool:
+        return self.reach > 0
+
+
+@dataclass(frozen=True)
+class Seek:
+    prep: float
+    points: float
+
+    @property
+    def on(self) -> bool:
+        return self.prep > 0
+
+
+@dataclass(frozen=True)
+class Flag:
+    points: float
+    pickup: float
+    charge: float   # share of a pickup's points taken off the other side
+    home: float     # points a metre a carrier brings the other side's flag nearer its own nest
+    steal: bool     # a touch takes the flag off its carrier, rather than sending it home
+    guard: float    # seconds a new carrier can't be robbed
+    lie: float      # seconds a flag that's been put down waits before going home
+    sense: bool     # the flags' compass: how far each is and which way, from anywhere (off: only what the rays see)
+
+    @property
+    def on(self) -> bool:
+        return self.points > 0
+
+
+@dataclass(frozen=True)
+class Peek:
+    show: float      # seconds the berry is in sight
+    points: float
+    gap: float       # seconds from one found to the next turning up
+    timeout: float   # seconds after hiding that it moves if nobody found it
+    near: float      # it turns up between these distances in front of someone
+    far: float
+    spin: bool       # turn everyone round at random when it hides
+    again: float     # once hidden, it's back in sight for `flash` s every `again` s at the same spot (0 is never)
+    flash: float
+
+    @property
+    def on(self) -> bool:
+        return self.show > 0
+
+
+@dataclass(frozen=True)
+class Jump:
+    height: float    # metres a jump from standing lifts a Terrikin (0: it can't jump)
+    energy: float    # each jump costs this
+
+    @property
+    def on(self) -> bool:
+        return self.height > 0
+
+
+@dataclass(frozen=True)
+class Tree:
+    trunk: int       # the block that is its trunk
+    near: float      # apples hang between these distances (m) from the trunk's middle
+    far: float
+    reach: float     # how high (m) a Terrikin has to jump to take one (0: from the ground)
+    points: float    # for each apple taken (0 is off)
+    hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
+    home: bool       # an apple taken goes in the crop, and pays only once it's unloaded in the nest
+    move: float      # the tree moves every this many seconds, where [arena] scatter would put it (0: never)
+    start: float     # every episode starts with each Terrikin this far (m) from the trunk, facing it (0: at the nest)
+    burrow: bool     # unloading an apple at home takes the carrier down into the nest, back up at its middle turned any way
+
+    def __post_init__(self):
+        if self.start < 0:
+            raise ConfigError('[tree] start can\'t be below 0')
+        if self.start > 0 and self.points <= 0:
+            raise ConfigError('[tree] start needs the tree on ([tree] points above 0)')
+        if self.burrow and not (self.points > 0 and self.home):
+            raise ConfigError('[tree] burrow needs apples carried home ([tree] points above 0 and home)')
+
+    @property
+    def on(self) -> bool:
+        return self.points > 0
 
 
 @dataclass(frozen=True)
@@ -175,6 +353,9 @@ class Vision:
     rays: int
     fov: float
     range: float
+    cover: float
+    spread: float
+    side: float
 
 
 @dataclass(frozen=True)
@@ -191,15 +372,27 @@ class Config:
     creature: Creature
     energy: Energy
     colonies: Colonies
+    home: Home
     food: Food
     crop: Crop
     jelly: Jelly
     hatch: Hatch
+    young: Young
     night: Night
     sprint: Sprint
+    tired: Tired
     flowers: Flowers
     grab: Grab
+    carry: Carry
+    dung: Dung
     smell: Smell
+    hearing: Hearing
+    tag: Tag
+    seek: Seek
+    flag: Flag
+    peek: Peek
+    jump: Jump
+    tree: Tree
     ground: Ground
     vision: Vision
     episode: Episode
@@ -228,6 +421,7 @@ class Reward:
     hatch: float
     novelty: float
     variety: float
+    needs: float
 
 
 @dataclass(frozen=True)
@@ -240,13 +434,23 @@ class PPO:
     minibatches: int
     lr: float
     anneal: bool
+    warmup: int
     gamma: float
     bootstrap: bool
     lam: float
     clip: float
     entropy: float
+    coins: float
+    coins_for: tuple[str, ...]
+    side: float
+    side_back: int
+    closure: float
     value: float
     max_grad_norm: float
+    kl_stop: float
+    give_up: int
+    stuck: int
+    stuck_seconds: float
     checkpoint_every: int
 
 
@@ -254,6 +458,7 @@ class PPO:
 class Start:
     fresh: tuple[str, ...]
     staggered: bool
+    spread: bool
 
 
 @dataclass(frozen=True)
@@ -303,16 +508,32 @@ def convert(kind, value, where):
 
 # keys added after worlds were first recorded, as they were before: off. Only for reading old run
 # records (serve.py), never for configs on disk, which have every key
-SINCE = {'colonies': {'room': 0},
+SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
+         'colonies': {'room': 0},
+         'vision': {'cover': 0.0, 'spread': 1.0, 'side': 1.0},
          'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
+         'young': {'seconds': 0.0, 'speed': 1.0, 'energy': 1.0, 'start': False},
+         'tag': {'reach': 0.0, 'cooldown': 0.0, 'points': 0.0, 'speed': 1.0, 'back': -1.0},
+         'seek': {'prep': 0.0, 'points': 0.0},
+         'flag': {'points': 0.0, 'pickup': 0.0, 'charge': 1.0, 'home': 0.0, 'steal': False, 'guard': 0.0, 'lie': 0.0, 'sense': True},
+         'peek': {'show': 0.0, 'points': 0.0, 'gap': 0.0, 'timeout': 0.0, 'near': 0.0, 'far': 0.0, 'spin': False, 'again': 0.0, 'flash': 0.0},
          'sprint': {'speed': 1.0, 'seconds': 0.0, 'cooldown': 0.0, 'energy': 0.0},
+         'tired': {'drain': 0.0, 'rest': 0.0, 'still': 0.0, 'below': 0.0, 'slowest': 1.0},
          'food': {'middle': 0},
          'flowers': {'count': 0, 'every_min': 0.0, 'every_max': 0.0, 'open': 0.0, 'radius': 0.0, 'food': 0, 'boost': 0.0,
-                     'speed': 1.0},
+                     'speed': 1.0, 'spots': 0, 'spot_gap': 0.0},
          'grab': {'reach': 0.0, 'grip': 0.0, 'seconds': 0.0, 'energy': 0.0},
-         'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0}}
+         'carry': {'reach': 0.0, 'slow': 0.0, 'energy': 0.0, 'stoop': 0.0, 'lift': 0.0},
+         'smell': {'cell': 0.0, 'spread': 0.0, 'fade': 0.0, 'leak': 0.0},
+         'hearing': {'range': 0.0},
+         'dung': {'every': 0, 'after': 0.0, 'lasts': 0.0, 'slots': 0, 'radius': 0.0, 'near': 0.0, 'sick': 0.0, 'away': 1.0,
+                  'pile': 0.0, 'start': 0, 'midden': 0.0, 'points': 0.0,
+                  'spot': 0.0, 'heap': 0, 'wander': 0.0, 'move': 0.0},
+         'jump': {'height': 0.0, 'energy': 0.0},
+         'tree': {'trunk': 0, 'near': 0.0, 'far': 0.0, 'reach': 0.0, 'points': 0.0, 'hop': 0.0, 'home': False, 'move': 0.0, 'start': 0.0, 'burrow': False},
+         'home': {'near': 0.0, 'far': 0.0}}
 
 
 def upgrade(data: dict) -> dict:
@@ -320,7 +541,7 @@ def upgrade(data: dict) -> dict:
     out = {**data, **{k: {**old, **data.get(k, {})} for k, old in SINCE.items()}}
     if 'block' in data:
         # the vault's hinged doors were taken out again (0.3): those worlds come back with doors that slide
-        out['block'] = [{k: v for k, v in b.items() if k != 'hinge'} for b in data['block']]
+        out['block'] = [{'carry': False, 'shut': 0.0} | {k: v for k, v in b.items() if k != 'hinge'} for b in data['block']]
     return out
 
 

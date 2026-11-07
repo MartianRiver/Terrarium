@@ -1,5 +1,5 @@
 # Saves what harness.js POSTs: /frame/<clip>/<n> as OUT/frames/<clip>/<n>.jpg, /card/<name> as OUT/cards/<name>.png.
-# python3 reel/receive.py OUT   (127.0.0.1:8799; keep OUT outside the repo)
+# python3 reel/receive.py OUT [PORT]   (127.0.0.1:8799 unless a port is given, then the clip's url needs &receiver=PORT; keep OUT outside the repo)
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -41,4 +41,4 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-ThreadingHTTPServer(('127.0.0.1', 8799), Handler).serve_forever()
+ThreadingHTTPServer(('127.0.0.1', int(sys.argv[2]) if len(sys.argv) > 2 else 8799), Handler).serve_forever()

@@ -196,9 +196,9 @@ export class MindPanel {
   }
 
   private fanPoint(i: number, dist: number) {
-    const { count, fov } = this.track!.head.rays;
+    const { count, fov, angles } = this.track!.head.rays;
     // ray 0 is on its right; up the page is straight ahead
-    const a = count > 1 ? -fov / 2 + (fov * i) / (count - 1) : 0;
+    const a = angles?.[i] ?? (count > 1 ? -fov / 2 + (fov * i) / (count - 1) : 0);
     return { x: FAN.cx - Math.sin(a) * dist * FAN.r, y: FAN.cy - Math.cos(a) * dist * FAN.r };
   }
 

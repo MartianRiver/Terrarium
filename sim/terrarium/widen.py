@@ -17,6 +17,8 @@ def widen(old: Brain, width: int, noise: float = 0.0, seed: int = 0) -> Brain:
     w, k = old.shape['width'], width // old.shape['width']
     if width % w or k < 2:
         raise ValueError(f'width {width} has to be a multiple of {w}, at least twice it')
+    if old.memory:
+        raise ValueError("widening a brain with memory isn't written yet: widen first, then add memory")
     new = Brain(width, old.shape['layers'], old.shape['heads'] * k, old.schema, old.yes_no)
     state = new.state_dict()
 

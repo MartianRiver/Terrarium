@@ -6,7 +6,8 @@ export const SIGNAL_COUNT = 5;
 export const SIGNAL_OFF = -1;
 
 // jelly is what a Terrikin leaves when it unloads its crop outside a nest (0.3 on)
-export type FoodKind = 'common' | 'jelly';
+// and an apple grows on a tree, hanging up out of reach ([tree])
+export type FoodKind = 'common' | 'jelly' | 'apple';
 
 export interface CreatureState {
   id: number;
@@ -22,6 +23,11 @@ export interface CreatureState {
   holding: number; // 1 while it grips a block (grab); 0 in replays of worlds without grab
   nectar: number; // seconds left of a nectar boost; 0 in worlds without flowers
   sprinting: number; // 1 mid-sprint; 0 in worlds without sprint and replays from before it
+  load: number; // 1 while it carries a berry in its jaws (carry); 0 in worlds without carry
+  young: number; // share of its youth left, 1 just hatched to 0 grown; 0 in worlds without young
+  stamina: number; // 0..1, how much go it has left before it tires ([tired]); 1 in worlds without it
+  dung: number; // 1 while it carries a dropping in its jaws; 0 in worlds without droppings
+  z: number; // metres off the ground mid-jump ([jump]); 0 in worlds without jumping
 }
 
 export interface FoodState {
@@ -29,6 +35,8 @@ export interface FoodState {
   kind: FoodKind;
   x: number;
   y: number;
+  hidden: boolean; // peekaboo's berry, out of the Terrikins' sight but still there
+  z: number; // an apple: metres above a standing Terrikin's reach it hangs; 0 for food on the ground
 }
 
 export interface BlockState {
@@ -38,6 +46,7 @@ export interface BlockState {
   angle: number;
   w: number;
   h: number;
+  carried: number; // 1 while a Terrikin carries it on its head (carry); 0 in replays from before 0.4
 }
 
 export interface NestInfo {
@@ -54,6 +63,9 @@ export interface WorldInfo {
   tickHz: number;
   maxSpeed: number;
   nests: NestInfo[];
+  midden: number; // metres past a nest's edge a dropping counts as taken out ([dung] midden); 0 without
+  middenSpot?: { x: number; y: number; radius: number }; // or the spot it has to go on ([dung] spot), this episode's
+  tree: number | null; // the id of the block that is an apple tree's trunk ([tree]); null without
 }
 
 // jelly in a colony's store, in food unloaded
@@ -78,6 +90,22 @@ export interface FlowerState {
   y: number;
 }
 
+// a dropping lying on the ground ([dung])
+export interface DungState {
+  id: number;
+  x: number;
+  y: number;
+}
+
+// a capture-the-flag flag: on its nest, lying where it was put down, or with its carrier (an id, -1 for none)
+export interface FlagState {
+  colony: number;
+  x: number;
+  y: number;
+  down: boolean;
+  carrier: number;
+}
+
 export interface Frame {
   tick: number;
   creatures: CreatureState[];
@@ -87,4 +115,6 @@ export interface Frame {
   light: number; // 1 by day, 0 at night; always 1 in worlds without nights
   eggs: EggState[]; // empty in worlds without hatching and replays from before it
   flowers: FlowerState[]; // empty in worlds without flowers
+  flags: FlagState[]; // empty in worlds without capture the flag and replays from before 0.4's flags
+  dung?: DungState[]; // only in worlds with droppings; without, the viewer makes its own up from meals
 }

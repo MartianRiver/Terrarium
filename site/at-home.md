@@ -1,17 +1,18 @@
 ---
 title: Terrarium at Home
 description: Lend a spare NVIDIA GPU or Apple silicon Mac to train the Terrikins' brains. What it does on your machine, how to install it, and what lent machines have trained so far.
-usd_per_billion: 3.46
-rate_from: everything I'd spent on rented GPUs by 26 October 2026, over every sample they trained
+usd_per_billion: 3.88
 aud_per_usd: 1.424
 aud_date: 23 October 2026
 ---
 
-Every brain on this site learned by practice, and practice is samples: one Terrikin taking one step, billions of times over. So far that's been my MacBook Air and GPUs I rent by the hour, which have cost about A$4.93 (US$3.46) for every billion samples. A gaming PC sitting idle most of the day could do the same work.
+Every brain on this site learned by practice, and practice is samples: one Terrikin taking one step, billions of times over. So far that's been my MacBook Air and GPUs I rent by the hour, which have cost about A$5.53 (US$3.88) for every billion samples so far. A gaming PC sitting idle most of the day could do the same work.
 
 If you have an NVIDIA GPU or an Apple silicon Mac that's often idle, you can lend it. A small program, the worker, takes training jobs from my queue while you're away from the computer, sends back the brain it trained, and gets out of the way when you come back. Every machine that does shows up on the board below, next to my Mac and the GPUs I've rented.
 
 For a sense of speed: my M3 MacBook Air trains about 8,000 samples a second, and a rented RTX 3060 does 11,000 to 14,000. A Mac with more GPU cores, like a Mac mini with an M4 Pro, should be quicker than mine, but I haven't tried one yet.
+
+It matters because the ideas I'd most like to try are big. OpenAI's [hide-and-seek](https://arxiv.org/abs/1909.07528) agents, which learned to build forts out of boxes and use ramps to get over them, took 31.7 billion frames to get to their fourth stage. At my rented price that's at least US$250 (A$350) for one run, and the whole of Terrarium so far has cost about US$28.50 (A$40). There's more on that in [the post about this page](/blog/at-home/).
 
 ## What it does on your machine
 
@@ -20,7 +21,7 @@ For a sense of speed: my M3 MacBook Air trains about 8,000 samples a second, and
 - **Not all of it.** At most half the CPU, at low priority, and it pauses if an NVIDIA GPU passes 85 °C (a Mac doesn't say how hot its GPU is, so there it leaves that to macOS).
 - **Awake while it works.** While a job trains, it keeps the computer from going to sleep, so you don't have to change your power settings. The screen still turns off, and sleep works as normal again once the job is done or paused.
 - **Its own folder.** Jobs, their code and their runs live in `~/.terrarium/worker`. The one exception is [uv](https://docs.astral.sh/uv/), which keeps the Python and packages it downloads (PyTorch included) in its own cache. It listens only on your own machine.
-- **What it sends.** The runs it trained, and once a minute what your machine is (OS, CPU, cores, memory, NVIDIA GPU) and whether it's working, waiting or paused. No hostname, user name or files. The board shows your machine's name, its GPU and what it's trained, never whether you're at it.
+- **What it sends.** The runs it trained, and once a minute what your machine is (OS, CPU, cores, memory, NVIDIA GPU) and whether it's working, waiting or paused, plus how busy the GPU and CPU are while it trains, so I can tell when a job isn't using your machine well. No hostname, user name or files. The board shows your machine's name, its GPU and what it's trained, never whether you're at it.
 
 The whole of it, with how to change each rule, is in [docs/compute.md](https://github.com/MartianRiver/Terrarium/blob/HEAD/docs/compute.md).
 
@@ -52,8 +53,25 @@ On a Mac or Linux it's the same four lines (`cd Terrarium/sim`), with [git](http
 
 The first time, it asks for the token. The first job downloads PyTorch, about 2.5 GB with CUDA (130 MB on a Mac), and takes a while to start. Close the window or press Ctrl-C to stop it; a job it was running goes back to the queue. To update it, run `git pull` in the Terrarium folder and start it again.
 
+## Watching what your machine trains
+
+You can watch the Terrikins your GPU is training while it trains them. In a second window, in the same `sim` folder:
+
+```
+uv run python -m terrarium.watch
+```
+
+It opens the viewer in your browser on the brain your machine is working on, and each time a replay ends it moves on to the newest checkpoint, so you see it get better as you watch. The runs page beside it has the charts. It all stays on your machine.
+
+Play puts you in the world as one of the Terrikins, against the brain your machine is training: WASD or the arrows to walk and turn, or hold the mouse (or trackpad) to walk to a spot, and the keys for anything else that world has are on screen. You score a point a second alive, 10 a berry picked up and 20 a food brought home, and the panel puts you beside the brain's worst, average and best. Along the top are your energy, your sprint, how full your jelly belly is and how long till night, with a word popping up when something changes, since you can't feel hunger through a keyboard. The brain only sees what its rays show it and you can see the whole garden, so it's not quite a fair fight.
+
+Click a Terrikin to follow it, then press B for its brain window: what each of its rays sees, which of them it's paying attention to, how well it thinks things are going and what it's about to do. N shows the whole brain wired up, its units lighting up as it thinks.
+
 ## Versions
 
+- **8** · 30 October 2026 · Runs code only from `main` and `next`, gives a job only a short list of your environment variables, refuses packages from anywhere but PyPI and PyTorch, pins the keys that may sign jobs the first time it runs, takes your home folder and user name out of a failed job's log, sends times in UTC and no longer says why it's waiting, can't be paused or resumed by a website, deletes old checkouts, reads idle time on Linux desktops and holds a job to its CPU share there. After two models read the worker and said not to run it on an everyday PC.
+- **7** · 28 October 2026 · Sends back a run too big for the queue by leaving out every other checkpoint (the last always goes); your machine keeps them all.
+- **6** · 28 October 2026 · While it trains, says how busy the GPU and CPU are, so I can tell when a job isn't using your machine well.
 - **5** · 26 October 2026 · Checks when it starts that it can verify my signature, using the `ssh-keygen` that comes with Git on Windows (Windows 10's own may be too old).
 - **4** · 26 October 2026 · Keeps the computer awake while a job trains, and cleans up properly when a job is taken away (after a sleep, its leftover processes held the GPU).
 - **3** · 26 October 2026 · Says what the machine is and what it's doing every minute, for the board.

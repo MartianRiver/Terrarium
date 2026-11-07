@@ -11,6 +11,8 @@
 #
 # OnDevice can also play several brains against each other, one per colony: brain k plays colony (k + arena) mod
 # the number of brains, so across the arenas every brain takes every seat. `whose` says which brain each sample is.
+#
+# A brain with memory carries each creature's notes from one rollout into the next, as its life goes on.
 
 import multiprocessing as mp
 
@@ -20,7 +22,7 @@ import torch
 from .brain import Brain, tensors
 from .config import Config, Train
 from .forage import Forage, Observation
-from .ppo import Episodes, Rollout, collect
+from .ppo import Episodes, Rollout, collect, kept
 
 
 def seeds(seed: int, parts: int, workers: int) -> list[int]:
@@ -35,13 +37,14 @@ class Share:
         self.actor = actor
         self.episodes = Episodes(self.env.samples, cfg.dt * train.ppo.repeat)
         self.obs = self.env.observe()
+        self.notes = actor.blank(self.env.samples)
 
     def play(self, state: dict, steps: int) -> tuple[Rollout, np.ndarray, list]:
         """Load the learner's weights, play a rollout, and hand back the value after it and finished episodes."""
         self.actor.load_state_dict(state)
-        roll, self.obs = collect(self.env, self.actor, steps, self.obs, self.episodes)
+        roll, self.obs, self.notes = collect(self.env, self.actor, steps, self.obs, self.episodes, self.notes)
         with torch.no_grad():
-            last_value = self.actor(*tensors(self.obs, 'cpu'))[1].numpy()
+            last_value = self.actor(*tensors(self.obs, 'cpu'), self.notes)[1].numpy()
         finished, self.episodes.finished = self.episodes.finished, []
         return roll, last_value, finished
 
@@ -112,12 +115,12 @@ class Collector:
 
 def stepped(env: Forage, actions: np.ndarray) -> tuple:
     obs, reward, done, _ = env.step(actions)
-    return obs, reward, done, env.active, env.final, env.cut
+    return obs, reward, done, env.active, env.final, env.cut, env.hint
 
 
 def simulate(conn, cfg: Config, train: Train, arenas: int, seed: int):
     env = Forage(cfg, train, arenas, seed)
-    conn.send((env.observe(), env.active))
+    conn.send((env.observe(), env.active, env.hint))
     while (actions := conn.recv()) is not None:
         try:
             conn.send(stepped(env, actions))
@@ -134,7 +137,7 @@ class Here:
         self.actions = np.zeros(0)
 
     def first(self):
-        return self.env.observe(), self.env.active
+        return self.env.observe(), self.env.active, self.env.hint
 
     def send(self, actions: np.ndarray):
         self.actions = actions
@@ -175,12 +178,13 @@ def join(parts: list[Observation]) -> Observation:
     return Observation(*(np.concatenate(x) for x in zip(*((o.me, o.kinds, o.rays) for o in parts))))
 
 
-def seats(parts: list[tuple[Config, int]], brains: int) -> np.ndarray:
-    """Which brain plays each sample: colony (k + arena) mod brains is brain k's, arenas counted over every part."""
+def seats(parts: list[tuple[Config, int]], brains: int, fixed: bool = False) -> np.ndarray:
+    """Which brain plays each sample: colony (k + arena) mod brains is brain k's, arenas counted over every part, so
+    every brain takes every seat; fixed, colony k is always brain k's (mod brains), as when a game's sides differ."""
     out, first = [], 0
     for c, n in parts:
         colony = np.repeat(np.arange(c.colonies.count), c.colonies.slots)
-        arena = np.arange(first, first + n)[:, None]
+        arena = np.arange(first, first + n)[:, None] * (not fixed)
         out.append(((colony[None] - arena) % brains).reshape(-1))
         first += n
     return np.concatenate(out)
@@ -188,7 +192,7 @@ def seats(parts: list[tuple[Config, int]], brains: int) -> np.ndarray:
 
 class OnDevice:
     def __init__(self, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain | list[Brain], workers: int = 1,
-                 mix: list[tuple[Config, int]] | None = None, device: str = 'cpu'):
+                 mix: list[tuple[Config, int]] | None = None, device: str = 'cpu', fixed: bool = False):
         mix = mix or []
         parts = ([(cfg, arenas)] if workers == 1 else
                  [(cfg, len(a)) for a in np.array_split(np.arange(arenas), workers)]) + mix
@@ -199,7 +203,10 @@ class OnDevice:
         self.gamma = train.ppo.gamma
         self.actors = [a.to(device) for a in (actor if isinstance(actor, list) else [actor])]
         self.actor, self.device = self.actors[0], device
-        self.whose = seats(parts, len(self.actors))
+        if len(self.actors) > 1 and any(a.memory for a in self.actors):
+            raise ValueError("rivals with memory aren't written yet")
+        self.notes = self.actor.blank(self.samples)
+        self.whose = seats(parts, len(self.actors), fixed)
         self.by_brain = [Episodes(self.samples, cfg.dt * train.ppo.repeat) for _ in self.actors]
         mine = seeds(seed, len(parts), workers)
         if workers == 1:
@@ -209,12 +216,13 @@ class OnDevice:
             ctx = mp.get_context('spawn')
             self.shares = [There(ctx, c, train, n, s) for (c, n), s in zip(parts, mine)]
         first = [s.first() for s in self.shares]
-        self.obs = join([o for o, _ in first])
-        self.active = np.concatenate([a for _, a in first])
+        self.obs = join([f[0] for f in first])
+        self.active = np.concatenate([f[1] for f in first])
+        self.hint = np.concatenate([f[2] for f in first])
 
-    def _value(self, obs: Observation) -> torch.Tensor:
+    def _value(self, obs: Observation, notes: torch.Tensor) -> torch.Tensor:
         if len(self.actors) == 1:
-            return self.actor(*tensors(obs, self.device))[1]
+            return self.actor(*tensors(obs, self.device), notes)[1]
         value = torch.zeros(len(obs.me), device=self.device)
         for k, actor in enumerate(self.actors):
             mine = torch.from_numpy(self.whose == k).to(self.device)
@@ -228,7 +236,7 @@ class OnDevice:
     def _act(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Each brain's actions, log odds and values for its own samples."""
         if len(self.actors) == 1:
-            mean, value = self.actor(*tensors(self.obs, self.device))
+            mean, value, self.notes = self.actor(*tensors(self.obs, self.device), self.notes)
             dist = self.actor.dist(mean)
             action = dist.sample()
             return action.cpu().numpy(), dist.log_prob(action).sum(-1).cpu().numpy(), value.cpu().numpy()
@@ -236,7 +244,7 @@ class OnDevice:
         logps, values = np.zeros(self.samples, np.float32), np.zeros(self.samples, np.float32)
         for k, actor in enumerate(self.actors):
             mine = self.whose == k
-            mean, value = actor(*tensors(self._part(self.obs, k), self.device))
+            mean, value, _ = actor(*tensors(self._part(self.obs, k), self.device))
             dist = actor.dist(mean)
             action = dist.sample()
             actions[mine], values[mine] = action.cpu().numpy(), value.cpu().numpy()
@@ -246,7 +254,8 @@ class OnDevice:
     def collect(self, state: dict | list[dict], steps: int) -> tuple[Rollout, np.ndarray]:
         for actor, s in zip(self.actors, state if isinstance(state, list) else [state]):
             actor.load_state_dict(s)
-        keep: dict[str, list] = {k: [] for k in Rollout.__dataclass_fields__}
+        keep: dict[str, list] = {k: [] for k in Rollout.__dataclass_fields__ if k != 'notes'}
+        start = self.notes.cpu().numpy()[None]
         with torch.no_grad():
             for _ in range(steps):
                 actions, logps, values = self._act()
@@ -259,6 +268,7 @@ class OnDevice:
                 keep['logprobs'].append(logps)
                 keep['values'].append(values)
                 keep['active'].append(self.active)
+                keep['hints'].append(self.hint)
                 got = [share.recv() for share in self.shares]
                 reward, done = np.concatenate([g[1] for g in got]), np.concatenate([g[2] for g in got])
                 self.episodes.add(reward, done, self.active)
@@ -268,14 +278,16 @@ class OnDevice:
                 if any(g[4] is not None for g in got):
                     # cut off by the time limit: what's left is worth what the value says (shares that weren't
                     # cut have none, and count nothing)
-                    after = self._value(join([g[0] if g[4] is None else g[4] for g in got]))
+                    after = self._value(join([g[0] if g[4] is None else g[4] for g in got]), self.notes)
                     reward = reward + self.gamma * after.cpu().numpy() * np.concatenate([g[5] for g in got])
                 keep['rewards'].append(reward)
                 keep['dones'].append(done)
+                self.notes = kept(self.notes, self.active, done)
                 self.obs = join([g[0] for g in got])
                 self.active = np.concatenate([g[3] for g in got])
-            last_value = self._value(self.obs).cpu().numpy()
-        return Rollout(**{k: np.stack(v) for k, v in keep.items()}), last_value
+                self.hint = np.concatenate([g[6] for g in got])
+            last_value = self._value(self.obs, self.notes).cpu().numpy()
+        return Rollout(**{k: np.stack(v) for k, v in keep.items()}, notes=start), last_value
 
     def close(self):
         for share in self.shares:

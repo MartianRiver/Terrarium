@@ -14,12 +14,15 @@
 # Running out of time is an end like any other unless [ppo] bootstrap is on: then a
 # creature cut off alive is marked in `cut` and its last look kept in `final`, so the
 # learner can carry on its value instead of teaching it that time running out is death.
+#
+# `hint` is a label per sample for a side job, never seen by the brain: in a maze, whether
+# the creature has been in this room before (maze.Visits); 0 in other worlds.
 
 from dataclasses import dataclass
 
 import numpy as np
 
-from . import night
+from . import hearing, maze, night, vision
 from .fun import Fun
 from .config import Config, Reward, Train
 from .vision import directions, look
@@ -37,7 +40,7 @@ def observe(world: World, last: np.ndarray) -> Observation:
     """last is each creature's previous thrust and turn, (arenas, creatures, 2)."""
     cfg, v = world.cfg, world.cfg.vision
     sight = look(world)
-    facing = directions(world.heading, 1, 0.0)[..., 0, :]          # A,N,2
+    facing = directions(world.heading, np.zeros(1))[..., 0, :]      # A,N,2
     vel = world.vel / cfg.creature.max_speed
     forward = (vel * facing).sum(-1)
     side = facing[..., 0] * vel[..., 1] - facing[..., 1] * vel[..., 0]
@@ -46,22 +49,35 @@ def observe(world: World, last: np.ndarray) -> Observation:
     # how much jelly its colony has, as an ant knows how hungry its nest is: near 1 at a jelly a member
     store = np.tanh(np.take_along_axis(world.store, np.broadcast_to(world.colony, world.crop.shape), 1) / cfg.colonies.size)
     bearing = np.arctan2(home[..., 1], home[..., 0]) - world.heading
+    # with [home] far, it fades with distance and is gone past it: home_felt says how much is left, so a lost
+    # Terrikin's 0 can't be mistaken for standing in the middle of its nest
+    away = np.hypot(home[..., 0], home[..., 1])
+    h = cfg.home
+    felt = np.clip((h.far - away) / max(h.far - h.near, 1e-9), 0, 1) if h.far > 0 else np.ones_like(away)
     # how much of its sprint is left, how far through its rest it is (1: it can sprint now; 0 with sprint off),
-    # holding a block, how much of its grip is left, and how much of a nectar boost
+    # holding a block, how much of its grip is left, how much of a nectar boost, and a berry (or block) in its jaws
     s = cfg.sprint
     sprinting = world.sprinting / max(round(s.seconds * cfg.tick_hz), 1)
     rested = (1 - world.resting / max(round(s.cooldown * cfg.tick_hz), 1)) * (world.sprinting == 0) * s.on
     me = np.stack([world.energy, forward, side, last[..., 0], last[..., 1],
-                   np.hypot(home[..., 0], home[..., 1]) / v.range, np.sin(bearing), np.cos(bearing),
+                   away / v.range * felt, np.sin(bearing) * felt, np.cos(bearing) * felt,
                    world.crop / max(cfg.crop.capacity, 1), world.nest_at() == world.colony, store,
                    np.broadcast_to(world.light()[:, None], store.shape), sprinting, rested,
                    world.holding * world.gripping / max(round(cfg.grab.seconds * cfg.tick_hz), 1),
-                   *world.smelled(), world.nectar / max(round(cfg.flowers.boost * cfg.tick_hz), 1)], -1)
+                   *world.smelled(), world.nectar / max(round(cfg.flowers.boost * cfg.tick_hz), 1),
+                   (world.load >= 0) | (world.block_load >= 0), world.young / max(round(cfg.young.seconds * cfg.tick_hz), 1),
+                   world.tag.mask() if world.tag else np.zeros(store.shape),
+                   *((np.broadcast_to(world.seek.seeker, store.shape), np.broadcast_to(world.seek.waiting()[:, None], store.shape))
+                     if world.seek else (np.zeros(store.shape),) * 2),
+                   *flag_senses(world, store.shape), world.stamina, *hearing.heard(world),
+                   *dung_senses(world, store.shape), world.z / max(cfg.jump.height, 1e-9),
+                   # which way it faces in the world, as an ant reads the sky
+                   np.sin(world.heading), np.cos(world.heading), felt], -1)
 
-    angles = np.linspace(-v.fov / 2, v.fov / 2, v.rays)
+    angles = vision.angles(v)
     shape = sight.dist.shape
     rays = np.stack([sight.dist / v.range, *(np.broadcast_to(f(angles), shape) for f in (np.sin, np.cos)),
-                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range], -1)
+                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range, sight.it, sight.carrier], -1)
     return Observation(me.reshape(-1, me.shape[-1]).astype(np.float32),
                        sight.kind.reshape(-1, v.rays).astype(np.int64),
                        rays.reshape(-1, v.rays, rays.shape[-1]).astype(np.float32))
@@ -72,6 +88,8 @@ class Forage:
         self.world = World(cfg, arenas, seed)
         self.staggered = train.start.staggered and cfg.night.on
         self._stagger(np.ones(arenas, bool))
+        if train.start.spread:
+            self.world.age[:] = [rng.integers(0, self.world.episode_ticks) for rng in self.world.rngs]
         self.reward = train.reward
         r = self.reward
         self.fun = Fun(self.world, r.novelty, r.variety) if r.novelty or r.variety else None
@@ -85,6 +103,8 @@ class Forage:
         # after a step where arenas ran out of time: which samples were cut off alive, and where they got to
         self.cut = np.zeros(self.samples, bool)
         self.final: Observation | None = None
+        self.visits = maze.Visits(self.world) if cfg.arena.maze else None
+        self.hint = np.zeros(self.samples, np.float32)
 
     @property
     def samples(self) -> int:
@@ -108,20 +128,35 @@ class Forage:
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
         # tick, and an arena where everyone has died only ticks on with nobody in it
-        lived, snug, fun = np.zeros(alive.shape), np.zeros(alive.shape), np.zeros(alive.shape)
+        lived, snug, fun, play = (np.zeros(alive.shape) for _ in range(4))
         for _ in range(self.repeat):
             w.step(actions)
             lived += w.alive
+            if w.tag:
+                play += w.tag.points(w.alive)
+            if w.seek:
+                play += w.seek.points(w.alive)
+            if w.flags:
+                play += w.flags.points(w.alive)
+            if w.peek:
+                play += w.peek.points(w.alive)
+            if w.dung:
+                play += w.dung.points(w.alive)
+            if w.tree:
+                play += w.tree.points(w.alive)
             if self.fun:
                 fun += self.fun.step(actions)
             if r.snug or r.warm:
                 warm = night.warmth(w.pos, w.alive, w.colony, w.nest_at() == w.colony, w.cfg.night)
                 snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
         self.last = actions[..., :2].copy()
-        own = ((r.food * (w.fed - before['fed']) - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
+        gain = w.fed - before['fed']
+        # hunger before the meal squared, less after: gain × (2 × hunger after + gain)
+        needs = r.needs * gain * (2 * (1 - w.energy) + gain)
+        own = ((r.food * gain - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)
-               + w.cfg.dt * (r.alive * lived + snug) + fun)
+               + w.cfg.dt * (r.alive * lived + snug) + fun + play + needs)
         ended = w.ended.copy()
         died = alive & ~w.alive
         done = died | ended[:, None]
@@ -135,13 +170,36 @@ class Forage:
         if self.fun:
             self.fun.reset(ended)
         self.last[ended] = 0
+        if self.visits:
+            self.visits.reset(ended)
+            self.hint = self.visits.update()
         return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
 
     def _stagger(self, arenas: np.ndarray):
         # a start in the dark loses its standing food on the first step, as at nightfall
         if self.staggered:
-            self.world.clock[arenas] = self.world.rng.uniform(0, self.world.cfg.night.cycle, int(arenas.sum()))
+            w = self.world
+            for a in np.flatnonzero(arenas):
+                w.clock[a] = w.rngs[a].uniform(0, w.cfg.night.cycle)
 
+
+
+def flag_senses(world: World, shape) -> tuple:
+    """Carrying their flag, the way to it (how far, which way off the heading), whether ours is off its nest, then
+    carrying ours and the way to it."""
+    if not world.flags:
+        return (np.zeros(shape),) * 9
+    flags = world.flags
+    where, held = flags.where(), flags.held()
+    out = []
+    for side in (1 - world.colony, world.colony):
+        to = where[:, side] - world.pos                              # A,N,2
+        bearing = np.arctan2(to[..., 1], to[..., 0]) - world.heading
+        way = (np.hypot(to[..., 0], to[..., 1]) / world.cfg.vision.range, np.sin(bearing), np.cos(bearing))
+        # with the compass off, where a flag is comes only from what the rays see
+        out.append((held == side, *(way if world.cfg.flag.sense else (np.zeros(shape),) * 3)))
+    taken = ((flags.carrier >= 0) | flags.down)[:, world.colony]
+    return (*out[0], taken, *out[1])
 
 def carried_worth(world: World, r: Reward) -> np.ndarray:
     """What the food in each crop is worth where it is: r.home a food at its own nest, falling to nothing an arena's width away."""
@@ -159,3 +217,10 @@ def colony_mean(x: np.ndarray, alive: np.ndarray, colony: np.ndarray) -> np.ndar
         mean = (x[:, mine] * live).sum(1) / np.maximum(live.sum(1), 1)
         out[:, mine] = mean[:, None]
     return out
+
+
+def dung_senses(world: World, shape) -> tuple:
+    """How many droppings lie close (a pile as one; 1 at four or more), and carrying one."""
+    if not world.dung:
+        return (np.zeros(shape),) * 2
+    return np.minimum(world.dung.dirt() / 4, 1), world.dung.load >= 0

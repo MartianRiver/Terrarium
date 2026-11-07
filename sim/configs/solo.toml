@@ -8,6 +8,10 @@ slop = 0.01
 
 [arena]
 size = 26.0
+# every block moves up to this far (m) from where it's set and turns any way, anew each episode; 0 keeps them put
+scatter = 0.0
+# a maze this many rooms a side, its blocks the inner walls, carved anew each episode (0: no maze)
+maze = 0
 
 [creature]
 radius = 0.45
@@ -42,6 +46,12 @@ nest_radius = 1.6
 nest_distance = 0.68
 # creatures start on a ring this far from their nest's centre
 spawn_ring = 2.5
+
+[home]
+# the way home is felt in full within `near` m of the nest's centre and fades to nothing by `far` (0: felt
+# everywhere); home_felt tells the brain how much is left
+near = 0.0
+far = 0.0
 
 [food]
 # scarce enough that finding food decides survival: random actions die within a minute,
@@ -80,6 +90,16 @@ cost = 0
 threshold = 0
 seconds = 0.0
 
+[young]
+# a hatchling is young for this long (0 is off): it walks at `speed` of max_speed, everything costs it `energy` of what
+# it costs a grown one, and in its own nest it eats from the store whenever it isn't full, hungry or not, a bite its size:
+# a jelly goes 1 / `energy` times as far, and it takes only what fits
+seconds = 0.0
+speed = 1.0
+energy = 1.0
+# the Terrikins an episode starts with are young too, not only hatchlings
+start = false
+
 [night]
 # a day and its night take this long, the night being the last `length` of it; 0 turns nights off.
 # At nightfall the food standing goes, and none grows back until dawn
@@ -102,6 +122,15 @@ seconds = 0.0
 cooldown = 6.0
 energy = 0.04
 
+[tired]
+# stamina (0 to 1) drains by `drain` a second at full thrust (a sprint by its speed up) and comes back by `rest` a second
+# while thrust stays under `still`; below `below`, top speed sinks to `slowest` of itself with none left. drain 0 is off
+drain = 0.0
+rest = 0.0
+still = 0.0
+below = 0.0
+slowest = 1.0
+
 [flowers]
 # now and then by day a nectar flower opens somewhere clear of nests and walls, every every_min to every_max seconds
 # while fewer than `count` are open, and closes after `open` seconds or at nightfall. The first to touch one drinks
@@ -115,6 +144,10 @@ radius = 0.35
 food = 3
 boost = 8.0
 speed = 1.25
+# 0: anywhere clear. Else they open only at this many spots, drawn anew each episode at least spot_gap metres
+# apart, so a creature that remembers where one opened knows where to look for the next
+spots = 0
+spot_gap = 0.0
 
 [grab]
 # a creature saying yes to grab takes hold of a block within reach of its body (metres from its edge), or the first
@@ -125,6 +158,18 @@ grip = 0.0
 seconds = 0.0
 energy = 0.0
 
+[carry]
+# a creature saying yes to carry (after a no) picks up a berry within reach of its body (metres from its edge to the
+# berry's) and holds it in its jaws, apart from its crop; yes again puts it down, still a berry. While it carries one
+# it's slower by this share of top speed and pays energy a second; reach 0 turns it off
+reach = 0.0
+slow = 0.0
+energy = 0.0
+# picking up or putting down takes `stoop` seconds standing still, and each pick-up costs `lift` energy, so
+# setting something down to pick it straight up again isn't a way round what carrying costs
+stoop = 0.0
+lift = 0.0
+
 [smell]
 # food gives off a smell that spreads over a grid of `cell`-metre squares: each tick a share `spread` of the difference
 # flows to each neighbouring cell, then it all fades by `fade`. Blocks stop it, but one a creature can drag (a door)
@@ -133,6 +178,110 @@ cell = 0.25
 spread = 0.0
 fade = 0.01
 leak = 0.1
+
+[hearing]
+# each hears the nearest other Terrikin within `range` metres, all the way round and through blocks, as a child hears
+# footsteps behind them: how close (1 touching, 0 at the edge) and which way off its heading. 0 is off
+range = 0.0
+
+[dung]
+# droppings (terrarium/droppings.py): one every `every` meals (0: none), `after` seconds later, just behind; each lies
+# `lasts` seconds (up to `slots` at once) and costs `sick` energy a second to anyone within `near` of it (from their
+# edge), as `away` of that outside every nest. Droppings within `pile` of each other count as one (0: no piles).
+# `start` lie in each nest at the start; one put down past `midden` from its carrier's nest edge is worth `points`
+# to its colony, and with `start` it goes and a new one turns up in the nest
+every = 0
+after = 0.0
+lasts = 0.0
+slots = 0
+radius = 0.0
+near = 0.0
+sick = 0.0
+away = 1.0
+pile = 0.0
+start = 0
+midden = 0.0
+points = 0.0
+# with `spot` (m) the midden is a spot that big, its middle `midden` past the nest's edge, `wander` degrees either side
+# of due east anew each episode (180: anywhere): one put down on it stays there, on a heap that can't be picked
+# up again, and `heap` lie on it at the start so there's something to see. 0: the line all round
+spot = 0.0
+heap = 0
+wander = 0.0
+# the spot (and its heap) moves somewhere new every this many seconds (0: never)
+move = 0.0
+
+[tag]
+# a nursery game: one in each arena is it, and touching another (bodies within `reach`, 0 is off) passes it on; the
+# new one can't tag for `cooldown` seconds, and being it costs `points` a second, shared out among the rest as a gain; it runs at `speed` of top speed;
+# it can tag back the one who tagged it after `back` seconds (negative: never, until someone else has been tagged)
+reach = 0.0
+cooldown = 0.0
+points = 0.0
+speed = 1.0
+back = -1.0
+
+[seek]
+# a nursery game: colony 0 hides, colony 1 seeks, and seekers can't move for the first `prep` seconds (0 is off); after
+# that each tick any seeker sees a hider pays the seekers `points` a second and costs the hiders the same, and the other
+# way round when every hider is out of sight
+prep = 0.0
+points = 0.0
+
+[flag]
+# a nursery game for two colonies: walking into the other nest picks up their flag, bringing it onto your own captures it
+# for `points` (0 is off) to your colony and as much off theirs; a pickup from a nest or a touch on the carrier is worth
+# `pickup` of points, and costs the other side `charge` of that; each metre a carrier brings their flag nearer its own
+# nest is worth `home`. With `steal`, a touch from the other side takes the flag (nobody can take it off the new
+# carrier for `guard` seconds), a colony has to carry its own flag home, and a carrier can put it down (unload) for a
+# teammate; one left lying goes home after `lie` seconds. Without, a touch sends it straight home
+points = 0.0
+pickup = 0.0
+charge = 1.0
+home = 0.0
+steal = false
+guard = 0.0
+lie = 0.0
+# the flags' compass: how far each flag is and which way, felt from anywhere; false leaves only what the rays see
+sense = true
+
+[peek]
+# peekaboo, a nursery game for memory: a berry turns up `near`–`far` m in front of someone, in sight for `show` seconds
+# (0 is off), then out of sight where it is; finding it pays `points`, the next turns up `gap` s later, and one not found
+# `timeout` s after hiding moves. `spin` turns everyone round at random as it turns up and as it hides
+show = 0.0
+points = 0.0
+gap = 0.0
+timeout = 0.0
+near = 0.0
+far = 0.0
+spin = false
+again = 0.0
+flash = 0.0
+
+[jump]
+# a yes to jump while standing lifts a Terrikin this high (m) and gravity brings it down; each jump costs `energy`.
+# 0 is off
+height = 0.0
+energy = 0.0
+
+[tree]
+# a nursery game for jumping: block `trunk` is a tree, every apple hangs `near`-`far` m from its middle and `reach` m
+# above what a Terrikin standing under it can get to, and each one taken is worth `points` (0 is off); each jump
+# costs `hop` points; with `home`, an apple taken goes in the crop and pays only once it's unloaded in the nest
+trunk = 0
+near = 0.0
+far = 0.0
+reach = 0.0
+points = 0.0
+hop = 0.0
+home = false
+# the tree moves every this many seconds, where [arena] scatter would draw it (0: never)
+move = 0.0
+# every episode starts with each Terrikin this far (m) from the trunk, facing it (0: at the nest)
+start = 0.0
+# unloading an apple at home takes the carrier down into the nest, and it comes back up at the middle turned any way
+burrow = false
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
@@ -144,6 +293,13 @@ rays = 16
 # 200°
 fov = 3.49
 range = 8.0
+# how wide each ray is: 0 a thin line; 1 a slice of the fan that meets its neighbours', so nothing
+# small falls between rays or vanishes dead ahead
+cover = 0.0
+# 1 spreads rays evenly; above 1 packs them towards the middle, like the eye's fovea
+spread = 1.0
+# how far the rays at the edges of the fan see, as a share of range (in between, it eases)
+side = 1.0
 
 [episode]
 # a training arena starts over after this long, or once everyone in it is dead
@@ -157,6 +313,8 @@ w = 1.3
 h = 1.3
 mass = 4.0
 friction = 0.6
+carry = false
+shut = 0.0
 
 [[block]]
 x = -3.0
@@ -166,3 +324,5 @@ w = 2.4
 h = 1.1
 mass = 12.0
 friction = 0.6
+carry = false
+shut = 0.0

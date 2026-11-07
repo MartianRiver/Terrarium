@@ -5,45 +5,49 @@
 name = "rented RTX 3060 12 GB"
 kind = "rented"
 gpu = "RTX 3060 12 GB"
-samples = 2714083328
-hours = 66.73
-runs = 452
-last_active = "2026-10-26"
+samples = 2809896960
+hours = 72.93
+runs = 459
+last_active = "2026-10-28"
+dollars = 9.64
 
 [[machine]]
 name = "rented RTX 3080"
 kind = "rented"
 gpu = "RTX 3080"
-samples = 1873870848
-hours = 37.67
-runs = 252
-last_active = "2026-10-26"
+samples = 1961558016
+hours = 42.12
+runs = 254
+last_active = "2026-10-28"
+dollars = 6.05
 
 [[machine]]
 name = "rented RTX 3070 8 GB"
 kind = "rented"
 gpu = "RTX 3070 8 GB"
-samples = 1091321856
-hours = 21.88
-runs = 252
-last_active = "2026-10-25"
-
-[[machine]]
-name = "river-m3"
-kind = "mine"
-gpu = "Apple M3"
-samples = 609304576
-hours = 27.18
-runs = 105
-last_active = "2026-10-26"
+samples = 1486635008
+hours = 43.27
+runs = 286
+last_active = "2026-10-28"
+dollars = 5.38
 
 [[machine]]
 name = "rented RTX 4060 Ti"
 kind = "rented"
 gpu = "RTX 4060 Ti"
-samples = 305340416
-hours = 12.86
-runs = 33
+samples = 976035840
+hours = 36.8
+runs = 73
+last_active = "2026-10-28"
+dollars = 6.32
+
+[[machine]]
+name = "river-m3"
+kind = "admin"
+gpu = "Apple M3"
+samples = 609304576
+hours = 27.18
+runs = 105
 last_active = "2026-10-26"
 
 [[machine]]
@@ -54,6 +58,7 @@ samples = 119930880
 hours = 2.16
 runs = 5
 last_active = "2026-10-26"
+dollars = 0.34
 
 [[machine]]
 name = "rented A10 24 GB"
@@ -63,3 +68,34 @@ samples = 79626240
 hours = 2.46
 runs = 16
 last_active = "2026-10-24"
+dollars = 0.61
+
+[[machine]]
+name = "rented RTX 3080 Ti"
+kind = "rented"
+gpu = "RTX 3080 Ti"
+samples = 0
+hours = 0.0
+runs = 0
+last_active = "2026-10-23"
+dollars = 0.03
+
+[[machine]]
+name = "rented RTX 3060 Ti"
+kind = "rented"
+gpu = "RTX 3060 Ti"
+samples = 0
+hours = 0.0
+runs = 0
+last_active = "2026-10-23"
+dollars = 0.0
+
+[[machine]]
+name = "rented RTX 4070"
+kind = "rented"
+gpu = "RTX 4070"
+samples = 0
+hours = 0.0
+runs = 0
+last_active = "2026-10-25"
+dollars = 0.14

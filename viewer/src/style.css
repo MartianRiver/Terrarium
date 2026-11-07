@@ -81,9 +81,14 @@ body {
   display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (pointer: coarse) {
   #hud .hint {
     display: none;
+  }
+
+  /* big enough to hit with a thumb */
+  #hud button {
+    padding: 6px 14px;
   }
 }
 
@@ -422,4 +427,809 @@ body {
 .net-foot {
   margin: 4px 0 0;
   opacity: 0.75;
+}
+
+#play {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+#play table {
+  border-collapse: collapse;
+}
+
+#play th,
+#play td {
+  padding: 1px 10px 1px 0;
+  text-align: left;
+}
+
+#play th {
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+#play small {
+  opacity: 0.6;
+}
+
+#play p {
+  margin: 6px 0 0;
+}
+
+.play-meta,
+.play-keys {
+  opacity: 0.7;
+}
+
+.play-error {
+  color: #8a2a1d;
+}
+
+#play-hud {
+  position: fixed;
+  /* below the replay bar */
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 18px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 18px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.hud-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-right: 8px;
+}
+
+.hud-energy {
+  display: flex;
+  align-items: center;
+}
+
+.hud-bar {
+  width: 200px;
+  height: 16px;
+  border: 2px solid rgb(44 58 51 / 0.35);
+  border-radius: 9px;
+  background: rgb(44 58 51 / 0.12);
+  overflow: hidden;
+}
+
+.hud-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 7px;
+  transition: width 0.2s linear, background-color 0.3s;
+  /* notches, like a game's health bar */
+  background-image: repeating-linear-gradient(90deg, transparent 0 18px, rgb(255 255 255 / 0.35) 18px 20px);
+}
+
+.hud-energy.high .hud-bar span {
+  background-color: #5fae4f;
+}
+
+.hud-energy.mid .hud-bar span {
+  background-color: #e0a93a;
+}
+
+.hud-energy.low .hud-bar span {
+  background-color: #d4553f;
+  animation: hud-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hud-pulse {
+  to {
+    opacity: 0.45;
+  }
+}
+
+.hud-value {
+  width: 3.2em;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.hud-points b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-points b,
+.hud-counts span {
+  display: inline-block;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.hud-counts {
+  display: flex;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-counts small {
+  opacity: 0.6;
+}
+
+.hud-points.bump b,
+.hud-counts .bump {
+  color: #c98a12;
+  transform: scale(1.18);
+}
+
+#play .play-you td {
+  font-weight: 700;
+}
+
+.play-rank b {
+  color: #c98a12;
+}
+
+.hud-state {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13px;
+}
+
+.hud-state[hidden],
+.hud-sprint[hidden] {
+  display: none;
+}
+
+.hud-sprint {
+  display: flex;
+  align-items: center;
+}
+
+.hud-sprint .hud-bar {
+  width: 80px;
+  height: 10px;
+}
+
+.hud-sprint .hud-bar span {
+  background-image: none;
+  transition: width 0.1s linear;
+}
+
+.hud-sprint i {
+  width: 4.5em;
+  margin-left: 6px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.hud-sprint.ready .hud-bar span {
+  background-color: #4f8fd4;
+}
+
+.hud-sprint.going .hud-bar span {
+  background-color: #e07a3a;
+}
+
+.hud-sprint.resting .hud-bar span {
+  background-color: rgb(44 58 51 / 0.35);
+}
+
+.hud-sprint.resting i {
+  opacity: 0.55;
+}
+
+.hud-chase {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid rgb(44 58 51 / 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hud-chase[aria-pressed='true'] {
+  background: #3f7a38;
+  border-color: #3f7a38;
+  color: #fff;
+}
+
+.hud-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hud-chips span {
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: rgb(44 58 51 / 0.08);
+}
+
+.hud-chips .full {
+  background: #f3c955;
+  font-weight: 700;
+}
+
+.hud-chips .turbo {
+  background: linear-gradient(90deg, #f7a8c4, #f3d36b, #9fd8a8, #8fc3f0);
+  font-weight: 700;
+}
+
+.hud-chips .home {
+  background: rgb(95 174 79 / 0.2);
+}
+
+.hud-chips .dusk {
+  background: #f0b27a;
+}
+
+.hud-chips .night {
+  background: #3c4a6b;
+  color: #eef1f8;
+}
+
+#play-toasts {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.play-toast {
+  padding: 8px 18px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.92);
+  font-size: 18px;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  animation: play-toast 2.6s ease-out forwards;
+}
+
+.play-toast.quiet {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.play-toast.turbo {
+  background: linear-gradient(90deg, #f7a8c4, #f3d36b, #9fd8a8, #8fc3f0);
+}
+
+.play-toast.low {
+  background: #d4553f;
+  color: #fff;
+}
+
+.play-toast.dusk {
+  background: #3c4a6b;
+  color: #eef1f8;
+}
+
+@keyframes play-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+  }
+  10%,
+  75% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+/* ?channel: what's on screen (channelcard.ts) */
+#channel {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+}
+
+#channel summary {
+  cursor: pointer;
+  font-size: 15px;
+}
+
+#channel summary span {
+  opacity: 0.6;
+  font-size: 13px;
+}
+
+#channel p {
+  margin: 6px 0;
+}
+
+#channel p > b:first-child {
+  display: inline-block;
+  min-width: 4.6em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+#channel .channel-now {
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgb(95 174 79 / 0.18);
+}
+
+#channel .channel-now[data-hidden='true'] {
+  background: rgb(240 140 170 / 0.25);
+}
+
+#channel .channel-now[hidden] {
+  display: none;
+}
+
+.channel-value {
+  font-weight: 700;
+}
+
+.channel-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: rgb(44 58 51 / 0.1);
+}
+
+.channel-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 5px;
+  background: #5fae4f;
+}
+
+.channel-bar i {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgb(44 58 51 / 0.55);
+}
+
+#channel .channel-marks,
+#channel .channel-foot {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+/* the site's /watch/ with nothing asked for: what there is to watch (picker.ts) */
+#picker {
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  padding: 18px 20px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.95);
+  color: #2c3a33;
+  font: inherit;
+  outline: none;
+}
+
+#picker::backdrop {
+  background: rgb(20 30 25 / 0.35);
+}
+
+#picker h2 {
+  margin: 0 0 12px;
+  font-size: 19px;
+}
+
+#picker ol,
+#picker ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#picker h3 {
+  display: inline;
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3f7a38;
+}
+
+.picker-live {
+  margin: 0 -8px 10px;
+  padding: 10px 8px 6px;
+  border-radius: 12px;
+  background: rgb(95 174 79 / 0.1);
+}
+
+.picker-live h3 {
+  margin-left: 10px;
+}
+
+.picker-about {
+  display: block;
+  margin: 2px 10px 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+#picker details {
+  border-top: 1px solid rgb(44 58 51 / 0.12);
+}
+
+#picker summary {
+  padding: 10px 10px 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+#picker summary::-webkit-details-marker {
+  display: none;
+}
+
+#picker summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 14px;
+  margin-left: -4px;
+  color: #3f7a38;
+  transition: transform 0.15s;
+}
+
+#picker details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+#picker summary .picker-about {
+  margin: 2px 0 4px 10px;
+}
+
+.picker-count {
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.picker-all {
+  display: inline-block;
+  margin: 0 10px 6px;
+  font-size: 13px;
+  color: #3f7a38;
+}
+
+.picker-card + .picker-card {
+  border-top: 1px dashed rgb(44 58 51 / 0.1);
+}
+
+#picker .picker-head,
+.picker-rows a,
+.picker-rows .picker-off {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+#picker a:hover,
+#picker a:focus-visible {
+  background: rgb(95 174 79 / 0.14);
+}
+
+.picker-head b {
+  font-size: 15px;
+}
+
+/* a card's setups: indented under it, each its own link */
+.picker-rows {
+  margin: -4px 0 6px 14px !important;
+  border-left: 2px solid rgb(95 174 79 / 0.3);
+}
+
+.picker-rows a,
+.picker-rows .picker-off {
+  padding: 6px 10px;
+  border-radius: 0 10px 10px 0;
+}
+
+.picker-rows b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* a stage not trained yet: listed so the way ahead shows, greyed */
+.picker-off {
+  opacity: 0.5;
+}
+
+/* a nursery: its own fold inside the group, its stages numbered in order under it */
+#picker .picker-nursery {
+  border-top: none;
+}
+
+#picker .picker-nursery > summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 2px 8px;
+  align-items: baseline;
+  padding: 9px 10px;
+}
+
+.picker-nursery > summary b {
+  font-size: 15px;
+}
+
+.picker-nursery > summary .picker-tag {
+  grid-column: 3;
+}
+
+.picker-nursery > summary .picker-text,
+.picker-nursery > summary .picker-when {
+  grid-column: 2 / -1;
+}
+
+.picker-stages {
+  margin: 0 0 8px 14px !important;
+  border-left: 2px solid rgb(95 174 79 / 0.3);
+}
+
+#picker .picker-stage details {
+  border-top: none;
+}
+
+/* a nursery's older stages and those to come, folded away under what's going on now */
+#picker .picker-fold {
+  border-top: none;
+  margin-left: 14px;
+}
+
+/* a nursery's plan: where it's at, and what each stage has to show before the next */
+#picker .picker-now {
+  margin: 4px 10px 8px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.picker-pass {
+  display: block;
+  margin: 0 10px 6px;
+  font-size: 12.5px;
+  color: #3f7a38;
+}
+
+.picker-stage .picker-off .picker-pass {
+  margin: 0;
+}
+
+#picker .picker-fold > summary {
+  padding: 5px 10px;
+  font-size: 13px;
+  color: #5b6b57;
+}
+
+#picker .picker-stage summary,
+.picker-stage .picker-off {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 6px 10px;
+}
+
+#picker .picker-stage summary::before {
+  display: none;
+}
+
+.picker-stage summary b::before {
+  content: '▸ ';
+  color: #3f7a38;
+}
+
+.picker-stage details[open] > summary b::before {
+  content: '▾ ';
+}
+
+.picker-stage b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.picker-stage details > .picker-text,
+.picker-chips {
+  display: block;
+  margin: 0 10px 6px;
+}
+
+.picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.picker-chips-label {
+  opacity: 0.7;
+}
+
+.picker-chips a {
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: rgb(95 174 79 / 0.16);
+  color: inherit;
+  text-decoration: none;
+}
+
+.picker-tag.training {
+  background: rgb(95 174 79 / 0.28);
+  font-weight: 600;
+}
+
+.picker-tag.training::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #3f9a3a;
+  animation: picker-pulse 1.6s ease-in-out infinite;
+}
+
+.picker-tag.held {
+  background: rgb(214 160 52 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .picker-tag.training::before { animation: none; }
+}
+
+.picker-tag {
+  justify-self: end;
+  align-self: start;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgb(44 58 51 / 0.08);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.picker-tag.live {
+  background: rgb(95 174 79 / 0.28);
+  font-weight: 600;
+}
+
+.picker-tag.live::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #3f9a3a;
+  animation: picker-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes picker-pulse {
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .picker-tag.live::before { animation: none; }
+}
+
+.picker-text {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.picker-when,
+.picker-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.picker-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+.picker-foot button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #5fae4f;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* a run's replay: the same run's brain from random moves to now (learns.ts) */
+#learns {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.8);
+  backdrop-filter: blur(6px);
+  font-size: 0.9em;
+}
+
+#learns button {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#learns button[aria-pressed='true'] {
+  background: rgb(0 0 0 / 0.75);
+  color: white;
+}
+
+/* phones: the channel card takes the bottom, so the chips go up top under the buttons */
+@media (max-width: 640px) {
+  #learns {
+    top: 64px;
+    bottom: auto;
+    left: 16px;
+    border-radius: 14px;
+    justify-content: flex-start;
+  }
 }

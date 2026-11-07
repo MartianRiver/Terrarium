@@ -1,6 +1,6 @@
 # Roadmap
 
-Each stage is a version: stage N ships as 0.N.0 once it's done and has been through the checks in [docs/releasing.md](docs/releasing.md). The main world is 1.0. Stages build on each other: every stage's brain starts from the one the stage before it promoted, and a new stage isn't finished if it made an old skill worse.
+Each stage is a version: stage N opens as 0.N.0 with its first milestone, and each milestone after it ships as 0.N.y once it has been through the checks in [docs/releasing.md](docs/releasing.md). The main world is 1.0. Stages build on each other: every stage's brain starts from the one the stage before it promoted, and a new stage isn't finished if it made an old skill worse.
 
 What each mechanic is for is in [VISION.md](VISION.md). This is the order they arrive in, and what has to be true before a stage counts as done.
 
@@ -74,6 +74,11 @@ Two things I wanted here moved to 0.4: Terrikins not starving with jelly at home
 - Evals: how big each colony gets and how long it lasts, head to head between colonies' brains, and colonies founded.
 
 Done when foragers go back to a patch they remember, Terrikins don't starve with jelly at home, foragers away from the nest keep themselves fed, colonies grow from their store and shrink in lean times, hatchlings grow up on what their colony brings home, and the brains of the colonies that do well spread.
+
+It comes in milestones:
+
+- **0.4.0 Memory that steers (done, 7 November 2026).** In a nursery with an apple tree out of sight of home, a Terrikin's own notes hold where the tree is and take it back there. Notes from a game whose tree lay the other way pull it that way, and when the tree moves while it's underground, it walks to the empty spot first. Three brains, on seeds never used for choosing them ([finding 0004](docs/findings/0004-the-notes-hold-the-trees-place.md); [notes](docs/notes/0.4.md), "A tree they go back to").
+- The rest of the list above comes as the next 0.4 milestones.
 
 ## 0.5 Foxglove: The way home
 

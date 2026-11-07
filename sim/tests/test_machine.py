@@ -1,8 +1,12 @@
+import io
 import json
+import random
 import signal
 import subprocess
 import sys
+import tarfile
 import time
+from pathlib import Path
 
 import psutil
 import pytest
@@ -163,6 +167,40 @@ def test_the_worker_pauses_resumes_and_hands_back_a_running_job(running):
     assert proc.wait(timeout=10) is not None
 
 
+def test_the_status_pause_stops_and_resumes_a_running_job(running):
+    wk, task, proc, fake, _ = running
+    fake.seen = QUIET
+    wk.paused = True
+    wk.mind(now=1000)
+    assert task.state == 'paused' and task.reason == 'paused from the status page'
+    assert machine.tree(proc.pid)[0].status() == 'stopped' or sys.platform == 'win32'
+    wk.paused = False
+    wk.mind(now=1010)
+    assert task.state == 'training' and task.paused == 10
+
+
+def test_manual_pause_keeps_machine_stop_rules(running):
+    wk, task, proc, fake, _ = running
+    wk.paused = True
+    fake.seen = QUIET._replace(fullscreen=True)
+    wk.mind(now=1000)
+    assert task.state == 'handed back' and task.reason == 'something is running full screen'
+    assert proc.wait(timeout=10) is not None
+
+
+def test_resuming_manually_waits_for_the_machine_to_be_ready(running):
+    wk, task, _, fake, _ = running
+    wk.paused = True
+    wk.mind(now=1000)
+    wk.paused = False
+    fake.seen = QUIET._replace(temp=90)
+    wk.mind(now=1010)
+    assert task.state == 'paused' and task.reason == 'GPU at 90 °C'
+    fake.seen = QUIET
+    wk.mind(now=1020)
+    assert task.state == 'training' and task.paused == 20
+
+
 def test_a_game_hands_the_job_back_straight_away(running):
     wk, task, proc, fake, _ = running
     fake.seen = QUIET._replace(fullscreen=True)
@@ -257,3 +295,24 @@ def test_load_is_read_where_os_has_none(tmp_path, monkeypatch):
     monkeypatch.setattr(worker.psutil, 'getloadavg', lambda: (0.5, 0, 0))
     assert wk.wants_work()
 
+
+
+def test_a_result_too_big_for_the_coordinator_leaves_checkpoints_out_but_never_the_last(tmp_path):
+    run = tmp_path / '20261028-100000-n'
+    (run / 'checkpoints').mkdir(parents=True)
+    (run / 'run.json').write_text(json.dumps({'checkpoint': '00000000009.pt'}))
+    names = [f'{i:011d}.pt' for i in range(10)]
+    for i, name in enumerate(names):
+        (run / 'checkpoints' / name).write_bytes(random.Random(i).randbytes(1000))
+    data = worker.pack(run, limit=3500)
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tar:
+        sent = sorted(Path(m.name).name for m in tar.getmembers() if m.name.endswith('.pt'))
+        record = json.load(tar.extractfile(f'{run.name}/run.json'))  # type: ignore[arg-type]
+    assert len(data) <= 3500 and sent[-1] == names[-1] and 1 < len(sent) < 10
+    assert record['checkpoints_left_out'] == 10 - len(sent)
+    # what's kept here is the whole run
+    assert len(list((run / 'checkpoints').iterdir())) == 10
+    assert 'checkpoints_left_out' not in json.loads((run / 'run.json').read_text())
+    # a brain bigger than the limit by itself still goes, and the coordinator says no
+    with tarfile.open(fileobj=io.BytesIO(worker.pack(run, limit=10)), mode='r:gz') as tar:
+        assert [Path(m.name).name for m in tar.getmembers() if m.name.endswith('.pt')] == [names[-1]]

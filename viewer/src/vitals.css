@@ -1,0 +1,144 @@
+.vitals {
+  position: fixed;
+  left: 16px;
+  top: 64px;
+  width: 210px;
+  box-sizing: border-box;
+  padding: 8px 12px 9px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  color: #2c3a33;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* ?vitals=big: for clips and big screens */
+.vitals.big {
+  width: 20em;
+  font-size: 22px;
+  border-radius: 0.9em;
+}
+
+.vitals h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.vitals ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vitals li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1.6em;
+}
+
+.vitals li[data-row='notes'] {
+  align-items: flex-start;
+}
+
+.vitals li[data-row='notes'] .vitals-value {
+  white-space: normal;
+}
+
+.vitals li[hidden] {
+  display: none;
+}
+
+.vitals-name {
+  width: 4.6em;
+  flex: none;
+  color: #5d6b63;
+}
+
+.vitals-value {
+  white-space: nowrap;
+}
+
+.vitals-dial {
+  position: relative;
+  flex: none;
+  width: 2.4em;
+  height: 2.4em;
+  border-radius: 50%;
+  border: 1.5px solid rgb(44 58 51 / 0.35);
+  box-sizing: border-box;
+  margin: 1px 0;
+}
+
+.vitals-north,
+.vitals-needle {
+  position: absolute;
+  inset: 0;
+}
+
+.vitals-north {
+  display: flex;
+  justify-content: center;
+  font-size: 0.6em;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #b5532a;
+  transition: transform 0.15s linear;
+}
+
+.vitals-needle::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 1.5px);
+  top: 32%;
+  bottom: 50%;
+  width: 3px;
+  border-radius: 2px;
+  background: #3f7a38;
+}
+
+.vitals-needle::before {
+  content: '';
+  position: absolute;
+  left: calc(50% - 4px);
+  top: 22%;
+  border: 4px solid transparent;
+  border-bottom: 6px solid #3f7a38;
+  border-top: 0;
+}
+
+.vitals-needle {
+  transition: transform 0.15s linear;
+}
+
+.vitals-bar {
+  flex: 1;
+  height: 0.55em;
+  border-radius: 0.3em;
+  background: rgb(44 58 51 / 0.12);
+  overflow: hidden;
+}
+
+.vitals-bar i {
+  display: block;
+  height: 100%;
+  background: #6aa84f;
+}
+
+.vitals li[data-low='true'] .vitals-bar i {
+  background: #d9822b;
+}
+
+/* phones: the channel card and the chips take the screen, so the card stays small */
+@media (max-width: 600px) {
+  .vitals {
+    width: 170px;
+    font-size: 12px;
+  }
+
+  .vitals.big {
+    width: 17em;
+    font-size: 16px;
+  }
+}

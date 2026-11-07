@@ -10,7 +10,7 @@ def outputs(brain):
     n = len(brain.schema['ray'])
     me, kinds, rays = torch.randn(64, len(brain.schema['self'])), torch.randint(0, 5, (64, 16)), torch.randn(64, 16, n)
     with torch.no_grad():
-        return brain(me, kinds, rays)
+        return brain(me, kinds, rays)[:2]
 
 
 @pytest.mark.parametrize('width', [128, 256])
@@ -20,7 +20,7 @@ def test_a_widened_brain_acts_as_the_narrow_one(width):
     for p in old.parameters():
         p.data += torch.randn_like(p) * 0.1
     new = widen(old, width)
-    assert new.shape == {'width': width, 'layers': SHAPE['layers'], 'heads': SHAPE['heads'] * width // SHAPE['width']}
+    assert new.shape == {'width': width, 'layers': SHAPE['layers'], 'heads': SHAPE['heads'] * width // SHAPE['width'], 'memory': 0}
     for a, b in zip(outputs(old), outputs(new)):
         assert torch.allclose(a, b, atol=1e-5)
 

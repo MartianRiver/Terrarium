@@ -12,7 +12,8 @@ import numpy as np
 from .world import World
 
 FORMAT = 'terrarium-replay'
-VERSION = 1
+# 2: a store's jelly can hold part of one (v1 rounded it down, and its viewers read it as a whole number)
+VERSION = 2
 # the viewer's blob is modelled at this radius, so a creature's size is its radius over this
 BLOB_RADIUS = 0.45
 # millimetres and milliradians: plenty for drawing, and a third of the file
@@ -29,6 +30,16 @@ def header(world: World, arena: int, source: dict) -> dict:
              for c, (x, y) in enumerate(world.nests)]
     info = {'width': cfg.arena.size, 'height': cfg.arena.size, 'tickHz': cfg.tick_hz,
             'maxSpeed': cfg.creature.max_speed, 'nests': nests}
+    # a spot that moves mid-game isn't marked (the marker is drawn once): its heap shows where it is
+    if cfg.dung.spot > 0:
+        if not cfg.dung.move:
+            x, y = world.dung.midden_at[arena]
+            info['middenSpot'] = {'x': _r(x), 'y': _r(y), 'radius': cfg.dung.spot}
+    elif cfg.dung.midden > 0:
+        info['midden'] = cfg.dung.midden
+    if world.tree:
+        # the block drawn as an apple tree
+        info['tree'] = int(world.block_id[cfg.tree.trunk])
     return {'format': FORMAT, 'version': VERSION, 'info': info,
             'source': {**source, 'arena': arena, 'config': cfg.to_dict()}}
 
@@ -48,20 +59,69 @@ def frame(world: World, a: int) -> dict:
     if cfg.sprint.on:
         for c, burst in zip(creatures, world.sprinting[a][born]):
             c['sprinting'] = int(burst > 0)
+    if cfg.carry.on:
+        # a berry in its jaws
+        for c, load in zip(creatures, world.load[a][born]):
+            c['load'] = int(load >= 0)
+    if world.dung and cfg.carry.on:
+        # a dropping in its jaws
+        for c, held in zip(creatures, world.dung.load[a][born]):
+            c['dung'] = int(held >= 0)
+    if world.tag:
+        # it lights its bulb
+        for c, it in zip(creatures, world.tag.mask()[a][born]):
+            c['signal'] = 0 if it else -1
+    if world.seek:
+        # seekers light their bulbs while they count
+        counting = world.seek.waiting()[a] > 0
+        for c, seeker in zip(creatures, world.seek.seeker[born]):
+            c['signal'] = 2 if seeker and counting else -1
+    if cfg.tired.on:
+        # stamina left: drawn sleepy and slow when low, resting when still
+        for c, left in zip(creatures, world.stamina[a][born]):
+            c['stamina'] = _r(left)
+    if cfg.young.on:
+        # share of its youth left: 1 just hatched, 0 grown
+        for c, left in zip(creatures, world.young[a][born]):
+            c['young'] = _r(left / max(round(cfg.young.seconds * cfg.tick_hz), 1))
     if cfg.flowers.on:
         # seconds of nectar boost left
         for c, boost in zip(creatures, world.nectar[a][born]):
             c['nectar'] = _r(boost / cfg.tick_hz)
+    if cfg.jump.on:
+        for c, z in zip(creatures, world.z[a][born]):
+            c['z'] = _r(z)
     here = world.food_present[a]
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
             for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
+    if world.tree:
+        # the tree's berries are apples, hanging this far above a standing Terrikin's reach
+        for f in food:
+            if f['kind'] == 'common':
+                f.update(kind='apple', z=cfg.tree.reach)
+    if world.peek and world.peek.hidden[a]:
+        # peekaboo's berry, out of sight
+        food[0]['hidden'] = 1
     blocks = [{'id': int(i), 'x': _r(x), 'y': _r(y), 'angle': _r(t), 'w': b.w, 'h': b.h}
-              for i, b, (x, y), t in zip(world.block_id, cfg.block, world.block_pos[a], world.block_angle[a])]
-    stores = [{'colony': c, 'jelly': int(j)} for c, j in enumerate(world.store[a])]
+              for i, b, (x, y), t in zip(world.block_id, cfg.block, world.physics.block_pos[a], world.block_angle[a])]
+    # a carried block rides on its carrier, crosswise
+    for i in np.flatnonzero(world.block_load[a] >= 0):
+        block = blocks[world.block_load[a, i]]
+        block.update(x=_r(world.pos[a, i, 0]), y=_r(world.pos[a, i, 1]), angle=_r(world.heading[a, i]), carried=1)
+    # the young take bites smaller than a jelly, so a store can hold part of one
+    stores = [{'colony': c, 'jelly': int(j) if float(j).is_integer() else round(float(j), 3)} for c, j in enumerate(world.store[a])]
     out = {'tick': world.tick, 'creatures': creatures, 'food': food, 'blocks': blocks, 'stores': stores}
     if cfg.night.on:
         out['light'] = _r(world.light()[a])
+    if world.dung:
+        out['dung'] = [{'id': int(world.dung.id[a, k]), 'x': _r(world.dung.pos[a, k, 0]), 'y': _r(world.dung.pos[a, k, 1])}
+                       for k in np.flatnonzero(world.dung.lying()[a])]
+    if world.flags:
+        where = world.flags.where()[a]
+        out['flags'] = [{'colony': t, 'x': _r(where[t, 0]), 'y': _r(where[t, 1]), 'down': int(world.flags.down[a, t]),
+                         'carrier': int(world.creature_id[a, c]) if (c := world.flags.carrier[a, t]) >= 0 else -1}
+                        for t in range(2)]
     if cfg.flowers.on:
         out['flowers'] = [{'id': int(world.flower_id[a, f]), 'x': _r(world.flower_pos[a, f, 0]), 'y': _r(world.flower_pos[a, f, 1])}
                           for f in np.flatnonzero(world.flowers_open[a])]
