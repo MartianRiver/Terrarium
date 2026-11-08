@@ -46,6 +46,32 @@ def test_someone_at_the_machine_or_on_battery_pauses_it():
     assert watch(plugged=None, idle=None)[0].check().action == 'go'
 
 
+def test_a_battery_floor_pauses_a_job_allowed_on_battery_until_plugged_in():
+    on = Rules(battery=True)
+    assert on.battery_floor == 30
+    w, fake = watch(on, plugged=False, charge=31)
+    assert w.check().action == 'go'
+    fake.seen = QUIET._replace(plugged=False, charge=30)
+    assert w.check() == ('pause', 'battery at 30%')
+    # a battery only falls: a reading back above the floor on battery stays paused
+    fake.seen = QUIET._replace(plugged=False, charge=45)
+    assert w.check() == ('pause', 'battery at 45%')
+    fake.seen = QUIET._replace(plugged=True, charge=45)
+    assert w.check().action == 'go'
+    fake.seen = QUIET._replace(plugged=False, charge=45)
+    assert w.check().action == 'go'
+
+
+def test_the_floor_is_for_battery_only_and_zero_turns_it_off():
+    assert watch(Rules(battery=True), plugged=True, charge=5)[0].check().action == 'go'
+    assert watch(Rules(battery=True), plugged=None, charge=None)[0].check().action == 'go'
+    assert watch(Rules(battery=True, battery_floor=0), plugged=False, charge=3)[0].check().action == 'go'
+    assert watch(Rules(battery=True, battery_floor=50), plugged=False, charge=40)[0].check().action == 'pause'
+    # without battery = true the plain rule answers, whatever the charge
+    assert watch(Rules(), plugged=False, charge=80)[0].check().reason == 'on battery'
+    assert watch(Rules(), plugged=False, charge=10)[0].check().reason == 'on battery'
+
+
 def test_a_hot_gpu_pauses_until_it_has_cooled_a_little():
     w, fake = watch(temp=86)
     assert w.check().reason == 'GPU at 86 °C'
@@ -81,6 +107,14 @@ def test_settings_load_strictly_and_flags_win(tmp_path):
     assert machine.load(path, cpu=0.25) == Rules(cooldown=0, cpu=0.25, battery=True)
     for bad, match in [('gpu = 1\n', 'unknown setting'), ('battery = 1\n', 'should be bool'),
                        ('cooldown = "10"\n', 'should be float'), ('cpu = 1.5\n', 'share of the cores')]:
+        path.write_text(bad)
+        with pytest.raises(ValueError, match=match):
+            machine.load(path)
+    path.write_text('battery = true\nbattery_floor = 25\n')
+    assert machine.load(path) == Rules(battery=True, battery_floor=25)
+    assert machine.load(path, battery_floor=0).battery_floor == 0
+    for bad, match in [('battery_floor = "30"\n', 'should be float'), ('battery_floor = 100\n', 'a percent'),
+                       ('battery_floor = -1\n', 'a percent')]:
         path.write_text(bad)
         with pytest.raises(ValueError, match=match):
             machine.load(path)

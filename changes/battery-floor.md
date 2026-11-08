@@ -1,0 +1,1 @@
+A worker allowed to train on battery (`battery = true`) now pauses its job at or below a charge floor, 30% by default (`battery_floor` in settings.toml, `--battery-floor PCT`, 0 for none), and stays paused until it is plugged in, so a job that sits there goes back to the queue after the usual 30 minutes. It checks every two seconds, so nobody has to watch the battery.

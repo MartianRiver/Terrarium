@@ -1,8 +1,9 @@
 # What a worker on a lent machine keeps to, so it never gets in its owner's way
 # (docs/compute.md): it only trains when nobody has touched the machine for a
-# while and it's on mains power, uses at most half the CPU at low priority,
-# pauses when the GPU runs hot, gives the job back when another program (a game)
-# starts using the GPU, and keeps the machine from sleeping while a job trains.
+# while and it's on mains power (or, if allowed on battery, above a floor), uses
+# at most half the CPU at low priority, pauses when the GPU runs hot, gives the
+# job back when another program (a game) starts using the GPU, and keeps the
+# machine from sleeping while a job trains.
 # Rented machines skip all of it.
 #
 # Rules are the settings; Watch reads the machine every few seconds and says
@@ -38,6 +39,7 @@ COOL = 5
 class Rules:
     cooldown: float = 10      # minutes without keyboard or mouse before training; 0 = while in use too
     battery: bool = False     # also train on battery
+    battery_floor: float = 30  # with battery on, pause at or below this % until plugged in; 0 = no floor
     cpu: float = 0.5          # share of the cores
     gpu_temp: float = 85      # pause above this (°C) until it's COOL below; 0 = no limit
     share_gpu: bool = False   # keep training while other programs use the GPU
@@ -48,7 +50,7 @@ class Rules:
     @classmethod
     def anytime(cls) -> 'Rules':
         """A rented machine: nobody else is using it."""
-        return cls(cooldown=0, battery=True, cpu=1, gpu_temp=0, share_gpu=True, keep_awake=False)
+        return cls(cooldown=0, battery=True, battery_floor=0, cpu=1, gpu_temp=0, share_gpu=True, keep_awake=False)
 
 
 
@@ -68,6 +70,8 @@ def load(path: Path, **overrides) -> Rules:
                 raise ValueError(f'{path.name}: {key} should be {types[key].__name__}')
         rules = replace(rules, **raw)
     rules = replace(rules, **{k: v for k, v in overrides.items() if v is not None})
+    if not 0 <= rules.battery_floor < 100:
+        raise ValueError(f'battery_floor is a percent, 0 for none, below 100, not {rules.battery_floor}')
     if not 0 < rules.cpu <= 1:
         raise ValueError(f'cpu is a share of the cores, above 0 and at most 1, not {rules.cpu}')
     return rules
@@ -79,6 +83,7 @@ class Seen(NamedTuple):
     temp: float | None          # hottest GPU, °C
     others: tuple[float, float] | None  # other programs on the GPU: (3D share, GB); None: can't tell
     fullscreen: bool            # a game or presentation has the screen
+    charge: float | None = None  # battery %; None: no battery
 
 
 class Verdict(NamedTuple):
@@ -91,6 +96,7 @@ class Watch:
         self.rules, self.probes = rules, probes
         self.busy_since: float | None = None
         self.hot = False
+        self.drained = False
         self.seen: Seen | None = None
         if rules != Rules.anytime() and probes is None:
             self.probes = Probes()
@@ -105,6 +111,11 @@ class Watch:
         since = self.busy_since = (self.busy_since or now) if busy else None
         if seen.temp is not None and r.gpu_temp:
             self.hot = seen.temp > r.gpu_temp or (self.hot and seen.temp > r.gpu_temp - COOL)
+        # a battery only falls, so once at the floor it stays down until the charger is in
+        if seen.plugged is not False or not r.battery_floor:
+            self.drained = False
+        elif seen.charge is not None and seen.charge <= r.battery_floor:
+            self.drained = True
         if not r.share_gpu:
             if seen.fullscreen:
                 return Verdict('stop', 'something is running full screen')
@@ -112,6 +123,8 @@ class Watch:
                 return Verdict('stop', 'another program is using the GPU')
         if not r.battery and seen.plugged is False:
             return Verdict('pause', 'on battery')
+        if r.battery and self.drained:
+            return Verdict('pause', f'battery at {seen.charge:.0f}%' if seen.charge is not None else 'battery low')
         if r.cooldown and seen.idle is not None and seen.idle < r.cooldown * 60:
             return Verdict('pause', f'in use (idle {seen.idle / 60:.0f} of {r.cooldown:g} min)')
         if self.hot:
@@ -162,7 +175,7 @@ class Probes:
         self.gpu = Pdh() if sys.platform == 'win32' else None
 
     def read(self, ours: frozenset[int]) -> Seen:
-        return Seen(idle(), plugged(), self.temp(), self.others(ours), fullscreen())
+        return Seen(idle(), plugged(), self.temp(), self.others(ours), fullscreen(), charge())
 
     def temp(self) -> float | None:
         if not self.smi:
@@ -232,6 +245,11 @@ def logind_idle(read=None, now: float | None = None) -> float | None:
 def plugged() -> bool | None:
     battery = psutil.sensors_battery()
     return None if battery is None or battery.power_plugged is None else bool(battery.power_plugged)
+
+
+def charge() -> float | None:
+    battery = psutil.sensors_battery()
+    return None if battery is None else float(battery.percent)
 
 
 def fullscreen() -> bool:
