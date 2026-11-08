@@ -35,6 +35,11 @@ variety = 0.0
 # pays 0.16 of this, from 0.3 0.4). Only the fall pays: charging hunger as it rises would make dying a way out
 # of what's still to come
 needs = 0.0
+# the other half of needs: energy lost to the drain, the cold and effort, charged as it goes, as the rise in hunger
+# squared it makes (0 or less; none for a nim that dies or whose arena ends that tick). With needs and needs_lost
+# both 1 a tick pays the whole change in hunger squared, so a life's rises and meals cancel and dying gets out of
+# nothing: the cost is in when it's felt, a night out charged that night and only paid back at the next meal
+needs_lost = 0.0
 # once, on the tick a night ends, to each living nim inside its own nest then: the end of a night spent at home,
 # not each second of it (snug and warm pay by the second, and the brains still walked out into the dark)
 dawn = 0.0
