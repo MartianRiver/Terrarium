@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { linePlan } from '../src/lines';
 import { plan, when, type Channel } from '../src/pickplan';
 
 const NOW = Date.parse('2026-11-01T21:00:00+11:00');
@@ -74,7 +75,7 @@ describe('the picker', () => {
         { replay: 'c.jsonl.gz', title: 'The apple tree · 16 m · seed 1 · 1.0M samples so far', game: 'tree-03' },
       ],
     };
-    const cards = plan(trees, null, NOW).find((s) => s.key === 'nursery')!.cards;
+    const cards = plan(trees, null, NOW).find((s) => s.key === 'earlier')!.cards;
     const tree = cards.find((c) => c.title === 'The apple tree')!.nursery!;
     expect(tree.stages.map((s) => [s.order, s.title, s.status, s.note])).toEqual([
       [1, 'apples just out of reach', 'done', `finished ${when('2026-11-01T20:00:00+11:00', NOW)}`],
@@ -92,7 +93,7 @@ describe('the picker', () => {
     expect(tree.stages.map((s) => s.recent)).toEqual([true, false, false, false]);
     expect(tree.stages[3].pass).toBe('it beats the picker.');
     expect(tree.now).toBe('Growing the garden.');
-    expect(plan(trees, null, NOW + 13 * 3600_000).find((s) => s.key === 'nursery')!.cards
+    expect(plan(trees, null, NOW + 13 * 3600_000).find((s) => s.key === 'earlier')!.cards
       .find((c) => c.title === 'The apple tree')!.nursery!.stages[0].recent).toBe(false);
     const needs = cards.find((c) => c.title === 'Needs')!;
     expect(needs.href).toBe('');
@@ -114,5 +115,104 @@ describe('the picker', () => {
     const old = { ...channel, games: { peek: game('Peekaboo') }, items: [channel.items[2]] };
     expect(plan(old, null, NOW)[0].cards).toHaveLength(1);
     expect(plan(old, null, NOW + 3600_000)[0].cards).toHaveLength(0);
+  });
+});
+
+// cut from the channel's index of 8 Nov: the colonies and nights lines, one question made to be asking now
+const FILE = '0014-the-needs-reward-lifts-the-night-brains.md';
+const f14 = { number: '0014', title: 'The needs reward is the one change that lifts the night brains', status: 'held-out', file: FILE };
+const f15 = { number: '0015', title: 'A scripted nim lives through both nights', status: 'confirmed', file: '0015-a-scripted-nim-lives-through-both-nights.md' };
+const f19 = { number: '0019', title: 'Starting at nightfall does not keep them in', status: 'held-out' };
+const lined = (name: string, line: string, question: string, status: string, more = {}) =>
+  game(name, { family: name, line, question, status, asking: false, answer: [], seen_in: [], training: false, goal: `Goal of ${line}.`, ...more });
+
+const lineChannel: Channel = {
+  updated: '2026-11-08T13:25:27+11:00',
+  games: {
+    'nights-a': lined('Nights', 'nights', 'Does 8M more lift it?', 'answered', { started: '2026-11-07T04:52:43+11:00', answer: [f14], seen_in: [f15, f19] }),
+    'nights-b': lined('Nights', 'nights', 'Does 8M more lift it?', 'answered', { started: '2026-11-07T04:55:00+11:00', answer: [f14] }),
+    'nights-c': lined('Nights', 'nights', 'Does a pay at dawn help?', 'asking', { started: '2026-11-08T11:28:07+11:00', asking: true, training: true, now: 'Latest: 0019 Dawn pay' }),
+    'colonies-a': lined('Colonies', 'colonies', 'Does a fresh brain beat the 0.3 brain?', 'done', { started: '2026-10-31T02:30:53+11:00', result: '7.24 of 8 places, the 0.3 brain 6.29 (one seed of two).' }),
+    'colonies-b': lined('Colonies', 'colonies', 'Do three colonies cost each other?', 'answered', { started: '2026-11-07T23:26:33+11:00', answer: [{ ...f14, number: '0016', title: 'Three colonies of six', file: '0016-x.md' }] }),
+    old: game('Tag', { kind: 'a chasing game', training: false, finished: '2026-10-28T10:00:00+11:00' }),
+    'tree-01': game('The apple tree', { family: 'The apple tree', nursery: 'tree', order: 1, status: 'done' }),
+  },
+  items: [
+    { replay: 'a1.jsonl.gz', title: 'Nights · n47-a · seed 1 · 8.0M samples', game: 'nights-a' },
+    { replay: 'a2.jsonl.gz', title: 'Nights · n47-a · seed 2 · 8.0M samples', game: 'nights-a' },
+    { replay: 'b1.jsonl.gz', title: 'Nights · n47-b · seed 1 · 8.0M samples', game: 'nights-b' },
+    { replay: 'c1.jsonl.gz', title: 'Nights · n47-dawn · seed 1 · 2.0M samples so far', game: 'nights-c' },
+    { replay: 'ca.jsonl.gz', title: 'Colonies · cy-fresh · seed 1 · 64.0M samples', game: 'colonies-a' },
+    { replay: 'cb.jsonl.gz', title: 'Colonies · cy-three · seed 1 · 8.0M samples', game: 'colonies-b' },
+    { replay: 't.jsonl.gz', title: 'Tag', game: 'old' },
+    { replay: 'tr.jsonl.gz', title: 'The apple tree · stage 1', game: 'tree-01' },
+  ],
+};
+
+describe('lines of work', () => {
+  const l = linePlan(lineChannel, NOW);
+
+  it('asking now holds each line with something asking: its goal, the question and its live runs', () => {
+    expect(l.asking.map((c) => [c.title, c.goal, c.questions.map((q) => q.text)])).toEqual([['Nights', 'Goal of nights.', ['Does a pay at dawn help?']]]);
+    const q = l.asking[0].questions[0];
+    expect(q.status).toBe('asking');
+    expect(q.runs.map((r) => [r.title, r.note, r.live])).toEqual([['n47-dawn', 'seed 1 · 2.0M samples so far', true]]);
+    expect(q.runs[0].href).toContain('&game=nights-c&start=c1.jsonl.gz');
+  });
+
+  it('is empty, not missing, when nothing is asking, and with no lines at all', () => {
+    const quiet = linePlan({ ...lineChannel, games: { ...lineChannel.games, 'nights-c': { ...lineChannel.games!['nights-c'], asking: false, status: 'answered', training: false } } }, NOW);
+    expect(quiet.asking).toEqual([]);
+    expect(quiet.cards).toHaveLength(2);
+    expect(linePlan(null, NOW)).toEqual({ asking: [], answered: [], more: 0, cards: [] });
+    expect(linePlan({ updated: '', games: { old: lineChannel.games!.old }, items: [] }, NOW).cards).toEqual([]);
+  });
+
+  it('puts answered questions newest first, one question for the games that ask the same, answer from the finding’s file', () => {
+    expect(l.answered.map((q) => q.text)).toEqual(['Do three colonies cost each other?', 'Does 8M more lift it?']);
+    const more = l.answered[1];
+    expect(more.runs.map((r) => r.title)).toEqual(['n47-a', 'n47-a', 'n47-b']);
+    expect(more.answers.map((a) => [a.number, a.exact, a.href])).toEqual([
+      ['0014', true, `https://github.com/MartianRiver/Terrarium/blob/next/docs/findings/${FILE}`],
+    ]);
+    expect(more.href).toContain('&game=nights-a,nights-b');
+    expect(more.note).toMatch(/^answered · /);
+  });
+
+  it('keeps findings that only mention the runs as "also in", and links the findings list when the index has no file name', () => {
+    const more = l.answered[1];
+    expect(more.seen.map((c) => [c.number, c.exact])).toEqual([['0015', true], ['0019', false]]);
+    expect(more.seen[1].href).toBe('https://github.com/MartianRiver/Terrarium/blob/next/docs/findings/README.md');
+    const dup = linePlan({ ...lineChannel, games: { x: lined('X', 'x', 'q?', 'answered', { answer: [f14], seen_in: [f14, f15] }) }, items: [] }, NOW);
+    expect(dup.answered[0].seen.map((c) => c.number)).toEqual(['0015']);
+  });
+
+  it('shows a finished question with no finding by its numbers, and counts a few answers before "show all"', () => {
+    const colonies = l.cards.find((c) => c.key === 'colonies')!;
+    const done = colonies.questions.find((q) => q.status === 'done')!;
+    expect([done.answers, done.result]).toEqual([[], '7.24 of 8 places, the 0.3 brain 6.29 (one seed of two).']);
+    expect(l.answered).not.toContain(done);
+    const games: Channel['games'] = {};
+    for (let i = 0; i < 9; i++) games![`q${i}`] = lined('Q', 'q', `Question ${i}?`, 'answered', { started: new Date(NOW - i * 3600_000).toISOString(), answer: [f14] });
+    const many = linePlan({ updated: '', games, items: [] }, NOW);
+    expect([many.answered.length, many.more, many.answered[0].text]).toEqual([9, 3, 'Question 0?']);
+  });
+
+  it('gives each line a card: asking lines first, questions newest first, and the line’s own latest note', () => {
+    expect(l.cards.map((c) => [c.key, c.count])).toEqual([['nights', '2 questions · 1 answered · 1 asking now'], ['colonies', '2 questions · 1 answered']]);
+    expect(l.cards[0].asking).toBe(true);
+    expect(l.cards[0].questions.map((q) => q.text)).toEqual(['Does a pay at dawn help?', 'Does 8M more lift it?']);
+    expect(l.cards[0].now).toBe('Latest: 0019 Dawn pay');
+  });
+
+  it('leaves games without a line to the old lists, and folds the old nurseries into an archive', () => {
+    const sections = plan(lineChannel, null, NOW);
+    const titles = sections.flatMap((s) => s.cards.map((c) => c.title));
+    expect(titles).toContain('Tag');
+    expect(titles).toContain('The apple tree');
+    expect(titles.some((t) => /Nights|Colonies/.test(t))).toBe(false);
+    expect(sections.find((s) => s.key === 'earlier')!.cards.map((c) => c.title)).toEqual(['The apple tree']);
+    expect(sections.find((s) => s.key === 'nursery')!.cards.map((c) => c.title)).toEqual(['Tag']);
+    expect(sections[0].cards).toEqual([]);
   });
 });

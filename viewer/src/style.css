@@ -1189,6 +1189,73 @@ body {
   cursor: pointer;
 }
 
+/* lines of work: a question, what it came to, and its runs (lines.ts) */
+.picker-answers,
+.picker-lines {
+  margin: 0 0 10px;
+}
+
+.picker-answers h3,
+.picker-lines h3 {
+  margin-left: 2px;
+}
+
+.picker-answers .picker-about,
+.picker-lines .picker-about {
+  margin-left: 2px;
+}
+
+.picker-line + .picker-line {
+  margin-top: 8px;
+}
+
+.picker-line > b {
+  display: block;
+  margin: 4px 10px 0;
+  font-size: 15px;
+}
+
+.picker-line > .picker-about {
+  margin-bottom: 2px;
+}
+
+.picker-q > .picker-fold {
+  margin-left: 10px;
+}
+
+.picker-answer {
+  margin: 0 10px 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.picker-answer a {
+  color: #3f7a38;
+}
+
+.picker-answer .picker-tag {
+  margin-left: 6px;
+}
+
+.picker-answer.none {
+  opacity: 0.7;
+}
+
+.picker-seen {
+  margin: 0 10px 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.picker-seen a {
+  color: #3f7a38;
+}
+
+.picker-nursery > ol {
+  margin: 0 0 8px 14px !important;
+  border-left: 2px solid rgb(95 174 79 / 0.3);
+}
+
 /* a run's replay: the same run's brain from random moves to now (learns.ts) */
 #learns {
   position: fixed;

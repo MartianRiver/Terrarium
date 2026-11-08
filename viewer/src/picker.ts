@@ -1,7 +1,9 @@
 // The site's /watch/ with nothing asked for: what there is to watch in plain words, over the garden playing behind.
-// Training now stays open at the top; each group below opens on a tap, so the list starts short (pickplan.ts says what's in it).
+// What's being asked now stays open at the top, then the newest answers and a card per line of work (lines.ts); the groups
+// below open on a tap, so the list starts short (pickplan.ts says what's in them).
 import { createLogger } from './lib/logger';
-import { CHANNEL, plan, type Card, type Channel, type Chip, type Gallery, type Section, type Stage, type Status } from './pickplan';
+import { linePlan, type Cite, type LineCard, type Lines, type Question } from './lines';
+import { CHANNEL, plan, type Card, type Channel, type Chip, type Gallery, type Row, type Section, type Stage, type Status } from './pickplan';
 
 const log = createLogger('picker');
 const GALLERY = '/replays/gallery/index.json';
@@ -131,20 +133,128 @@ function card(c: Card) {
   head.append(el('span', c.text, 'picker-text'));
   head.classList.add('picker-head');
   li.append(head);
-  if (c.rows.length) {
-    const rows = el('ul', '', 'picker-rows');
-    for (const r of c.rows) {
-      const a = link(r.href, el('b', r.title));
-      if (r.live) a.append(tag('training now', true));
-      if (r.text) a.append(el('span', r.text, 'picker-text'));
-      if (r.note) a.append(el('span', r.note, 'picker-when'));
-      const row = el('li');
-      row.append(a);
-      rows.append(row);
-    }
-    li.append(rows);
+  if (c.rows.length) li.append(rows(c.rows));
+  return li;
+}
+
+function rows(list: Row[]) {
+  const ul = el('ul', '', 'picker-rows');
+  for (const r of list) {
+    const a = link(r.href, el('b', r.title));
+    if (r.live) a.append(tag('training now', true));
+    if (r.text) a.append(el('span', r.text, 'picker-text'));
+    if (r.note) a.append(el('span', r.note, 'picker-when'));
+    const row = el('li');
+    row.append(a);
+    ul.append(row);
+  }
+  return ul;
+}
+
+function cited(c: Cite, text: string) {
+  const a = link(c.href, text);
+  a.title = c.exact ? c.title : `${c.title} (opens the findings list)`;
+  return a;
+}
+
+// what a question came to: the finding that settled it, the others that mention its runs, or its numbers and "no finding yet"
+function outcome(q: Question) {
+  const out: HTMLElement[] = [];
+  for (const c of q.answers) {
+    const p = el('p', '', 'picker-answer');
+    p.append(cited(c, `finding ${c.number}: ${c.title}`));
+    if (c.status) p.append(el('span', c.status, 'picker-tag'));
+    out.push(p);
+  }
+  if (!q.answers.length && q.status !== 'asking') out.push(el('p', [q.result, 'No finding yet.'].filter(Boolean).join(' '), 'picker-answer none'));
+  if (q.seen.length) {
+    const p = el('p', 'also in ', 'picker-seen');
+    q.seen.forEach((c, i) => p.append(...(i ? [', '] : []), cited(c, c.number)));
+    out.push(p);
+  }
+  return out;
+}
+
+// the question, what it came to, then its runs: open while it's being asked, folded away once it's done
+function question(q: Question, line?: string) {
+  const li = el('li', '', q.asking ? 'picker-card picker-q live' : 'picker-card picker-q');
+  const head = document.createElement(q.href ? 'a' : 'div');
+  if (q.href) (head as HTMLAnchorElement).href = q.href;
+  head.className = 'picker-head';
+  head.append(el('b', q.text), tag(q.note, q.asking));
+  if (line) head.append(el('span', line, 'picker-when'));
+  li.append(head, ...outcome(q));
+  if (q.asking) li.append(q.runs.length ? rows(q.runs) : el('p', 'Nothing to watch yet.', 'picker-answer none'));
+  else if (q.runs.length) {
+    const box = document.createElement('details');
+    box.className = 'picker-fold';
+    box.append(el('summary', `${q.runs.length} ${q.runs.length === 1 ? 'run' : 'runs'}`), rows(q.runs));
+    li.append(box);
   }
   return li;
+}
+
+function questions(list: Question[], lineOf?: (q: Question) => string | undefined) {
+  const ol = el('ol');
+  ol.append(...list.map((q) => question(q, lineOf?.(q))));
+  return ol;
+}
+
+// what's being asked now: each line with something asking, its goal, the question and the live runs. Shown even when empty
+function askingNow(l: Lines) {
+  const box = el('section', '', 'picker-live');
+  box.setAttribute('aria-label', 'Asking now');
+  box.append(el('h3', 'Asking now'));
+  if (!l.asking.length) {
+    box.append(el('p', 'Nothing is being asked right now.', 'picker-about'));
+    return box;
+  }
+  for (const c of l.asking) {
+    const line = el('div', '', 'picker-line');
+    line.append(el('b', c.title), el('span', c.goal, 'picker-about'), questions(c.questions));
+    box.append(line);
+  }
+  return box;
+}
+
+function latestAnswers(l: Lines) {
+  const box = el('section', '', 'picker-answers');
+  box.setAttribute('aria-label', 'Latest answers');
+  box.append(el('h3', 'Latest answers'));
+  const name = (q: Question) => l.cards.find((c) => c.key === q.line)?.title;
+  const show = l.answered.slice(0, l.answered.length - l.more);
+  box.append(el('p', 'Questions the runs have settled, newest first.', 'picker-about'), questions(show, name));
+  if (l.more) {
+    const rest = document.createElement('details');
+    rest.className = 'picker-fold';
+    rest.append(el('summary', `Show all ${l.answered.length}`), questions(l.answered.slice(show.length), name));
+    box.append(rest);
+  }
+  return box;
+}
+
+// a line reads as question, runs, answer; open while something is being asked
+function lineCard(c: LineCard) {
+  const li = el('li', '', c.asking ? 'picker-card live' : 'picker-card');
+  const box = document.createElement('details');
+  box.className = 'picker-nursery';
+  box.open = c.asking;
+  const summary = document.createElement('summary');
+  summary.append(el('b', c.title), ...(c.asking ? [tag('asking now', true)] : []), el('span', c.goal, 'picker-text'), el('span', c.count, 'picker-when'));
+  box.append(summary);
+  if (c.now) box.append(el('p', c.now, 'picker-now'));
+  box.append(questions(c.questions));
+  li.append(box);
+  return li;
+}
+
+function lineCards(l: Lines) {
+  const box = el('section', '', 'picker-lines');
+  box.setAttribute('aria-label', 'Lines of work');
+  const ol = el('ol');
+  ol.append(...l.cards.map(lineCard));
+  box.append(el('h3', 'Lines of work'), el('p', 'Each line of work is a goal, the questions asked on the way, and what the runs found.', 'picker-about'), ol);
+  return box;
 }
 
 function section(s: Section) {
@@ -153,7 +263,7 @@ function section(s: Section) {
   if (s.key === 'live') {
     const box = el('section', '', 'picker-live');
     box.setAttribute('aria-label', s.title);
-    box.append(el('h3', s.title), el('p', s.cards.length ? s.text : 'Nothing is training right now.', 'picker-about'), list);
+    box.append(el('h3', s.title), el('p', s.text, 'picker-about'), list);
     return box;
   }
   const box = document.createElement('details');
@@ -187,14 +297,17 @@ export class Picker {
     this.box.replaceChildren(el('h2', 'What do you want to watch?'), el('p', 'Loading…', 'picker-note'));
     if (!this.box.open) this.box.showModal();
     const [channel, gallery] = await Promise.all([json<Channel>(CHANNEL), json<Gallery>(GALLERY)]);
-    const sections = channel || gallery ? plan(channel, gallery) : [];
-    log.info('picker opened', { sections: sections.map((s) => `${s.key}:${s.cards.length}`).join(' ') });
+    // the live list outside the lines only shows when it has something; "asking now" is the one that always does
+    const sections = (channel || gallery ? plan(channel, gallery) : []).filter((s) => s.key !== 'live' || s.cards.length);
+    const lines = channel ? linePlan(channel) : null;
+    log.info('picker opened', { sections: sections.map((s) => `${s.key}:${s.cards.length}`).join(' '), asking: lines?.asking.length, answered: lines?.answered.length });
     const close = document.createElement('button');
     close.textContent = 'Just watch the garden';
     close.addEventListener('click', () => this.box.close());
     const foot = el('p', '', 'picker-foot');
     foot.append(close, link('/brains/', 'Every brain, and how they got here'));
-    const body = sections.length ? sections.map(section)
+    const top = lines ? [askingNow(lines), ...(lines.answered.length ? [latestAnswers(lines)] : []), ...(lines.cards.length ? [lineCards(lines)] : [])] : [];
+    const body = sections.length || top.length ? [...top, ...sections.map(section)]
       : [el('p', 'The list isn’t answering right now, so here’s the garden.', 'picker-note')];
     this.box.replaceChildren(el('h2', 'What do you want to watch?'), ...body, foot);
   }
