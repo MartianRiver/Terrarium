@@ -2,6 +2,7 @@ import json
 
 import numpy as np
 import pytest
+import torch
 
 from terrarium import replay
 from terrarium.brain import SHAPE, Brain, save
@@ -11,6 +12,8 @@ from terrarium.kids import DRAIN, EASE, FILL, LITTLE, MODES, REGROW, TURBO, Catc
 @pytest.fixture
 def brain(tmp_path):
     path = tmp_path / 'brain.pt'
+    # a random brain steers the others, so the same one every run, or a stray one can bump into a test's setup
+    torch.manual_seed(0)
     save(Brain(**SHAPE), path)
     return path
 
