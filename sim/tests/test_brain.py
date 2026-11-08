@@ -76,6 +76,22 @@ def test_a_brain_from_shorter_lists_acts_the_same(tmp_path):
     assert (mean2[:, 1] == 0).all()
 
 
+def test_a_v19_brain_ignores_chill(tmp_path):
+    """A brain from before chill (schema v19) loads with zero weights for it and acts the same however chilled."""
+    torch.manual_seed(3)
+    now = schema.current()
+    assert now['self'][-1] == 'chill'
+    old = now | {'version': 19, 'self': now['self'][:-1]}
+    brain = Brain(**SHAPE, lists=old)
+    save(brain, tmp_path / 'v19.pt')
+    grown, _ = load_brain(tmp_path / 'v19.pt')
+    me, kinds, rays = observation()
+    warm, chilled = me.clone(), me.clone()
+    warm[:, -1], chilled[:, -1] = 0, 1
+    for a, b, c in zip(brain(me[:, :-1], kinds, rays), grown(warm, kinds, rays), grown(chilled, kinds, rays)):
+        assert torch.allclose(a, b, atol=1e-6) and torch.allclose(b, c, atol=1e-6)
+
+
 def test_a_kind_carved_out_of_an_older_one_starts_as_a_copy(tmp_path):
     """A brain from before heaped droppings were their own kind sees them as it saw every dropping."""
     torch.manual_seed(2)

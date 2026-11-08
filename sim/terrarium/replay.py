@@ -91,6 +91,10 @@ def frame(world: World, a: int) -> dict:
     if cfg.jump.on:
         for c, z in zip(creatures, world.z[a][born]):
             c['z'] = _r(z)
+    if cfg.night.on and cfg.night.cold > 0:
+        # how chilled it feels, 0 warm to 1 through
+        for c, chill in zip(creatures, world.chill[a][born]):
+            c['chill'] = _r(chill)
     here = world.food_present[a]
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}

@@ -4,9 +4,11 @@ import numpy as np
 import pytest
 
 from terrarium import load
-from terrarium.config import DEFAULT, Config, build, load_train, upgrade
-from terrarium.forage import Forage
+from terrarium.config import DEFAULT, Config, ConfigError, build, load_train, upgrade
+from terrarium.forage import Forage, observe
 from terrarium.night import dark, light, warmth
+from terrarium.replay import frame
+from terrarium.schema import SELF
 from terrarium.world import World
 
 CFG = load(DEFAULT)
@@ -224,3 +226,93 @@ def test_dawn_zero_leaves_rewards_as_they_were():
         totals[dawn] = np.abs([env.step(still)[1] for _ in range(60)]).sum()
     # everything else is off, and every nim starts in its own nest
     assert totals[0.0] == 0 and totals[0.7] > 0
+
+
+STILL = lambda w: np.zeros((1, len(w.colony), 2))
+
+
+def test_chill_builds_out_in_the_dark_on_the_clock_chill_time_sets():
+    w = World(NIGHTS, 1, 0)
+    assert not w.chill.any()
+    # deep in the night, standing on the spawn ring where nobody is kept warm
+    w.age[:] = round(23 * CFG.tick_hz)
+    steps = round(NIGHTS.night.chill_time * CFG.tick_hz / 2)
+    for _ in range(steps):
+        w.age[:] = round(23 * CFG.tick_hz)
+        w.step(STILL(w))
+    # a lag with a time constant of chill_time: 1 - exp(-t / chill_time), a little under with the discrete steps
+    expected = 1 - (1 - CFG.dt / NIGHTS.night.chill_time) ** steps
+    assert w.chill[0] == pytest.approx(expected, abs=1e-6) and 0.35 < expected < 0.4
+    for _ in range(round(60 * CFG.tick_hz)):
+        w.age[:] = round(23 * CFG.tick_hz)
+        w.step(STILL(w))
+    assert 0.95 < w.chill.min() <= w.chill.max() <= 1
+
+
+def test_chill_fades_in_the_nest_and_a_huddle_cuts_it_like_the_cold():
+    w = World(NIGHTS, 1, 0)
+    n = NIGHTS.night
+    pos = w.pos.copy()
+    pos[0, 0] = w.nests[0]
+    # 1 and 2 are nestmates a metre from each other, 3 is alone
+    pos[0, 1] = (30.0, 0.0)
+    pos[0, 2] = (30.0, 1.0)
+    pos[0, 3] = (-30.0, 0.0)
+    w.physics.place(np.array([0]), pos)
+    w.chill[:] = 1.0
+    w.age[:] = round(25 * CFG.tick_hz)
+    steps = round(3 * CFG.tick_hz)
+    for _ in range(steps):
+        w.age[:] = round(25 * CFG.tick_hz)
+        w.step(STILL(w))
+    # in the nest the cold is kept off entirely, so it only fades, at the same lag
+    assert w.chill[0, 0] == pytest.approx((1 - CFG.dt / n.chill_time) ** steps, abs=1e-6)
+    assert w.chill[0, 1] == pytest.approx(w.chill[0, 2], abs=1e-9)
+    assert w.chill[0, 3] > w.chill[0, 1] > w.chill[0, 0]
+    # long enough in a huddle and it settles at the share of the cold it still feels
+    for _ in range(round(200 * CFG.tick_hz)):
+        w.age[:] = round(25 * CFG.tick_hz)
+        w.energy[:] = 1
+        w.step(STILL(w))
+    assert w.chill[0, 1] == pytest.approx(1 - n.huddle, abs=1e-3) and w.chill[0, 3] == pytest.approx(1, abs=1e-3)
+    assert w.chill[0, 0] == pytest.approx(0, abs=1e-3)
+
+
+def test_chill_stays_0_by_day_with_nights_off_and_with_no_cold():
+    day = World(NIGHTS, 1, 0)
+    for _ in range(round(5 * CFG.tick_hz)):
+        day.age[:] = round(10 * CFG.tick_hz)
+        day.step(STILL(day))
+    assert not day.chill.any()
+    for cfg in (CFG, replace(NIGHTS, night=replace(NIGHTS.night, cold=0.0))):
+        w = World(cfg, 1, 0)
+        w.age[:] = round(25 * CFG.tick_hz)
+        for _ in range(round(5 * CFG.tick_hz)):
+            w.step(STILL(w))
+        assert not w.chill.any()
+
+
+def test_chill_starts_over_with_the_arena():
+    w = World(NIGHTS, 1, 0)
+    w.chill[:] = 0.7
+    w.reset(np.ones(1, bool))
+    assert not w.chill.any()
+
+
+def test_the_chill_is_a_self_input_and_old_worlds_without_chill_time_load():
+    w = World(NIGHTS, 1, 0)
+    w.chill[:] = 0.4
+    assert np.allclose(observe(w, np.zeros((1, len(w.colony), 2))).me[:, SELF.index('chill')], 0.4)
+    assert SELF[-1] == 'chill'
+    recorded = NIGHTS.to_dict()
+    del recorded['night']['chill_time']
+    assert build(Config, upgrade(recorded)).night.chill_time == 20.0
+    with pytest.raises(ConfigError):
+        build(Config, upgrade({**NIGHTS.to_dict(), 'night': {**NIGHTS.to_dict()['night'], 'chill_time': 0.0}}))
+
+
+def test_chill_is_in_replay_frames_where_there_is_cold():
+    w = World(NIGHTS, 1, 0)
+    w.chill[:] = 0.25
+    assert {c['chill'] for c in frame(w, 0)['creatures']} == {0.25}
+    assert all('chill' not in c for c in frame(World(CFG, 1, 0), 0)['creatures'])
