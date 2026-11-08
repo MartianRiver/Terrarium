@@ -430,6 +430,7 @@ class Reward:
     novelty: float
     variety: float
     needs: float
+    dawn: float
 
 
 @dataclass(frozen=True)

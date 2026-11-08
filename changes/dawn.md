@@ -1,0 +1,1 @@
+`[reward] dawn` pays once, on the tick a night ends, to each living nim inside its own nest then: the end of a night spent at home, where `snug` and `warm` pay by the second and the brains still walked out into the dark. Rewards with `dawn = 0` are unchanged; scratch train configs need the key, as with `needs`.
