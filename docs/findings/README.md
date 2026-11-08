@@ -29,3 +29,7 @@ Line 1 is `# NNNN Title`, line 3 is `date: … · status: … · seeds: … · b
 - [0011](0011-ask-what-a-frozen-brain-can-show.md) Ask what a frozen brain can show before training a twin. *confirmed*
 - [0012](0012-the-night-brain-comes-home-by-the-light.md) The night-trained brain comes home by the light; the day-trained ones die whatever their start. *hint*
 - [0013](0013-without-a-compass-the-notes-hold-the-place-loosely.md) Without a compass the notes hold the tree's place three times more loosely, and are worth less. *hint*
+- [0014](0014-the-needs-reward-lifts-the-night-brains.md) The needs reward is the one change that lifts the night brains; gamma .998 on top costs, and none gets near 85%. *held-out*
+- [0015](0015-a-scripted-nim-lives-through-both-nights.md) A scripted nim lives through both nights; the brains die out in the dark, not by deadlock. *confirmed*
+- [0016](0016-three-colonies-of-six-beat-one-of-eighteen.md) Three colonies of six end bigger than one of eighteen on the same food, and don't cost each other. *confirmed*
+- [0017](0017-the-nest-is-a-pass-through.md) The night brains walk straight back out of the nest, fed or hungry, dark or light; the nest has to end the trip. *hint*
