@@ -185,3 +185,47 @@ def test_needs_lost_zero_is_bit_identical_over_a_rollout():
     base = run(needs_lost=0.0)
     assert np.array_equal(base, run(needs_lost=0.0))
     assert not np.array_equal(base, run(needs_lost=1.0))
+
+
+WATER = load(DEFAULT.parent / 'nursery-water.toml')
+
+
+def sip(needs, needs_lost, water, in_pond):
+    """Creature 0 at this water, standing in the pond or well clear of it, for one tick at full energy."""
+    env = lost_env(needs, needs_lost, WATER)
+    w = env.world
+    spot = w.ponds.pos[0, 0] if in_pond else w.nests[0]
+    for i, body in enumerate(w.physics.bodies[0]):
+        body.position, body.velocity = (tuple(spot) if i == 0 else body.position), (0, 0)
+    w.physics.read()
+    w.water[0, 0] = water
+    reward = step_at(env, 1.0)
+    return env, reward[0]
+
+
+def test_a_drink_pays_its_fall_in_thirst_squared():
+    env, reward = sip(1.0, 0.0, 0.4, in_pond=True)
+    drunk = env.world.drank[0, 0]
+    assert drunk > 0
+    assert reward == pytest.approx(drunk * (2 * (1 - env.world.water[0, 0]) + drunk))
+    _, dry = sip(1.0, 0.0, 0.4, in_pond=False)
+    assert dry == 0
+
+
+def test_thirst_from_the_drain_is_charged_with_needs_lost():
+    env, reward = sip(0.0, 1.0, 0.6, in_pond=False)
+    after = env.world.water[0, 0]
+    assert after < 0.6 and env.world.drank[0, 0] == 0
+    assert reward == pytest.approx((1 - 0.6)**2 - (1 - after)**2, abs=1e-6) and reward < 0
+
+
+def test_both_halves_make_the_whole_change_in_thirst_squared():
+    env, reward = sip(1.0, 1.0, 0.4, in_pond=True)
+    assert reward == pytest.approx(0.6**2 - (1 - env.world.water[0, 0])**2, abs=1e-6)
+
+
+def test_no_ponds_no_thirst_pay():
+    env = lost_env(1.0, 1.0)
+    assert env.world.ponds is None
+    env.step(np.zeros((env.samples, len(ACTIONS))))
+    assert (env.world.water == 1).all() and (env.world.drank == 0).all()

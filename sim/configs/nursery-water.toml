@@ -121,7 +121,7 @@ chill_time = 20.0
 
 [water]
 # one pond in sight of home: 4 m from the nest's centre (the 8 m arena only has room for one whole pond up to about
-# 5.8 m away, so 6 m can't be placed), a nim's water lasting ~2 minutes full
+# 5.8 m away, so 6 m can't be placed), a nim's water lasting about 67 s full
 ponds = 1
 radius = 1.5
 distance = 4.0

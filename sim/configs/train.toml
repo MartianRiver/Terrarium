@@ -39,6 +39,8 @@ needs = 0.0
 # squared it makes (0 or less; none for a nim that dies or whose arena ends that tick). With needs and needs_lost
 # both 1 a tick pays the whole change in hunger squared, so a life's rises and meals cancel and dying gets out of
 # nothing: the cost is in when it's felt, a night out charged that night and only paid back at the next meal
+# Where a world has water, thirst counts the same way under both keys: a drink pays its fall in thirst squared, and
+# needs_lost charges what the drain takes
 needs_lost = 0.0
 # once, on the tick a night ends, to each living nim inside its own nest then: the end of a night spent at home,
 # not each second of it (snug and warm pay by the second, and the brains still walked out into the dark)
