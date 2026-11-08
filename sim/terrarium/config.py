@@ -433,6 +433,7 @@ class Reward:
     novelty: float
     variety: float
     needs: float
+    needs_lost: float
     dawn: float
 
 
