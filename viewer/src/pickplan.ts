@@ -1,20 +1,23 @@
-// What the picker lists, worked out from the channel's and the gallery's index.json: first what's training now (and
-// what finished in the last 12 hours, a few at most), each line with what it's trying and a link per run; then every game by group,
+// What the picker lists, worked out from the channel's and the gallery's index.json (games on a line of work are lines.ts's):
+// first what's training now (and what finished in the last 12 hours, a few at most), each with what it's trying and a link per run; then every game by group,
 // a card per family with the question it asks and a row per setup saying what's different and how it did; then the
 // main line's steps from the gallery, newest first. picker.ts draws it.
 import { flatten } from './gallery';
+import type { QStatus, Ref } from './lines';
+import { CHANNEL, runRow, sentence, watch, when } from './pickshared';
 
-export const CHANNEL = '/replays/nursery/index.json';
+export { CHANNEL, sentence, when };
 const RECENT_MS = 12 * 3600_000;
 // the top list: everything training, then the newest finished ones up to this many in all
 const TOP = 6;
 // older indexes don't say per game whether it's training: then anything updated in the last 40 min counts
 const LIVE_MS = 40 * 60_000;
 
-export type Group = 'colonies' | 'nursery' | 'experiments';
+export type Group = 'colonies' | 'nursery' | 'experiments' | 'earlier';
 const GROUPS: { key: Group; title: string; text: string }[] = [
   { key: 'colonies', title: 'Colonies', text: 'The main world: colonies that forage, store food, get through the nights and hatch new nims.' },
   { key: 'nursery', title: 'The nursery', text: 'Small worlds where baby nims learn one thing at a time: kids’ games, chores and looking after themselves.' },
+  { key: 'earlier', title: 'Earlier nurseries', text: 'The first nurseries, a stage at a time: tidying up, the apple tree and the needs games. Finished, kept to watch again.' },
   { key: 'experiments', title: 'Experiments', text: 'Tried on the side: holes they found, dead ends, and setups that aren’t the main line.' },
 ];
 
@@ -26,7 +29,9 @@ export type Status = 'training' | 'held' | 'done' | 'planned';
 export interface Game {
   name: string; kind: string; goal: string; setup?: string; training?: boolean; finished?: string;
   family?: string; variant?: string; group?: Group; question?: string; about?: string; result?: string;
-  nursery?: string; order?: number; planned?: boolean; status?: Status;
+  nursery?: string; order?: number; planned?: boolean; status?: Status | QStatus;
+  // a game that belongs to a line of work (the channel's lines.toml and job keys): see lines.ts
+  line?: string; asking?: boolean; answer?: Ref[]; seen_in?: Ref[]; started?: string;
   // a nursery's stage: what it has to show before the next one starts; now: where the nursery is at, the same on each stage
   pass?: string; now?: string;
 }
@@ -57,20 +62,8 @@ export interface Stage {
 export interface Nursery { status: Status; count: string; stages: Stage[]; now?: string }
 export interface Section { key: string; title: string; text: string; cards: Card[]; all?: string }
 
-export function sentence(text = '') {
-  const end = text.search(/[.!?](\s|$)/);
-  return end < 0 ? text : text.slice(0, end + 1);
-}
-
-export function when(iso: string, now: number) {
-  const d = new Date(iso);
-  const today = new Date(now).toDateString() === d.toDateString();
-  return today ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-}
-
-const watch = (keys: string[], start?: string, at?: string) =>
-  `/watch/?channel=${CHANNEL}&game=${keys.map(encodeURIComponent).join(',')}${start ? `&start=${encodeURIComponent(start)}` : ''}${at ? `&at=${encodeURIComponent(at)}` : ''}`;
-const groupOf = (g: Game): Group => g.group ?? (g.kind === 'the main world' ? 'colonies' : 'nursery');
+// a nursery with no line is one of the first three (tidy, tree, needs): they fold into the archive
+const groupOf = (g: Game): Group => g.group ?? (g.nursery ? 'earlier' : g.kind === 'the main world' ? 'colonies' : 'nursery');
 const familyOf = (g: Game) => g.family ?? g.name;
 
 // a setup's name on its own: never just the family's name again
@@ -80,7 +73,8 @@ function variantOf(g: Game) {
 }
 
 function channelSections(c: Channel, now: number): { live: Card[]; groups: Map<Group, Card[]>; all: string[] } {
-  const games = c.games ?? {};
+  // games on a line are drawn by lines.ts
+  const games = Object.fromEntries(Object.entries(c.games ?? {}).filter(([, g]) => !g.line));
   const fresh = now - new Date(c.updated).getTime() < LIVE_MS;
   const says = Object.values(games).some((g) => g.training !== undefined);
   const training = (g: Game) => (says ? !!g.training : fresh);
@@ -92,13 +86,9 @@ function channelSections(c: Channel, now: number): { live: Card[]; groups: Map<G
     const g = games[key];
     const recent = g.finished && now - new Date(g.finished).getTime() < RECENT_MS;
     if (!training(g) && !recent) continue;
-    // each run's title is "Game · arm · seed 1 · 22.1M samples so far"
     const runs = c.items.filter((i) => i.game === key);
     // one run: the card itself opens it
-    const rows = runs.length < 2 ? [] : runs.map((i) => {
-      const [, arm = '', ...rest] = i.title.split(' · ');
-      return { title: arm, text: '', href: watch([key], i.replay), note: rest.join(' · ') };
-    });
+    const rows = runs.length < 2 ? [] : runs.map((i) => runRow(i, key));
     live.push({
       title: `${familyOf(g)}: ${variantOf(g)}`, text: [g.about ?? sentence(g.setup), g.result].filter(Boolean).join(' '),
       href: runs.length === 1 ? watch([key], runs[0].replay) : watch([key]), live: training(g), note: training(g) ? 'training now' : `finished ${when(g.finished!, now)}`, rows,
@@ -138,7 +128,7 @@ function nursery(keys: string[], games: Record<string, Game>, items: Item[], tra
   const stages = [...keys].sort((a, b) => (games[a].order ?? 0) - (games[b].order ?? 0)).map((k): Stage => {
     const g = games[k];
     const item = items.find((i) => i.game === k);
-    const status: Status = g.status ?? (training(g) ? 'training' : !item || g.planned ? 'planned' : 'done');
+    const status: Status = (g.status as Status | undefined) ?? (training(g) ? 'training' : !item || g.planned ? 'planned' : 'done');
     const note = { training: 'training now', held: 'on hold', planned: 'not yet in training', done: g.finished ? `finished ${when(g.finished, now)}` : 'finished' }[status];
     const chip = (r: Replay): Chip => ({ label: r.label, href: watch([k], item!.replay, r.replay), about: r.about });
     return {
@@ -185,7 +175,7 @@ export function plan(channel: Channel | null, gallery: Gallery | null, now = Dat
   const training = [...c.live.filter((x) => x.live), ...g.live];
   const finished = c.live.filter((x) => !x.live).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   const out: Section[] = [{
-    key: 'live', title: 'Training now, and just finished',
+    key: 'live', title: 'Also training, and just finished',
     text: 'What’s learning now, and the newest to finish. Everything else is in the groups below, '
       + 'each stage with buttons to compare it with random moves, the brain it started from and partway through.',
     cards: [...training, ...finished.slice(0, Math.max(TOP - training.length, 0))],
