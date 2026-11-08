@@ -55,6 +55,7 @@ class Sight:
     other_nest: np.ndarray  # the same for any other colony's
     it: np.ndarray          # it's a creature that's it, in tag
     carrier: np.ndarray     # it's a creature carrying a flag
+    pond: np.ndarray        # to the edge of the nearest pond, the range when it hit something first or there is none
 
 
 def look(world: 'World') -> Sight:
@@ -107,7 +108,9 @@ def look(world: 'World') -> Sight:
     to_nest = hit_circles(pos, dirs, nests, cfg.colonies.nest_radius, every, start)
     own = world.colony[:, None, None] == np.arange(len(world.nests))      # N,1,C
     own_nest, other_nest = (np.where(mask, to_nest, np.inf).min(-1) for mask in (own, ~own))
-    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, far) for t in (own_nest, other_nest)), it, carrier)
+    pond = world.ponds.edge(pos, dirs, start) if world.ponds else np.inf
+    return Sight(dist, kind, nestmate, *(np.where(t < dist, t, far) for t in (own_nest, other_nest)), it, carrier,
+                 np.where(pond < dist, pond, far))
 
 
 def hit_circles(origin, dirs, centres, radius, valid, start, wide=None):

@@ -34,7 +34,7 @@ Earlier work has to stay usable. That's the whole point of building in stages.
   | format | version | where | bumped when |
   |---|---|---|---|
   | replay | 2 | `sim/terrarium/replay.py`, `viewer/src/replay.ts` | a field is renamed, removed or changes meaning or type ([replays.md](replays.md)) |
-  | brain schema | 20 | `sim/terrarium/schema.py` | every new input or action (append only; older brains load) |
+  | brain schema | 21 | `sim/terrarium/schema.py` | every new input or action (append only; older brains load) |
   | mind track | 1 | `sim/terrarium/mind.py` | as replays |
   | worker | 13 | `sim/terrarium/worker.py` | the worker and the coordinator stop understanding each other |
   | scoring | none yet | | #115 made every game its own world, so scores from before it can't be compared game for game with scores after; a version written into every score file would say so |

@@ -75,6 +75,17 @@ describe('reading', () => {
     refuses(lines(header, { ...later, flowers: [{ id: 9, x: 'here', y: 0 }] }), /flowers/);
   });
 
+  test('ponds and each nim’s water are read when there, and absent in worlds without them', () => {
+    const ponds = [{ x: -2.4, y: -0.4, radius: 1.5 }];
+    const later = { ...frame, creatures: [{ ...frame.creatures[0], water: 0.4 }] };
+    const replay = parseReplay(lines({ ...header, info: { ...header.info, ponds } }, frame, later));
+    expect(replay.info.ponds).toEqual(ponds);
+    expect(replay.frames.map((f) => f.creatures[0].water)).toEqual([undefined, 0.4]);
+    expect(parseReplay(lines(header, frame)).info.ponds).toBeUndefined();
+    refuses(lines({ ...header, info: { ...header.info, ponds: [{ x: 1, y: 'there', radius: 1 }] } }, frame), /ponds/);
+    refuses(lines(header, { ...frame, creatures: [{ ...frame.creatures[0], water: 'wet' }] }), /water/);
+  });
+
   test('the light is read when there, and full day in worlds without nights', () => {
     const replay = parseReplay(lines(header, frame, { ...frame, light: 0.25 }));
     expect(replay.frames.map((f) => f.light)).toEqual([1, 0.25]);

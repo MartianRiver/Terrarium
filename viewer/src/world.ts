@@ -28,6 +28,7 @@ export interface CreatureState {
   stamina: number; // 0..1, how much go it has left before it tires ([tired]); 1 in worlds without it
   dung: number; // 1 while it carries a dropping in its jaws; 0 in worlds without droppings
   z: number; // metres off the ground mid-jump ([jump]); 0 in worlds without jumping
+  water?: number; // 0..1, how much water it has left ([water]); absent in worlds without ponds
 }
 
 export interface FoodState {
@@ -56,6 +57,13 @@ export interface NestInfo {
   radius: number;
 }
 
+// a pond ([water]): a flat disc of shallow water on the ground, where a nim drinks standing in it
+export interface PondInfo {
+  x: number;
+  y: number;
+  radius: number;
+}
+
 // Static for the life of an episode
 export interface WorldInfo {
   width: number;
@@ -66,6 +74,7 @@ export interface WorldInfo {
   midden: number; // metres past a nest's edge a dropping counts as taken out ([dung] midden); 0 without
   middenSpot?: { x: number; y: number; radius: number }; // or the spot it has to go on ([dung] spot), this episode's
   tree: number | null; // the id of the block that is an apple tree's trunk ([tree]); null without
+  ponds?: PondInfo[]; // this episode's ponds ([water]); absent without
 }
 
 // jelly in a colony's store, in food unloaded

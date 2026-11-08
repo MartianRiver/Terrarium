@@ -71,6 +71,7 @@ def move(world, a: int, k: int) -> bool:
         box = corners(moved)
         if ((np.abs(box) <= room).all() and (box_gap(world.nests, moved) > reach).all()
                 and (box_gap(bodies, moved) > cfg.creature.radius + GAP).all()
+                and (world.ponds is None or (box_gap(world.ponds.pos[a], moved) > cfg.water.radius).all())
                 and all(apart(box, o, GAP) for o in others)):
             ph.shift([a], [k], np.array([(moved.x, moved.y)]), np.array([moved.angle]))
             return True

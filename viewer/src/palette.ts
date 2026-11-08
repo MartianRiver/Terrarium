@@ -53,4 +53,8 @@ export const GARDEN = {
   petals: [0xffffff, 0xffd166, 0xff9fb2, 0xc9b6ff, 0xff8f6b],
   soil: 0xc9a37a,
   hole: 0x4a3524,
+  // a pond: the water, its pale shallows and the damp bank (water.ts in the sim)
+  water: 0x6fb4d4,
+  shallows: 0xa9dcea,
+  bank: 0xa98d68,
 };

@@ -3,11 +3,11 @@ import type { CreatureState, Frame, WorldInfo } from './world';
 
 // the followed nim's card (top left): only the rows its world uses, worked out from the frames, since a replay's
 // config is never relied on for what the frames show. A row turns on the first time the episode shows it (energy
-// below full, stamina below full, something carried, a jump, jelly in the store) and stays on until the next
+// below full, stamina below full, water in the frames, something carried, a jump, jelly in the store) and stays on until the next
 // episode. The compass and notes rows come from the replay's header instead (see hasCompass, notesLabel).
-type Row = 'home' | 'compass' | 'fed' | 'go' | 'holds' | 'jump' | 'store' | 'notes';
-const ROWS: Row[] = ['home', 'compass', 'fed', 'go', 'holds', 'jump', 'store', 'notes'];
-const WORDS: Record<Row, string> = { home: 'home', compass: 'facing', fed: 'fed', go: 'go', holds: 'carrying', jump: 'jump', store: 'store', notes: 'notes' };
+type Row = 'home' | 'compass' | 'fed' | 'water' | 'go' | 'holds' | 'jump' | 'store' | 'notes';
+const ROWS: Row[] = ['home', 'compass', 'fed', 'water', 'go', 'holds', 'jump', 'store', 'notes'];
+const WORDS: Record<Row, string> = { home: 'home', compass: 'facing', fed: 'fed', water: 'water', go: 'go', holds: 'carrying', jump: 'jump', store: 'store', notes: 'notes' };
 const POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
 export interface Facing { x: number; z: number } // the camera's forward along the ground, in the scene's x/z
@@ -66,6 +66,9 @@ export function pointName(bear: number) {
   return POINTS[(Math.round(bear / (Math.PI / 4)) % 8 + 8) % 8];
 }
 
+// how thirsty a nim with this much water left says it is: nothing in between
+export const thirst = (left: number) => (left < 0.25 ? 'parched' : left < 0.4 ? 'thirsty' : left > 0.9 ? 'full' : '');
+
 export function holding(c: CreatureState, frame: Frame | null, tree: boolean) {
   if (frame?.flags.some((f) => f.carrier === c.id)) return 'a flag';
   if (c.dung) return 'a dropping';
@@ -102,7 +105,7 @@ export class Vitals {
       li.append(name);
       let bar: HTMLElement | undefined;
       let arrow: HTMLElement | undefined;
-      if (row === 'fed' || row === 'go') {
+      if (row === 'fed' || row === 'water' || row === 'go') {
         const track = document.createElement('span');
         track.className = 'vitals-bar';
         bar = document.createElement('i');
@@ -159,6 +162,8 @@ export class Vitals {
     if (nest) this.seen.add('home');
     if (this.compass) this.seen.add('compass');
     if (c.energy < 0.999) this.seen.add('fed');
+    // there from the first frame wherever the world has ponds: a nim's thirst is the point of them
+    if (c.water !== undefined) this.seen.add('water');
     if (c.stamina < 0.999) this.seen.add('go');
     if (holds) this.seen.add('holds');
     if (c.z > 0.01) this.seen.add('jump');
@@ -182,6 +187,10 @@ export class Vitals {
       } else if (row === 'fed') {
         line.text = c.energy < 0.25 ? 'starving' : c.energy < 0.4 ? 'hungry' : c.energy > 0.9 ? 'full' : '';
         line.share = c.energy;
+      } else if (row === 'water') {
+        const left = c.water ?? 1;
+        line.text = thirst(left);
+        line.share = left;
       } else if (row === 'go') {
         line.text = c.stamina < 0.25 ? 'worn out' : c.stamina < 0.5 ? 'tired' : '';
         line.share = c.stamina;

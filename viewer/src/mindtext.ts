@@ -26,6 +26,7 @@ export const SENSES: Record<string, Words> = {
   smell_sin: { label: 'smell: side', text: 'Which side the smell gets stronger on.' },
   smell_cos: { label: 'smell: ahead', text: 'Whether the smell gets stronger ahead or behind.' },
   nectar: { label: 'nectar', text: 'How much of a nectar boost it has left: a flower’s nectar makes it faster for 8 s.' },
+  water: { label: 'water', text: 'How much water it has left: 1 just after a drink, 0 is dying of thirst. It falls all the time, and fills while it stands in a pond.' },
   load: { label: 'carrying', text: '1 while it carries a berry in its jaws, on top of its head. That berry isn’t eaten: it stays a berry until it’s put down.' },
 };
 

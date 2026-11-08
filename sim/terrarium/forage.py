@@ -72,12 +72,12 @@ def observe(world: World, last: np.ndarray) -> Observation:
                    *flag_senses(world, store.shape), world.stamina, *hearing.heard(world),
                    *dung_senses(world, store.shape), world.z / max(cfg.jump.height, 1e-9),
                    # which way it faces in the world, as an ant reads the sky
-                   np.sin(world.heading) * h.compass, np.cos(world.heading) * h.compass, felt, world.chill], -1)
+                   np.sin(world.heading) * h.compass, np.cos(world.heading) * h.compass, felt, world.chill, world.water], -1)
 
     angles = vision.angles(v)
     shape = sight.dist.shape
     rays = np.stack([sight.dist / v.range, *(np.broadcast_to(f(angles), shape) for f in (np.sin, np.cos)),
-                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range, sight.it, sight.carrier], -1)
+                     sight.nestmate, sight.own_nest / v.range, sight.other_nest / v.range, sight.it, sight.carrier, sight.pond / v.range], -1)
     return Observation(me.reshape(-1, me.shape[-1]).astype(np.float32),
                        sight.kind.reshape(-1, v.rays).astype(np.int64),
                        rays.reshape(-1, v.rays, rays.shape[-1]).astype(np.float32))

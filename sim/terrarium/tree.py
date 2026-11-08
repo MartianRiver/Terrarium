@@ -162,7 +162,7 @@ class Tree:
         for _ in range(TRIES):
             angle = rng.uniform(-np.pi, np.pi)
             spot = middle + rng.uniform(t.near, t.far) * np.array([np.cos(angle), np.sin(angle)])
-            if (np.abs(spot) <= room).all() and not w._on_block(a, spot, half):
+            if (np.abs(spot) <= room).all() and not w._on_block(a, spot, half) and not (w.ponds and w.ponds.covers(a, spot, cfg.food.radius)):
                 return spot
         return middle + t.far * np.array([1.0, 0.0])
 

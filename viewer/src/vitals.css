@@ -126,6 +126,10 @@
   background: #6aa84f;
 }
 
+.vitals li[data-row='water'] .vitals-bar i {
+  background: #5b9bd0;
+}
+
 .vitals li[data-low='true'] .vitals-bar i {
   background: #d9822b;
 }

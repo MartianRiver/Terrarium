@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bearing, hasCompass, holding, notesLabel, pointName, turnTo, vitalsAsk } from '../src/vitals';
+import { bearing, hasCompass, holding, notesLabel, pointName, thirst, turnTo, vitalsAsk } from '../src/vitals';
 import type { CreatureState, Frame, WorldInfo } from '../src/world';
 
 const baby: CreatureState = { id: 3, colony: 0, x: 0, y: 0, heading: 0, speed: 0, size: 1, energy: 1, signal: -1, carrying: 0, holding: 0,
@@ -50,6 +50,10 @@ describe('the followed one’s card', () => {
     expect(hasCompass({ tree: 2 } as WorldInfo)).toBe(true);
     expect(hasCompass(info, { config: { home: { far: 12 } } })).toBe(true);
     expect(hasCompass(info, { config: { home: { far: 0 } } })).toBe(false);
+  });
+
+  it('says how thirsty it is from its water', () => {
+    expect([1, 0.95, 0.6, 0.39, 0.1, 0].map(thirst)).toEqual(['full', 'full', '', 'thirsty', 'parched', 'parched']);
   });
 
   it('reads a heading as a bearing from north (up the default view, -y)', () => {
