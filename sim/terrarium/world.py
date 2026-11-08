@@ -180,6 +180,8 @@ class World:
         self.nectar = np.zeros((arenas, n), int)
         # how much go each has left before it tires ([tired]; always 1 with it off)
         self.stamina = np.ones((arenas, n))
+        # how chilled each feels ([night] cold): follows the cold it's in with a lag, 0 warm to 1 through
+        self.chill = np.zeros((arenas, n))
         self.drunk = np.zeros((arenas, n), int)
         # the berry each creature carries (its food slot, -1 for none), whether it said yes to carry last tick, and
         # since its arena started: berries picked up, put down at its own nest, and put down ones a nestmate ate,
@@ -325,6 +327,7 @@ class World:
         self.flower_due[idx] = self._flower_wait(idx)
         self.nectar[idx] = 0
         self.stamina[idx] = 1
+        self.chill[idx] = 0
         self.z[idx] = 0
         self.vz[idx] = 0
         self.jumps[idx] = 0
@@ -420,7 +423,10 @@ class World:
         effort = (e.move * np.abs(thrust) + e.turn * turn * turn + s.energy * bursting * np.maximum(thrust, 0)
                   + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt * share
         self.spent += effort
-        self.energy = np.clip(self.energy - effort - (e.drain + self._cold()) * cfg.dt * share, 0, 1)
+        cold, exposure = self._cold()
+        self.energy = np.clip(self.energy - effort - (e.drain + cold) * cfg.dt * share, 0, 1)
+        if cfg.night.cold > 0 and cfg.night.on:
+            self.chill += (exposure - self.chill) * min(1.0, cfg.dt / cfg.night.chill_time)
         if cfg.tired.on:
             tired.tire(self, thrust, bursting)
         np.maximum(self.young - 1, 0, out=self.young)
@@ -810,6 +816,7 @@ class World:
         self.crop[a, i] = 0
         self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = self.nectar[a, i] = 0
         self.stamina[a, i] = 1
+        self.chill[a, i] = 0
         self.young[a, i] = round(self.cfg.young.seconds * self.cfg.tick_hz)
         np.add.at(self.hatched, (a, self.colony[i]), 1)
         if self.dung:
@@ -828,13 +835,15 @@ class World:
         """How light it is in each arena, 1 by day and 0 at night, (arenas,)."""
         return night.light(self.age / self.cfg.tick_hz + self.clock, self.cfg.night)
 
-    def _cold(self) -> np.ndarray | float:
-        """Energy per second the dark takes, on top of the drain, (arenas, creatures)."""
+    def _cold(self) -> tuple[np.ndarray | float, np.ndarray | float]:
+        """Energy per second the dark takes, on top of the drain, and how exposed each is to it (0 to 1),
+        both (arenas, creatures)."""
         n = self.cfg.night
         if not n.on or n.cold <= 0:
-            return 0.0
+            return 0.0, 0.0
         kept = night.warmth(self.pos, self.alive, self.colony, self.nest_at() == self.colony, n)
-        return n.cold * (1 - self.light())[:, None] * (1 - kept)
+        dark = (1 - self.light())[:, None]
+        return n.cold * dark * (1 - kept), dark * (1 - kept)
 
     def _nightfall(self):
         """The food standing where night has just fallen goes, to grow back after dawn."""

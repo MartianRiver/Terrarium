@@ -118,8 +118,11 @@ class Night:
     huddle: float
     reach: float
     start_dark: float   # share of games that start at nightfall, not at the start of the day
+    chill_time: float   # seconds a nim's felt chill takes to follow the cold it's in
 
     def __post_init__(self):
+        if self.chill_time <= 0:
+            raise ConfigError('[night] chill_time is seconds, above 0')
         if not 0 <= self.start_dark <= 1:
             raise ConfigError('[night] start_dark is a share, 0 to 1')
         if self.start_dark > 0 and not (self.cycle > 0 and self.length > 0):
@@ -520,7 +523,7 @@ def convert(kind, value, where):
 SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'colonies': {'room': 0},
          'vision': {'cover': 0.0, 'spread': 1.0, 'side': 1.0},
-         'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0, 'start_dark': 0.0},
+         'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0, 'start_dark': 0.0, 'chill_time': 20.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},
          'young': {'seconds': 0.0, 'speed': 1.0, 'energy': 1.0, 'start': False},

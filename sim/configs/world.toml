@@ -116,6 +116,9 @@ reach = 1.5
 # share of games that start at nightfall, the nims at home, instead of at dawn (0: none), drawn for each arena
 # every time it starts over. Part of the world, so a score of it starts them there too: for training worlds
 start_dark = 0.0
+# how chilled a nim feels (the brain's `chill`, 0 warm to 1 through) follows the cold it's in with this lag, in seconds:
+# it builds up out in the dark and fades in the nest or a huddle. Changes only what the brain feels, never the cold's cost
+chill_time = 20.0
 
 [sprint]
 # a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full

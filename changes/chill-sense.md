@@ -1,0 +1,1 @@
+A nim can feel how chilled it is (`chill`, schema v20): 0 warm to 1 chilled through, following the cold it's in over `[night] chill_time` seconds (20 for worlds recorded before it), so it builds up in the dark and fades in the nest or a huddle. The cold's cost is unchanged; older brains load with zero weights for it, and replays carry `chill` per nim where a world has cold.
