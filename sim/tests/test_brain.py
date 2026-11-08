@@ -80,15 +80,34 @@ def test_a_v19_brain_ignores_chill(tmp_path):
     """A brain from before chill (schema v19) loads with zero weights for it and acts the same however chilled."""
     torch.manual_seed(3)
     now = schema.current()
-    assert now['self'][-1] == 'chill'
-    old = now | {'version': 19, 'self': now['self'][:-1]}
+    assert now['self'][-2] == 'chill'
+    old = now | {'version': 19, 'self': now['self'][:-2], 'ray': now['ray'][:-1]}
     brain = Brain(**SHAPE, lists=old)
     save(brain, tmp_path / 'v19.pt')
     grown, _ = load_brain(tmp_path / 'v19.pt')
     me, kinds, rays = observation()
     warm, chilled = me.clone(), me.clone()
-    warm[:, -1], chilled[:, -1] = 0, 1
-    for a, b, c in zip(brain(me[:, :-1], kinds, rays), grown(warm, kinds, rays), grown(chilled, kinds, rays)):
+    warm[:, -2], chilled[:, -2] = 0, 1
+    for a, b, c in zip(brain(me[:, :-2], kinds, rays[..., :-1]), grown(warm, kinds, rays), grown(chilled, kinds, rays)):
+        assert torch.allclose(a, b, atol=1e-6) and torch.allclose(b, c, atol=1e-6)
+
+
+def test_a_v20_brain_ignores_water_and_ponds(tmp_path):
+    """A brain from before water (schema v20) loads with zero weights for `water` and `pond`: it acts the same
+    however thirsty its nim is and wherever the pond lies."""
+    torch.manual_seed(4)
+    now = schema.current()
+    assert now['self'][-1] == 'water' and now['ray'][-1] == 'pond'
+    old = now | {'version': 20, 'self': now['self'][:-1], 'ray': now['ray'][:-1]}
+    brain = Brain(**SHAPE, lists=old)
+    save(brain, tmp_path / 'v20.pt')
+    grown, _ = load_brain(tmp_path / 'v20.pt')
+    me, kinds, rays = observation()
+    full, dry = me.clone(), me.clone()
+    full[:, -1], dry[:, -1] = 1, 0
+    near, far = rays.clone(), rays.clone()
+    near[..., -1], far[..., -1] = 0.1, 1
+    for a, b, c in zip(brain(me[:, :-1], kinds, rays[..., :-1]), grown(full, kinds, near), grown(dry, kinds, far)):
         assert torch.allclose(a, b, atol=1e-6) and torch.allclose(b, c, atol=1e-6)
 
 

@@ -5,7 +5,7 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type DungState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type GhostState, type NestInfo, type StoreState, type WorldInfo,
+  type BlockState, type CreatureState, type DungState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type GhostState, type NestInfo, type PondInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
@@ -87,6 +87,7 @@ function readInfo(o: Obj): WorldInfo {
     midden: o.midden === undefined ? 0 : num(o, 'midden', where),
     ...(o.middenSpot === undefined ? {} : { middenSpot: spot(o.middenSpot, `${where}.middenSpot`) }),
     tree: o.tree === undefined ? null : int(o, 'tree', where),
+    ...(o.ponds === undefined ? {} : { ponds: list(o, 'ponds', where, (p, w): PondInfo => ({ x: num(p, 'x', w), y: num(p, 'y', w), radius: num(p, 'radius', w) })) }),
   };
 }
 
@@ -108,6 +109,7 @@ function readFrame(o: Obj, where: string): Frame {
         stamina: c.stamina === undefined ? 1 : num(c, 'stamina', w),
         dung: c.dung === undefined ? 0 : int(c, 'dung', w),
         z: c.z === undefined ? 0 : num(c, 'z', w),
+        ...(c.water === undefined ? {} : { water: num(c, 'water', w) }),
       };
     }),
     food: list(o, 'food', where, (f, w): FoodState => {

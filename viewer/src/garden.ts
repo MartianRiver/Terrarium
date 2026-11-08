@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { addNestDome } from './nestdome';
+import { addPonds } from './ponds';
 import { COLONY_COLOURS, GARDEN } from './palette';
 import type { NestInfo, WorldInfo } from './world';
 
@@ -30,6 +31,7 @@ export function buildGarden(info: WorldInfo) {
   addGround(group, info);
   addHedge(group, info, rng);
   for (const nest of info.nests) addNest(group, nest);
+  if (info.ponds) addPonds(group, info.ponds);
   const domes = info.nests.map((nest) => addNestDome(group, nest));
   const sway = addGrass(group, info, rng);
   addPebbles(group, info, rng);

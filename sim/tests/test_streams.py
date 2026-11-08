@@ -36,7 +36,7 @@ def arrays(world: World, arena: int, drawn=True) -> dict[str, np.ndarray]:
     right after a reset they're left out. Where a food slot is empty its position is left over from before and unused."""
     out = {}
     owners = {'world': world, 'physics': world.physics}
-    for name in ('smell', 'tag', 'seek', 'flags', 'peek', 'dung', 'tree'):
+    for name in ('smell', 'tag', 'seek', 'flags', 'peek', 'dung', 'tree', 'ponds'):
         if getattr(world, name):
             owners[name] = getattr(world, name)
     for owner, obj in owners.items():

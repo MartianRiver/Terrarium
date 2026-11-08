@@ -40,6 +40,8 @@ def header(world: World, arena: int, source: dict) -> dict:
     if world.tree:
         # the block drawn as an apple tree
         info['tree'] = int(world.block_id[cfg.tree.trunk])
+    if world.ponds:
+        info['ponds'] = [{'x': _r(x), 'y': _r(y), 'radius': cfg.water.radius} for x, y in world.ponds.pos[arena]]
     return {'format': FORMAT, 'version': VERSION, 'info': info,
             'source': {**source, 'arena': arena, 'config': cfg.to_dict()}}
 
@@ -95,6 +97,10 @@ def frame(world: World, a: int) -> dict:
         # how chilled it feels, 0 warm to 1 through
         for c, chill in zip(creatures, world.chill[a][born]):
             c['chill'] = _r(chill)
+    if world.ponds:
+        # how much water it has left, 0 to 1
+        for c, water in zip(creatures, world.water[a][born]):
+            c['water'] = _r(water)
     here = world.food_present[a]
     kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}

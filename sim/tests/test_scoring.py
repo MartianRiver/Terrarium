@@ -88,7 +88,7 @@ def test_a_wipe_on_every_choice_is_the_same_as_wiped(tmp_path):
     cfg = config.load(config.DEFAULT.parent / 'solo.toml')
     cfg = replace(cfg, episode=replace(cfg.episode, seconds=3.0))
     # a random brain whose turning hangs on its memory: with some seeds it turns the same either way
-    torch.manual_seed(2)
+    torch.manual_seed(3)
     brain = Brain(**SHAPE).with_memory(8)
     with torch.no_grad():
         for q in brain.parameters():

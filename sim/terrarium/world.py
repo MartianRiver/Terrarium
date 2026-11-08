@@ -21,6 +21,9 @@
 # spinning isn't) and sprinting, a burst of speed with a cooldown ([sprint]),
 # chosen like unload and eat.
 #
+# With [water] on (water.py), a nim is thirsty too: its water falls over time and fills while it stands in a pond, and
+# at 0 it dies like starving. Food and flowers don't grow in a pond.
+#
 # With [flowers] on, a nectar flower opens now and then by day, rare and rich:
 # the first to touch one drinks it all, food's worth several times over (eaten
 # or carried like food) and a burst of speed that lasts a few seconds. It closes
@@ -60,6 +63,7 @@ from .flags import Flags
 from .peek import Peek
 from .jump import step as jump_step
 from .tree import Tree
+from .water import Ponds
 from .maze import carve, check as check_maze
 from .scatter import scatter
 from .seek import Seek
@@ -182,6 +186,8 @@ class World:
         self.stamina = np.ones((arenas, n))
         # how chilled each feels ([night] cold): follows the cold it's in with a lag, 0 warm to 1 through
         self.chill = np.zeros((arenas, n))
+        # how much water each has left ([water], water.py; always 1 with no ponds)
+        self.water = np.ones((arenas, n))
         self.drunk = np.zeros((arenas, n), int)
         # the berry each creature carries (its food slot, -1 for none), whether it said yes to carry last tick, and
         # since its arena started: berries picked up, put down at its own nest, and put down ones a nestmate ate,
@@ -209,6 +215,7 @@ class World:
         self.flags = Flags(self) if cfg.flag.on else None
         self.peek = Peek(self) if cfg.peek.on else None
         self.dung = Droppings(self) if cfg.dung.on else None
+        self.ponds = Ponds(self) if cfg.water.on else None
         # the first game starts the way every later one does, through the same draws in the same order
         self.reset(np.ones(arenas, bool))
 
@@ -328,6 +335,7 @@ class World:
         self.nectar[idx] = 0
         self.stamina[idx] = 1
         self.chill[idx] = 0
+        self.water[idx] = self.cfg.water.start if self.ponds else 1
         self.z[idx] = 0
         self.vz[idx] = 0
         self.jumps[idx] = 0
@@ -356,6 +364,8 @@ class World:
             self.peek.reset(idx)
         if self.tree:
             self.tree.reset(idx)
+        if self.ponds:
+            self.ponds.reset(idx)
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -429,6 +439,8 @@ class World:
             self.chill += (exposure - self.chill) * min(1.0, cfg.dt / cfg.night.chill_time)
         if cfg.tired.on:
             tired.tire(self, thrust, bursting)
+        if self.ponds:
+            self.ponds.step(share)
         np.maximum(self.young - 1, 0, out=self.young)
         np.maximum(self.stooping - 1, 0, out=self.stooping)
         self.sprinting[bursting] -= 1
@@ -465,6 +477,8 @@ class World:
         if self.smell:
             self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
         dying = self.alive & (self.energy <= 0)
+        if self.ponds:
+            dying |= self.alive & (self.water <= 0)
         if dying.any():
             self.alive &= ~dying
             self.sprinting[dying] = 0
@@ -817,6 +831,7 @@ class World:
         self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = self.nectar[a, i] = 0
         self.stamina[a, i] = 1
         self.chill[a, i] = 0
+        self.water[a, i] = 1
         self.young[a, i] = round(self.cfg.young.seconds * self.cfg.tick_hz)
         np.add.at(self.hatched, (a, self.colony[i]), 1)
         if self.dung:
@@ -903,7 +918,8 @@ class World:
             inside = (np.abs(p) <= room).all()
             near_nest = (np.hypot(*(self.nests - p).T) < nest_gap).any()
             near_block = len(half) and self._on_block(a, p, half)
-            if inside and not near_nest and not near_block:
+            in_pond = self.ponds and self.ponds.covers(a, p, cfg.food.radius)
+            if inside and not near_nest and not near_block and not in_pond:
                 return p
             p = pick()
         log.warn('no open ground found, placing food anyway', arena=int(a), tries=PLACE_TRIES)

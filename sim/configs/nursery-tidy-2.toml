@@ -117,6 +117,14 @@ reach = 1.5
 start_dark = 0.0
 chill_time = 20.0
 
+[water]
+ponds = 0
+radius = 0.0
+distance = 0.0
+drain = 0.0
+drink = 0.0
+start = 1.0
+
 [sprint]
 # a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
 # thrust, and none again until `cooldown` seconds after it ends
