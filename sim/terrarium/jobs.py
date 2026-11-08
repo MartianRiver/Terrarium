@@ -19,6 +19,8 @@
 # on = "rented" (or "trusted", "donor") keeps a job to that kind of machine.
 # needs = { gpu = true, gpu_memory_gb = 6, cores = 8, memory_gb = 8, machine = "Kelpie" } keeps it to machines
 # that say they have that (any of the keys; gpu = false for machines without one).
+# line = "nights" and question = "one sentence on what the run decides" say which line of work a job belongs to
+# (the channel groups runs by line) and what it answers; both are optional and ride in the signed spec.
 # chunk = N splits a job into pieces of N samples, each carrying on from the
 # last, so a lent machine never holds more than a short job.
 # A job with a score table and a brain (instead of train) is a score job: the
@@ -68,7 +70,9 @@ AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
 FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int, 'needs': dict,
-          'score': dict, 'brain': str}
+          'score': dict, 'brain': str, 'line': str, 'question': str}
+LINE = re.compile(r'^[\w.-]{1,40}$')
+MOST_QUESTION = 200
 SCORE = {'game': str, 'episodes': int, 'held_out': bool, 'seed': int, 'wiped': bool, 'wiped_every': (int, float),
          'wiped_on_event': bool, 'baselines': list}
 MOST_EPISODES = 4096
@@ -168,10 +172,23 @@ def check(spec: dict):
     need(spec.get('on') in (None, *MACHINES), 'bad on')
     need(not (spec['trusted'] and spec.get('on') == 'donor'), 'a trusted job can never run on a donor')
     need('needs' not in spec or bad_needs(spec['needs']) is None, f'bad needs: {bad_needs(spec.get("needs"))}')
+    for key in ('line', 'question'):
+        need(key not in spec or bad_label(key, spec[key]) is None, f'bad {key}: {bad_label(key, spec.get(key))}')
     parent = spec.get('parent')
     need(parent is None or (isinstance(parent, dict) and (
         (set(parent) == {'blob', 'file'} and DIGEST.match(parent['blob']) and NAME.match(parent['file'])) or
         (set(parent) == {'job'} and re.fullmatch(r'[0-9a-f]{12}', parent['job'])))), 'bad parent')
+
+
+def bad_label(key: str, value) -> str | None:
+    """What's wrong with a job's line or question, by shape only."""
+    if not isinstance(value, str):
+        return f'{key} is text'
+    if key == 'line':
+        return None if LINE.match(value) else 'line is a short key of letters, digits, - _ . (at most 40)'
+    if not value.strip() or len(value) > MOST_QUESTION or '\n' in value or '\r' in value:
+        return f'question is one line of at most {MOST_QUESTION} characters'
+    return None
 
 
 def bad_score(score) -> str | None:
@@ -223,6 +240,9 @@ def load_batch(path: Path) -> list[dict]:
             raise BadJob(f'{path.name} job {name}: on is one of {", ".join(MACHINES)}')
         if 'needs' in job and (why := bad_needs(job['needs'])):
             raise BadJob(f'{path.name} job {name}: {why}')
+        for key in ('line', 'question'):
+            if key in job and (why := bad_label(key, job[key])):
+                raise BadJob(f'{path.name} job {name}: {why}')
         if job.get('chunk', 1) < 1:
             raise BadJob(f'{path.name} job {name}: chunk is a number of samples')
         out.append(job)
@@ -285,8 +305,9 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
                     'train_file': train.name, 'parent': before,
                     # each piece plays its own episodes, not the first piece's again
                     'seed': job['seed'] + 1000 * i, 'samples': size, 'on': job.get('on')}
-            if 'needs' in job:
-                spec['needs'] = job['needs']
+            for key in ('needs', 'line', 'question'):
+                if key in job:
+                    spec[key] = job[key]
             ids[name] = spec['id']
             before = {'job': spec['id']}
             out.append(spec)
@@ -313,8 +334,9 @@ def score_spec(job: dict, path: Path, code: dict, runs: Path, ids: dict, blob, n
             'world': blob(world.read_bytes()), 'world_file': world.name,
             'parent': parent(job['parent'], path.parent, runs, ids, blob), 'seed': seed, 'samples': 0,
             'on': job.get('on'), 'score': {'episodes': games.EPISODES, 'baselines': ['random']} | score}
-    if 'needs' in job:
-        spec['needs'] = job['needs']
+    for key in ('needs', 'line', 'question'):
+        if key in job:
+            spec[key] = job[key]
     return spec
 
 

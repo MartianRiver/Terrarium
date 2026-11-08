@@ -555,6 +555,56 @@ def test_needs_are_checked_in_a_spec_and_in_a_batch(tmp_path):
         jobs.load_batch(batch)
 
 
+def test_line_and_question_ride_in_every_spec_of_a_batch(repo, tmp_path):
+    (repo / 'sim' / 'train.toml').write_text('[ppo]\nsamples = 1_000\nlr = 3e-4\n[reward]\nsamples = 2\n')
+    git(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'longer')
+    git(repo, 'update-ref', 'refs/remotes/origin/next', 'HEAD')
+    batch = tmp_path / 'grid.toml'
+    batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n'
+                     'line = "nights"\nquestion = "Does a dawn reward bring them home?"\n'
+                     '[[job]]\nname = "long"\nchunk = 400\n'
+                     '[[job]]\nname = "own"\nline = "colonies"\nquestion = "Do two colonies share a tree?"\n'
+                     '[[job]]\nname = "none"\n')
+    made, _ = jobs.specs(batch, tmp_path / 'runs', repo)
+    for s in made:
+        jobs.check(s)
+    by = {s['name']: s for s in made}
+    assert [s['name'] for s in made] == ['long.1', 'long.2', 'long.3', 'own', 'none']
+    for name in ('long.1', 'long.2', 'long.3', 'none'):
+        assert by[name]['line'] == 'nights' and by[name]['question'] == 'Does a dawn reward bring them home?'
+    assert by['own']['line'] == 'colonies' and by['own']['question'] == 'Do two colonies share a tree?'
+    batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n[[job]]\nname = "plain"\n')
+    plain, _ = jobs.specs(batch, tmp_path / 'runs', repo)
+    assert 'line' not in plain[0] and 'question' not in plain[0]
+    jobs.check(plain[0])
+
+
+def test_line_and_question_are_checked_in_a_spec_and_in_a_batch(tmp_path):
+    jobs.check(spec())
+    jobs.check(spec() | {'line': 'nights', 'question': 'Is it fed from the store?'})
+    jobs.check(spec() | {'line': 'a' * 40, 'question': 'q' * 200})
+    for bad in ({'line': ''}, {'line': 'a' * 41}, {'line': 'two words'}, {'line': 'a/b'}, {'line': 3}, {'line': None},
+                {'question': ''}, {'question': ' '}, {'question': 'q' * 201}, {'question': 'one\ntwo'},
+                {'question': 'one\rtwo'}, {'question': 7}, {'question': ['a']}):
+        with pytest.raises(jobs.BadJob, match='bad (line|question)'):
+            jobs.check(spec() | bad)
+    batch = tmp_path / 'grid.toml'
+    for text, why in [('line = "two words"', 'line is a short key'), ('line = 3', 'should be str'),
+                      ('question = "one\\ntwo"', 'question is one line'),
+                      (f'question = "{"q" * 201}"', 'question is one line'), ('question = 3', 'should be str')]:
+        for top in (True, False):
+            body = f'{text}\n[[job]]\nname = "x"\n' if top else f'[[job]]\nname = "x"\n{text}\n'
+            batch.write_text('world = "w"\ntrain = "t"\n' + body)
+            with pytest.raises(jobs.BadJob, match=why):
+                jobs.load_batch(batch)
+    queue = coordinator.Queue(tmp_path / 'coord', None)
+    queue.store.put(b'w')
+    queue.store.put(b't')
+    queue.add({'spec': spec() | {'line': 'nights', 'question': 'ok'}, 'sig': 'sig'})
+    with pytest.raises(coordinator.Refused, match='bad line'):
+        queue.add({'spec': spec('b' * 12) | {'line': 'no good'}, 'sig': 'sig'})
+
+
 def test_a_brain_that_ends_its_own_run_fails_at_once_and_a_crash_gets_another_try(tmp_path):
     s = store(tmp_path)
     s.add(spec('a' * 12, added=1), 'sig')

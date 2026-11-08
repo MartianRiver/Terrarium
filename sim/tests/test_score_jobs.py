@@ -80,6 +80,14 @@ def test_a_batch_can_score_its_own_training_job(repo, tmp_path):
     assert sc['kind'] == 'score' and sc['parent'] == {'job': train['id']} and 'train' not in sc
     assert sc['samples'] == 0 and sc['seed'] == evals.HELD_OUT and sc['trusted'] and not train['trusted']
     assert sc['score'] == {'game': 'tree', 'episodes': 16, 'wiped_every': 3.0, 'baselines': ['picker']}
+    for s in made:
+        assert 'line' not in s and 'question' not in s
+    batch.write_text(head.replace('[[job]]', 'line = "nights"\nquestion = "Does it keep the tree?"\n[[job]]', 1)
+                     + '[[job]]\nname = "t-score"\nbrain = "job:t"\nscore = { game = "tree" }\n')
+    made, _ = jobs.specs(batch, tmp_path / 'runs', repo)
+    for s in made:
+        jobs.check(s)
+        assert s['line'] == 'nights' and s['question'] == 'Does it keep the tree?'
     for bad, why in [('score = { game = "golf" }\nbrain = "job:t"', 'no game'),
                      ('score = { game = "tree", baselines = ["nobody"] }\nbrain = "job:t"', 'no baseline'),
                      ('score = { game = "tree", wiped_on_event = true }\nbrain = "job:t"', 'no event'),
