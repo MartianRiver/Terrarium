@@ -118,3 +118,15 @@ def test_the_api_starts_a_game_steps_it_and_refuses_what_it_cant_use(tmp_path):
             assert e.value.code == code
     finally:
         server.shutdown()
+
+
+def test_the_brain_is_told_what_you_played_not_what_it_asked_for(brain):
+    from terrarium.evals import brain_policy
+    from terrarium.schema import SELF
+    game = Game(COLONY, brain, 0, 'test')
+    n = len(game.world.colony)
+    told = []
+    game.act = brain_policy(brain, watch=lambda obs, actions, notes: told.append(
+        obs.me.reshape(-1, n, len(SELF))[0, game.slot, [SELF.index('last_thrust'), SELF.index('last_turn')]].copy()))(game.world)
+    game.step(3, 1.0, 0.5, [])
+    assert told and np.allclose(told[-1], [1.0, 0.5])

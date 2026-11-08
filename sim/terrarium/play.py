@@ -74,6 +74,9 @@ class Game:
                 actions[0, self.slot] = mine[:actions.shape[-1]]
             ids, alive = w.creature_id[0].copy(), w.alive[0].copy()
             meals, stored = w.meals[0].copy(), w.stored[0].copy()
+            # the brain is told what was played, as in training, not what it asked for
+            if executed := getattr(self.act, 'executed', None):
+                executed(actions)
             w.step(actions)
             gained = np.stack([alive, np.maximum(w.meals[0] - meals, 0), np.maximum(w.stored[0] - stored, 0)], -1)
             for slot in np.flatnonzero(alive):

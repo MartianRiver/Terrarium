@@ -1,0 +1,1 @@
+Catch them! and the kids' games tell the brain the move actually played when your input or a game rule (pace, dizzy, pull) overrides it, through the scorer's `executed` hook, so the brain playing beside you sees what it would in training.
