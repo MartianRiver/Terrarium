@@ -43,6 +43,8 @@ def padded(make: Make) -> Make:
             if x.shape[-1] < len(ACTIONS):
                 x = np.concatenate([x, -np.ones((*x.shape[:-1], len(ACTIONS) - x.shape[-1]))], -1)
             return x[..., :len(ACTIONS)]
+        if hasattr(act, 'executed'):
+            go.executed = act.executed
         return go
     return build
 
@@ -87,6 +89,10 @@ def play(cfg, episodes: int, seed: int, parts: list[tuple[Callable[[World], np.n
             taken |= m
             if k in brain:
                 ours |= m
+        # Every brain observes what was played, including while another policy controls its creatures.
+        for _, act in acts:
+            if executed := getattr(act, 'executed', None):
+                executed(x)
         before = w.pos.copy()
         w.step(x)
         ours &= w.alive

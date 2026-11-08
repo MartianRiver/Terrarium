@@ -216,7 +216,8 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
     """A trained brain. Steering by its mean scores what it's learned, not its exploration; a yes/no action taken
     by its mean is never yes until it's sure, so it's drawn instead, with seeded noise so the numbers repeat. watch,
     if given, sees each observation it chose from and the actions it chose (mind.py). wipe_on(world) makes a check,
-    run at each choice, of whose notes to blank then, (arenas, creatures): an event in a game."""
+    run at each choice, of whose notes to blank then, (arenas, creatures): an event in a game. The policy's
+    executed(actions) hook replaces its last steering with the commands played by a mixed-policy scorer."""
     brain, meta = load_brain(path)
     brain.eval().to(device)
     # it chooses every `repeat` ticks, as it did in training, and holds its choice in between
@@ -265,6 +266,12 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
             ticks += 1
             assert held is not None
             return held
+
+        def executed(actions):
+            nonlocal last
+            last = actions[..., :2].copy()
+
+        act.executed = executed
         return act
     return make
 
