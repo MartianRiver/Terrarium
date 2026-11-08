@@ -35,3 +35,4 @@ Line 1 is `# NNNN Title`, line 3 is `date: … · status: … · seeds: … · b
 - [0017](0017-the-nest-is-a-pass-through.md) The night brains walk straight back out of the nest, fed or hungry, dark or light; the nest has to end the trip. *hint*
 - [0018](0018-more-of-the-same-and-three-pays-dont-lift-the-night.md) More of the needs pay, two-night games, pay for warmth and full cold: none lifts the night brains. *held-out*
 - [0019](0019-starting-at-nightfall-and-a-dawn-pay-dont-keep-them-in.md) Starting games at nightfall and a pay at dawn for being home don't keep the night brains in. *held-out*
+- [0020](0020-feeling-the-chill-doesnt-bring-them-home.md) Feeling the chill doesn't bring the night brains home: alive moves inside the twins' spread. *held-out*

@@ -1,0 +1,1 @@
+Finding 0020, held-out: the night brains given a chill sense to feel (n48, schema v20) live no more than the same parents' twins without it, 39% alive over two nights against 42%; the needs reward never charging energy lost to the cold is the likely reason, tested next with `needs_lost`.
