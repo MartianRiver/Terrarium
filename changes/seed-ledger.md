@@ -1,0 +1,1 @@
+Seed blocks used for scoring are now written in one ledger, `docs/seeds.toml`, and `python -m terrarium.seeds take` hands out the next free block of 1,000, so a confirm can't land on seeds something was already chosen by. `check` and `list` say what's taken, and the repo check wants every confirmed finding to name a seed from a confirm block.
