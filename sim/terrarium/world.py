@@ -364,7 +364,18 @@ class World:
             self.dung.reset(idx)
         if self.tree:
             self.tree.start(idx)
+        self._start_dark(idx)
         log.debug('arenas reset', tick=self.tick, count=len(idx))
+
+    def _start_dark(self, idx: np.ndarray):
+        """[night] start_dark: some of these arenas start at nightfall, with the food standing already gone."""
+        n = self.cfg.night
+        if n.start_dark <= 0:
+            return
+        late = np.array([a for a in idx if self.rngs[a].uniform() < n.start_dark], int)
+        self.clock[late] = n.cycle - n.length
+        self.dark[late] = True
+        self._fall(late)
 
     def step(self, actions: np.ndarray):
         """actions (arenas, creatures, k): thrust and turn, then unload, eat, sprint, grab, carry and jump (yes when
@@ -830,9 +841,13 @@ class World:
         dark = night.dark(self.age / self.cfg.tick_hz + self.clock, self.cfg.night)
         fell = dark & ~self.dark
         self.dark = dark
-        if not fell.any():
-            return
+        if fell.any():
+            self._fall(np.flatnonzero(fell))
+
+    def _fall(self, arenas: np.ndarray):
         # flowers close at nightfall
+        fell = np.zeros(len(self.age), bool)
+        fell[arenas] = True
         self.flower_left[fell] = 0
         standing = (self.food_regrow[:, :self.wild] == 0) & fell[:, None]
         self.food_regrow[:, :self.wild][standing] = self._regrow_wait(np.nonzero(standing)[0])

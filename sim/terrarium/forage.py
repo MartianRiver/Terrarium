@@ -180,7 +180,8 @@ class Forage:
         # a start in the dark loses its standing food on the first step, as at nightfall
         if self.staggered:
             w = self.world
-            for a in np.flatnonzero(arenas):
+            # the ones [night] start_dark put at nightfall stay there
+            for a in np.flatnonzero(arenas & ~w.dark):
                 w.clock[a] = w.rngs[a].uniform(0, w.cfg.night.cycle)
 
 

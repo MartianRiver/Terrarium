@@ -81,11 +81,69 @@ def test_staggered_arenas_start_at_any_time_of_day():
     assert w.clock[0] != before[0] and (w.clock[1:] == before[1:]).all()
 
 
+def dark_start(share: float):
+    return replace(NIGHTS, night=replace(NIGHTS.night, start_dark=share))
+
+
+def test_every_game_starts_in_the_dark_with_the_dial_at_1():
+    w = World(dark_start(1.0), 4, 0)
+    first_dark = NIGHTS.night.cycle - NIGHTS.night.length
+    assert (w.clock == first_dark).all() and w.dark.all()
+    assert (w.light() == 0).all() and not w.food_present[:, :w.wild].any()
+    w.step(np.zeros((4, len(w.colony), 2)))
+    assert w.dark.all() and not w.food_present[:, :w.wild].any()
+    # an arena that starts over starts at nightfall again, the others go on
+    w.age[1] = w.episode_ticks
+    w.clock[1] = 0
+    w.reset(np.arange(4) == 1)
+    assert w.clock[1] == first_dark and not w.food_present[1, :w.wild].any()
+
+
+def test_the_dial_at_0_leaves_the_world_and_its_random_numbers_alone():
+    plain = World(NIGHTS, 6, 3)
+    assert NIGHTS.night.start_dark == 0
+    assert (plain.clock == 0).all() and not plain.dark.any()
+    off = World(CFG, 6, 3)
+    assert all(a.bit_generator.state == b.bit_generator.state for a, b in zip(plain.rngs, off.rngs))
+    assert (plain.pos == off.pos).all() and (plain.food_pos == off.food_pos).all()
+
+
+def test_about_the_share_of_games_start_in_the_dark_the_same_ones_for_a_seed():
+    w = World(dark_start(0.5), 64, 7)
+    started = w.clock > 0
+    assert 20 <= started.sum() <= 44
+    assert (w.dark == started).all() and not w.food_present[:, :w.wild][started].any()
+    assert (w.food_present[:, :w.wild][~started].sum(1) == CFG.food.count).all()
+    again = World(dark_start(0.5), 64, 7)
+    assert (again.clock == w.clock).all()
+    # game i of a seed is the same game in a smaller job
+    small = World(dark_start(0.5), 16, 7)
+    assert (small.clock == w.clock[:16]).all()
+    assert w.light()[started].max() == 0
+
+
+def test_a_staggered_batch_keeps_the_games_that_start_at_nightfall():
+    train = load_train()
+    env = Forage(dark_start(1.0), replace(train, start=replace(train.start, staggered=True)), 4, 0)
+    assert (env.world.clock == NIGHTS.night.cycle - NIGHTS.night.length).all()
+
+
+def test_start_dark_is_a_share_and_needs_nights():
+    with pytest.raises(ValueError, match='share'):
+        replace(NIGHTS.night, start_dark=1.5)
+    with pytest.raises(ValueError, match='nights on'):
+        replace(CFG.night, start_dark=0.5)
+
+
 def test_old_run_records_load_with_nights_off():
     recorded = CFG.to_dict()
     del recorded['night']
     old = build(Config, upgrade(recorded))
     assert not old.night.on and old.food == CFG.food
+    # a recorded world with nights but no start_dark plays every game from dawn
+    recorded = NIGHTS.to_dict()
+    del recorded['night']['start_dark']
+    assert build(Config, upgrade(recorded)).night == NIGHTS.night
 
 
 def test_being_warm_pays_by_the_second_and_more_in_the_dark():
