@@ -114,6 +114,9 @@ cold = 0.02
 nest = 1.0
 huddle = 0.25
 reach = 1.5
+# share of games that start at nightfall, the nims at home, instead of at dawn (0: none), drawn for each arena
+# every time it starts over. Part of the world, so a score of it starts them there too: for training worlds
+start_dark = 0.0
 
 [sprint]
 # a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
