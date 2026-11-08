@@ -309,3 +309,13 @@ def test_the_burrows_carry_down_into_the_nest_is_not_walking():
         unload = lambda world: lambda w: doing(unload=True).repeat(w.arenas, 0)
         return games.play(cfg, 2, 1, [(games.everyone, unload)], begin=begin)
     assert np.allclose(play(True)[1], 0) and np.allclose(play(False)[1], 0)
+
+
+def test_tree_games_with_water_count_drinking_and_what_each_died_of():
+    water = load(DEFAULT.parent / 'nursery-water.toml')
+    out = games.tree_game(water, games.still, 2, 1)
+    # standing at the nest, nowhere near the pond: dry at 1 / drain = 66.7 s, well before hunger
+    assert np.allclose(out['seconds_alive'], 1 / water.water.drain, atol=0.1)
+    assert out['died_of_thirst'].tolist() == [1, 1] and out['starved'].tolist() == [0, 0]
+    assert out['drank'].tolist() == [0, 0] and out['alive_at_end'].tolist() == [0, 0]
+    assert 'drank' not in games.tree_game(HOME, games.still, 1, 1)
