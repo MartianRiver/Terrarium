@@ -790,6 +790,8 @@ def main():
     rules.add_argument('--cooldown', type=float, help='minutes without keyboard or mouse before training '
                        '(default 10; 0 trains while in use too)')
     rules.add_argument('--battery', action='store_const', const=True, help='train on battery too')
+    rules.add_argument('--battery-floor', type=float, help='with --battery, pause at or below this %% charge until '
+                       'plugged in (default 30; 0 for no floor)')
     rules.add_argument('--cpu', type=float, help='share of the cores (default 0.5)')
     rules.add_argument('--gpu-temp', type=float, help='pause above this many °C (default 85; 0 for no limit)')
     rules.add_argument('--share-gpu', action='store_const', const=True,
@@ -811,7 +813,8 @@ def main():
         rules = machine.Rules.anytime()
     else:
         rules = machine.load(args.home / 'settings.toml', cooldown=args.cooldown, battery=args.battery,
-                             cpu=args.cpu, gpu_temp=args.gpu_temp, share_gpu=args.share_gpu)
+                             battery_floor=args.battery_floor, cpu=args.cpu, gpu_temp=args.gpu_temp,
+                             share_gpu=args.share_gpu)
     if args.command == 'calibrate':
         return run_calibration(args, rules)
     if why := jobs.can_verify(args.signers):

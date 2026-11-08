@@ -78,7 +78,7 @@ Each job builds a checkout of its commit with its own `.venv` under `~/.terrariu
 On a machine someone uses, the worker keeps to these rules by default (`machine.py`):
 
 - **Only when you're away.** It starts a job after 10 minutes without keyboard or mouse input. When you come back, it pauses the job on the spot (every process of it is suspended) and carries on once you've been away 10 minutes again.
-- **Only on mains.** On battery it pauses, the same way.
+- **Only on mains.** On battery it pauses, the same way. With `battery = true` it may train on battery, but at or below 30% charge it pauses, and stays paused until the charger is in (a battery on its own only falls); a job paused that long goes back to the queue like any other.
 - **Never while you're playing.** If another program uses more than a fifth of the GPU's 3D engine, or more than 1 GB of its memory, for 10 seconds, the worker stops the job and gives it back to the queue, freeing the GPU. Anything full screen (a game, a presentation) does the same. It reads the counters Task Manager shows, for the NVIDIA GPU only, and leaves out the desktop itself.
 - **Half the CPU, at low priority.** On Windows it's a hard cap on the worker and everything it starts (a job object), so a job can't take more however it's written, and a job dies with the worker if the worker crashes. On Linux the job runs in a systemd scope with a CPU quota, the same kind of hard cap, where there's a user systemd to ask. On macOS it's the number of threads and processes a job gets, plus `nice`, which keeps it to about half but isn't a cap.
 - **Not hot.** Above 85 °C on the GPU it pauses until it's 5 degrees cooler.
@@ -92,6 +92,7 @@ Change any of it with flags, or in `~/.terrarium/worker/settings.toml` (flags wi
 ```toml
 cooldown = 10      # minutes away before training; 0 trains while you use it too
 battery = false    # also on battery
+battery_floor = 30 # with battery on, pause at or below this % until plugged in; 0 for no floor
 cpu = 0.5          # share of the cores
 gpu_temp = 85      # pause above this; 0 for no limit
 share_gpu = false  # keep training while other programs use the GPU
@@ -102,7 +103,7 @@ keep_awake = true  # no sleeping while a job trains
 
 | flag | |
 |---|---|
-| `--cooldown MIN`, `--battery`, `--cpu SHARE`, `--gpu-temp C`, `--share-gpu` | the rules above |
+| `--cooldown MIN`, `--battery`, `--battery-floor PCT`, `--cpu SHARE`, `--gpu-temp C`, `--share-gpu` | the rules above |
 | `--anytime` | none of the rules: for machines nobody uses (rented machines get this with `--instance`) |
 | `--slots N` | jobs at once; the cores are split between them. Default: what `worker calibrate` found for this machine, else 1 |
 | `calibrate` | (a command, like `status`) measures whether this machine gains from two jobs at once; see Slots below |
