@@ -207,7 +207,13 @@ def test_the_status_pause_stops_and_resumes_a_running_job(running):
     wk.paused = True
     wk.mind(now=1000)
     assert task.state == 'paused' and task.reason == 'paused from the status page'
-    assert machine.tree(proc.pid)[0].status() == 'stopped' or sys.platform == 'win32'
+    # a stop signal lands asynchronously: on a busy machine the status can lag a moment
+    stopped = lambda: machine.tree(proc.pid)[0].status() == 'stopped'
+    for _ in range(40):
+        if stopped() or sys.platform == 'win32':
+            break
+        time.sleep(0.05)
+    assert stopped() or sys.platform == 'win32'
     wk.paused = False
     wk.mind(now=1010)
     assert task.state == 'training' and task.paused == 10

@@ -152,6 +152,8 @@ class World:
         self.fed = np.zeros((arenas, n))
         # energy it has kept from any meal, a store's jelly too, since its arena started (what `needs` pays)
         self.nourished = np.zeros((arenas, n))
+        # water it has drunk since its arena started ([water]; what `needs` pays for thirst)
+        self.drank = np.zeros((arenas, n))
         # jelly in each colony's store, food unloaded into it and jelly eaten from it per creature
         # jelly, in grown nims' bites (the young take smaller ones)
         self.store = np.zeros((arenas, len(self.nests)))
@@ -319,6 +321,7 @@ class World:
         self.crop[idx] = self.cfg.crop.start
         self.fed[idx] = 0
         self.nourished[idx] = 0
+        self.drank[idx] = 0
         self.store[idx] = 0
         self.stored[idx] = 0
         self.jelly[idx] = 0

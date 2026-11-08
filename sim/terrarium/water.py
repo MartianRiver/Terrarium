@@ -70,8 +70,10 @@ class Ponds:
         """One tick of thirst and drinking for the living; share is what the young pay of each cost."""
         w = self.world
         t, dt = w.cfg.water, w.cfg.dt
-        left = w.water - t.drain * dt * share + t.drink * dt * self.inside()
-        w.water = np.where(w.alive, np.clip(left, 0, 1), w.water)
+        dried = np.clip(w.water - t.drain * dt * share, 0, 1)
+        left = np.clip(dried + t.drink * dt * self.inside(), 0, 1)
+        w.drank += np.where(w.alive, left - dried, 0)
+        w.water = np.where(w.alive, left, w.water)
 
     def edge(self, origin, dirs, start) -> np.ndarray:
         """(arenas, creatures, rays): how far along each ray a pond's edge is, inf for none; ponds don't stop a ray."""
