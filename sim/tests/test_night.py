@@ -164,3 +164,63 @@ def test_being_warm_pays_by_the_second_and_more_in_the_dark():
     day, night_ = rewards[5.0], rewards[25.0]
     assert day[0] == pytest.approx(0.1 * solo.dt) and day[1] == 0
     assert night_[0] == pytest.approx(1.1 * solo.dt) and night_[1] == 0
+
+
+COLONY_NIGHTS = replace(load(DEFAULT.parent / 'colony.toml'), night=NIGHTS.night)
+
+
+def dawn_env(dawn):
+    """Colony world with a 30 s cycle (dark from 20 s) and every reward off but dawn."""
+    train = load_train()
+    zero = {k: 0.0 for k in train.reward.__dataclass_fields__}
+    env = Forage(COLONY_NIGHTS, replace(train, reward=replace(train.reward, **zero | {'dawn': dawn})), 1, 0)
+    return env, np.zeros((env.samples, 5))
+
+
+def place(w, i, at):
+    w.physics.bodies[0][i].position = tuple(at)
+    w.physics.read()
+
+
+def test_dawn_pays_once_to_the_living_in_their_own_nest():
+    env, still = dawn_env(0.5)
+    w = env.world
+    mine, other = np.flatnonzero(w.colony == 0), np.flatnonzero(w.colony == 1)
+    home, away, dead = mine[:3]
+    place(w, home, w.nests[0])
+    place(w, away, w.nests[0] + (8.0, 0.0))
+    place(w, dead, w.nests[0] + (0.3, 0.0))
+    place(w, other[0], w.nests[0])
+    w.alive[0, dead] = False
+    w.clock[:] = 30.0 - 3.5 * COLONY_NIGHTS.dt
+    paid = np.array([env.step(still)[1] for _ in range(8)])
+    assert paid[:, home].sum() == pytest.approx(0.5)
+    assert (paid[:, home] != 0).sum() == 1
+    assert paid[:, [away, dead, other[0]]].sum() == 0
+
+
+def test_dawn_is_the_one_tick_the_dark_ends():
+    env, still = dawn_env(1.0)
+    w = env.world
+    home = np.flatnonzero(w.colony == 0)[0]
+    seen = []
+    for _ in range(round(31 * COLONY_NIGHTS.tick_hz)):
+        place(w, home, w.nests[0])
+        seen.append(env.step(still)[1][home])
+    paid_at = np.flatnonzero(np.array(seen) > 0.5)
+    assert len(paid_at) == 1
+    assert (paid_at[0] + 1) / COLONY_NIGHTS.tick_hz == pytest.approx(30.0, abs=1.5 * COLONY_NIGHTS.dt)
+
+
+def test_dawn_zero_leaves_rewards_as_they_were():
+    assert load_train().reward.dawn == 0
+    totals = {}
+    for dawn in (0.0, 0.7):
+        env, still = dawn_env(dawn)
+        w = env.world
+        for i, c in enumerate(w.colony):
+            place(w, i, w.nests[c])
+        w.clock[:] = 29.0
+        totals[dawn] = np.abs([env.step(still)[1] for _ in range(60)]).sum()
+    # everything else is off, and every nim starts in its own nest
+    assert totals[0.0] == 0 and totals[0.7] > 0

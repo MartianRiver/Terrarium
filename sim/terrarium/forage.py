@@ -128,8 +128,9 @@ class Forage:
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
         # tick, and an arena where everyone has died only ticks on with nobody in it
-        lived, snug, fun, play = (np.zeros(alive.shape) for _ in range(4))
+        lived, snug, fun, play, dawned = (np.zeros(alive.shape) for _ in range(5))
         for _ in range(self.repeat):
+            dark = w.dark.copy()
             w.step(actions)
             lived += w.alive
             if w.tag:
@@ -149,6 +150,8 @@ class Forage:
             if r.snug or r.warm:
                 warm = night.warmth(w.pos, w.alive, w.colony, w.nest_at() == w.colony, w.cfg.night)
                 snug += w.alive * warm * (r.snug + r.warm * (1 - w.light())[:, None])
+            if r.dawn and (dark & ~w.dark).any():
+                dawned += (dark & ~w.dark)[:, None] * w.alive * (w.nest_at() == w.colony)
         self.last = actions[..., :2].copy()
         gain = w.fed - before['fed']
         # hunger before the meal squared, less after: nourished × (2 × hunger after + nourished); a store's jelly counts
@@ -157,7 +160,7 @@ class Forage:
         own = ((r.food * gain - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)
-               + w.cfg.dt * (r.alive * lived + snug) + fun + play + needs)
+               + w.cfg.dt * (r.alive * lived + snug) + r.dawn * dawned + fun + play + needs)
         ended = w.ended.copy()
         died = alive & ~w.alive
         done = died | ended[:, None]
