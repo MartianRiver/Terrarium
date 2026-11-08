@@ -182,6 +182,9 @@ class Catch(Game):
             actions[0, self.slot] = mine
             tag = self.tag
             before = (int(tag.it[0]), int(tag.back[0]), int(tag.since[0]), int(tag.wait[0]))
+            # the brain is told what was played, as in training, not what it asked for
+            if executed := getattr(self.act, 'executed', None):
+                executed(actions)
             w.step(actions)
             self.ticks += 1
             self.munch()
