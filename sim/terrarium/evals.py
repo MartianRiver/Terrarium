@@ -497,12 +497,13 @@ def main():
     parser.add_argument('--wipe-every', type=float, nargs='*', default=[], metavar='S',
                         help='also score each brain with its memory wiped every S seconds (the tidy game: do later trips still get faster?)')
     parser.add_argument('--held-out', action='store_true', help=f'the promotion worlds (seed {HELD_OUT}) instead of {SEED}')
+    parser.add_argument('--seed', type=int, help='the worlds start from this seed (beats --held-out)')
     parser.add_argument('--episodes', type=int, default=EPISODES)
     parser.add_argument('--device', default='cpu', help="where the brains run; the worlds are always on the CPU")
     parser.add_argument('--out', help='write the results here as JSON')
     args = parser.parse_args()
     cfg = load(args.config)
-    seed = HELD_OUT if args.held_out else SEED
+    seed = args.seed if args.seed is not None else HELD_OUT if args.held_out else SEED
 
     jobs: dict[str, dict] = {name: {'policy': name} for name in args.policy}
     names = [Path(b).name for b in args.brain]
@@ -574,7 +575,7 @@ def main():
                   + f'  {du["near_each"]:10.2f}  {du["near_nest_share"]:9.0%}'
                   + ''.join(f'  {"–" if du[k] is None else f"{du[k]:.1f}":>{n}}' for k, n in (('first_trip', 12), ('later_trip', 13))))
     if args.out:
-        Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'results': results}, indent=2) + '\n')
+        Path(args.out).write_text(json.dumps({'config': Path(args.config).name, 'seed': seed, 'results': results}, indent=2) + '\n')
 
 
 if __name__ == '__main__':
