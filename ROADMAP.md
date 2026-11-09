@@ -84,9 +84,11 @@ It comes in milestones. The numbers go in the order they ship, so the later ones
   - Done when in a rich world a well-fed colony ends bigger than it started and in a lean one it shrinks, with scripted colonies first, then the brain, for three brains.
   - Done when, in a world that keeps going, a colony that never hatches dies out of old age, and one that hatches is still there after three lifespans.
 
+**The energy budget.** Walking cost the colonies more than their trips paid: a 10.7 s trip cost 0.32 for 0.8 of food brought home, so they went out and came back and had time for little else, and halving what walking costs filled them with no training at all. So a world's energy gets set as a budget, not dial by dial: the world check says how long a full nim lasts resting and walking, and what a trip costs against what it brings back, and trips are kept at about five times their cost as the world grows (real foragers bring home several times what a trip costs them). Unloading one food at a time comes next, so keeping some back for the walk out is something they can learn, then a bigger crop to train on.
+
 0.4 is finished when 0.4.1 to 0.4.4 all hold in one colony world with one recommended brain in `brains.toml`. It's announced on the site, not renumbered.
 
-Once hatchlings grow, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job. **Mazes** are one of memory's test worlds rather than a track of their own: one nim, a new maze every game, food only at the end, scored on mazes it has never seen by how close it gets to the shortest way, and how much faster it gets on a second and third run through the same one.
+Once hatchlings grow, passing food mouth to mouth, as ants feed their larvae, gets tried, so nursing can become a job. Before that I want to know whether colonies already split the work: each nim's share of what comes home, its time at home, and how old it is when it first goes out. With nothing to do at home but eat and rest, everyone is a forager, so roles need a second job first. **Mazes** are one of memory's test worlds rather than a track of their own: one nim, a new maze every game, food only at the end, scored on mazes it has never seen by how close it gets to the shortest way, and how much faster it gets on a second and third run through the same one.
 
 Moved out of 0.4: a brain for each colony, and colonies founding new ones, go to 0.7, where rivals give the world something to pick between. A bigger garden and seeing which nestmates come home loaded go to Later.
 
@@ -111,6 +113,7 @@ Done when foragers find their way home by smell, creatures keep clear of dust de
 
 - Two scent marks, one that draws others and a "no entry" one, as Pharaoh's ants use, laid on the same smell the food has. Both learned: no scripted trail-layers to get them started, even though that makes the first trails harder to find.
 - Shivering: spending energy to warm nestmates close by, so huddling can split into heaters and passengers, as it does in honeybees.
+- Carrying costs energy by its weight as well as slowing a nim down, so a load and a body's heat are both paid for, beside pushing blocks and shivering.
 - With dust devils about, a signal has more to mean than "help me carry this".
 - A signal comes in only where the world already gives it something to mean (eating makes a sound, say), never as a free action in the hope it comes to mean something. The call I tried in 0.4 started out meaning nothing, and after 32M samples it still meant nothing: calling only pays once others come to calls, and coming only pays once calls mean something ([notes](docs/notes/0.4.md)).
 - **Moving blocks on purpose.** Walking into a block isn't enough to move it: a hard push, costing energy, moves it the way the nim is going. Blocks in the way of food first, then heavier ones that need two. In 0.3's tries, light blocks got pushed aside by nims just walking at food, which isn't the same as moving them on purpose, and a grab-and-drag for doors never got learned (notes 0.3).
@@ -134,11 +137,15 @@ Done when there's stealing, guarding of food patches, fights and retreats, and t
 
 *Rented GPUs.* A queen who lays the eggs, brood that needs feeding and guarding, and a colony that can lose its queen and raise a new one with food and time. The queen is a body with her own place in the colony, not a script: what she does, and what the rest do about her, is learned. Raiding rival brood becomes possible.
 
+Bodies of very different sizes (queen, brood, workers) mean what living and moving cost scales with a body's mass, in place of a separate share for each kind. A replete caste gets tried here too: honeypot ants keep the colony's store in the swollen crops of nestmates who stay home, which is how a big body reserve can sit beside a store instead of making it pointless.
+
 Done when there are guards staying home, nurses near the brood, raids on rival nests, and colony crises and comebacks.
 
 ## 0.9 Juniper: Farming and seasons
 
 *Rented GPUs.* Seeds, fertile soil, lean seasons.
+
+Lean seasons are the first lean times longer than a brain looks ahead, so fat comes in here and not before: food eaten past full slowly turns into a reserve, at a loss, that makes a nim heavier and burns back when food runs short. It stays smaller than a lean season, or the colony's store loses its point.
 
 Done when colonies plant and defend farms, and different colonies settle on different strategies. The big one.
 
@@ -149,6 +156,7 @@ Done when colonies plant and defend farms, and different colonies settle on diff
 - **World state saved apart from the brains,** versioned, and moved forward to new versions instead of reset. It grows out of 0.4.2's saved worlds and 0.5's dome.
 - Swapping in a new brain without wiping the world.
 - The viewer streams the live world as well as playing replays.
+- One energy ledger the whole world balances to, since nothing starts over.
 
 Done when it's running, worth checking in on, and the dome has kept going for a month.
 
