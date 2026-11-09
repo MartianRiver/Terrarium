@@ -77,6 +77,12 @@ Rented containers often show the host's cores rather than their own share; one p
 
 On Linux torch comes with an extra: `uv sync --extra cpu`, or `--extra cuda` for an NVIDIA GPU (CUDA 12.6 builds, which need a driver that supports 12.6). PyPI's Linux wheels would bring CUDA whether it's wanted or not. Every `uv run` there needs the same extra, or uv syncs torch away; `start` picks `cuda` when the machine has `nvidia-smi`. macOS takes torch from PyPI, with MPS.
 
+## Energy budget
+
+`uv run python -m terrarium.budget WORLD.toml [--arenas 64]` prints what a world's energy comes to, so it is set as a budget and not dial by dial: energy a second for an adult (and a young nim, if `[young]` is on) resting, at full thrust and at full thrust with a full crop, by day and, with `[night]` on, in the dark outside and in the nest (a nim alone, no huddle); how long a nim lasts from `[energy] start` and from full; with `[water]`, how long its water lasts and what a trip to the pond costs; and a trip to the food and home: the median and 90th-percentile distance from a nest to the food (measured by building the world and reading where the food landed, every piece from every nest, and the nearest piece to each nest), the time at top speed out and laden back (`[crop] slow`), the energy it costs split into walking, staying alive and, with a tree, the jump, what a full crop brings home (`[crop] capacity` times `[energy] food`, and as jelly), and the ratio of the two. Trips should return about 5x their cost: when walking cost more than a trip paid (a 10 s trip for 0.8 of food at move 0.02), the colonies had no slack however well they foraged. It counts the nest's edge and the food's reach (about 2 m) as walked, so it reads a little high, and it leaves out sprints, tiredness, flowers, hatching and carrying blocks.
+
+Last it prices a day: the share of daylight an adult spends on food trips, pond trips and drinking to keep itself fed and watered, and what's left for anything else, with food waiting where it lies and nothing for the store or the young, so the real colony needs more. Water is set the same way: an adult's water should last a little less than its food (`drain` 0.012 lasts 83 s against 100 s resting on food at drain 0.01), a pond trip should be cheap next to a food trip, and at least a third of the day should be left at the median distances. Where `drink` is no more than `drain` it says a nim never keeps up.
+
 ## What it cost
 
 ```
