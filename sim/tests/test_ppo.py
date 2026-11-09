@@ -110,6 +110,11 @@ def test_a_short_run_leaves_a_full_record(tmp_path):
     rows = [json.loads(line) for line in (run.dir / 'metrics.jsonl').read_text().splitlines()]
     assert [r['update'] for r in rows] == [1, 2, 3, 4] and all(np.isfinite(r['policy_loss']) for r in rows)
     assert all(0 < r['live_samples'] <= r['samples'] and 0 < r['live_share'] <= 1 for r in rows)
+    # where a round's collect went: the parts, with what's left over, add up to collect_seconds
+    parts = [f'{k}_seconds' for k in ('rays', 'rules', 'physics', 'brain', 'other')]
+    assert all(r[k] >= 0 for r in rows for k in parts)
+    assert all(r['rays_seconds'] > 0 and r['brain_seconds'] > 0 for r in rows)
+    assert all(abs(sum(r[k] for k in parts) - r['collect_seconds']) < 0.01 for r in rows)
     # the brain it started as comes first
     assert sorted(p.name for p in (run.dir / 'checkpoints').iterdir()) == ['00000000000.pt', '00000000128.pt',
                                                                             '00000000256.pt']

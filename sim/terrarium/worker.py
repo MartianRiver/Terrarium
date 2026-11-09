@@ -58,7 +58,8 @@ PEEK = 900
 # the wait between looks when jobs are running and a free slot found nothing to claim
 BUSY = 5
 # 13: score jobs can wipe on the game's event (a worker before it would score them with the notes kept)
-VERSION = 13
+# 14: training jobs can ask for fast and gpu_collect (a worker before it would train them the slow way)
+VERSION = 14
 
 
 def cpus() -> int:
@@ -131,6 +132,8 @@ class Task:
         self.paused = 0.0
         # the most other jobs this one ran beside, for checking the machine's calibration against real jobs
         self.beside = 0
+        # fast and gpu_collect as the job ran them, for a training job (the machine may have dropped what it asked)
+        self.ran: dict | None = None
         self.peeked = time.time()
         # the coordinator has the run: a beat now would get 410 and read as the job taken away
         self.uploaded = False
@@ -155,7 +158,7 @@ class Task:
         return recent | {'held_back': usage.held_back(recent, record)} if recent else None
 
     def job_record(self) -> dict:
-        return {'spec': self.spec, 'sig': self.sig, 'beside': self.beside}
+        return {'spec': self.spec, 'sig': self.sig, 'beside': self.beside, **({'ran': self.ran} if self.ran else {})}
 
     def summary(self) -> dict:
         return {'id': self.id, 'name': self.spec['name'], 'batch': self.spec['batch'], 'total': self.spec['samples'],
@@ -431,6 +434,7 @@ class Worker:
                 self.tasks.pop(task.id, None)
 
     def train(self, task: Task, inputs: dict[str, Path], sim: Path, runs: Path, dir: Path):
+        task.ran = self.flags(task.spec)
         with open(dir / 'train.log', 'wb') as out:
             env = job_env(OMP_NUM_THREADS=str(self.threads), PYTHONUNBUFFERED='1')
             task.proc = subprocess.Popen(self.command(task.spec, inputs, sim), cwd=sim,
@@ -543,7 +547,19 @@ class Worker:
             cmd += ['--parent', str(inputs['parent'])]
         if spec['code']['overlay']:
             cmd.append('--scratch')
+        asked, ran = {k: bool(spec.get(k)) for k in jobs.TRAINING}, self.flags(spec)
+        for key, on in asked.items():
+            if on and not ran[key]:
+                log.info(f'{key} dropped: {"no CUDA GPU" if key == "fast" else "no GPU"} on this machine', job=spec['name'])
+        cmd += [f'--{k.replace("_", "-")}' for k, on in ran.items() if on]
         return cap(cmd, self.slots, self.rules)
+
+    def flags(self, spec: dict) -> dict[str, bool]:
+        """fast and gpu_collect as they'll run: fast (compiled, bf16) is for CUDA, and a brain stepped on the CPU is
+        what a collect already does, so gpu_collect needs a GPU, an Apple one included."""
+        cuda = bool(self.specs.get('gpus'))
+        return {'fast': bool(spec.get('fast')) and cuda,
+                'gpu_collect': bool(spec.get('gpu_collect')) and (cuda or bool(self.specs.get('mps')))}
 
     def score_command(self, spec: dict, inputs: dict[str, Path], sim: Path, out: Path) -> list[str]:
         # on the CPU, one thread a process: the same games on any machine

@@ -7,6 +7,7 @@ import pymunk
 import pymunk.batch
 from pymunk.constraints import GearJoint, PivotJoint
 
+from . import clock
 from .config import Config
 
 CREATURE, BLOCK, WALL = 1, 2, 4
@@ -219,6 +220,7 @@ class Physics:
 
     def step(self, force: np.ndarray):
         """Push each creature with force (arenas, creatures, 2) for one tick."""
+        began = clock.now()
         f = self.force.reshape(self.arenas, self.rows, 2)
         f[:, :self.creatures] = force
         substeps = self.cfg.substeps
@@ -231,3 +233,4 @@ class Physics:
                 pymunk.batch.set_space_bodies(space, pymunk.batch.BodyFields.FORCE, buf)
                 space.step(dt)
         self.read()
+        clock.spent['physics'] += clock.now() - began

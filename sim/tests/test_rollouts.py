@@ -1,3 +1,4 @@
+import time
 from dataclasses import replace
 
 import numpy as np
@@ -146,3 +147,22 @@ def test_each_brain_scores_its_own_samples():
             logp = brain.dist(mean).log_prob(torch.from_numpy(flat(roll.actions)[mine])).sum(-1)
         assert np.allclose(logp.numpy(), flat(roll.logprobs)[mine], atol=1e-5)
         assert np.allclose(value.numpy(), flat(roll.values)[mine], atol=1e-5)
+
+
+def test_every_way_of_collecting_says_where_the_round_went():
+    def second_round(make):
+        torch.manual_seed(0)
+        rollouts = make(Brain(**SHAPE))
+        try:
+            rollouts.collect(Brain(**SHAPE).state_dict(), 10)
+            began = time.perf_counter()
+            rollouts.collect(Brain(**SHAPE).state_dict(), 10)
+            return rollouts.timers, time.perf_counter() - began
+        finally:
+            rollouts.close()
+    for make in (lambda a: Collector(SHORT, TRAIN, 4, 3, a), lambda a: Collector(SHORT, TRAIN, 4, 3, a, workers=2),
+                 lambda a: OnDevice(SHORT, TRAIN, 4, 3, a), lambda a: OnDevice(SHORT, TRAIN, 4, 3, a, workers=2)):
+        got, wall = second_round(make)
+        assert set(got) == {'rays', 'rules', 'physics', 'brain'} and all(v > 0 for v in got.values()), got
+        # only this round's seconds: a round's parts can't come to more than its wall time
+        assert sum(got.values()) < wall
