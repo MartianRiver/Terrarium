@@ -650,9 +650,13 @@ def test_the_train_command_asks_only_for_what_the_machine_can_use(tmp_path):
         assert ('--fast' in cmd, '--gpu-collect' in cmd) == ran
         assert tuple(w.flags(both).values()) == ran
     w.specs = LAPTOP_GPU
-    for plain in (spec(), spec() | {'fast': False, 'gpu_collect': False}):
-        cmd = w.train_command(plain, inputs, tmp_path)
-        assert '--fast' not in cmd and '--gpu-collect' not in cmd
+    # fast is on by default on CUDA, off when a job says so; gpu_collect only when asked
+    cmd = w.train_command(spec(), inputs, tmp_path)
+    assert '--fast' in cmd and '--gpu-collect' not in cmd
+    cmd = w.train_command(spec() | {'fast': False, 'gpu_collect': False}, inputs, tmp_path)
+    assert '--fast' not in cmd and '--gpu-collect' not in cmd
+    w.specs = MAC
+    assert '--fast' not in w.train_command(spec(), inputs, tmp_path)
     # job.json says what ran, not what was asked
     w.specs = CPU
     task = worker.Task({'spec': both, 'sig': ''})
