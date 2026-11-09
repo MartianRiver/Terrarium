@@ -173,11 +173,14 @@ def maze_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarr
 
 
 def tree_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarray]:
-    visible = np.zeros(episodes)
+    visible, lived = np.zeros(episodes), np.zeros(episodes)
 
     def begin(w):
         visible[:] = w.tree.seen_from_home()
-    w, walked = play(cfg, episodes, seed, [(everyone, player)], begin=begin)
+
+    def watch(w, t):
+        lived[:] += w.alive.mean(1)
+    w, walked = play(cfg, episodes, seed, [(everyone, player)], watch, begin=begin)
     assert w.tree
     minutes = cfg.episode.seconds / 60
     jumps = w.jumps.sum(1)
@@ -188,6 +191,12 @@ def tree_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarr
            'tree_seen_from_home': visible}
     if cfg.tree.home:
         out['home_a_minute'] = w.stored.sum(1) / minutes
+    if w.ponds:
+        # a nim that ran dry is counted as thirst even if it was also out of energy
+        dead = ~w.alive
+        dry = dead & (w.water <= 0)
+        out |= {'seconds_alive': lived / cfg.tick_hz, 'alive_at_end': w.alive.mean(1), 'drank': w.drank.mean(1),
+                'died_of_thirst': dry.sum(1), 'starved': (dead & ~dry & (w.energy <= 0)).sum(1)}
     return out
 
 
