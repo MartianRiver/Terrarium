@@ -35,6 +35,8 @@ NEEDS = {'gpu': bool, 'gpu_memory_gb': (int, float), 'cores': int, 'memory_gb': 
 SCORE_VERSION = 10
 # wiping a brain's notes on the game's event: an older worker would drop it and score with the notes kept
 SCORE_EVENT_VERSION = 13
+# fast and gpu_collect on a training job: an older worker would drop them and train the slow way without saying
+SWITCH_VERSION = 14
 
 
 def scoring(spec: dict) -> bool:
@@ -223,7 +225,7 @@ class Store:
             # a pod is paid by the hour for its GPU: it scores only what's kept to rented machines
             need = SCORE_EVENT_VERSION if spec['score'].get('wiped_on_event') else SCORE_VERSION
             return (version or 0) >= need and (role != 'rented' or spec.get('on') == 'rented')
-        return True
+        return (version or 0) >= SWITCH_VERSION or not (spec.get('fast') or spec.get('gpu_collect'))
 
     def claim(self, worker: str, trusted: bool, now: float | None = None, role: str | None = None,
               specs: dict | None = None, version: int | None = None) -> dict | None:

@@ -70,7 +70,9 @@ AGENT = 'terrarium-jobs/1'
 NAME = re.compile(r'^[\w.-]{1,80}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
 FIELDS = {'world': str, 'train': str, 'parent': str, 'seed': int, 'on': str, 'chunk': int, 'needs': dict,
-          'score': dict, 'brain': str, 'line': str, 'question': str}
+          'score': dict, 'brain': str, 'line': str, 'question': str, 'fast': bool, 'gpu_collect': bool}
+# train-job switches that are off unless asked for; the worker drops one the machine can't use (worker.flags)
+TRAINING = ('fast', 'gpu_collect')
 LINE = re.compile(r'^[\w.-]{1,40}$')
 MOST_QUESTION = 200
 SCORE = {'game': str, 'episodes': int, 'held_out': bool, 'seed': int, 'wiped': bool, 'wiped_every': (int, float),
@@ -174,6 +176,8 @@ def check(spec: dict):
     need('needs' not in spec or bad_needs(spec['needs']) is None, f'bad needs: {bad_needs(spec.get("needs"))}')
     for key in ('line', 'question'):
         need(key not in spec or bad_label(key, spec[key]) is None, f'bad {key}: {bad_label(key, spec.get(key))}')
+    for key in TRAINING:
+        need(key not in spec or (isinstance(spec[key], bool) and not scores), f'bad {key}')
     parent = spec.get('parent')
     need(parent is None or (isinstance(parent, dict) and (
         (set(parent) == {'blob', 'file'} and DIGEST.match(parent['blob']) and NAME.match(parent['file'])) or
@@ -233,6 +237,8 @@ def load_batch(path: Path) -> list[dict]:
             job['parent'] = entry.get('brain') or defaults.get('brain', '')
             if (why := bad_score(job['score'])) or not job['parent'] or 'chunk' in entry:
                 raise BadJob(f'{path.name} job {name}: {why or "a score job has a brain and no chunk"}')
+        if 'score' in job and (flag := next((k for k in TRAINING if k in entry), None)):
+            raise BadJob(f'{path.name} job {name}: {flag} is for training jobs')
         for key in ('world', *(() if 'score' in job else ('train',))):
             if key not in job:
                 raise BadJob(f'{path.name} job {name}: no {key}')
@@ -253,7 +259,7 @@ def take(table: dict, where: str) -> dict:
     for key, value in table.items():
         if key not in FIELDS:
             raise BadJob(f'{where}: unknown key {key!r}')
-        if not isinstance(value, FIELDS[key]) or isinstance(value, bool):
+        if not isinstance(value, FIELDS[key]) or (isinstance(value, bool) and FIELDS[key] is not bool):
             raise BadJob(f'{where}: {key} should be {FIELDS[key].__name__}')
     return dict(table)
 
@@ -305,7 +311,7 @@ def specs(path: Path, runs: Path = ROOT, repo: Path = snapshot.REPO) -> tuple[li
                     'train_file': train.name, 'parent': before,
                     # each piece plays its own episodes, not the first piece's again
                     'seed': job['seed'] + 1000 * i, 'samples': size, 'on': job.get('on')}
-            for key in ('needs', 'line', 'question'):
+            for key in ('needs', 'line', 'question', *TRAINING):
                 if key in job:
                     spec[key] = job[key]
             ids[name] = spec['id']

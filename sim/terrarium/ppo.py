@@ -15,6 +15,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from . import clock
 from .brain import Brain, tensors
 from .config import PPO
 from .forage import Forage, Observation
@@ -74,9 +75,11 @@ def collect(env: Forage, actor: Brain, steps: int, obs: Observation, episodes: E
     start = notes.numpy()[None]
     with torch.no_grad():
         for _ in range(steps):
+            t = clock.now()
             mean, value, notes = actor(*tensors(obs, 'cpu'), notes)
             dist = actor.dist(mean)
             action = dist.sample()
+            clock.spent['brain'] += clock.now() - t
             for k, v in (('me', obs.me), ('kinds', obs.kinds), ('rays', obs.rays)):
                 keep[k].append(v)
             keep['actions'].append(action.numpy())
@@ -89,7 +92,9 @@ def collect(env: Forage, actor: Brain, steps: int, obs: Observation, episodes: E
             episodes.add(reward, done, active)
             if env.final is not None:
                 # cut off by the time limit, not ended: what's left is worth what the value says it is
+                t = clock.now()
                 _, after, _ = actor(*tensors(env.final, 'cpu'), notes)
+                clock.spent['brain'] += clock.now() - t
                 reward = reward + env.gamma * after.numpy() * env.cut
             notes = kept(notes, active, done)
             keep['rewards'].append(reward)

@@ -605,6 +605,62 @@ def test_line_and_question_are_checked_in_a_spec_and_in_a_batch(tmp_path):
         queue.add({'spec': spec('b' * 12) | {'line': 'no good'}, 'sig': 'sig'})
 
 
+def test_fast_and_gpu_collect_are_switches_of_a_training_job(repo, tmp_path):
+    batch = tmp_path / 'grid.toml'
+    for text, why in [('fast = "yes"', 'fast should be bool'), ('gpu_collect = 1', 'gpu_collect should be bool')]:
+        batch.write_text(f'world = "w"\ntrain = "t"\n[[job]]\nname = "x"\n{text}\n')
+        with pytest.raises(jobs.BadJob, match=why):
+            jobs.load_batch(batch)
+    # a score job plays on the CPU; it takes the batch's switches without them, but not asked for its own
+    batch.write_text('world = "w"\ntrain = "t"\nfast = true\n[[job]]\nname = "x"\n'
+                     '[[job]]\nname = "s"\nbrain = "b.pt"\nscore = { game = "tree" }\n')
+    assert jobs.load_batch(batch)[0]['fast'] is True
+    batch.write_text('world = "w"\n[[job]]\nname = "s"\nbrain = "b.pt"\nscore = { game = "tree" }\ngpu_collect = true\n')
+    with pytest.raises(jobs.BadJob, match='gpu_collect is for training jobs'):
+        jobs.load_batch(batch)
+    batch.write_text(f'world = "{repo}/sim/world.toml"\ntrain = "{repo}/sim/train.toml"\n'
+                     '[[job]]\nname = "quick"\nfast = true\ngpu_collect = false\n[[job]]\nname = "plain"\n')
+    quick, plain = jobs.specs(batch, tmp_path / 'runs', repo)[0]
+    jobs.check(quick)
+    jobs.check(plain)
+    assert quick['fast'] is True and quick['gpu_collect'] is False
+    assert 'fast' not in plain and 'gpu_collect' not in plain
+    for bad in ({'fast': 1}, {'gpu_collect': 'yes'}):
+        with pytest.raises(jobs.BadJob, match='bad (fast|gpu_collect)'):
+            jobs.check(spec() | bad)
+
+
+def test_a_job_asking_for_fast_waits_for_a_worker_that_knows_it(tmp_path):
+    s = store(tmp_path)
+    s.add(spec('a' * 12, added=1) | {'fast': True}, 'sig')
+    s.add(spec('b' * 12, added=2), 'sig')
+    assert s.claim('old', True, specs=LAPTOP_GPU, version=13)['spec']['id'] == 'b' * 12
+    assert s.claim('old', True, specs=LAPTOP_GPU, version=13) is None
+    assert s.claim('new', True, specs=LAPTOP_GPU, version=worker.VERSION)['spec']['id'] == 'a' * 12
+
+
+def test_the_train_command_asks_only_for_what_the_machine_can_use(tmp_path):
+    w = worker.Worker(None, tmp_path / 'home', trusted=True)  # type: ignore[arg-type]
+    inputs = {'world': tmp_path / 'w.toml', 'train': tmp_path / 't.toml'}
+    both = spec() | {'fast': True, 'gpu_collect': True}
+    # (machine, what runs): fast is CUDA's; gpu_collect needs a GPU, Apple's too
+    for box, ran in ((LAPTOP_GPU, (True, True)), (MAC, (False, True)), (CPU, (False, False))):
+        w.specs = box
+        cmd = w.train_command(both, inputs, tmp_path)
+        assert ('--fast' in cmd, '--gpu-collect' in cmd) == ran
+        assert tuple(w.flags(both).values()) == ran
+    w.specs = LAPTOP_GPU
+    for plain in (spec(), spec() | {'fast': False, 'gpu_collect': False}):
+        cmd = w.train_command(plain, inputs, tmp_path)
+        assert '--fast' not in cmd and '--gpu-collect' not in cmd
+    # job.json says what ran, not what was asked
+    w.specs = CPU
+    task = worker.Task({'spec': both, 'sig': ''})
+    assert 'ran' not in task.job_record()
+    task.ran = w.flags(both)
+    assert task.job_record()['ran'] == {'fast': False, 'gpu_collect': False}
+
+
 def test_a_brain_that_ends_its_own_run_fails_at_once_and_a_crash_gets_another_try(tmp_path):
     s = store(tmp_path)
     s.add(spec('a' * 12, added=1), 'sig')

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import hearing, maze, night, vision
+from . import clock, hearing, maze, night, vision
 from .fun import Fun
 from .config import Config, Reward, Train
 from .vision import directions, look
@@ -111,7 +111,10 @@ class Forage:
         return self.last.shape[0] * self.last.shape[1]
 
     def observe(self) -> Observation:
-        return observe(self.world, self.last)
+        t = clock.now()
+        got = observe(self.world, self.last)
+        clock.spent['rays'] += clock.now() - t
+        return got
 
     @property
     def active(self) -> np.ndarray:
@@ -122,6 +125,7 @@ class Forage:
         """actions (samples, len(ACTIONS)) → next observation, reward and done per sample, and which arenas ended.
         A sample is done when its creature dies or its arena ends."""
         w, r = self.world, self.reward
+        began, rays, physics = clock.now(), clock.spent['rays'], clock.spent['physics']
         actions = np.clip(actions, -1, 1).reshape(*self.last.shape[:2], -1)
         before = {k: getattr(w, k).copy() for k in ('fed', 'nourished', 'spent', 'stored', 'jelly', 'hatched', 'alive', 'energy', 'water', 'drank')}
         alive = before['alive']
@@ -186,7 +190,10 @@ class Forage:
         if self.visits:
             self.visits.reset(ended)
             self.hint = self.visits.update()
-        return self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
+        out = self.observe(), reward.reshape(-1).astype(np.float32), done.reshape(-1).copy(), ended
+        # the rules are the step less its rays and its physics
+        clock.spent['rules'] += clock.now() - began - (clock.spent['rays'] - rays) - (clock.spent['physics'] - physics)
+        return out
 
     def _stagger(self, arenas: np.ndarray):
         # a start in the dark loses its standing food on the first step, as at nightfall

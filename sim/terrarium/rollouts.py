@@ -19,6 +19,7 @@ import multiprocessing as mp
 import numpy as np
 import torch
 
+from . import clock
 from .brain import Brain, tensors
 from .config import Config, Train
 from .forage import Forage, Observation
@@ -38,15 +39,20 @@ class Share:
         self.episodes = Episodes(self.env.samples, cfg.dt * train.ppo.repeat)
         self.obs = self.env.observe()
         self.notes = actor.blank(self.env.samples)
+        clock.take()
 
-    def play(self, state: dict, steps: int) -> tuple[Rollout, np.ndarray, list]:
-        """Load the learner's weights, play a rollout, and hand back the value after it and finished episodes."""
+    def play(self, state: dict, steps: int) -> tuple[Rollout, np.ndarray, list, dict]:
+        """Load the learner's weights, play a rollout, and hand back the value after it, finished episodes and where
+        the seconds went."""
+        clock.take()
         self.actor.load_state_dict(state)
         roll, self.obs, self.notes = collect(self.env, self.actor, steps, self.obs, self.episodes, self.notes)
+        t = clock.now()
         with torch.no_grad():
             last_value = self.actor(*tensors(self.obs, 'cpu'), self.notes)[1].numpy()
+        clock.spent['brain'] += clock.now() - t
         finished, self.episodes.finished = self.episodes.finished, []
-        return roll, last_value, finished
+        return roll, last_value, finished, clock.take()
 
 
 def serve(conn, cfg: Config, train: Train, arenas: int, seed: int, actor: Brain):
@@ -69,6 +75,7 @@ class Collector:
         self.samples = sum(n * c.colonies.count * c.colonies.slots for c, n in [(cfg, arenas), *mix])
         self.episodes = Episodes(self.samples, cfg.dt * train.ppo.repeat)
         self.local, self.pipes, self.procs = [], [], []
+        self.timers = dict.fromkeys(clock.KEYS, 0.0)
         if workers == 1:
             parts = [(cfg, arenas), *mix]
             self.local = [Share(c, train, n, s, actor) for (c, n), s in zip(parts, seeds(seed, len(parts), 1))]
@@ -99,8 +106,9 @@ class Collector:
             for p in parts:
                 if isinstance(p, Exception):
                     raise RuntimeError('a rollout worker failed') from p
-        for _, _, finished in parts:
+        for _, _, finished, _ in parts:
             self.episodes.finished += finished
+        self.timers = clock.combine([p[3] for p in parts], parallel=not self.local)
         rolls = [p[0] for p in parts]
         roll = Rollout(**{k: np.concatenate([getattr(r, k) for r in rolls], axis=1)
                           for k in Rollout.__dataclass_fields__})
@@ -121,9 +129,10 @@ def stepped(env: Forage, actions: np.ndarray) -> tuple:
 def simulate(conn, cfg: Config, train: Train, arenas: int, seed: int):
     env = Forage(cfg, train, arenas, seed)
     conn.send((env.observe(), env.active, env.hint))
+    clock.take()
     while (actions := conn.recv()) is not None:
         try:
-            conn.send(stepped(env, actions))
+            conn.send(clock.take() if isinstance(actions, str) else stepped(env, actions))
         except Exception as e:
             conn.send(e)
             raise
@@ -137,13 +146,18 @@ class Here:
         self.actions = np.zeros(0)
 
     def first(self):
-        return self.env.observe(), self.env.active, self.env.hint
+        out = self.env.observe(), self.env.active, self.env.hint
+        clock.take()
+        return out
 
     def send(self, actions: np.ndarray):
         self.actions = actions
 
     def recv(self):
         return stepped(self.env, self.actions)
+
+    def timers(self) -> dict:
+        return clock.take()
 
 
 class There:
@@ -168,6 +182,10 @@ class There:
         if isinstance(got, Exception):
             raise RuntimeError('a world worker failed') from got
         return got
+
+    def timers(self) -> dict:
+        self.pipe.send('timers')
+        return self.recv()
 
     def close(self):
         self.pipe.send(None)
@@ -219,6 +237,7 @@ class OnDevice:
         self.obs = join([f[0] for f in first])
         self.active = np.concatenate([f[1] for f in first])
         self.hint = np.concatenate([f[2] for f in first])
+        self.timers = dict.fromkeys(clock.KEYS, 0.0)
 
     def _value(self, obs: Observation, notes: torch.Tensor) -> torch.Tensor:
         if len(self.actors) == 1:
@@ -256,9 +275,12 @@ class OnDevice:
             actor.load_state_dict(s)
         keep: dict[str, list] = {k: [] for k in Rollout.__dataclass_fields__ if k != 'notes'}
         start = self.notes.cpu().numpy()[None]
+        brain = 0.0
         with torch.no_grad():
             for _ in range(steps):
+                t = clock.now()
                 actions, logps, values = self._act()
+                brain += clock.now() - t
                 for share, a in zip(self.shares, np.split(actions, self.ends)):
                     share.send(a)
                 # while the worlds step
@@ -278,15 +300,22 @@ class OnDevice:
                 if any(g[4] is not None for g in got):
                     # cut off by the time limit: what's left is worth what the value says (shares that weren't
                     # cut have none, and count nothing)
+                    t = clock.now()
                     after = self._value(join([g[0] if g[4] is None else g[4] for g in got]), self.notes)
                     reward = reward + self.gamma * after.cpu().numpy() * np.concatenate([g[5] for g in got])
+                    brain += clock.now() - t
                 keep['rewards'].append(reward)
                 keep['dones'].append(done)
                 self.notes = kept(self.notes, self.active, done)
                 self.obs = join([g[0] for g in got])
                 self.active = np.concatenate([g[3] for g in got])
                 self.hint = np.concatenate([g[6] for g in got])
+            t = clock.now()
             last_value = self._value(self.obs, self.notes).cpu().numpy()
+            brain += clock.now() - t
+        # the worlds' seconds from where they step, ours is the brain
+        sims = clock.combine([share.timers() for share in self.shares], parallel=any(isinstance(s, There) for s in self.shares))
+        self.timers = {**sims, 'brain': brain}
         return Rollout(**{k: np.stack(v) for k, v in keep.items()}, notes=start), last_value
 
     def close(self):

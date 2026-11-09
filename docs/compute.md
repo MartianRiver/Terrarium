@@ -173,6 +173,8 @@ train = "train-full-more.toml"
 
 `line` and `question` say what a job is for: `line = "nights"` is a short key (letters, digits, `- _ .`, at most 40) for the line of work it belongs to, and `question = "Does a dawn reward bring them home?"` is one line of plain text (at most 200 characters, no line breaks) for what the run decides, so write it as the thing the result will settle. Both are optional, can be set at the top of a batch or on a job (a job's own wins), and go into every piece of a chunked job and into score jobs. They ride in the signed spec, so each run folder's `job.json` carries them (`spec.line`, `spec.question`) and the channel can group runs by line and show the question without a hand-kept list.
 
+`fast = true` and `gpu_collect = true` (both optional, false unless asked, for training jobs only; score jobs refuse them) pass `--fast` and `--gpu-collect` to the run ([training.md](training.md)). The worker drops what the machine can't use and says so in its log: `fast` is for CUDA, so a Mac or a CPU box trains the usual way, and `gpu_collect` needs a GPU (a Mac's counts). The run folder's `job.json` has `ran` with what actually ran, and a worker before version 14 never takes a job that asks for either.
+
 ### Score jobs
 
 A job with a `score` table and a `brain` (in place of `train`) plays that brain in its world with `terrarium.games` on whichever machine is free, and comes back as the table (`report.txt`), every game's numbers (`games.json`) and how long it took on what (`score.json`), synced into `runs/scores/`:
