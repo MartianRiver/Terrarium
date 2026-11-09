@@ -128,6 +128,24 @@ def test_a_job_waits_for_its_parent_job_and_gets_its_final_checkpoint(tmp_path):
     assert second['spec']['id'] == 'b' * 12 and s.get(s.parent_blob(second) or '') == b'final brain'
 
 
+def test_a_worker_that_beats_again_keeps_a_job_whose_lease_ran_out_until_someone_else_claims_it(tmp_path):
+    s = store(tmp_path)
+    s.add(spec(), 'sig')
+    s.claim('mac', True, now=100)
+    s.expire(100 + LEASE + 1)
+    assert s.read('a' * 12)['state'] == 'pending'
+    s.beat('a' * 12, 'mac', {'samples': 8}, now=100 + LEASE + 2)
+    job = s.read('a' * 12)
+    assert job['state'] == 'running' and job['worker'] == 'mac' and job['attempts'] == 1 and job['kind'] is None
+    # a stranger's beat for a pending job is still refused, and so is the old holder's once another has it
+    s.expire(100 + 2 * LEASE + 10)
+    with pytest.raises(Gone):
+        s.beat('a' * 12, 'pod', now=100 + 2 * LEASE + 11)
+    assert claimed(s, 'pod', True, now=100 + 2 * LEASE + 12)['attempts'] == 2
+    with pytest.raises(Gone):
+        s.beat('a' * 12, 'mac', now=100 + 2 * LEASE + 13)
+
+
 def test_a_lost_worker_lets_the_job_go_once_then_it_fails(tmp_path):
     s = store(tmp_path)
     s.add(spec(), 'sig')
@@ -639,7 +657,8 @@ def test_a_job_asking_for_fast_waits_for_a_worker_that_knows_it(tmp_path):
     assert s.claim('new', True, specs=LAPTOP_GPU, version=worker.VERSION)['spec']['id'] == 'a' * 12
 
 
-def test_the_train_command_asks_only_for_what_the_machine_can_use(tmp_path):
+def test_the_train_command_asks_only_for_what_the_machine_can_use(tmp_path, monkeypatch):
+    monkeypatch.setattr(worker, 'has_triton', lambda: True)
     w = worker.Worker(None, tmp_path / 'home', trusted=True)  # type: ignore[arg-type]
     inputs = {'world': tmp_path / 'w.toml', 'train': tmp_path / 't.toml'}
     both = spec() | {'fast': True, 'gpu_collect': True}

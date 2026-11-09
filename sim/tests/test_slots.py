@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from test_machine import QUIET, watch
 
-from terrarium import calibrate, machine, worker
+from terrarium import calibrate, jobs, machine, worker
 from terrarium.machine import Rules
 from terrarium.store import scoring
 
@@ -290,3 +290,79 @@ def test_calibrating_can_be_pointed_at_another_world_config_and_memory(tmp_path,
     cmd = seen[0][0]
     assert [cmd[cmd.index(f) + 1] for f in ('--world', '--train', '--memory')] == ['/w.toml', '/t.toml', '64']
     assert (rec['world'], rec['train'], rec['memory']) == ('/w.toml', '/t.toml', 64)
+
+
+def test_a_job_offered_again_beside_its_running_attempt_is_kept_not_run_twice(fake_work, tmp_path):
+    queue = Queue(job('a'))
+    queue.waiting.append(queue.waiting[0])
+    wk, _ = start(queue, tmp_path)
+    try:
+        until(lambda: queue.calls.count('/api/claim') >= 2 and not queue.waiting)
+        time.sleep(0.2)
+        assert [t.name for t in threading.enumerate()].count('job-' + 'a'.ljust(12, '0')) == 1
+        assert not queue.returned()
+    finally:
+        wk.stop()
+
+
+def test_the_second_offer_of_a_job_leaves_the_first_attempts_run_folder_alone(tmp_path, monkeypatch):
+    started = []
+    code = tmp_path / 'checkout'
+    runs = code / 'runs'
+
+    def train(self, task, inputs, sim, runs, dir):
+        started.append(task)
+        task.run = runs / f'20261110-000000-{jobs.run_name(task.spec)}'
+        task.run.mkdir(parents=True)
+        (task.run / 'metrics.jsonl').write_text('{}')
+        task.gone.wait(10)
+
+    monkeypatch.setattr(worker.Worker, 'prepare', lambda self, task, dir: {})
+    monkeypatch.setattr(worker.Worker, 'code', lambda self, spec: code)
+    monkeypatch.setattr(worker.Worker, 'train', train)
+    monkeypatch.setattr(worker, 'POLL', 0.02)
+    monkeypatch.setattr(worker, 'BUSY', 0.02)
+    queue = Queue(job('a'))
+    queue.waiting.append(queue.waiting[0])
+    wk, _ = start(queue, tmp_path)
+    try:
+        until(lambda: started and (next(runs.glob('*-a*')) / 'metrics.jsonl').exists())
+        until(lambda: queue.calls.count('/api/claim') >= 2)
+        time.sleep(0.3)
+        assert len(started) == 1 and (next(runs.glob('*-a*')) / 'metrics.jsonl').exists()
+    finally:
+        wk.stop()
+
+
+def test_cleanup_before_a_job_skips_a_folder_another_task_is_writing(tmp_path, monkeypatch):
+    code = tmp_path / 'checkout'
+    mine, other = worker.Task(job('a')), worker.Task(job('b'))
+    other.run = code / 'runs' / f'20261110-000000-{jobs.run_name(mine.spec)}'
+    other.run.mkdir(parents=True)
+    stale = code / 'runs' / f'20261109-000000-{jobs.run_name(mine.spec)}'
+    stale.mkdir()
+    monkeypatch.setattr(worker.Worker, 'prepare', lambda self, task, dir: {})
+    monkeypatch.setattr(worker.Worker, 'code', lambda self, spec: code)
+    monkeypatch.setattr(worker.Worker, 'train', lambda self, *a: None)
+    w, _ = watch()
+    wk = worker.Worker(Queue(), tmp_path, slots=2, rules=Rules(), watch=w)  # type: ignore[arg-type]
+    wk.tasks |= {mine.id: mine, other.id: other}
+    wk.stopping.set()
+    wk.work(mine)
+    assert other.run.exists() and not stale.exists()
+
+
+def test_fast_is_dropped_without_triton_with_a_warning_even_when_a_job_asks_for_it(tmp_path, monkeypatch, caplog):
+    w, _ = watch()
+    wk = worker.Worker(Queue(), tmp_path, rules=Rules(), watch=w)  # type: ignore[arg-type]
+    wk.specs = {'gpus': [{'name': 'RTX 3050 Ti', 'memory_gb': 4}]}
+    spec = job('a')['spec'] | {'seed': 1, 'code': {'overlay': None}}
+    inputs = {'world': tmp_path / 'w', 'train': tmp_path / 't'}
+    monkeypatch.setattr(worker, 'has_triton', lambda: False)
+    for asked in ({}, {'fast': True}):
+        assert wk.flags(spec | asked)['fast'] is False
+        assert '--fast' not in wk.train_command(spec | asked, inputs, tmp_path)
+    assert 'fast dropped: triton' in caplog.text
+    monkeypatch.setattr(worker, 'has_triton', lambda: True)
+    assert wk.flags(spec)['fast'] is True and '--fast' in wk.train_command(spec, inputs, tmp_path)
+    assert wk.flags(spec | {'fast': False})['fast'] is False

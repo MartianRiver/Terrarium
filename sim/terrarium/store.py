@@ -254,7 +254,13 @@ class Store:
     def beat(self, id: str, worker: str, progress: dict | None = None, now: float | None = None):
         now = now or time.time()
         with self.lock:
-            job = self.mine(id, worker)
+            job = self.read(id)
+            if job['state'] == 'pending' and job['history'][-1][1] == f'{KINDS["quiet"]} on {worker}':
+                # the lease ran out while its beats couldn't get through, and nobody has claimed it since
+                job |= {'state': 'running', 'worker': worker, 'kind': None}
+                job['history'].append([now, f'beating again, kept by {worker}'])
+            else:
+                job = self.mine(id, worker)
             job['lease'] = now + LEASE
             if progress is not None:
                 job['progress'] = progress

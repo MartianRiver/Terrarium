@@ -24,6 +24,7 @@
 # --instance, a rented machine) turns that off.
 
 import argparse
+import importlib
 import io
 import json
 import os
@@ -108,6 +109,14 @@ def code_key(spec: dict) -> str:
     """The folder in code/ a job's checkout is built in: one per commit and overlay."""
     c = spec['code']
     return c['commit'][:12] + (f'-{c["overlay"][:12]}' if c['overlay'] else '')
+
+
+def has_triton() -> bool:
+    try:
+        importlib.import_module('triton')
+    except ImportError:
+        return False
+    return True
 
 
 def python(sim: Path) -> Path:
@@ -229,6 +238,9 @@ class Worker:
                 except (urllib.error.URLError, OSError, RuntimeError) as e:
                     log.warn('claim failed', error=str(e))
                     job = None
+                if job and job['spec']['id'] in self.tasks:
+                    self.keep(job)
+                    job = None
                 if job and scoring(job['spec']) and self.tasks:
                     # the queue can't tell it what's already running here, so a score job that arrives
                     # beside a training one goes back, and nothing is claimed until the machine is empty
@@ -282,9 +294,23 @@ class Worker:
         except (urllib.error.URLError, OSError, RuntimeError) as e:
             log.warn('status report failed', error=str(e))
 
+    def keep(self, job: dict):
+        """The queue offered a job this process is already running (its lease ran out while beats failed, say, and it
+        went back to the front): the server now lists it as ours again, so the running attempt stays and a beat says so.
+        A second attempt would clear the first one's run folder."""
+        task = self.tasks.get(job['spec']['id'])
+        if task and not task.gone.is_set():
+            log.warn('job offered again while still running here, keeping the running attempt', id=task.id)
+            self.beat()
+        else:
+            self.hand_back(Task(job), 'its first attempt here is still stopping')
+
     def start(self, job: dict):
         task = Task(job)
         with self.lock:
+            if task.id in self.tasks:
+                log.warn('job already running here, not starting it twice', id=task.id)
+                return
             self.tasks[task.id] = task
         threading.Thread(target=self.work, args=(task,), name=f'job-{task.id}', daemon=True).start()
 
@@ -399,13 +425,16 @@ class Worker:
             log.info(task.state, id=task.id, name=task.spec['name'], code=code.name)
             runs = code / 'runs' / ('scores' if scoring(task.spec) else '')
             # half a run from an attempt that was stopped would be mistaken for this one
+            live = {t.run for t in list(self.tasks.values()) if t is not task}
             for old in runs.glob(f'*-{jobs.run_name(task.spec)}'):
-                shutil.rmtree(old)
+                if old not in live:
+                    shutil.rmtree(old)
             # relative, so the paths run.json records don't carry this machine's home folder
             rel = {k: Path(os.path.relpath(v, code / 'sim')) for k, v in inputs.items()}
             (self.score if scoring(task.spec) else self.train)(task, rel, code / 'sim', runs, dir)
             if self.stopping.is_set() or task.gone.is_set():
                 return
+            assert task.run
             task.state = 'uploading'
             (task.run / 'job.json').write_text(json.dumps(task.job_record(), indent=1) + '\n')
             if task.spec['code']['overlay']:
@@ -548,9 +577,12 @@ class Worker:
         if spec['code']['overlay']:
             cmd.append('--scratch')
         asked, ran = {k: bool(spec.get(k)) for k in jobs.TRAINING}, self.flags(spec)
+        cuda = bool(self.specs.get('gpus'))
         for key, on in asked.items():
-            if on and not ran[key]:
+            if on and not ran[key] and (key != 'fast' or not cuda):
                 log.info(f'{key} dropped: {"no CUDA GPU" if key == "fast" else "no GPU"} on this machine', job=spec['name'])
+        if spec.get('fast', True) and cuda and not ran['fast']:
+            log.warn('fast dropped: triton is not installed, so torch.compile cannot build kernels here', job=spec['name'])
         cmd += [f'--{k.replace("_", "-")}' for k, on in ran.items() if on]
         return cap(cmd, self.slots, self.rules)
 
@@ -559,7 +591,8 @@ class Worker:
         cut the update a quarter without moving the curve (`fast = false` turns it off); a brain stepped on the CPU is
         what a collect already does, so gpu_collect needs a GPU, an Apple one included."""
         cuda = bool(self.specs.get('gpus'))
-        return {'fast': bool(spec.get('fast', True)) and cuda,
+        # torch.compile on CUDA needs triton, which Windows wheels don't have: inductor dies at the first compile
+        return {'fast': bool(spec.get('fast', True)) and cuda and has_triton(),
                 'gpu_collect': bool(spec.get('gpu_collect')) and (cuda or bool(self.specs.get('mps')))}
 
     def score_command(self, spec: dict, inputs: dict[str, Path], sim: Path, out: Path) -> list[str]:
