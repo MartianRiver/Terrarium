@@ -97,6 +97,9 @@ class World:
         # each arena draws from its own stream, so a game is the same whatever else is in the job: how many arenas
         # there are, and what happens in the others, can't change it
         self.rngs = [np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(a,))) for a in range(arenas)]
+        # who wins a tie is drawn from a stream of its own (key 1 is the evals' action noise), so settling one shifts no other random number in the game
+        self.tie_rngs = [np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(a, 2))) for a in range(arenas)]
+        self._nest_ranks: dict[int, tuple[int, np.ndarray]] = {}
         self.tick = 0
 
         col = cfg.colonies
@@ -529,9 +532,9 @@ class World:
         eaten = touching.any(1)
         if not eaten.any():
             return
-        # when two creatures reach the same food on one tick, the lower index gets it
+        # when two creatures reach the same food on one tick, one of them is picked at random
         arena, food = np.nonzero(eaten)
-        who = touching.argmax(1)[arena, food]
+        who = self._winners(arena, touching[arena, :, food])
         wild = food < self.wild
         # an apple on its way home goes in the crop, hungry or not
         eats = hungry[arena, who] & (self.tree is None or not cfg.tree.home) | ~wild
@@ -550,9 +553,17 @@ class World:
         self.eaten += len(arena)
         log.trace('food eaten', tick=self.tick, count=len(arena))
 
+    def _winners(self, arena: np.ndarray, reaching: np.ndarray) -> np.ndarray:
+        """Which creature gets each thing: `reaching` is (things, creatures), who reaches it, and `arena` the arena each
+        thing is in. A thing two reach goes to one of them at random, from its arena's tie stream."""
+        who = reaching.argmax(1)
+        for k in np.flatnonzero(reaching.sum(1) > 1):
+            who[k] = self.tie_rngs[arena[k]].choice(np.flatnonzero(reaching[k]))
+        return who
+
     def _carry(self, carry: np.ndarray):
-        """A yes after a no puts down the berry carried, or picks up the nearest one within reach; the lower
-        index first when two reach for the same one."""
+        """A yes after a no puts down the berry carried, or picks up the nearest one within reach; in a random order
+        when two reach for the same one."""
         want = carry & ~self.carry_was
         self.carry_was = carry
         if not want.any():
@@ -575,7 +586,7 @@ class World:
         cfg = self.cfg
         reach = cfg.creature.radius + cfg.food.radius + cfg.carry.reach
         facing = np.stack([np.cos(self.heading), np.sin(self.heading)], -1)
-        for a, i in zip(*np.nonzero(want)):
+        for a, i in self._in_turn(want):
             if self.load[a, i] >= 0:
                 # just in front of it, where an ant sets down what it carries
                 self._put_down(a, i, self.pos[a, i] + facing[a, i] * (cfg.creature.radius + cfg.food.radius))
@@ -608,6 +619,16 @@ class World:
                     self.block_load[a, i] = k
                     self.shut_in[a, k] = -1
                     self.lifted[a, i] += 1
+
+    def _in_turn(self, want: np.ndarray) -> list[tuple[int, int]]:
+        """Each (arena, creature) in want, arena by arena, the creatures of an arena in a random order."""
+        out = []
+        for a in np.flatnonzero(want.any(1)):
+            who = np.flatnonzero(want[a])
+            if len(who) > 1:
+                who = self.tie_rngs[a].permutation(who)
+            out += [(a, i) for i in who]
+        return out
 
     def _set_block_down(self, a, i) -> bool:
         """The block creature i carries, set down crosswise just in front of it if the ground there is clear."""
@@ -667,7 +688,7 @@ class World:
         if not drunk.any():
             return
         arena, flower = np.nonzero(drunk)
-        who = touching.argmax(1)[arena, flower]
+        who = self._winners(arena, touching[arena, :, flower])
         self.flower_left[arena, flower] = 0
         np.add.at(self.drunk, (arena, who), 1)
         self.nectar[arena, who] = round(cfg.flowers.boost * cfg.tick_hz)
@@ -736,7 +757,18 @@ class World:
         """Which nest each creature is standing in, -1 for none, (arenas, creatures)."""
         d = self.pos[:, :, None] - self.nests                                 # A,N,C,2
         inside = d[..., 0] ** 2 + d[..., 1] ** 2 < self.cfg.colonies.nest_radius ** 2
+        for a in np.flatnonzero((inside.sum(-1) > 1).any(1)):
+            # standing in two nests at once: a random one of them, the same all tick
+            rank = self._nest_rank(a)
+            inside[a] &= rank == np.where(inside[a], rank, -1).max(-1, keepdims=True)
         return np.where(inside.any(-1), inside.argmax(-1), -1)
+
+    def _nest_rank(self, a: int) -> np.ndarray:
+        """A random order of the nests for each creature of arena a, drawn once a tick it's needed."""
+        if self._nest_ranks.get(a, (-1,))[0] != self.tick:
+            n, c = self.alive.shape[1], len(self.nests)
+            self._nest_ranks[a] = (self.tick, self.tie_rngs[a].random((n, c)))
+        return self._nest_ranks[a][1]
 
     def _unload(self, unload: np.ndarray):
         """The crop as jelly into the store of the nest it's in (a rival's too), or onto the ground outside one."""

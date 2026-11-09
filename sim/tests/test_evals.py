@@ -98,3 +98,20 @@ def test_flowers_drunk_and_sprints_toward_them_are_counted():
         return lambda w: np.concatenate([greedy(w), coin.choice([-1.0, 1.0], (*w.alive.shape, 1))], -1)
     seen = run(short, tossing, 4)['actions']['sprint_flower']
     assert seen['ticks'] > 0 and 0 < seen['yes'] < 1
+
+
+def test_seed_beats_held_out_and_is_written_down(monkeypatch, tmp_path):
+    import json
+    from terrarium import evals
+    seen = []
+
+    def fake(cfg, jobs, episodes, seed, device):
+        seen.append(seed)
+        return {}
+    monkeypatch.setattr(evals, 'side_by_side', fake)
+    for flags, want in (([], evals.SEED), (['--held-out'], evals.HELD_OUT), (['--held-out', '--seed', '8200000'], 8_200_000),
+                        (['--seed', '0'], 0)):
+        monkeypatch.setattr('sys.argv', ['evals', '--config', str(DEFAULT.parent / 'solo.toml'), '--policy', 'random',
+                                         *flags, '--out', str(tmp_path / 'out.json')])
+        main()
+        assert seen[-1] == want == json.loads((tmp_path / 'out.json').read_text())['seed']
