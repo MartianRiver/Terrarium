@@ -204,3 +204,51 @@ use = "confirm"
 what = "confirming 0022: n49-lost against n45-nm3 at 300 s and 180 s"
 where = "findings/0022"
 date = 2026-11-09
+
+[[block]]
+start = 9_400_000
+size = 64
+use = "choosing"
+what = "the stillness probe (still_probe.py, 64 games): every pond and colony stillness rung was read and the next chosen on it"
+where = "findings/0028"
+date = 2026-11-09
+
+[[block]]
+start = 9_500_000
+size = 64
+use = "choosing"
+what = "the grazing probes (grass_probe, reward_probe, turn_check, 64 games): every grass rung was read and the next chosen on it"
+where = "findings/0029"
+date = 2026-11-09
+
+[[block]]
+start = 9_700_000
+size = 64
+use = "confirm"
+what = "the pond stillness ladder p1 to p4, both training seeds, never used for choosing"
+where = "findings/0030"
+date = 2026-11-10
+
+[[block]]
+start = 9_710_000
+size = 64
+use = "confirm"
+what = "the grazing stillness ladder (anchor_probe.py: staying within 0.25 m for 3 s), never used for choosing"
+where = "findings/0031"
+date = 2026-11-10
+
+[[block]]
+start = 9_720_000
+size = 64
+use = "confirm"
+what = "the steering-spread reset (finding 0032): colony and pond brains on the grass (anchor_probe, turn_check) and at the pond (still_probe), never used for choosing"
+where = "findings/0032"
+date = 2026-11-10
+
+[[block]]
+start = 9_730_000
+size = 64
+use = "confirm"
+what = "the grazing ladder and its controls (finding 0031, anchor_probe.py), fresh after 9,710,000 was also used for reading later rungs, never used for choosing"
+where = "findings/0031"
+date = 2026-11-10
