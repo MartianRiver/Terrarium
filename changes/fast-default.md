@@ -1,0 +1,1 @@
+A training job on a CUDA machine runs with `fast` (compiled, bf16 update) unless it says `fast = false`: on an RTX 3060 pod it cut the update a quarter and an 8M chunk 4.5%, with the curve inside the spread of identical reruns.

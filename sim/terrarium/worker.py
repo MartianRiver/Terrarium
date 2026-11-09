@@ -555,10 +555,11 @@ class Worker:
         return cap(cmd, self.slots, self.rules)
 
     def flags(self, spec: dict) -> dict[str, bool]:
-        """fast and gpu_collect as they'll run: fast (compiled, bf16) is for CUDA, and a brain stepped on the CPU is
+        """fast and gpu_collect as they'll run: fast (compiled, bf16) is for CUDA, and on by default there, since it
+        cut the update a quarter without moving the curve (`fast = false` turns it off); a brain stepped on the CPU is
         what a collect already does, so gpu_collect needs a GPU, an Apple one included."""
         cuda = bool(self.specs.get('gpus'))
-        return {'fast': bool(spec.get('fast')) and cuda,
+        return {'fast': bool(spec.get('fast', True)) and cuda,
                 'gpu_collect': bool(spec.get('gpu_collect')) and (cuda or bool(self.specs.get('mps')))}
 
     def score_command(self, spec: dict, inputs: dict[str, Path], sim: Path, out: Path) -> list[str]:
