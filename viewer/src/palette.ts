@@ -53,6 +53,10 @@ export const GARDEN = {
   petals: [0xffffff, 0xffd166, 0xff9fb2, 0xc9b6ff, 0xff8f6b],
   soil: 0xc9a37a,
   hole: 0x4a3524,
+  // ground that's been grazed bare, and the cover that thins out of it (grassfield.ts)
+  bare: '#cdb98e',
+  bareFlecks: ['#c2ad82', '#d6c49c', '#b9a47a'],
+  meadow: '#6fb84f',
   // a pond: the water, its pale shallows and the damp bank (water.ts in the sim)
   water: 0x6fb4d4,
   shallows: 0xa9dcea,

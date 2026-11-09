@@ -134,6 +134,25 @@ drink = 0.0
 still = 0.0
 start = 1.0
 
+[grass]
+# a field on the ground, grazed where a nim stands (grass.py): cover (0 bare to 1 full) in cells `cell` m across.
+# `meadows` of them (0 with `base` 0: no grass), each `radius` m wide and `distance` m from colony 0's nest centre in a
+# random direction, clear of walls, nests and blocks, start full; outside them cover starts at `base` (0 to 1).
+# A nim whose energy is below 1 eats the cell it stands on by itself, no action: it takes `bite` cover a second (less
+# the faster it moves when `still` is set: all of it at a stop, none at `still` m/s; 0, and speed doesn't matter) and
+# gets `food` energy for each unit of cover (a full cell is worth `food`, whatever `cell` is). The young get the same
+# energy for [young] energy times the cover, as with jelly. A grazed cell regains `regrow` cover a second, up to what
+# it started with. Rays don't see it: the brain feels the cover under it and which way it rises
+cell = 0.5
+meadows = 0
+radius = 0.0
+distance = 0.0
+base = 0.0
+regrow = 0.0
+bite = 0.0
+still = 0.0
+food = 0.0
+
 [sprint]
 # a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
 # thrust, and none again until `cooldown` seconds after it ends

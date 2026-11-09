@@ -24,6 +24,9 @@
 # With [water] on (water.py), a nim is thirsty too: its water falls over time and fills while it stands in a pond, and
 # at 0 it dies like starving. Food and flowers don't grow in a pond.
 #
+# With [grass] on (grass.py), the ground is food too: cover a nim eats where it stands, by itself, while it's below
+# full, and that grows back; with `still` set it only counts while the nim stands still.
+#
 # With [flowers] on, a nectar flower opens now and then by day, rare and rich:
 # the first to touch one drinks it all, food's worth several times over (eaten
 # or carried like food) and a burst of speed that lasts a few seconds. It closes
@@ -64,6 +67,7 @@ from .peek import Peek
 from .jump import step as jump_step
 from .tree import Tree
 from .water import Ponds
+from .grass import Meadows
 from .maze import carve, check as check_maze
 from .scatter import scatter
 from .seek import Seek
@@ -157,6 +161,9 @@ class World:
         self.nourished = np.zeros((arenas, n))
         # water it has drunk since its arena started ([water]; what `needs` pays for thirst)
         self.drank = np.zeros((arenas, n))
+        # energy each has got from grazing ([grass]) and seconds it has spent at it, since its arena started
+        self.grazed = np.zeros((arenas, n))
+        self.grazing = np.zeros((arenas, n))
         # jelly in each colony's store, food unloaded into it and jelly eaten from it per creature
         # jelly, in grown nims' bites (the young take smaller ones)
         self.store = np.zeros((arenas, len(self.nests)))
@@ -221,6 +228,7 @@ class World:
         self.peek = Peek(self) if cfg.peek.on else None
         self.dung = Droppings(self) if cfg.dung.on else None
         self.ponds = Ponds(self) if cfg.water.on else None
+        self.grass = Meadows(self) if cfg.grass.on else None
         # the first game starts the way every later one does, through the same draws in the same order
         self.reset(np.ones(arenas, bool))
 
@@ -325,6 +333,8 @@ class World:
         self.fed[idx] = 0
         self.nourished[idx] = 0
         self.drank[idx] = 0
+        self.grazed[idx] = 0
+        self.grazing[idx] = 0
         self.store[idx] = 0
         self.stored[idx] = 0
         self.jelly[idx] = 0
@@ -372,6 +382,8 @@ class World:
             self.tree.reset(idx)
         if self.ponds:
             self.ponds.reset(idx)
+        if self.grass:
+            self.grass.reset(idx)
         self.food_regrow[idx, :self.wild] = 0
         self.food_regrow[idx, self.wild:] = EMPTY
         for a in idx:
@@ -476,6 +488,8 @@ class World:
             self._drink()
         self._unload(unload)
         self._feed(eat)
+        if self.grass:
+            self.grass.step(share)
         if self.dung:
             self.dung.step(self.meals + self.jelly + self.drunk - ate)
         if self.tree:
@@ -880,6 +894,12 @@ class World:
         if not self.smell:
             return tuple(np.zeros_like(self.energy) for _ in range(3))
         return self.smell.sense(self.pos, self.heading)
+
+    def grassed(self) -> tuple[np.ndarray, ...]:
+        """The cover under each creature (0 to 1) and which way off its heading it rises (sin, cos); all 0 without grass."""
+        if not self.grass:
+            return tuple(np.zeros_like(self.energy) for _ in range(3))
+        return self.grass.sense(self.heading)
 
     def light(self) -> np.ndarray:
         """How light it is in each arena, 1 by day and 0 at night, (arenas,)."""

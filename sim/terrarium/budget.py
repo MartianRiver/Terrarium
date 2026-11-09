@@ -65,6 +65,22 @@ def day(cfg: Config, food_secs: float, pond_secs: float | None) -> dict:
             'left': 1 - food - pond_walk - drinking if INF not in (food, drinking) else -INF}
 
 
+def grazing(cfg: Config, share: float = 1.0) -> dict:
+    """What the grass gives a nim standing on it: energy a second at a stop on full cover, what that leaves after
+    staying alive, how long a full cell lasts one nim and takes to grow back, what a meadow gives a second for good
+    (every cell grazed bare as soon as it's back), how many nims that keeps alive, and the share of its time a nim
+    has to graze at a stop to cover its resting cost. The young eat the cover of `share` of a grown nim's for the
+    same energy."""
+    g, e = cfg.grass, cfg.energy
+    rate = g.bite * g.food
+    cells = np.pi * g.radius ** 2 / g.cell ** 2 * g.meadows
+    steady = cells * g.regrow * g.food
+    rest = e.drain * share
+    return {'rate': rate, 'net': rate - rest, 'cell lasts': lasts(1.0, g.bite * share), 'regrow': lasts(1.0, g.regrow),
+            'cells': cells, 'steady': steady, 'keeps': steady / rest if rest > 0 else INF,
+            'share of time': rest / rate if rate > 0 else INF}
+
+
 def pair_distances(world: World, points: np.ndarray, per: str = 'any') -> np.ndarray:
     """From each nest to points (arenas, k, 2), all arenas and nests pooled: to every one, or to the nearest."""
     d = np.hypot(points[:, None, :, 0] - world.nests[None, :, None, 0],
@@ -89,12 +105,14 @@ def budget(cfg: Config, arenas: int = 64, seed: int = 0) -> dict:
         if cfg.water.on:
             drain = cfg.water.drain * share
             g['water'] = {'start': lasts(cfg.water.start, drain), 'full': lasts(1.0, drain)}
+        if cfg.grass.on:
+            g['grass'] = grazing(cfg, share)
         out['groups'][name] = g
 
     world = World(cfg, arenas, seed)
     food = world.food_pos[:, :world.wild]
     out['food'] = {'what': 'apple' if cfg.tree.on else 'food', 'pieces': world.wild}
-    for per in ('any', 'nearest'):
+    for per in ('any', 'nearest') if world.wild else ():
         d50, d90 = spread(pair_distances(world, food, per))
         out['food'][per] = {name: [trip(cfg, d, young) if cfg.crop.capacity > 0 else None for d in (d50, d90)]
                             for name, young in groups.items()}
@@ -113,9 +131,14 @@ def budget(cfg: Config, arenas: int = 64, seed: int = 0) -> dict:
                              'energy': (cfg.energy.drain + cfg.energy.move) * share * secs})
             pond[name] = legs
         out['pond'] = pond
-    food_secs = out['food']['any']['adult'][0]['secs'] if cfg.crop.capacity else INF
-    pond_secs = out['pond']['adult'][0]['secs'] if 'pond' in out else None
-    out['day'] = day(cfg, food_secs, pond_secs)
+    if world.grass:
+        # a nest's distance to the nearest meadow's centre, as for a pond
+        d50, d90 = spread(pair_distances(world, world.grass.pos, 'nearest'))
+        out['meadow'] = {'p50': d50, 'p90': d90}
+    if world.wild:
+        food_secs = out['food']['any']['adult'][0]['secs'] if cfg.crop.capacity else INF
+        pond_secs = out['pond']['adult'][0]['secs'] if 'pond' in out else None
+        out['day'] = day(cfg, food_secs, pond_secs)
     if cfg.water.on:
         out['refill'] = 1 / (cfg.water.drink - cfg.water.drain) if cfg.water.drink > cfg.water.drain else INF
     return out
@@ -146,9 +169,25 @@ def show(cfg: Config, b: dict, name: str = '') -> str:
                 lines.append(f'    {state}, {c}'.ljust(34) + secs(row[c]['start']).rjust(11) + secs(row[c]['full']).rjust(11))
         if 'water' in g:
             lines.append(f'  water lasts, seconds'.ljust(34) + secs(g['water']['start']).rjust(11) + secs(g['water']['full']).rjust(11))
+        if 'grass' in g:
+            r = g['grass']
+            still = f'none at {cfg.grass.still:g} m/s' if cfg.grass.still > 0 else 'any speed'
+            lines += [f'  grass at a stop on full cover ({still}): energy a second'.ljust(68) + fmt(r['rate'], 3).rjust(8),
+                      f'    less staying alive'.ljust(68) + fmt(r['net'], 3).rjust(8),
+                      f'    share of the time grazing to cover resting'.ljust(68) + (f'{r["share of time"]:.0%}' if r['share of time'] != INF else 'never').rjust(8),
+                      f'    a full cell lasts one nim, seconds'.ljust(68) + secs(r['cell lasts']).rjust(8),
+                      f'    a bare cell grows back in, seconds'.ljust(68) + secs(r['regrow']).rjust(8),
+                      f'    a meadow, grazed bare as it grows: {r["cells"]:.0f} cells, energy a second'.ljust(68) + fmt(r['steady'], 3).rjust(8),
+                      f'    nims that keeps alive at rest'.ljust(68) + (f'{r["keeps"]:.1f}' if r['keeps'] != INF else '-').rjust(8)]
 
     f = b['food']
-    if cfg.crop.capacity == 0:
+    if 'meadow' in b:
+        m = b['meadow']
+        lines += ['', f'a meadow: metres, nest centre to the nearest one, p50 {m["p50"]:.2f}, p90 {m["p90"]:.2f} '
+                  f'({cfg.grass.meadows} of {cfg.grass.radius:g} m radius)']
+    if not b['food']['pieces']:
+        lines += ['', 'no food but the grass: no trip to price']
+    elif cfg.crop.capacity == 0:
         lines += ['', 'no crop: nothing is carried home, so there is no trip to price']
     for who in b['groups']:
         if cfg.crop.capacity == 0:
@@ -177,6 +216,8 @@ def show(cfg: Config, b: dict, name: str = '') -> str:
                 lines.append(f'  {label}'.ljust(50) + ''.join(fmt(l[key], places).rjust(9) for l in legs))
     if 'refill' in b:
         lines.append(f'  adult: empty to full in a pond, seconds'.ljust(50) + ('never' if b['refill'] == INF else secs(b['refill'])).rjust(9))
+    if 'day' not in b:
+        return '\n'.join(lines)
     d = b['day']
     lines += ['', 'adult: a day, keeping itself fed and watered (median trips; itself only, food waiting, no searching)']
     for label, key in (('food trips', 'food trips'), ('pond trips', 'pond trips'), ('drinking', 'drinking'),

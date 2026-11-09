@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { addNestDome } from './nestdome';
+import { addGrassField } from './grassfield';
 import { addPonds } from './ponds';
 import { COLONY_COLOURS, GARDEN } from './palette';
 import type { NestInfo, WorldInfo } from './world';
@@ -29,6 +30,7 @@ export function buildGarden(info: WorldInfo) {
   const rng = seeded(42);
   addSun(group, info);
   addGround(group, info);
+  const cover = info.grass ? addGrassField(group, info, info.grass) : null;
   addHedge(group, info, rng);
   for (const nest of info.nests) addNest(group, nest);
   if (info.ponds) addPonds(group, info.ponds);
@@ -46,6 +48,10 @@ export function buildGarden(info: WorldInfo) {
       sway.value = time;
       for (const fade of domes) fade(camera);
       frame(camera);
+    },
+    // the ground's cover from a frame that has one
+    cover(grass: string) {
+      cover?.(grass);
     },
   };
 }
@@ -142,7 +148,8 @@ function addGround(scene: THREE.Object3D, info: WorldInfo) {
   bed.position.y = 0.003;
   bed.receiveShadow = true;
   // mown in stripes a metre wide, so the play area reads clearly
-  const inner = flecks(GARDEN.lawn, GARDEN.lawnFlecks, 700, 4, 4, GARDEN.lawnStripe);
+  // with grass the lawn is the bare ground it grows out of (grassfield.ts)
+  const inner = info.grass ? flecks(GARDEN.bare, GARDEN.bareFlecks, 700, 4, 4) : flecks(GARDEN.lawn, GARDEN.lawnFlecks, 700, 4, 4, GARDEN.lawnStripe);
   inner.repeat.set(info.width / 2, info.height / 2);
   const lawn = new THREE.Mesh(new THREE.PlaneGeometry(info.width, info.height).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: inner, roughness: 0.8 }));
   lawn.position.y = 0.005;

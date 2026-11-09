@@ -185,6 +185,7 @@ function boot() {
     cues.next(first);
     tick = first.tick;
     stage.light(first.light);
+    if (first.grass) stage.cover(first.grass);
     sounds.light(first.light, true);
     acc = 0;
     snap = true;
@@ -501,6 +502,7 @@ function boot() {
         if (channel) card.frame(next);
         tick = next.tick;
         stage.light(next.light);
+        if (next.grass) stage.cover(next.grass);
         sounds.light(next.light);
         sounds.hear(cues.next(next));
         acc -= tickSeconds;

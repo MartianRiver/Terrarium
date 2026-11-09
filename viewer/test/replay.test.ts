@@ -86,6 +86,22 @@ describe('reading', () => {
     refuses(lines(header, { ...frame, creatures: [{ ...frame.creatures[0], water: 'wet' }] }), /water/);
   });
 
+  test('the grass grid and each second\'s cover are read when there, and absent in worlds without them', () => {
+    // 4 × 4 cells, a byte each
+    const cover = Buffer.from(Array.from({ length: 16 }, (_, i) => i * 17)).toString('base64');
+    const grass = { cell: 0.5, n: 4 };
+    const replay = parseReplay(lines({ ...header, info: { ...header.info, grass } }, { ...frame, grass: cover }, { ...frame, tick: 1 }));
+    expect(replay.info.grass).toEqual(grass);
+    expect(replay.frames.map((f) => f.grass)).toEqual([cover, undefined]);
+    expect(parseReplay(lines(header, frame)).info.grass).toBeUndefined();
+    // no grid, nothing to draw it on
+    expect(parseReplay(lines(header, { ...frame, grass: cover })).frames[0].grass).toBeUndefined();
+    const withGrid = { ...header, info: { ...header.info, grass } };
+    refuses(lines(withGrid, { ...frame, grass: cover.slice(4) }), /grass/);
+    refuses(lines(withGrid, { ...frame, grass: 12 }), /grass/);
+    refuses(lines({ ...header, info: { ...header.info, grass: { cell: 0.5 } } }, frame), /grass/);
+  });
+
   test('the light is read when there, and full day in worlds without nights', () => {
     const replay = parseReplay(lines(header, frame, { ...frame, light: 0.25 }));
     expect(replay.frames.map((f) => f.light)).toEqual([1, 0.25]);

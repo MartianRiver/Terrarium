@@ -303,7 +303,6 @@ def test_the_chill_is_a_self_input_and_old_worlds_without_chill_time_load():
     w = World(NIGHTS, 1, 0)
     w.chill[:] = 0.4
     assert np.allclose(observe(w, np.zeros((1, len(w.colony), 2))).me[:, SELF.index('chill')], 0.4)
-    assert SELF[-2] == 'chill'
     recorded = NIGHTS.to_dict()
     del recorded['night']['chill_time']
     assert build(Config, upgrade(recorded)).night.chill_time == 20.0

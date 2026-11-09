@@ -125,6 +125,17 @@ drink = 0.0
 still = 0.0
 start = 1.0
 
+[grass]
+cell = 0.5
+meadows = 0
+radius = 0.0
+distance = 0.0
+base = 0.0
+regrow = 0.0
+bite = 0.0
+still = 0.0
+food = 0.0
+
 [sprint]
 # a burst at this share of max_speed for `seconds` (0 turns sprint off), costing `energy` a second on top at full
 # thrust, and none again until `cooldown` seconds after it ends

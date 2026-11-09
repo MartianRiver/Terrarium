@@ -80,15 +80,15 @@ def test_a_v19_brain_ignores_chill(tmp_path):
     """A brain from before chill (schema v19) loads with zero weights for it and acts the same however chilled."""
     torch.manual_seed(3)
     now = schema.current()
-    assert now['self'][-2] == 'chill'
-    old = now | {'version': 19, 'self': now['self'][:-2], 'ray': now['ray'][:-1]}
+    k = now['self'].index('chill')
+    old = now | {'version': 19, 'self': now['self'][:k], 'ray': now['ray'][:-1]}
     brain = Brain(**SHAPE, lists=old)
     save(brain, tmp_path / 'v19.pt')
     grown, _ = load_brain(tmp_path / 'v19.pt')
     me, kinds, rays = observation()
     warm, chilled = me.clone(), me.clone()
-    warm[:, -2], chilled[:, -2] = 0, 1
-    for a, b, c in zip(brain(me[:, :-2], kinds, rays[..., :-1]), grown(warm, kinds, rays), grown(chilled, kinds, rays)):
+    warm[:, k], chilled[:, k] = 0, 1
+    for a, b, c in zip(brain(me[:, :k], kinds, rays[..., :-1]), grown(warm, kinds, rays), grown(chilled, kinds, rays)):
         assert torch.allclose(a, b, atol=1e-6) and torch.allclose(b, c, atol=1e-6)
 
 
@@ -97,17 +97,35 @@ def test_a_v20_brain_ignores_water_and_ponds(tmp_path):
     however thirsty its nim is and wherever the pond lies."""
     torch.manual_seed(4)
     now = schema.current()
-    assert now['self'][-1] == 'water' and now['ray'][-1] == 'pond'
-    old = now | {'version': 20, 'self': now['self'][:-1], 'ray': now['ray'][:-1]}
+    k = now['self'].index('water')
+    assert now['ray'][-1] == 'pond'
+    old = now | {'version': 20, 'self': now['self'][:k], 'ray': now['ray'][:-1]}
     brain = Brain(**SHAPE, lists=old)
     save(brain, tmp_path / 'v20.pt')
     grown, _ = load_brain(tmp_path / 'v20.pt')
     me, kinds, rays = observation()
     full, dry = me.clone(), me.clone()
-    full[:, -1], dry[:, -1] = 1, 0
+    full[:, k], dry[:, k] = 1, 0
     near, far = rays.clone(), rays.clone()
     near[..., -1], far[..., -1] = 0.1, 1
-    for a, b, c in zip(brain(me[:, :-1], kinds, rays[..., :-1]), grown(full, kinds, near), grown(dry, kinds, far)):
+    for a, b, c in zip(brain(me[:, :k], kinds, rays[..., :-1]), grown(full, kinds, near), grown(dry, kinds, far)):
+        assert torch.allclose(a, b, atol=1e-6) and torch.allclose(b, c, atol=1e-6)
+
+
+def test_a_v21_brain_ignores_the_grass_senses(tmp_path):
+    """A brain from before grass (schema v21) loads with zero weights for `grass`, `grass_sin` and `grass_cos`: it acts
+    the same however green the ground is and wherever it rises."""
+    torch.manual_seed(5)
+    now = schema.current()
+    assert now['self'][-3:] == ['grass', 'grass_sin', 'grass_cos']
+    old = now | {'version': 21, 'self': now['self'][:-3]}
+    brain = Brain(**SHAPE, lists=old)
+    save(brain, tmp_path / 'v21.pt')
+    grown, _ = load_brain(tmp_path / 'v21.pt')
+    me, kinds, rays = observation()
+    bare, green = me.clone(), me.clone()
+    bare[:, -3:], green[:, -3:] = 0, torch.tensor([1.0, 0.6, -0.8])
+    for a, b, c in zip(brain(me[:, :-3], kinds, rays), grown(bare, kinds, rays), grown(green, kinds, rays)):
         assert torch.allclose(a, b, atol=1e-6) and torch.allclose(b, c, atol=1e-6)
 
 

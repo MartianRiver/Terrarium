@@ -5,7 +5,7 @@
 
 import {
   SIGNAL_COUNT, SIGNAL_OFF,
-  type BlockState, type CreatureState, type DungState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type GhostState, type NestInfo, type PondInfo, type StoreState, type WorldInfo,
+  type BlockState, type CreatureState, type DungState, type EggState, type FlagState, type FlowerState, type FoodState, type Frame, type GhostState, type GrassInfo, type NestInfo, type PondInfo, type StoreState, type WorldInfo,
 } from './world';
 
 export const REPLAY_FORMAT = 'terrarium-replay';
@@ -53,7 +53,8 @@ export function parseReplay(text: string): Replay {
 
   const info = readInfo(obj(head.info, 'line 1: info'));
   const source = head.source === undefined ? {} : obj(head.source, 'line 1: source');
-  const frames = lines.slice(1).map((line, i) => readFrame(parseLine(line, i + 2), `line ${i + 2}`));
+  const cells = info.grass ? info.grass.n ** 2 : 0;
+  const frames = lines.slice(1).map((line, i) => readFrame(parseLine(line, i + 2), `line ${i + 2}`, cells));
   if (!frames.length) throw new ReplayError('it has a header but no frames');
   return { version, info, source, frames };
 }
@@ -88,10 +89,17 @@ function readInfo(o: Obj): WorldInfo {
     ...(o.middenSpot === undefined ? {} : { middenSpot: spot(o.middenSpot, `${where}.middenSpot`) }),
     tree: o.tree === undefined ? null : int(o, 'tree', where),
     ...(o.ponds === undefined ? {} : { ponds: list(o, 'ponds', where, (p, w): PondInfo => ({ x: num(p, 'x', w), y: num(p, 'y', w), radius: num(p, 'radius', w) })) }),
+    ...(o.grass === undefined ? {} : { grass: readGrass(obj(o.grass, `${where}.grass`), `${where}.grass`) }),
   };
 }
 
-function readFrame(o: Obj, where: string): Frame {
+function readGrass(o: Obj, where: string): GrassInfo {
+  const cell = num(o, 'cell', where), n = int(o, 'n', where);
+  if (cell <= 0 || n < 1) throw new ReplayError(`${where}: a grid of ${n} cells ${cell} m across`);
+  return { cell, n };
+}
+
+function readFrame(o: Obj, where: string, cells: number): Frame {
   return {
     tick: int(o, 'tick', where),
     creatures: list(o, 'creatures', where, (c, w): CreatureState => {
@@ -132,7 +140,17 @@ function readFrame(o: Obj, where: string): Frame {
     })),
     ...(o.dung === undefined ? {} : { dung: list(o, 'dung', where, (d, w): DungState => ({ id: int(d, 'id', w), x: num(d, 'x', w), y: num(d, 'y', w) })) }),
     ...(o.ghosts === undefined ? {} : { ghosts: list(o, 'ghosts', where, (g, w): GhostState => ({ id: int(g, 'id', w), x: num(g, 'x', w), y: num(g, 'y', w) })) }),
+    // a world without a grid has nothing to draw it on, so a cover there is left out
+    ...(o.grass === undefined || !cells ? {} : { grass: cover(o.grass, cells, `${where}.grass`) }),
   };
+}
+
+// a cell a byte, in base64: 4 characters for every 3 bytes, padded
+function cover(v: unknown, cells: number, where: string): string {
+  if (typeof v !== 'string' || v.length !== Math.ceil(cells / 3) * 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(v)) {
+    throw new ReplayError(`${where}: expected ${cells} bytes of base64`);
+  }
+  return v;
 }
 
 function obj(value: unknown, where: string): Obj {
