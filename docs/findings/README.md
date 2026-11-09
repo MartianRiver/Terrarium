@@ -36,3 +36,9 @@ Line 1 is `# NNNN Title`, line 3 is `date: … · status: … · seeds: … · b
 - [0018](0018-more-of-the-same-and-three-pays-dont-lift-the-night.md) More of the needs pay, two-night games, pay for warmth and full cold: none lifts the night brains. *held-out*
 - [0019](0019-starting-at-nightfall-and-a-dawn-pay-dont-keep-them-in.md) Starting games at nightfall and a pay at dawn for being home don't keep the night brains in. *held-out*
 - [0020](0020-feeling-the-chill-doesnt-bring-them-home.md) Feeling the chill doesn't bring the night brains home: alive moves inside the twins' spread. *held-out*
+- [0021](0021-two-colonies-of-nine-hold-their-size.md) Two colonies of nine hold their size, untrained or after 8M in their own world; the one-big-colony brains start them best. *held-out*
+- [0022](0022-charging-for-the-cold-doesnt-bring-them-home.md) Charging them for the energy the cold takes doesn't bring the night brains home either. *confirmed*
+- [0023](0023-180-second-games-teach-drinking.md) With a pond in sight, 90 s games don't teach drinking and 180 s games do, but half still die of thirst. *confirmed*
+- [0024](0024-thrust-is-pinned-and-unpinning-it-slows-them-down.md) The night brains' thrust is pinned at full everywhere, and unpinning it slows them down instead of keeping them home. *hint*
+- [0025](0025-pond-nims-plateau-and-time-in-the-pond-caps-them.md) The pond nims level off at 115 to 150 s of 180: more training, a bigger pond, a longer horizon or an unpinned thrust barely lift them, and paying three times as much for a drink lifts all three. *held-out*
+- [0026](0026-food-not-the-brain-holds-the-colonies-at-their-size.md) Food, not the brain, holds two colonies of nine at their size: no rung of the night moved them, and with half as much food again they fill every place. *held-out*
