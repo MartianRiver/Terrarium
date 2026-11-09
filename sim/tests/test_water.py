@@ -274,3 +274,21 @@ def test_a_replay_of_a_world_without_water_has_neither(tmp_path):
     head, frames = replay.read(path)
     assert 'ponds' not in head['info']
     assert all('water' not in c for f in frames for c in f['creatures'])
+
+
+def test_with_still_set_walking_through_a_pond_drinks_nothing_and_standing_drinks_it_all():
+    lap = replace(WATER, water=replace(WATER.water, still=0.5))
+    gained = {}
+    for thrust in (0.0, 1.0):
+        w = World(lap, 1, 0)
+        w.water[:] = 0.2
+        go = np.zeros((1, len(w.colony), 2))
+        go[..., 0] = thrust
+        for _ in range(10):
+            put(w, pond=w.pos[0, 0])          # the pond follows it, so it's always in one
+            before = w.water[0, 0]
+            w.step(go)
+        speed = float(np.hypot(*w.vel[0, 0]))
+        gained[thrust] = w.water[0, 0] - before
+    assert gained[0.0] == pytest.approx((T.drink - T.drain) * DT)
+    assert speed > 0.5 and gained[1.0] == pytest.approx(-T.drain * DT)

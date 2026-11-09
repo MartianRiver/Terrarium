@@ -123,13 +123,15 @@ chill_time = 20.0
 [water]
 # ponds a game has (0: no thirst), each this wide (m) and this far (m) from colony 0's nest centre, in a random direction,
 # clear of walls, nests and blocks. A nim's water falls by `drain` a second (the young pay their [young] energy share) and
-# rises by `drink` a second while its centre is in a pond; at 0 it dies, as at 0 energy. `start` is the water a nim
-# starts with (hatchlings start full)
+# rises by `drink` a second while its centre is in a pond, less the faster it moves when `still` is set (all of it at a
+# stop, none at `still` m/s, so walking through doesn't count as drinking); at 0 it dies, as at 0 energy. `start` is the
+# water a nim starts with (hatchlings start full)
 ponds = 0
 radius = 0.0
 distance = 0.0
 drain = 0.0
 drink = 0.0
+still = 0.0
 start = 1.0
 
 [sprint]
