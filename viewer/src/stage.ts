@@ -309,6 +309,10 @@ export function createStage(container: HTMLElement, lite = false, turn = 0) {
     release() {
       handsOff = 0;
     },
+    // the grass's cover, from a frame that carries it (grassfield.ts)
+    cover(grass: string) {
+      garden?.cover(grass);
+    },
     // 1 by day, 0 at night
     light(level: number) {
       if (Math.abs(level - shown) < 0.005) return;

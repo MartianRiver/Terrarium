@@ -64,6 +64,13 @@ export interface PondInfo {
   radius: number;
 }
 
+// the grass grid ([grass]): n × n cells of `cell` m from the arena's corner (-width / 2, -height / 2); a frame's `grass`
+// is its cover, a byte a cell (255 full), index ix * n + iy for the cell ix across and iy up, base64
+export interface GrassInfo {
+  cell: number;
+  n: number;
+}
+
 // Static for the life of an episode
 export interface WorldInfo {
   width: number;
@@ -75,6 +82,7 @@ export interface WorldInfo {
   middenSpot?: { x: number; y: number; radius: number }; // or the spot it has to go on ([dung] spot), this episode's
   tree: number | null; // the id of the block that is an apple tree's trunk ([tree]); null without
   ponds?: PondInfo[]; // this episode's ponds ([water]); absent without
+  grass?: GrassInfo; // the cover's grid ([grass]); absent without
 }
 
 // jelly in a colony's store, in food unloaded
@@ -136,4 +144,5 @@ export interface Frame {
   flags: FlagState[]; // empty in worlds without capture the flag and replays from before 0.4's flags
   dung?: DungState[]; // only in worlds with droppings; without, the viewer makes its own up from meals
   ghosts?: GhostState[]; // only in replays recorded with a readout (--ghost), and only while one shows
+  grass?: string; // the cover of the ground ([grass]), once a second: base64 bytes, see GrassInfo; the last one holds between
 }

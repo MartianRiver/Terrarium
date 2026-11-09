@@ -197,6 +197,11 @@ def tree_game(cfg, player: Make, episodes: int, seed: int) -> dict[str, np.ndarr
         dry = dead & (w.water <= 0)
         out |= {'seconds_alive': lived / cfg.tick_hz, 'alive_at_end': w.alive.mean(1), 'drank': w.drank.mean(1),
                 'died_of_thirst': dry.sum(1), 'starved': (dead & ~dry & (w.energy <= 0)).sum(1)}
+    if w.grass:
+        # energy a nim got from grazing, and the seconds it spent at it
+        out |= {'grazed': w.grazed.mean(1), 'grazing_seconds': w.grazing.mean(1)}
+        if not w.ponds:
+            out |= {'seconds_alive': lived / cfg.tick_hz, 'alive_at_end': w.alive.mean(1)}
     return out
 
 

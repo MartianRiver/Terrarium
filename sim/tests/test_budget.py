@@ -1,9 +1,10 @@
 from dataclasses import replace
 
+import numpy as np
 import pytest
 
 from terrarium import load
-from terrarium.budget import budget, day, lasts, rates, show, trip
+from terrarium.budget import budget, day, grazing, lasts, rates, show, trip
 from terrarium.config import DEFAULT
 
 BASE = load(DEFAULT)
@@ -74,3 +75,25 @@ def test_a_day_solves_the_food_share_with_the_pond_walking_in_it():
     assert d['pond trips'] == pytest.approx(0.05)
     assert d['drinking'] == pytest.approx(0.01 / 0.26)
     assert d['food trips'] == pytest.approx(12.5 * (0.01 + 0.02 * 0.05) / 0.75)
+
+
+def test_grass_gives_bite_times_food_a_second_and_a_meadow_what_its_cells_grow_back():
+    cfg = replace(CFG, grass=replace(CFG.grass, cell=0.5, meadows=2, radius=1.0, distance=2.0, base=0.0, regrow=0.02,
+                                     bite=0.25, food=0.4))
+    g = grazing(cfg)
+    assert g['rate'] == pytest.approx(0.1) and g['net'] == pytest.approx(0.09)
+    assert g['cell lasts'] == pytest.approx(4) and g['regrow'] == pytest.approx(50)
+    # two meadows of pi / 0.25 cells each, each growing back 0.02 a second worth 0.4 a unit
+    assert g['cells'] == pytest.approx(8 * np.pi) and g['steady'] == pytest.approx(8 * np.pi * 0.02 * 0.4)
+    assert g['share of time'] == pytest.approx(0.1)
+    # the young eat the same energy off a smaller share of the cover
+    assert grazing(cfg, 0.25)['cell lasts'] == pytest.approx(16)
+
+
+def test_a_world_with_only_grass_prints_without_a_food_trip():
+    cfg = replace(CFG, colonies=replace(CFG.colonies, count=1, size=1), food=replace(CFG.food, count=0), crop=replace(CFG.crop, capacity=0),
+                  grass=replace(CFG.grass, meadows=1, radius=1.0, distance=4.0, regrow=0.02, bite=0.25, food=0.4))
+    b = budget(cfg, arenas=4)
+    assert b['meadow']['p50'] == pytest.approx(4.0) and 'day' not in b
+    text = show(cfg, b)
+    assert 'a full cell lasts one nim' in text and 'no food but the grass' in text

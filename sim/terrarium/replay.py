@@ -3,6 +3,7 @@
 # only ever gains fields; anything else bumps VERSION, and the viewer keeps
 # reading the old one (docs/releasing.md).
 
+import base64
 import gzip
 import json
 from pathlib import Path
@@ -42,6 +43,9 @@ def header(world: World, arena: int, source: dict) -> dict:
         info['tree'] = int(world.block_id[cfg.tree.trunk])
     if world.ponds:
         info['ponds'] = [{'x': _r(x), 'y': _r(y), 'radius': cfg.water.radius} for x, y in world.ponds.pos[arena]]
+    if world.grass:
+        # the grass grid: cells of `cell` m, n a side, from the arena's corner at (-width / 2, -height / 2)
+        info['grass'] = {'cell': cfg.grass.cell, 'n': world.grass.n}
     return {'format': FORMAT, 'version': VERSION, 'info': info,
             'source': {**source, 'arena': arena, 'config': cfg.to_dict()}}
 
@@ -141,6 +145,9 @@ def frame(world: World, a: int) -> dict:
         out['eggs'] = [{'id': int(world.egg_id[a, i]), 'colony': int(world.colony[i]), 'x': _r(world.egg_pos[a, i, 0]),
                         'y': _r(world.egg_pos[a, i, 1]), 'progress': _r(1 - world.egg[a, i] / total)}
                        for i in np.flatnonzero(world.egg[a])]
+    if world.grass and world.age[a] % cfg.tick_hz == 0:
+        # the cover once a second, a byte a cell (255 full), base64: the viewer keeps the last one it saw
+        out['grass'] = base64.b64encode(world.grass.bytes(a).tobytes()).decode()
     return out
 
 

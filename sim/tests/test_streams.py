@@ -16,7 +16,7 @@ TREE = load(CONFIGS / 'nursery-tree.toml')
 MOVING_TREE = replace(TREE, arena=replace(TREE.arena, scatter=3.0), tree=replace(TREE.tree, move=1.0))
 SEED = 2_000_000
 # not every array tells a game apart: labels from counters the arenas share, and the buffer forces are written to
-LABELS = {'next_id', 'food_id', 'flower_id', 'egg_id', 'id', 'force', 'peek.last'}
+LABELS = {'next_id', 'food_id', 'flower_id', 'egg_id', 'id', 'force', 'peek.last', 'grass.mid', 'grass.cells', 'grass.window'}
 
 
 def actions(world: World, tick: int, arenas=None, idle=()) -> np.ndarray:
@@ -36,7 +36,7 @@ def arrays(world: World, arena: int, drawn=True) -> dict[str, np.ndarray]:
     right after a reset they're left out. Where a food slot is empty its position is left over from before and unused."""
     out = {}
     owners = {'world': world, 'physics': world.physics}
-    for name in ('smell', 'tag', 'seek', 'flags', 'peek', 'dung', 'tree', 'ponds'):
+    for name in ('smell', 'tag', 'seek', 'flags', 'peek', 'dung', 'tree', 'ponds', 'grass'):
         if getattr(world, name):
             owners[name] = getattr(world, name)
     for owner, obj in owners.items():
