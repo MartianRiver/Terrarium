@@ -71,7 +71,9 @@ class Ponds:
         w = self.world
         t, dt = w.cfg.water, w.cfg.dt
         dried = np.clip(w.water - t.drain * dt * share, 0, 1)
-        left = np.clip(dried + t.drink * dt * self.inside(), 0, 1)
+        # lapping takes standing still: the rate falls with speed, to nothing at `still` m/s
+        slow = np.clip(1 - np.hypot(w.vel[..., 0], w.vel[..., 1]) / t.still, 0, 1) if t.still > 0 else 1.0
+        left = np.clip(dried + t.drink * dt * self.inside() * slow, 0, 1)
         w.drank += np.where(w.alive, left - dried, 0)
         w.water = np.where(w.alive, left, w.water)
 

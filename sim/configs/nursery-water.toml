@@ -127,6 +127,7 @@ radius = 1.5
 distance = 4.0
 drain = 0.015
 drink = 0.25
+still = 0.0
 start = 1.0
 
 [sprint]
