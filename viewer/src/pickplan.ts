@@ -34,6 +34,14 @@ export interface Game {
   line?: string; asking?: boolean; answer?: Ref[]; seen_in?: Ref[]; started?: string;
   // a nursery's stage: what it has to show before the next one starts; now: where the nursery is at, the same on each stage
   pass?: string; now?: string;
+  // a question's plan, one entry per run or queue job, and what's planned next while it's on hold (lines.ts)
+  plan?: PlanRun[]; hold?: string;
+}
+// name: the run's stem; label: what makes it its own; seed: as the run's name shows it; machine: the queue worker's name
+// while it trains; replay: its newest replay's file, once one is recorded; stopped: not finished, not writing, not queued
+export interface PlanRun {
+  name: string; label: string; seed: string; state: 'training' | 'queued' | 'done' | 'stopped';
+  machine?: string | null; samples: number; target: number; replay?: string;
 }
 interface Replay { label: string; replay: string; about?: string }
 export interface Item {

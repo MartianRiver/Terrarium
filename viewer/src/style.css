@@ -1300,3 +1300,97 @@ body {
     justify-content: flex-start;
   }
 }
+
+/* a question's plan: a row per run with its bar, and the "How to read this" fold (picker.ts) */
+.picker-plan b {
+  grid-column: 1 / -1;
+}
+
+/* a run with no replay yet isn't greyed out like a stage to come: it's training or waiting, and that's the news */
+.picker-plan .picker-off {
+  opacity: 1;
+}
+
+.picker-plan .picker-when {
+  margin-top: -1px;
+}
+
+.picker-bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  margin: 4px 0 2px;
+  border-radius: 3px;
+  background: rgb(44 58 51 / 0.12);
+  overflow: hidden;
+}
+
+.picker-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #5fae4f;
+}
+
+.picker-progress {
+  grid-column: 1;
+  align-self: center;
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.picker-plan .picker-tag {
+  grid-column: 2;
+  align-self: center;
+  white-space: normal;
+  text-align: right;
+}
+
+.picker-summary {
+  margin: 0 10px 4px;
+  font-size: 12.5px;
+  opacity: 0.75;
+}
+
+.picker-answer.next {
+  color: #8a5a10;
+}
+
+#picker .picker-help {
+  margin: 0 0 8px;
+  border-top: none;
+}
+
+#picker .picker-help > summary {
+  padding: 4px 2px;
+  font-size: 13px;
+  color: #3f7a38;
+}
+
+.picker-help dl {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgb(44 58 51 / 0.05);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.picker-help dt {
+  display: inline;
+  font-weight: 600;
+}
+
+.picker-help dt::after {
+  content: ' ';
+}
+
+.picker-help dd {
+  display: inline;
+  margin: 0;
+}
+
+.picker-help dd::after {
+  content: '';
+  display: block;
+  height: 6px;
+}

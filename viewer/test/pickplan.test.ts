@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { linePlan } from '../src/lines';
-import { plan, when, type Channel } from '../src/pickplan';
+import { linePlan, runLine, summarize } from '../src/lines';
+import { plan, when, type Channel, type PlanRun } from '../src/pickplan';
 
 const NOW = Date.parse('2026-11-01T21:00:00+11:00');
 const game = (name: string, more = {}) => ({ name, kind: 'a memory game', goal: 'Find the berry.', setup: 'A berry. Then more.', ...more });
@@ -214,5 +214,84 @@ describe('lines of work', () => {
     expect(sections.find((s) => s.key === 'earlier')!.cards.map((c) => c.title)).toEqual(['The apple tree']);
     expect(sections.find((s) => s.key === 'nursery')!.cards.map((c) => c.title)).toEqual(['Tag']);
     expect(sections[0].cards).toEqual([]);
+  });
+});
+
+// the grazing question while three runs train, and a held question, as the publisher writes them
+const run = (name: string, label: string, more: Partial<PlanRun> = {}): PlanRun =>
+  ({ name, label, seed: '1', state: 'training', machine: 'river-m3', samples: 2_900_000, target: 6_000_000, ...more });
+const grazing = [
+  run('g1a-c29', 'from the colony brain (c29)'),
+  run('g1a-sc2', 'from the pond brain (sc2)', { samples: 3_178_496 }),
+  run('g1a-fresh', 'a fresh brain', { state: 'queued', machine: null, samples: 0 }),
+];
+const planChannel: Channel = {
+  updated: '2026-11-09T20:00:00+11:00',
+  games: {
+    'grass-q': lined('Grazing', 'grass', 'Which parent learns to graze?', 'training', { asking: true, training: true, started: '2026-11-09T19:00:00+11:00', plan: grazing }),
+    'still-q': lined('Stand still', 'still', 'Does a pull on thrust stop them?', 'held', { started: '2026-11-09T18:00:00+11:00', result: 'It slows them.', hold: 'Try grazing.',
+      plan: [run('sc7-b1', 'from sc2-e12', { state: 'done', machine: null, samples: 5_996_544, replay: 'sc7.gz' })] }),
+    'still-r': lined('Stand still', 'still', 'Does charging for moving stop them?', 'answered', { started: '2026-11-09T17:00:00+11:00', answer: [f14] }),
+    'still-s': lined('Stand still', 'still', 'Does a drink at a stop help?', 'held', { started: '2026-11-09T16:00:00+11:00', hold: 'Try grazing.' }),
+  },
+  items: [{ replay: 'sc7.gz', title: 'Stand still · sc7-b1 · seed 1 · 6.0M samples', game: 'still-q', took: '8.1 days of play, learned in 40 min on the Mac' }],
+};
+
+describe('runs, plans and what is on hold', () => {
+  const l = linePlan(planChannel, NOW);
+  const grass = l.asking[0].questions[0];
+
+  it('shows an asking question’s runs from its plan before any replay exists, with a summary line', () => {
+    expect(l.asking.map((c) => c.key)).toEqual(['grass']);
+    expect(grass.runs).toEqual([]);
+    expect(grass.plan.map((r) => [r.label, r.detail, r.progress, r.tag, r.href, r.bar])).toEqual([
+      ['from the colony brain (c29)', 'seed 1 · g1a-c29', '2.9M of 6M samples', 'training on the Mac', undefined, true],
+      ['from the pond brain (sc2)', 'seed 1 · g1a-sc2', '3.2M of 6M samples', 'training on the Mac', undefined, true],
+      ['a fresh brain', 'seed 1 · g1a-fresh', '6M samples planned', 'waiting for a machine', undefined, true],
+    ]);
+    expect(grass.summary).toBe('3 runs · 6M samples each · 2 training, 1 waiting');
+  });
+
+  it('names the machine as the queue does, except the Mac', () => {
+    expect(runLine(run('x', 'y', { machine: 'Alexandria' }), 'g', []).tag).toBe('training on Alexandria');
+    expect(runLine(run('x', 'y', { machine: null }), 'g', []).tag).toBe('training');
+    expect(runLine(run('x', 'y', { state: 'stopped' }), 'g', []).tag).toBe('stopped');
+  });
+
+  it('links a run only once it has a replay; a finished run shows its samples and days of play, not a bar', () => {
+    const done = l.cards.find((c) => c.key === 'still')!.questions.find((q) => q.text.startsWith('Does a pull'))!.plan[0];
+    expect([done.progress, done.tag, done.bar, done.live]).toEqual(['6M samples · 8.1 days of play', 'done', false, false]);
+    expect(done.href).toContain('&game=still-q&start=sc7.gz');
+  });
+
+  it('says when a run ended before its planned samples, and when its target differs', () => {
+    expect(runLine(run('x', 'y', { state: 'done', samples: 2_900_000 }), 'g', [])).toMatchObject({ progress: 'ended at 2.9M of 6M samples', bar: true, tag: 'done' });
+    expect(runLine(run('x', 'y', { state: 'done', samples: 5_996_544 }), 'g', []).bar).toBe(false);
+    expect(summarize([run('a', 'a'), run('b', 'b', { target: 8_000_000, state: 'done' })])).toBe('2 runs · up to 8M samples each · 1 training, 1 done');
+    expect(summarize([run('a', 'a')])).toBe('1 run · 6M samples each · 1 training');
+    expect(summarize([])).toBe('');
+  });
+
+  it('puts a question with a hold and no finding on hold, carrying what is planned next', () => {
+    const held = l.cards.find((c) => c.key === 'still')!.questions.filter((q) => q.status === 'held');
+    expect(held.map((q) => [q.note.split(' · ')[0], q.hold, q.asking])).toEqual([['on hold', 'Try grazing.', false], ['on hold', 'Try grazing.', false]]);
+    expect(held[0].result).toBe('It slows them.');
+    expect(l.answered.map((q) => q.text)).toEqual(['Does charging for moving stop them?']);
+    expect(l.asking.flatMap((c) => c.questions).some((q) => q.status === 'held')).toBe(false);
+  });
+
+  it('sorts held questions after asking and before answered, and counts them on the line card', () => {
+    const still = l.cards.find((c) => c.key === 'still')!;
+    expect(still.questions.map((q) => q.status)).toEqual(['held', 'held', 'answered']);
+    expect(still.count).toBe('3 questions · 1 answered · 2 on hold');
+    expect(still.asking).toBe(false);
+    const mixed = linePlan({ ...planChannel, games: { ...planChannel.games, 'still-a': lined('Stand still', 'still', 'Newer?', 'training', { asking: true, started: '2026-11-09T19:30:00+11:00' }) } }, NOW);
+    expect(mixed.cards.find((c) => c.key === 'still')!.questions.map((q) => q.status)).toEqual(['asking', 'held', 'held', 'answered']);
+  });
+
+  it('falls back to the replays when the index carries no plan', () => {
+    const old = linePlan(lineChannel, NOW).asking[0].questions[0];
+    expect([old.plan, old.summary]).toEqual([[], '']);
+    expect(old.runs).toHaveLength(1);
   });
 });

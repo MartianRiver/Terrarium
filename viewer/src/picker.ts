@@ -2,7 +2,7 @@
 // What's being asked now stays open at the top, then the newest answers and a card per line of work (lines.ts); the groups
 // below open on a tap, so the list starts short (pickplan.ts says what's in them).
 import { createLogger } from './lib/logger';
-import { linePlan, type Cite, type LineCard, type Lines, type Question } from './lines';
+import { linePlan, type Cite, type LineCard, type Lines, type Question, type RunLine } from './lines';
 import { CHANNEL, plan, type Card, type Channel, type Chip, type Gallery, type Row, type Section, type Stage, type Status } from './pickplan';
 
 const log = createLogger('picker');
@@ -151,6 +151,38 @@ function rows(list: Row[]) {
   return ul;
 }
 
+// a run from a question's plan: what makes it its own, which seed, how far along it is and where it trains; a link only
+// once a replay exists
+function planRows(list: RunLine[]) {
+  const ul = el('ul', '', 'picker-rows picker-plan');
+  for (const r of list) {
+    const a = link(r.href, el('b', r.label), el('span', r.detail, 'picker-when'));
+    if (r.bar) {
+      const bar = el('span', '', 'picker-bar');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-label', `${r.detail}, ${r.progress}`);
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', '100');
+      bar.setAttribute('aria-valuenow', String(Math.round(r.fraction * 100)));
+      const fill = el('i');
+      fill.style.width = `${r.fraction > 0 ? Math.max(r.fraction * 100, 2) : 0}%`;
+      bar.append(fill);
+      a.append(bar);
+    }
+    a.append(el('span', r.progress, 'picker-progress'), el('span', r.tag, r.state === 'training' ? 'picker-tag training' : r.state === 'stopped' ? 'picker-tag held' : 'picker-tag'));
+    const row = el('li');
+    row.append(a);
+    ul.append(row);
+  }
+  return ul;
+}
+
+// what a question has to show: its plan's runs, or the replays alone when the index carries no plan
+function runList(q: Question) {
+  if (!q.plan.length) return q.runs.length ? rows(q.runs) : null;
+  return planRows(q.plan);
+}
+
 function cited(c: Cite, text: string) {
   const a = link(c.href, text);
   a.title = c.exact ? c.title : `${c.title} (opens the findings list)`;
@@ -167,6 +199,7 @@ function outcome(q: Question) {
     out.push(p);
   }
   if (!q.answers.length && q.status !== 'asking') out.push(el('p', [q.result, 'No finding yet.'].filter(Boolean).join(' '), 'picker-answer none'));
+  if (q.hold) out.push(el('p', `Next: ${q.hold}`, 'picker-answer next'));
   if (q.seen.length) {
     const p = el('p', 'also in ', 'picker-seen');
     q.seen.forEach((c, i) => p.append(...(i ? [', '] : []), cited(c, c.number)));
@@ -181,14 +214,19 @@ function question(q: Question, line?: string) {
   const head = document.createElement(q.href ? 'a' : 'div');
   if (q.href) (head as HTMLAnchorElement).href = q.href;
   head.className = 'picker-head';
-  head.append(el('b', q.text), tag(q.note, q.asking));
+  head.append(el('b', q.text), q.status === 'held' ? tagFor('held', q.note) : tag(q.note, q.asking));
   if (line) head.append(el('span', line, 'picker-when'));
   li.append(head, ...outcome(q));
-  if (q.asking) li.append(q.runs.length ? rows(q.runs) : el('p', 'Nothing to watch yet.', 'picker-answer none'));
-  else if (q.runs.length) {
+  const list = runList(q);
+  if (q.asking) {
+    if (q.summary) li.append(el('p', q.summary, 'picker-summary'));
+    if (list) li.append(list);
+    if (!q.plan.some((r) => r.href) && !q.runs.length) li.append(el('p', 'First replays come when a checkpoint lands.', 'picker-answer none'));
+  } else if (list) {
+    const count = q.plan.length || q.runs.length;
     const box = document.createElement('details');
     box.className = 'picker-fold';
-    box.append(el('summary', `${q.runs.length} ${q.runs.length === 1 ? 'run' : 'runs'}`), rows(q.runs));
+    box.append(el('summary', `${count} ${count === 1 ? 'run' : 'runs'}`), list);
     li.append(box);
   }
   return li;
@@ -281,6 +319,27 @@ function section(s: Section) {
   return box;
 }
 
+// closed by default: what the words on this list mean, for someone who has never trained a brain
+const HELP: [string, string][] = [
+  ['A question', 'is what a batch of runs is there to decide, like which starting brain learns to graze best.'],
+  ['A run', 'is one brain trained by one recipe. Its label says what makes it different from the others, such as which brain it started from.'],
+  ['A seed', 'is the random start a run begins from. Runs with the same label and a different seed are the same recipe tried again, there to show a result isn’t luck.'],
+  ['Samples', 'are moments of play the brain learned from: the more it has, the longer it has practised. The bar shows how many of the planned samples a run has done, and a finished run says how many days of play that was.'],
+  ['The tag', 'says whether a run is training now and on which computer, waiting for one, or done. A run opens to watch once its first replay is recorded.'],
+  ['A finding', 'is the written answer once a batch settles its question; its number links to it. Until then a question says what the runs showed so far.'],
+  ['On hold', 'means the question is paused with a plan, and the card says what comes next.'],
+];
+
+function help() {
+  const box = document.createElement('details');
+  box.className = 'picker-help';
+  box.append(el('summary', 'How to read this'));
+  const dl = el('dl');
+  for (const [term, text] of HELP) dl.append(el('dt', term), el('dd', text));
+  box.append(dl);
+  return box;
+}
+
 export class Picker {
   private box = document.createElement('dialog');
 
@@ -309,6 +368,6 @@ export class Picker {
     const top = lines ? [askingNow(lines), ...(lines.answered.length ? [latestAnswers(lines)] : []), ...(lines.cards.length ? [lineCards(lines)] : [])] : [];
     const body = sections.length || top.length ? [...top, ...sections.map(section)]
       : [el('p', 'The list isn’t answering right now, so here’s the garden.', 'picker-note')];
-    this.box.replaceChildren(el('h2', 'What do you want to watch?'), ...body, foot);
+    this.box.replaceChildren(el('h2', 'What do you want to watch?'), ...(lines ? [help()] : []), ...body, foot);
   }
 }
