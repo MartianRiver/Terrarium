@@ -39,15 +39,20 @@ class Energy:
     # what the body does changes what staying alive costs; all of these are off at their defaults
     # share of `drain` paid while still (thrust below [tired] still if tired is on, else below `still`)
     rest: float = 1.0
-    # share of `drain` paid instead while still in the dark and warm (see Night.nest and Night.huddle)
-    sleep: float = 1.0
+    # share of `drain` paid instead while still in the dark and warm (see Night.nest and Night.huddle); -1 leaves it
+    # to follow `rest`, so a world that only sets rest doesn't pay more asleep than awake
+    sleep: float = -1.0
     still: float = 0.1
     # energy a second per kg of body, fat and load, at full speed (0: moving costs only thrust and turn)
     work: float = 0.0
 
     def __post_init__(self):
-        if min(self.rest, self.sleep, self.still, self.work) < 0:
-            raise ConfigError('[energy] rest, sleep, still and work are 0 or more')
+        if min(self.rest, self.still, self.work) < 0 or (self.sleep < 0 and self.sleep != -1.0):
+            raise ConfigError('[energy] rest, still and work are 0 or more, and sleep is too, or -1 to follow rest')
+
+    @property
+    def asleep(self) -> float:
+        return self.rest if self.sleep < 0 else self.sleep
 
 
 @dataclass(frozen=True)

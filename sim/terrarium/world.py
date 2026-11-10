@@ -483,9 +483,7 @@ class World:
         effort = moving * cfg.dt * share
         self.spent += effort
         cold, exposure = self._cold()
-        self.energy = np.clip(self.energy - effort - (e.drain * body.burn(self, thrust) + cold) * cfg.dt * share, 0, 1)
-        if cfg.fat.on:
-            body.burn_fat(self)
+        self.energy = body.bound(self, self.energy - effort - (e.drain * body.burn(self, thrust) + cold) * cfg.dt * share)
         if cfg.night.cold > 0 and cfg.night.on:
             self.chill += (exposure - self.chill) * min(1.0, cfg.dt / cfg.night.chill_time)
         if cfg.tired.on:
@@ -529,7 +527,12 @@ class World:
             self.tree.step()
         if self.smell:
             self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
+        if cfg.fat.on:
+            # every cost has been paid by now: fat covers what it can, then whoever is still short has run out
+            body.burn_fat(self)
         dying = self.alive & (self.energy <= 0)
+        if cfg.fat.on:
+            np.maximum(self.energy, 0, out=self.energy)
         if self.ponds:
             dying |= self.alive & (self.water <= 0)
         if dying.any():
@@ -625,7 +628,7 @@ class World:
         if cfg.carry.lift > 0 and lifted.any():
             cost = cfg.carry.lift * np.where(self.young > 0, cfg.young.energy, 1.0) * lifted
             self.spent += cost
-            self.energy = np.clip(self.energy - cost, 0, 1)
+            self.energy = body.bound(self, self.energy - cost)
 
     def _laden(self) -> np.ndarray:
         return (self.load >= 0) | (self.block_load >= 0) | (self.dung.load >= 0 if self.dung else False)
@@ -743,11 +746,16 @@ class World:
         for _ in range(cfg.flowers.food):
             hungry = (self.energy[arena, who] <= 1 - cfg.energy.food) | body.fat_room(self)[arena, who] if cfg.fat.on \
                 else self.energy[arena, who] <= 1 - cfg.energy.food
+            meal = np.full(len(arena), cfg.energy.food)
+            if cfg.fat.on:
+                before = self.energy[arena, who]
             self.energy[arena[hungry], who[hungry]] += cfg.energy.food
-            self.fed[arena[hungry], who[hungry]] += cfg.energy.food
-            self.nourished[arena[hungry], who[hungry]] += cfg.energy.food
             if cfg.fat.on:
                 body.settle(self)
+                # what stayed in the bar, not what went to fat
+                meal = self.energy[arena, who] - before
+            self.fed[arena[hungry], who[hungry]] += meal[hungry]
+            self.nourished[arena[hungry], who[hungry]] += meal[hungry]
             room = ~hungry & (self.crop[arena, who] < cfg.crop.capacity)
             self.crop[arena[room], who[room]] += 1
         log.trace('flowers drunk', tick=self.tick, count=len(arena))
@@ -854,12 +862,16 @@ class World:
         """Eating chosen: from its crop if it carries any and has room, else in its own nest from the store, if it's hungry."""
         cfg = self.cfg
         own = eat & (self.crop > 0) & ((self.energy <= 1 - cfg.energy.food) | body.fat_room(self))
-        self.energy += cfg.energy.food * own
-        self.fed += cfg.energy.food * own
-        self.nourished += cfg.energy.food * own
-        self.crop[own] -= 1
+        meal = cfg.energy.food * own
+        before = self.energy.copy() if cfg.fat.on else None
+        self.energy += meal
         if cfg.fat.on:
             body.settle(self)
+            # what stayed in the bar, not what went to fat
+            meal = self.energy - before
+        self.fed += meal
+        self.nourished += meal
+        self.crop[own] -= 1
         young = self.young > 0
         # the young eat from it whenever they aren't full, hungry or not, but a bite their size: everything costs them
         # [young] energy of what it costs a grown one, so a jelly goes that much further, and they take only what fits

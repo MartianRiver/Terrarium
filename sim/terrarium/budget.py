@@ -40,7 +40,7 @@ def body(cfg: Config, share: float = 1.0) -> dict:
         mass = c.mass + extra + (load if loaded else 0.0)
         return (e.drain + e.move + e.work * mass * (slowed if loaded else 1.0)) * share
 
-    out = {'resting': e.drain * e.rest * share, 'asleep warm': (e.drain * e.sleep + nest_cold) * share,
+    out = {'resting': e.drain * e.rest * share, 'asleep warm': (e.drain * e.asleep + nest_cold) * share,
            'walking': walk(0.0, False), 'walking laden': walk(0.0, True)}
     if f.on:
         out |= {'walking, fat full': walk(fat, False), 'walking laden, fat full': walk(fat, True)}
@@ -174,7 +174,7 @@ def fmt(x: float, places: int = 3) -> str:
 
 def body_on(cfg: Config) -> bool:
     e = cfg.energy
-    return e.rest != 1 or e.sleep != 1 or e.work > 0 or cfg.fat.on
+    return e.rest != 1 or e.asleep != 1 or e.work > 0 or cfg.fat.on
 
 
 def secs(x: float) -> str:

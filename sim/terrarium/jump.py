@@ -6,6 +6,8 @@
 # goes. Nothing bumps into anything up there: it's only how high it is.
 import numpy as np
 
+from . import body
+
 G = 9.81
 
 
@@ -17,7 +19,7 @@ def step(world, jump: np.ndarray):
         world.vz[up] = np.sqrt(2 * G * j.height)
         cost = j.energy * np.where(world.young > 0, cfg.young.energy, 1.0) * up
         world.spent += cost
-        world.energy = np.clip(world.energy - cost, 0, 1)
+        world.energy = body.bound(world, world.energy - cost)
         world.jumps += up
     flying = (world.z > 0) | up
     # exactly where gravity has it, so the top of a jump is its height and no higher

@@ -21,6 +21,8 @@
 # again and remembered afresh.
 import numpy as np
 
+from . import body
+
 
 class Droppings:
     def __init__(self, world):
@@ -123,7 +125,7 @@ class Droppings:
                 self.held &= ~gone
                 k = np.where(self.load >= 0, self.load, 0)
                 self.load[np.take_along_axis(gone, k, 1) & (self.load >= 0)] = -1
-        w.energy = np.clip(w.energy - d.sick * self.dirt() * w.cfg.dt * w.alive, 0, 1)
+        w.energy = body.bound(w, w.energy - d.sick * self.dirt() * w.cfg.dt * w.alive)
 
     def dirt(self) -> np.ndarray:
         """(arenas, creatures): droppings lying within `near` of each creature's edge, a pile counting as one and

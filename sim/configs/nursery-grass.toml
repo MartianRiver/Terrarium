@@ -44,8 +44,9 @@ food = 0.4
 # share of `drain` paid while keeping still (thrust under `still`, or under [tired] still when that's on): resting costs
 # less than walking about, as it does for anything alive. 1 is the same as walking
 rest = 1.0
-# the share paid instead while still in the dark and warm (in the nest or huddled, [night] warmth of 0.5 or more): asleep
-sleep = 1.0
+# the share paid instead while still in the dark and warm (in the nest or huddled, [night] warmth of 0.5 or more): asleep.
+# -1 follows `rest`; a number here overrides it (asleep can cost less than resting, not more by accident)
+sleep = -1.0
 still = 0.1
 # per second, times kilograms (body, fat, what it carries or holds) and the share of top speed it's actually going: a
 # heavy nim costs more to move, and pushing a wall costs nothing as it doesn't move. 0 leaves moving to move and turn

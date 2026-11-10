@@ -4,11 +4,11 @@ import numpy as np
 
 from . import night
 
-# what a nim died of, as died_of keeps it (0: not dead); a predator is next
-CAUSES = ('', 'thirst', 'cold', 'starved')
-THIRST, COLD, STARVED = 1, 2, 3
-# chilled this much or more when its energy runs out, it died of the cold
-CHILLED = 0.5
+# what a nim died of, as died_of keeps it (0: not dead); a predator is next. 'chilled' says what was true when its
+# energy ran out (chill at CHILL or more), not that the cold did it: a nim chilled by the night that starves at home counts
+CAUSES = ('', 'thirst', 'chilled', 'starved')
+THIRST, CHILLED, STARVED = 1, 2, 3
+CHILL = 0.5
 # warm enough to sleep, and to rest the faster for it ([energy] sleep, [tired] warm)
 WARM = 0.5
 
@@ -34,11 +34,11 @@ def burn(world, thrust: np.ndarray) -> np.ndarray | float:
     """The share of `drain` each nim pays this tick: [energy] rest while it keeps still, sleep while it does in the
     dark and warm. Still is as [tired] has it when that's on."""
     e, t = world.cfg.energy, world.cfg.tired
-    if e.rest == 1 and e.sleep == 1:
+    if e.rest == 1 and e.asleep == 1:
         return 1.0
     still = np.abs(thrust) < (t.still if t.on else e.still)
     asleep = still & in_dark(world)[:, None] & warm(world)
-    return np.where(asleep, e.sleep, np.where(still, e.rest, 1.0))
+    return np.where(asleep, e.asleep, np.where(still, e.rest, 1.0))
 
 
 def mass(world) -> np.ndarray:
@@ -57,6 +57,12 @@ def mass(world) -> np.ndarray:
     return kg
 
 
+def bound(world, energy: np.ndarray) -> np.ndarray:
+    """Energy after a cost, kept in range. With fat on a shortfall stays below 0 until step has let fat and food
+    refill it and settled who died (it clips what's left then); off, it's clipped here, as it always was."""
+    return np.minimum(energy, 1) if world.cfg.fat.on else np.clip(energy, 0, 1)
+
+
 def burn_fat(world):
     """Below [fat] below, fat turns back into energy, up to `rate` a second."""
     f = world.cfg.fat
@@ -71,17 +77,20 @@ def fat_room(world) -> np.ndarray | bool:
 
 
 def settle(world):
-    """Energy past full goes to fat, `keep` of it while there's room; the rest is lost. Then energy is clipped."""
+    """Energy past full goes to fat, `keep` of it while there's room; the rest is lost. Then energy is clipped (with
+    fat on only from above: an unpaid cost stays owed, see bound)."""
     f = world.cfg.fat
     if f.on:
         world.fat += np.minimum(np.maximum(world.energy - 1, 0) * f.keep, f.capacity - world.fat)
-    np.clip(world.energy, 0, 1, out=world.energy)
+        np.minimum(world.energy, 1, out=world.energy)
+    else:
+        np.clip(world.energy, 0, 1, out=world.energy)
 
 
 def record_deaths(world, dying: np.ndarray):
-    """Why each of these nims died: out of water, else out of energy chilled through, else out of energy."""
+    """Why each of these nims died: out of water, else out of energy while chilled through, else out of energy."""
     dry = (world.water <= 0) if world.ponds else np.zeros_like(dying)
-    cause = np.where(dry, THIRST, np.where(world.chill >= CHILLED, COLD, STARVED))
+    cause = np.where(dry, THIRST, np.where(world.chill >= CHILL, CHILLED, STARVED))
     a, i = np.nonzero(dying)
     world.died_of[a, i] = cause[a, i]
     np.add.at(world.died_counts, (a, cause[a, i]), 1)
