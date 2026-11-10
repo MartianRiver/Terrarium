@@ -1,0 +1,54 @@
+# tree step 4, apples carried home: the tree's points pay on unloading in the nest, so stored and food are 0 here
+# (no paying twice; eating comes back with the snacks step). home 0.5 shaping stays: it doesn't change what's best.
+
+[reward]
+food = 0.0
+death = -1.0
+alive = 0.0
+stored = 0.0
+jelly = 0.0
+colony = 0.5
+home = 0.5
+snug = 0.0
+warm = 0.0
+effort = 0.0
+hatch = 0.0
+novelty = 0.0
+variety = 0.0
+needs = 1.0
+# n49: energy lost is charged too, so the cold costs as it's felt
+needs_lost = 1.0
+dawn = 0.0
+
+[ppo]
+samples = 8_000_000
+repeat = 4
+arenas = 64
+steps = 128
+epochs = 2
+minibatches = 8
+lr = 5e-5
+anneal = true
+warmup = 10
+gamma = 0.99
+bootstrap = true
+lam = 0.99
+clip = 0.2
+entropy = 0.0
+coins = 0.0
+coins_for = []
+side = 0.0
+side_back = 20
+closure = 0.0
+value = 0.5
+max_grad_norm = 0.5
+kl_stop = 0.02
+give_up = 0
+stuck = 0
+stuck_seconds = 0.0
+checkpoint_every = 16
+
+[start]
+fresh = []
+staggered = false
+spread = false

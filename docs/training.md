@@ -55,6 +55,17 @@ Training refuses to start with uncommitted changes unless it's given `--scratch`
 
 `--parent X.pt` carries on from a checkpoint, which has to fit the schema. Its id is recorded as the new brain's parent.
 
+## Before a rung: the payoff ledger
+
+```
+cd sim
+uv run python -m terrarium.ledger WORLD.toml TRAIN.toml [--json]
+```
+
+Prints what pays for what in a world and recipe pair: one row for every reward source switched on (each non-zero `[reward]` term, and each game's points: tree, tag, seek, flags, peek, dung), with when it pays, who gets it (the nim's own, through the `colony` blend, or every living nim in the arena), how big it is, and how far behind the choice that earns it. Under the table, the horizon (decision step, the discount's e-fold in seconds, its weight at 10, 30 and 60 s, GAE's e-fold, the rollout and episode in seconds) and where the first dusk, dark and dawn fall against the training episode. A source that pays in `Forage.step` and isn't in the ledger's registry (`terrarium/ledger.py`) is printed as UNCOVERED, so a new reward term or game has to be added there. Read it before a rung, and say in the plan what pays the behaviour and when.
+
+The warnings: `never-dark` / `never-dawn` (no training game reaches a night or its end: the first dark falls past the episode, with no staggered starts or `start_dark`), `double-pay` (one event paid twice, like `stored` on top of the tree's own pay for an apple unloaded in the nest), `paid-elsewhere` (a term at 0 that the world pays anyway, so it isn't "unpaid": `stored = 0` and the tree's points pay every delivery), `delay` (a payoff the world puts more than two e-folds of the discount behind its cause, like dying of the cold a night after it started), `death-zero` (games have deaths and dying costs nothing) and `turnover` (`needs` and `needs_lost` differ, so eating and burning the same energy again nets something).
+
 ## Speed
 
 On the M3 (4 performance and 4 efficiency cores), one 32k-sample update of the solo world is about 0.9 s of rollout and 3.5 s of update on MPS, so about 8k samples a second, and the update is the limit. A worker's rollout is two thirds the brain choosing actions and one third the sim; shipping a rollout back from a worker takes a few milliseconds. More workers only bring the rollout down to about 0.55 s here, with the efficiency cores and whatever else the Mac is doing in the way, which is why one worker stays the default. They're for machines with a GPU and many cores.
