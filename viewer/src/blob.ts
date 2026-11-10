@@ -23,6 +23,16 @@ export function eggRadius(y: number) {
   return a.x + ((b.x - a.x) * (y - a.y)) / (b.y - a.y);
 }
 
+// how high the egg's underside is at radius r from its middle
+const WIDEST = EGG.reduce((m, p, k) => (p.x > EGG[m].x ? k : m), 0);
+function underside(r: number) {
+  const i = EGG.findIndex((p) => p.x >= r);
+  if (i < 0 || i > WIDEST) return EGG[WIDEST].y;
+  if (i === 0) return EGG[0].y;
+  const [a, b] = [EGG[i - 1], EGG[i]];
+  return a.y + ((b.y - a.y) * (r - a.x)) / (b.x - a.x);
+}
+
 // where the egg's front is at (x, y), and the tilt and turn that lay a feature flat on it
 function onFront(x: number, y: number) {
   const z = (at: number) => Math.sqrt(eggRadius(at) ** 2 - x * x) * DEPTH;
@@ -64,6 +74,10 @@ const grey = new THREE.Color(0x8a8a90);
 
 const SPRING_STEP = 1 / 60;
 const LEGS = 0.1;
+const FOOT_X = 0.19;
+const FOOT_HALF = 0.07;
+const toBody = new THREE.Matrix4();
+const under = new THREE.Vector3();
 const BULB_GLOW = 0.8;
 // energy where starving starts to show, and where full does
 const HUNGRY_BELOW = 0.3;
@@ -187,7 +201,7 @@ export class BlobView {
       this.body.add(arm);
 
       const foot = mesh(ball, new THREE.MeshPhysicalMaterial({ color: this.tint.clone().multiplyScalar(0.82), roughness: 0.78 }),
-        [side * 0.23, 0.065, 0.17], [0.13, 0.07, 0.2]);
+        [side * FOOT_X, FOOT_HALF, 0.17], [0.13, FOOT_HALF, 0.2]);
       this.feet.push(foot);
       this.root.add(foot);
     }
@@ -333,9 +347,17 @@ export class BlobView {
       const wing = this.wings[i];
       if (wing) wing.rotation.z = (i ? 1 : -1) * (0.3 + Math.sin(time * (6 + 8 * this.stride)) * (0.2 + 0.35 * this.stride));
     });
+    // each foot stretches up to the underside above its outer half, so bob, rock and stride never open a gap
+    this.body.updateMatrix();
+    toBody.copy(this.body.matrix).invert();
     this.feet.forEach((foot, i) => {
-      foot.position.y = 0.065 + Math.max(0, Math.sin(this.phase + i * Math.PI)) * (0.075 + 0.04 * this.baby) * this.stride;
+      const lift = Math.max(0, Math.sin(this.phase + i * Math.PI)) * (0.075 + 0.04 * this.baby) * this.stride;
       foot.position.z = 0.17 + Math.cos(this.phase + i * Math.PI) * 0.11 * this.stride;
+      under.set(foot.position.x * 1.35, lift, foot.position.z).applyMatrix4(toBody);
+      under.set(under.x, underside(Math.hypot(under.x, under.z / DEPTH)), under.z).applyMatrix4(this.body.matrix);
+      const half = Math.max(FOOT_HALF, (under.y + 0.02 - lift) / 2);
+      foot.scale.y = half;
+      foot.position.y = lift + half;
     });
 
     this.stalk.rotation.z = Math.sin(time * 3 + this.seed) * 0.08 + this.turn * 0.05;

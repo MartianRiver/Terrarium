@@ -1,0 +1,1 @@
+A nim's feet now meet its body: each foot sits a little further in and stretches up to the body's underside as it bobs, rocks and steps, where before a gap opened between them mid-walk, most on young ones.
