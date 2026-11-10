@@ -293,6 +293,13 @@ def step(learner: Brain, optimizer: torch.optim.Optimizer, cfg: PPO, seen: dict[
     loss = policy_loss - cfg.entropy * entropy + cfg.value * value_loss
     if cfg.coins:
         loss = loss - cfg.coins * dist.coin_entropy(learner.named(cfg.coins_for)).mean()
+    if cfg.bound:
+        # the env clips at 1, so past it every draw plays the same and nothing pulls the mean back
+        out = (mean[:, learner.steering(cfg.bound_for)].abs() - 1).clamp(min=0)
+        penalty = (out ** 2).mean()
+        loss = loss + cfg.bound * penalty
+        seen.setdefault('bound_loss', []).append(penalty.item())
+        seen.setdefault('over_edge', []).append((out > 0).float().mean().item())
     if extra is not None:
         loss = loss + extra
     with torch.no_grad():

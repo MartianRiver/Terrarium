@@ -491,6 +491,7 @@ class Reward:
     needs: float
     needs_lost: float
     dawn: float
+    hunger: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -521,6 +522,8 @@ class PPO:
     stuck: int
     stuck_seconds: float
     checkpoint_every: int
+    bound: float = 0.0
+    bound_for: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -552,9 +555,10 @@ def build(cls, data, where='config'):
     names = {f.name for f in dataclasses.fields(cls)}
     if unknown := sorted(set(data) - names):
         raise ConfigError(f'{where}: unknown key(s) {", ".join(unknown)}')
-    if missing := sorted(names - set(data)):
+    defaults = {f.name for f in dataclasses.fields(cls) if f.default is not dataclasses.MISSING}
+    if missing := sorted(names - defaults - set(data)):
         raise ConfigError(f'{where}: missing key(s) {", ".join(missing)}')
-    return cls(**{name: convert(hints[name], data[name], f'{where}.{name}') for name in names})
+    return cls(**{name: convert(hints[name], data[name], f'{where}.{name}') for name in names if name in data})
 
 
 def convert(kind, value, where):

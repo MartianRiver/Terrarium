@@ -149,6 +149,15 @@ class Brain(nn.Module):
             raise ValueError(f'no such action: {", ".join(unknown)}')
         return torch.tensor([a in names for a in self.schema['actions']], device=self.log_std.device)
 
+    def steering(self, names: tuple[str, ...]) -> torch.Tensor:
+        """Which actions are continuous (not yes/no), narrowed to these names when given."""
+        actions = self.schema['actions']
+        if clash := sorted(set(names) & set(schema.YES_NO)):
+            raise ValueError(f'not a steering action: {", ".join(clash)}')
+        which = self.named(names)
+        steer = torch.tensor([a not in schema.YES_NO for a in actions], device=self.log_std.device)
+        return steer if which is None else steer & which
+
     def to_bernoulli(self):
         """Gaussian yes/no actions as coins with about the odds they had: a draw above 0 is Φ(mean / spread),
         close to a coin with odds 1.702 * mean / spread."""

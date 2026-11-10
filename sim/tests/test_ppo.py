@@ -1,5 +1,6 @@
 import json
 import subprocess
+import tomllib
 from dataclasses import replace
 
 import numpy as np
@@ -9,9 +10,10 @@ import torch
 from terrarium import load, runs
 from terrarium.brain import SHAPE, Brain, save, tensors
 from terrarium.brain import load as load_brain
-from terrarium.config import DEFAULT, TRAIN, load_train
+from terrarium.config import DEFAULT, TRAIN, ConfigError, Train, build, load_train
 from terrarium.forage import Forage
 from terrarium.ppo import Episodes, advantages, collect
+from terrarium.ppo import step as ppo_step
 from terrarium.runs import cpu_quota
 from terrarium.train import train
 
@@ -285,3 +287,53 @@ def test_a_rented_pod_is_named_in_the_record(tmp_path):
     first.write_bytes(b'RUNPOD_POD_ID=12iu15qz2qh8mf\0')
     assert rental(first) == {'provider': 'runpod', 'instance': '12iu15qz2qh8mf'}
     assert rental(tmp_path / 'missing') == {}
+
+
+def bound_step(means, **more):
+    """One PPO step on a brain's heads with these means and no advantage, so only the bound can move them."""
+    cfg = load_train()
+    cfg = replace(cfg, ppo=replace(cfg.ppo, **more))
+    brain = Brain(**SHAPE)
+    mean = torch.tensor(means, dtype=torch.float32).repeat(4, 1).requires_grad_()
+    actions = mean.detach().clone()
+    old_logp = brain.dist(mean.detach()).log_prob(actions).sum(-1)
+    seen = {k: [] for k in ('policy_loss', 'value_loss', 'entropy', 'kl', 'clipped')}
+    zero = torch.zeros(4)
+    stopped = ppo_step(brain, torch.optim.SGD(brain.parameters(), lr=0.0), cfg.ppo, seen, mean, zero.clone(), actions,
+                       old_logp, zero, zero)
+    assert not stopped
+    return seen, mean.grad
+
+
+def test_the_bound_pulls_means_past_the_edge_back():
+    # thrust, turn, then the yes/no actions
+    inside = [0.9, -0.9, 0, 0, 0, 0, 0, 0]
+    outside = [2.0, -0.9, 0, 0, 0, 0, 0, 0]
+    near, near_grad = bound_step(inside, bound=1.0)
+    far, far_grad = bound_step(outside, bound=1.0)
+    assert far['bound_loss'][0] > near['bound_loss'][0] == 0
+    assert near['over_edge'] == [0.0] and far['over_edge'] == [0.5]
+    assert far_grad[:, 0].min() > 0 and not far_grad[:, 1:].any() and not near_grad.any()
+
+
+def test_the_bound_is_off_by_default_and_leaves_yes_no_alone():
+    seen, grad = bound_step([3.0, -3.0, 5, 5, 5, 5, 5, 5])
+    assert 'bound_loss' not in seen and 'over_edge' not in seen and not grad.any()
+    seen, grad = bound_step([0, 0, 5, 5, 5, 5, 5, 5], bound=1.0)
+    assert seen['bound_loss'] == [0.0] and seen['over_edge'] == [0.0] and not grad.any()
+    seen, grad = bound_step([3.0, -3.0, 0, 0, 0, 0, 0, 0], bound=1.0, bound_for=('turn',))
+    assert not grad[:, 0].any() and grad[:, 1].max() < 0
+    with pytest.raises(ValueError, match='not a steering action: eat'):
+        bound_step([0] * 8, bound=1.0, bound_for=('eat',))
+
+
+def test_a_train_config_without_the_bound_keys_still_loads():
+    data = tomllib.loads(TRAIN.read_text())
+    data['ppo'].pop('bound', None), data['ppo'].pop('bound_for', None)
+    ppo = build(Train, data, 'train').ppo
+    assert ppo.bound == 0.0 and ppo.bound_for == ()
+    data['ppo']['bound'] = 0.5
+    assert build(Train, data, 'train').ppo.bound == 0.5
+    del data['ppo']['clip']
+    with pytest.raises(ConfigError, match=r'train\.ppo: missing key\(s\) clip'):
+        build(Train, data, 'train')

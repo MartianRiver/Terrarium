@@ -229,3 +229,21 @@ def test_no_ponds_no_thirst_pay():
     assert env.world.ponds is None
     env.step(np.zeros((env.samples, len(ACTIONS))))
     assert (env.world.water == 1).all() and (env.world.drank == 0).all()
+
+
+def test_hunger_hurts_by_the_square_of_what_is_missing_and_not_when_full():
+    def reward(hunger, energy):
+        train = load_train()
+        zero = {f.name: 0.0 for f in fields(train.reward)}
+        train = replace(train, reward=replace(train.reward, **{**zero, 'hunger': hunger}))
+        env = Forage(CFG, train, 1, 0)
+        env.world.energy[:] = energy
+        steps = round(1 / (CFG.dt * env.repeat))
+        total = 0.0
+        for _ in range(steps):
+            _, r, *_ = env.step(np.zeros((env.samples, 5)))
+            total += float(r[0])
+        return total
+
+    assert reward(1.0, 0.5) - reward(0.0, 0.5) == pytest.approx(-0.25, abs=0.03)
+    assert reward(1.0, 1.0) == pytest.approx(reward(0.0, 1.0), abs=0.01)
