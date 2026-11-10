@@ -1,0 +1,37 @@
+# 0035 Loosening the night brains' thrust doesn't keep them home: a steering-spread reset costs half the survivors, a gentle pull on the thrust mean lifts nothing, and every brain still walks out of the nest in about a second
+
+date: 2026-11-10 · status: held-out · seeds: 2,000,000 × 256 (scores, the held-out block, also used for choosing); 9,300,000 to 9,300,002 (thrust probe, 8 games a seed); 9,800,000 and on (dusk probe, 32 games × 8 draws); training seeds 661 and 662 · brains: n49-lost-s1 and -s2 (parents), n52-spread-s1 and -s2 (spread reset to 0.35), n52-ctl-s1 and -s2 (control: n49 + 8M, nothing else), n53-bound-s1 and -s2 (gentle thrust pull), n54-dawn-s1 and -s2 (n53 + a dawn pay), n54-far-s1 and -s2 (n53 + gamma .995), all 8M samples
+
+**Question.** The night brains' thrust mean sits past the clip (2 to 3 against a clip of 1), so they never sample going slow, and no night rung (0014 to 0024) could teach them to stay home because a pay can't shape what is never tried (a review by Codex, 10 Nov). Does loosening the thrust, by a steering-spread reset (n52) or a gentle pull of the thrust mean back inside the clip (n53), let them learn to stay home at night?
+
+**World and brains.** The night world of 0014 to 0024: one colony of two, the apple tree with burrow in a 32 m arena, a 60 s night in each 120 s cycle (dusk 10 s, drain 0.0125 a second), 128 note slots; training games of 180 s, `[reward] needs` 1.0, gamma .99 (about a 20 s horizon at 0.2 s decisions). From n49-lost, 8M each, one change per arm:
+- n52-spread: thrust and turn spread reset from 0.147 and 0.03 to 0.35 (the learned `log_std`), nothing else.
+- n52-ctl: the matched control, n49 and 8M of the same recipe, same seeds.
+- n53-bound: `[ppo] bound` 0.001 on the thrust only, a gentle pull of its mean back inside the clip (n51's weight 1.0 was about 500 times the policy loss and wrecked foraging).
+
+**Method.** `mates.py` (with `research/2026-11-06-matched-swap/lib.py`) on 256 games from seed 2,000,000, the same games for every brain, 300 s (two nights); n49 and n52 were also scored at 180 s. It steers thrust and turn by the mean (lib.Brain keeps spread only on the yes/no actions), so every score is what the brain learned, not noise. "Kept" leaves the notes as they are, "self" wipes them for the nim that stores, "both" wipes them for both nestmates whenever either stores. Alive is the share of nims alive at the end; nest is apples home a minute per nest. n49 and n52 were scored together on one code version, the control and n53 in their own runs on the same seeds. Two more reads: a thrust probe on nest visits at night (sampled actions, 8 games a seed), and a dusk probe (a scratch script, `dusk_probe.py`): n49's nims outside the nest at 46 s and 56 s of the 120 s cycle, three branches from the same state for 20 s (the brain as it is, steered home, stopped where they stand), discounted return at gamma .99, survival at dawn, paired.
+
+**Result.** Alive at the end of 300 s, kept / self / both, and nest, seeds as s1 / s2:
+
+| brain | change | alive, kept | alive, self | alive, both | nest, kept |
+|---|---|---|---|---|---|
+| n49-lost | parents | 46 / 52% | 46 / 38% | 42 / 39% | 4.75 / 4.79 |
+| n52-ctl | 8M more, nothing else | 47 / 58% | 47 / 50% | 43 / 50% | 4.73 / 5.07 |
+| n52-spread | spread reset to 0.35 | 24 / 22% | 21 / 17% | 19 / 13% | 3.46 / 3.23 |
+| n53-bound | gentle thrust pull | 44 / 59% | 45 / 46% | 34 / 44% | 4.51 / 5.01 |
+| n54-dawn | n53 + a dawn pay of 1.0 | 46 / 61% | 44 / 46% | 37 / 46% | 4.54 / 5.33 |
+| n54-far | n53 + gamma .995 (40 s) | 46 / 55% | 43 / 44% | 39 / 39% | 4.73 / 4.85 |
+
+At 180 s, both row, s1 / s2: n49 56 / 53%, n52 34 / 23%. Against the matched control the reset loses 24 and 37 points of survivors (both row) and 23 and 36 (kept); the bound is 9 and 6 points below it in the both row and level in the kept row (44 against 47, 59 against 58). The control against the parents: s1 level, s2 6 points up in kept and 11 in both. On top of n53, the dawn pay (once at dawn for being in its own nest, as big as dying, 0019) is 2 to 3 points up on both seeds in every row, and the longer horizon (gamma .995, so a dawn 60 s out keeps about 22% of its worth, not 5%) is 2 and 5 up on s1 and 4 and 5 down on s2; none of it is clear of the control.
+
+Thrust probe at night nest visits, thrust mean over steps, median and share of steps past the clip: n49-s1 1.75, 89%; n53-s1 1.39, 66% (executed near-stops 3.9% of steps, none in n49-s1); n53-s2 2.80, 96% (n49-s2's median was 2.87 in the review's earlier probe, not re-run). In all three every nim left the nest within 10 s and the median exit took 0.8 to 1.0 s.
+
+Dusk probe (n49-s1 and -s2, 32 games × 8 draws, outside-the-nest nims, going home against what the brain does): at 46 s of the cycle, with food still up for 14 s, home costs 0.54 and 0.59 of discounted return over 20 s and lifts survival at dawn 7 and 8 points; at 56 s it costs 0.04 and 0.06 (intervals touching zero) and lifts survival at dawn 17 and 19 points (68% to 85%, 64% to 84%). Stopping where they stand is worse on everything.
+
+**What it rules out.** That the spread reset helps the night brains: it cost about half the survivors on both seeds, against a control that shows the extra 8M changes nothing on s1 and little on s2. That a gentle pull on the thrust mean is enough: it loosened s1 (median 1.39, 66% past the clip, from 1.75 and 89%) and left s2 where it was, and neither seed survived better than the control, s1 doing worst with notes wiped for both (34% against 43%). That loosening thrust is what keeps them home: the brain that sampled going slow most (n53-s1) still left in about a second. What it points at instead: with the dusk probe, going home at 56 s of the cycle pays about nothing inside the 20 s the brain weighs while it lifts dawn survival 17 to 19 points, so the payoff for staying is out of its reach, not only thrust pinned past the clip. n54 then tried both on n53's brains, which can sample going slow: a dawn pay and a 40 s horizon, and neither lifted survival past the control's noise, so putting the payoff within reach one of these ways is not enough either.
+
+**Limits.** Two seeds, one score block that is the held-out one used for choosing, so `held-out`, not `confirmed`. The control twins differ by up to 10 points (0018, 0019) and the s2 control sits 6 to 11 points above its parent, so the n53 gaps are inside that noise and only the reset's gap is clear. The thrust probe is 8 games a seed on three brains, n49-s2 and the n52 brains weren't probed, so whether the reset moved the thrust mean is unread; the review's argument is that at a mean of 2 and a spread of 0.35 a draw below 1 comes about 0.2% of the time. One bound weight (0.001), one reset value (0.35), one dawn pay (1.0), one gamma (.995), 8M each. The dusk probe is two parent brains, replays prefixes to snapshot (the world can't be deep-copied), and is not a training result. The reset brains were scored only by the mean, as everything here is, so what steering noise does to them isn't read.
+
+**Replays and clips.** None yet. Next step, one line: a night check that reads where each nim is through the night and why it dies, before any more pays or dials.
+
+**Links.** 0017 (the pass-through nest); 0018, 0019 (pays for warmth and dawn); 0024 (the pinned thrust); 0028 (a pull on the pond nims' thrust); 0032 (the collapsed spread); 0034 (the same reset on the colony brain).
