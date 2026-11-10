@@ -39,6 +39,7 @@ from .tactics import REASONS, Tactics, flower_in_view
 from .vision import FLOWER, FOOD, NOTHING, look
 from . import vision
 from .maze import mapped_policy, wall_policy
+from .body import CAUSES
 from .world import CARRIED, World
 
 log = Logger('evals')
@@ -291,6 +292,8 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
     dirt, lived_ticks, nest_dung, all_dung = 0.0, 0, 0, 0
     # deaths in each slot: with hatching, one slot can die more than once
     died, jelly_at_home, at_nest, in_dark, away_by_day = (np.zeros(shape, int) for _ in range(5))
+    # deaths by cause (world.CAUSES) per episode
+    by_cause = np.zeros((episodes, len(CAUSES)), int)
     # dawns each creature lived to see, and the colonies with anyone left at the first one
     nights = np.zeros(shape, int)
     colonies = np.unique(world.colony)
@@ -372,6 +375,7 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         emptied |= ~going & ~done[:, None]
         # an arena that has ended stops counting; the others carry on
         finished = world.ended & ~done
+        by_cause[finished] = world.died_counts[finished]
         meals[finished] = world.meals[finished]
         stored[finished] = world.stored[finished]
         jelly[finished] = world.jelly[finished]
@@ -404,7 +408,8 @@ def run(cfg: Config, make: Callable[[World], Policy], episodes: int = EPISODES, 
         'flowers': summary(drunk[:, starters]),
         'deaths': {'creatures': died.size, 'died': int(died.sum()), 'jelly_at_home': int(jelly_at_home.sum()),
                    'at_nest': int(at_nest.sum()), 'in_dark': int(in_dark.sum()), 'away_by_day': int(away_by_day.sum()),
-                   'colonies': emptied.size, 'colonies_lost': int(emptied.sum())},
+                   'colonies': emptied.size, 'colonies_lost': int(emptied.sum()),
+                   'by_cause': {name: int(by_cause[:, k].sum()) for k, name in enumerate(CAUSES) if k}},
         # per colony an episode, and the colonies that hatched at least one
         'hatched': {**summary(hatched), 'colonies': int((hatched > 0).sum())},
         'colonies_to_the_end': int(at_end.sum()),

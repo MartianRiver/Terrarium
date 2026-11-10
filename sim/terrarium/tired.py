@@ -5,6 +5,8 @@
 # stamina stays 1.
 import numpy as np
 
+from . import body
+
 
 def speed(world) -> np.ndarray | float:
     """The share of top speed tiredness leaves each creature."""
@@ -18,4 +20,8 @@ def tire(world, thrust: np.ndarray, bursting: np.ndarray):
     t, dt = world.cfg.tired, world.cfg.dt
     go = np.abs(thrust) * np.where(bursting, world.cfg.sprint.speed, 1.0)
     still = np.abs(thrust) < t.still
-    world.stamina = np.where(world.alive, np.clip(world.stamina - t.drain * go * dt + t.rest * still * dt, 0, 1), 1.0)
+    rest = t.rest * still * dt
+    if t.warm != 1 or t.dark != 1:
+        # sleeping somewhere warm at night restores it fastest
+        rest = rest * np.where(body.warm(world), t.warm, 1.0) * np.where(body.in_dark(world)[:, None], t.dark, 1.0)
+    world.stamina = np.where(world.alive, np.clip(world.stamina - t.drain * go * dt + rest, 0, 1), 1.0)

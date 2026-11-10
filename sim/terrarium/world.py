@@ -21,6 +21,9 @@
 # spinning isn't) and sprinting, a burst of speed with a cooldown ([sprint]),
 # chosen like unload and eat.
 #
+# What staying alive and moving cost can follow what the body does, and food past a full bar can be kept as fat
+# (body.py: [energy] rest, sleep and work, [fat]); a nim that dies has its cause recorded.
+#
 # With [water] on (water.py), a nim is thirsty too: its water falls over time and fills while it stands in a pond, and
 # at 0 it dies like starving. Food and flowers don't grow in a pond.
 #
@@ -57,9 +60,12 @@
 # where a carried block is, for anything that senses blocks: well off the arena
 AWAY = 1e4
 
+import dataclasses
+
 import numpy as np
 
-from . import night, tired
+from . import body, night, tired
+from .body import CAUSES
 from .droppings import Droppings
 from .smell import Field
 from .flags import Flags
@@ -95,6 +101,7 @@ def box_gap(points: np.ndarray, b) -> np.ndarray:
 
 class World:
     def __init__(self, cfg: Config, arenas: int = 1, seed: int = 0):
+        cfg = self._nest_sized(cfg)
         self.cfg = cfg
         self.arenas = arenas
         self.seed = seed
@@ -119,6 +126,12 @@ class World:
         # where everyone stands is set by reset() at the end, the same way every later game is
         self.heading = np.zeros((arenas, n))
         self.energy = np.where(self.spare, 0.0, np.full((arenas, n), cfg.energy.start))
+        # a reserve kept beside energy ([fat]; always 0 with it off), and why each nim died (CAUSES) and how many
+        # have died of each in the arena since it started
+        self.fat = np.zeros((arenas, n))
+        self.died_of = np.zeros((arenas, n), int)
+        self.died_counts = np.zeros((arenas, len(CAUSES)), int)
+        self._kept_at: tuple[int, np.ndarray] = (-1, np.zeros(0))
         self.alive = np.tile(~self.spare, (arenas, 1))
         # places nobody has been in yet this episode, which replays leave out
         self.unborn = np.tile(self.spare, (arenas, 1))
@@ -234,6 +247,16 @@ class World:
 
         log.info('world created', arenas=arenas, creatures=n, food=cfg.food.count, blocks=len(cfg.block), seed=seed)
 
+    @staticmethod
+    def _nest_sized(cfg: Config) -> Config:
+        """With [colonies] nest_area, the nest grows to give every place that much room: the one radius everything
+        reads (warmth, home, unloading, rays, the replay header) is the grown one."""
+        col = cfg.colonies
+        if col.nest_area <= 0:
+            return cfg
+        radius = max(col.nest_radius, float(np.sqrt(col.nest_area * col.slots / np.pi)))
+        return dataclasses.replace(cfg, colonies=dataclasses.replace(col, nest_radius=radius))
+
     @property
     def pos(self):
         return self.physics.pos
@@ -295,6 +318,8 @@ class World:
             raise ConfigError('arena.scatter is for blocks that stay put: not with smell, carry or shut')
         if self.cfg.arena.maze:
             check_maze(self.cfg)
+        if self.cfg.colonies.nest_area > 0 and (np.abs(self.nests) + self.cfg.colonies.nest_radius > self.cfg.arena.size / 2).any():
+            raise ConfigError(f'colonies.nest_area {self.cfg.colonies.nest_area} makes a nest that reaches past the walls')
 
     def _spawn(self, idx: np.ndarray):
         """Each colony on an evenly spaced ring around its nest, turned a random amount per arena."""
@@ -319,6 +344,9 @@ class World:
         if self.cfg.arena.maze:
             carve(self, idx)
         self.energy[idx] = np.where(self.spare, 0.0, self.cfg.energy.start)
+        self.fat[idx] = 0
+        self.died_of[idx] = 0
+        self.died_counts[idx] = 0
         self.alive[idx] = ~self.spare
         self.unborn[idx] = self.spare
         if self.spare.any():
@@ -448,11 +476,16 @@ class World:
         # a sprint costs by how hard it runs: standing still through one is free
         # the young pay a share of every cost
         share = np.where(young, cfg.young.energy, 1.0)
-        effort = (e.move * np.abs(thrust) + e.turn * turn * turn + s.energy * bursting * np.maximum(thrust, 0)
-                  + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt * share
+        moving = (e.move * np.abs(thrust) + e.turn * turn * turn + s.energy * bursting * np.maximum(thrust, 0)
+                  + g.energy * self.holding + cfg.carry.energy * laden)
+        if e.work > 0:
+            moving = moving + e.work * body.mass(self) * np.hypot(self.vel[..., 0], self.vel[..., 1]) / c.max_speed
+        effort = moving * cfg.dt * share
         self.spent += effort
         cold, exposure = self._cold()
-        self.energy = np.clip(self.energy - effort - (e.drain + cold) * cfg.dt * share, 0, 1)
+        self.energy = np.clip(self.energy - effort - (e.drain * body.burn(self, thrust) + cold) * cfg.dt * share, 0, 1)
+        if cfg.fat.on:
+            body.burn_fat(self)
         if cfg.night.cold > 0 and cfg.night.on:
             self.chill += (exposure - self.chill) * min(1.0, cfg.dt / cfg.night.chill_time)
         if cfg.tired.on:
@@ -500,6 +533,7 @@ class World:
         if self.ponds:
             dying |= self.alive & (self.water <= 0)
         if dying.any():
+            body.record_deaths(self, dying)
             self.alive &= ~dying
             self.sprinting[dying] = 0
             self.nectar[dying] = 0
@@ -530,11 +564,11 @@ class World:
         # x and y apart: summing over a length-2 last axis is much slower in numpy
         dx = self.pos[:, :, None, 0] - self.food_pos[:, None, :, 0]
         dy = self.pos[:, :, None, 1] - self.food_pos[:, None, :, 1]
-        hungry = self.energy <= 1 - cfg.energy.food
+        hungry = (self.energy <= 1 - cfg.energy.food) | body.fat_room(self)
         # one too full to eat food and with no room in its crop walks over it; jelly on the ground is only
         # eaten, by one with room for it
         takes = self.alive & (hungry | (self.crop < cfg.crop.capacity))
-        wants_jelly = self.alive & (self.energy <= 1 - cfg.jelly.energy)
+        wants_jelly = self.alive & ((self.energy <= 1 - cfg.jelly.energy) | body.fat_room(self))
         takes = np.where(np.arange(self.food_pos.shape[1]) < self.wild, takes[..., None], wants_jelly[..., None])
         if self.tree:
             # an apple on the tree goes to whoever jumps high enough under it, hungry or not
@@ -555,7 +589,7 @@ class World:
         before = self.energy.copy()
         self._credit(arena, food, who)
         np.add.at(self.energy, (arena[eats], who[eats]), np.where(wild, cfg.energy.food, cfg.jelly.energy)[eats])
-        np.clip(self.energy, 0, 1, out=self.energy)
+        body.settle(self)
         self.fed += self.energy - before
         self.nourished += self.energy - before
         np.add.at(self.crop, (arena[~eats], who[~eats]), 1)
@@ -707,10 +741,13 @@ class World:
         np.add.at(self.drunk, (arena, who), 1)
         self.nectar[arena, who] = round(cfg.flowers.boost * cfg.tick_hz)
         for _ in range(cfg.flowers.food):
-            hungry = self.energy[arena, who] <= 1 - cfg.energy.food
+            hungry = (self.energy[arena, who] <= 1 - cfg.energy.food) | body.fat_room(self)[arena, who] if cfg.fat.on \
+                else self.energy[arena, who] <= 1 - cfg.energy.food
             self.energy[arena[hungry], who[hungry]] += cfg.energy.food
             self.fed[arena[hungry], who[hungry]] += cfg.energy.food
             self.nourished[arena[hungry], who[hungry]] += cfg.energy.food
+            if cfg.fat.on:
+                body.settle(self)
             room = ~hungry & (self.crop[arena, who] < cfg.crop.capacity)
             self.crop[arena[room], who[room]] += 1
         log.trace('flowers drunk', tick=self.tick, count=len(arena))
@@ -816,16 +853,19 @@ class World:
     def _feed(self, eat: np.ndarray):
         """Eating chosen: from its crop if it carries any and has room, else in its own nest from the store, if it's hungry."""
         cfg = self.cfg
-        own = eat & (self.crop > 0) & (self.energy <= 1 - cfg.energy.food)
+        own = eat & (self.crop > 0) & ((self.energy <= 1 - cfg.energy.food) | body.fat_room(self))
         self.energy += cfg.energy.food * own
         self.fed += cfg.energy.food * own
         self.nourished += cfg.energy.food * own
         self.crop[own] -= 1
+        if cfg.fat.on:
+            body.settle(self)
         young = self.young > 0
         # the young eat from it whenever they aren't full, hungry or not, but a bite their size: everything costs them
         # [young] energy of what it costs a grown one, so a jelly goes that much further, and they take only what fits
         hunger = np.where(young, 1.0, cfg.jelly.hunger)
-        wants = eat & (self.crop == 0) & (self.nest_at() == self.colony) & (self.energy < hunger)
+        # with fat on, a grown nim with room in its fat eats from the store whatever its bar
+        wants = eat & (self.crop == 0) & (self.nest_at() == self.colony) & ((self.energy < hunger) | (body.fat_room(self) & ~young))
         bite = np.where(young, np.minimum(1.0, (1 - self.energy) / cfg.jelly.energy) * cfg.young.energy, 1.0)
         gain = np.where(young, np.minimum(1 - self.energy, cfg.jelly.energy), cfg.jelly.energy)
         sated = self.energy.copy()
@@ -841,7 +881,7 @@ class World:
             # a full young one's bite is 0, but it never gets one; dividing only where they do keeps numpy quiet
             self.energy[gets] += (gain * np.divide(took, bite, out=np.zeros_like(took), where=gets))[gets]
             self.jelly[gets] += took[gets]
-        np.clip(self.energy, 0, 1, out=self.energy)
+        body.settle(self)
         self.nourished += self.energy - sated
 
     def _hatch(self):
@@ -874,6 +914,8 @@ class World:
         self.physics.revive(a, i, self.egg_pos[a, i])
         self.heading[a, i] = [self.rngs[x].uniform(-np.pi, np.pi) for x in a]
         self.energy[a, i] = self.cfg.energy.start
+        self.fat[a, i] = 0
+        self.died_of[a, i] = 0
         self.alive[a, i] = True
         self.unborn[a, i] = False
         self.crop[a, i] = 0
@@ -911,7 +953,7 @@ class World:
         n = self.cfg.night
         if not n.on or n.cold <= 0:
             return 0.0, 0.0
-        kept = night.warmth(self.pos, self.alive, self.colony, self.nest_at() == self.colony, n)
+        kept = body.kept(self)
         dark = (1 - self.light())[:, None]
         return n.cold * dark * (1 - kept), dark * (1 - kept)
 

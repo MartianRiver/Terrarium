@@ -20,9 +20,31 @@ def rates(cfg: Config, share: float = 1.0) -> dict:
         cold = {'day': 0.0, 'dark out': n.cold, 'dark nest': n.cold * (1 - min(1.0, n.nest))}
     elif n.on:
         cold = {'day': 0.0, 'dark out': 0.0, 'dark nest': 0.0}
-    still = {k: (e.drain + c) * share for k, c in cold.items()}
-    thrust = {k: (e.drain + c + e.move) * share for k, c in cold.items()}
+    still = {k: (e.drain * e.rest + c) * share for k, c in cold.items()}
+    # walking at full speed with nothing on it: what weight costs is in body()
+    thrust = {k: (e.drain + c + e.move + e.work * cfg.creature.mass) * share for k, c in cold.items()}
     return {'resting': still, 'full thrust': thrust, 'full thrust, full crop': dict(thrust)}
+
+
+def body(cfg: Config, share: float = 1.0) -> dict:
+    """Energy a second by what the body is doing, in the day unless it says otherwise: still, asleep (still in the dark
+    and warm, in its own nest, nobody else near), and walking at full speed empty and laden (a full crop, slowed by it),
+    each also with the fat full. Laden walking costs work by the speed it's really going at."""
+    e, c, f = cfg.energy, cfg.creature, cfg.fat
+    nest_cold = cfg.night.cold * (1 - min(1.0, cfg.night.nest)) if cfg.night.on else 0.0
+    fat = f.capacity * f.heavy
+    load = cfg.crop.capacity * cfg.crop.mass
+    slowed = 1 - cfg.crop.slow * cfg.crop.capacity
+
+    def walk(extra: float, loaded: bool) -> float:
+        mass = c.mass + extra + (load if loaded else 0.0)
+        return (e.drain + e.move + e.work * mass * (slowed if loaded else 1.0)) * share
+
+    out = {'resting': e.drain * e.rest * share, 'asleep warm': (e.drain * e.sleep + nest_cold) * share,
+           'walking': walk(0.0, False), 'walking laden': walk(0.0, True)}
+    if f.on:
+        out |= {'walking, fat full': walk(fat, False), 'walking laden, fat full': walk(fat, True)}
+    return out
 
 
 def lasts(energy: float, rate: float) -> float:
@@ -37,7 +59,9 @@ def trip(cfg: Config, dist: float, young: bool = False) -> dict:
     out = cfg.creature.max_speed * (cfg.young.speed if young else 1.0)
     back = out * (1 - cfg.crop.slow * cfg.crop.capacity)
     secs = dist / out + (dist / back if back > 0 else INF)
-    walking, alive = e.move * share * secs, e.drain * share * secs
+    # weight costs by the distance, whatever the speed: out unladen, back with the crop full
+    weight = e.work * share * dist * (2 * cfg.creature.mass + cfg.crop.capacity * cfg.crop.mass) / cfg.creature.max_speed
+    walking, alive = e.move * share * secs + weight, e.drain * share * secs
     # an apple hangs out of reach: taking it costs a jump
     hop = cfg.jump.energy * share if cfg.tree.on else 0.0
     cost = walking + alive + hop
@@ -98,7 +122,7 @@ def budget(cfg: Config, arenas: int = 64, seed: int = 0) -> dict:
     for name, young in groups.items():
         share = cfg.young.energy if young else 1.0
         r = rates(cfg, share)
-        g = {'rates': r, 'lasts': {}}
+        g = {'rates': r, 'lasts': {}, 'body': body(cfg, share)}
         for state in ('resting', 'full thrust'):
             g['lasts'][state] = {k: {'start': lasts(cfg.energy.start, v), 'full': lasts(1.0, v)}
                                  for k, v in r[state].items()}
@@ -148,6 +172,11 @@ def fmt(x: float, places: int = 3) -> str:
     return '-' if x == INF else f'{x:.{places}f}'
 
 
+def body_on(cfg: Config) -> bool:
+    e = cfg.energy
+    return e.rest != 1 or e.sleep != 1 or e.work > 0 or cfg.fat.on
+
+
 def secs(x: float) -> str:
     return 'never' if x == INF else f'{x:.1f}' if x < 10 else f'{x:.0f}'
 
@@ -167,6 +196,10 @@ def show(cfg: Config, b: dict, name: str = '') -> str:
                 if c == 'dark nest' and row[c]['full'] == g['lasts'][state]['day']['full']:
                     continue
                 lines.append(f'    {state}, {c}'.ljust(34) + secs(row[c]['start']).rjust(11) + secs(row[c]['full']).rjust(11))
+        if body_on(cfg):
+            lines.append(f'  by what the body does'.ljust(34) + 'energy/s'.rjust(11) + 'lasts, s'.rjust(11))
+            for what, rate in g['body'].items():
+                lines.append(f'    {what}'.ljust(34) + fmt(rate, 4).rjust(11) + secs(lasts(1.0 + cfg.fat.capacity * ('fat' in what), rate)).rjust(11))
         if 'water' in g:
             lines.append(f'  water lasts, seconds'.ljust(34) + secs(g['water']['start']).rjust(11) + secs(g['water']['full']).rjust(11))
         if 'grass' in g:
@@ -190,7 +223,7 @@ def show(cfg: Config, b: dict, name: str = '') -> str:
     elif cfg.crop.capacity == 0:
         lines += ['', 'no crop: nothing is carried home, so there is no trip to price']
     for who in b['groups']:
-        if cfg.crop.capacity == 0:
+        if cfg.crop.capacity == 0 or not f['pieces']:
             break
         any_, near = f['any'][who], f['nearest'][who]
         t = any_[0]

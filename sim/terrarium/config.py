@@ -36,6 +36,39 @@ class Energy:
     move: float
     turn: float
     food: float
+    # what the body does changes what staying alive costs; all of these are off at their defaults
+    # share of `drain` paid while still (thrust below [tired] still if tired is on, else below `still`)
+    rest: float = 1.0
+    # share of `drain` paid instead while still in the dark and warm (see Night.nest and Night.huddle)
+    sleep: float = 1.0
+    still: float = 0.1
+    # energy a second per kg of body, fat and load, at full speed (0: moving costs only thrust and turn)
+    work: float = 0.0
+
+    def __post_init__(self):
+        if min(self.rest, self.sleep, self.still, self.work) < 0:
+            raise ConfigError('[energy] rest, sleep, still and work are 0 or more')
+
+
+@dataclass(frozen=True)
+class Fat:
+    capacity: float = 0.0   # a reserve beside energy, up to this much (0: no fat)
+    keep: float = 0.8       # share of the food past a full bar that is kept as fat
+    below: float = 0.5      # fat turns back into energy while energy is below this...
+    rate: float = 0.02      # ...at up to this much a second
+    heavy: float = 0.0      # kg each unit of fat weighs, for what moving costs ([energy] work)
+
+    def __post_init__(self):
+        if self.capacity < 0 or self.rate < 0 or self.heavy < 0:
+            raise ConfigError('[fat] capacity, rate and heavy are 0 or more')
+        if not 0 < self.keep <= 1:
+            raise ConfigError('[fat] keep is a share, above 0 to 1')
+        if not 0 <= self.below <= 1:
+            raise ConfigError('[fat] below is an energy, 0 to 1')
+
+    @property
+    def on(self) -> bool:
+        return self.capacity > 0
 
 
 @dataclass(frozen=True)
@@ -47,6 +80,8 @@ class Colonies:
     nest_radius: float
     nest_distance: float
     spawn_ring: float
+    # m² of nest a place needs: the nest grows to hold the colony (size + room) if that's more than nest_radius (0: off)
+    nest_area: float = 0.0
 
     @property
     def slots(self) -> int:
@@ -77,6 +112,8 @@ class Crop:
     capacity: int
     slow: float
     start: int
+    # kg each thing carried weighs (food in the crop, a berry or dropping in the jaws), for what moving costs
+    mass: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -194,6 +231,9 @@ class Tired:
     still: float
     below: float
     slowest: float
+    # `rest` is worth this many times as much while warm (in the nest or huddled), and again while still in the dark
+    warm: float = 1.0
+    dark: float = 1.0
 
     @property
     def on(self) -> bool:
@@ -464,6 +504,8 @@ class Config:
     vision: Vision
     episode: Episode
     block: tuple[Block, ...]
+    # sections added since, left out of a world file they're off: lab worlds from before still load
+    fat: Fat = dataclasses.field(default_factory=Fat)
 
     @property
     def dt(self) -> float:
@@ -552,9 +594,12 @@ def build(cls, data, where='config'):
     names = {f.name for f in dataclasses.fields(cls)}
     if unknown := sorted(set(data) - names):
         raise ConfigError(f'{where}: unknown key(s) {", ".join(unknown)}')
-    if missing := sorted(names - set(data)):
+    # a field with a default may be left out (the keys added since most worlds were written)
+    optional = {f.name for f in dataclasses.fields(cls) if f.default is not dataclasses.MISSING
+                or f.default_factory is not dataclasses.MISSING}
+    if missing := sorted(names - optional - set(data)):
         raise ConfigError(f'{where}: missing key(s) {", ".join(missing)}')
-    return cls(**{name: convert(hints[name], data[name], f'{where}.{name}') for name in names})
+    return cls(**{name: convert(hints[name], data[name], f'{where}.{name}') for name in names if name in data})
 
 
 def convert(kind, value, where):
