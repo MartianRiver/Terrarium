@@ -2,6 +2,7 @@
 // What's being asked now stays open at the top, then the newest answers and a card per line of work (lines.ts); the groups
 // below open on a tap, so the list starts short (pickplan.ts says what's in them).
 import { createLogger } from './lib/logger';
+import { highlightHref, highlightPlan, type Highlight } from './highlights';
 import { linePlan, type Cite, type LineCard, type Lines, type Question, type RunLine } from './lines';
 import { CHANNEL, plan, type Card, type Channel, type Chip, type Gallery, type Row, type Section, type Stage, type Status } from './pickplan';
 
@@ -52,6 +53,44 @@ function chips(label: string, list: Chip[]) {
     p.append(a);
   }
   return p;
+}
+
+// a date-only ISO string in the viewer's own zone ("1 Nov"), not UTC midnight
+function day(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+function highlight(h: Highlight) {
+  const li = el('li', '', 'picker-hl');
+  const a = link(highlightHref(h), el('b', h.title), el('span', h.about, 'picker-text'));
+  a.title = h.about;
+  const meta = el('span', '', 'picker-hl-meta');
+  meta.append(el('span', h.kind, `picker-tag kind-${h.kind}`), el('span', day(h.date), 'picker-when'));
+  a.append(meta);
+  li.append(a);
+  return li;
+}
+
+// moments worth another look, newest first: a strip you swipe along, with the rest folded away behind "more"
+function highlights(list: Highlight[] | undefined) {
+  const { shown, rest } = highlightPlan(list);
+  if (!shown.length) return null;
+  const box = el('section', '', 'picker-highlights');
+  box.setAttribute('aria-label', 'Highlights');
+  box.append(el('h3', 'Highlights'), el('p', 'Moments worth another look: things the nims found, funny or first. Newest first.', 'picker-about'));
+  const strip = el('ul', '', 'picker-strip');
+  strip.append(...shown.map(highlight));
+  box.append(strip);
+  if (rest.length) {
+    const more = document.createElement('details');
+    more.className = 'picker-fold';
+    const grid = el('ul', '', 'picker-strip wrap');
+    grid.append(...rest.map(highlight));
+    more.append(el('summary', `${rest.length} more`), grid);
+    box.append(more);
+  }
+  return box;
 }
 
 // a stage with something to watch opens to its checkpoints; one still to come is a greyed line
@@ -365,7 +404,8 @@ export class Picker {
     close.addEventListener('click', () => this.box.close());
     const foot = el('p', '', 'picker-foot');
     foot.append(close, link('/brains/', 'Every brain, and how they got here'));
-    const top = lines ? [askingNow(lines), ...(lines.answered.length ? [latestAnswers(lines)] : []), ...(lines.cards.length ? [lineCards(lines)] : [])] : [];
+    const hl = highlights(channel?.highlights);
+    const top = lines ? [...(hl ? [hl] : []), askingNow(lines), ...(lines.answered.length ? [latestAnswers(lines)] : []), ...(lines.cards.length ? [lineCards(lines)] : [])] : [];
     const body = sections.length || top.length ? [...top, ...sections.map(section)]
       : [el('p', 'The list isn’t answering right now, so here’s the garden.', 'picker-note')];
     this.box.replaceChildren(el('h2', 'What do you want to watch?'), ...(lines ? [help()] : []), ...body, foot);

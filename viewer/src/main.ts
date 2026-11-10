@@ -33,6 +33,8 @@ interface Source {
   // a replay's header `source` (brain, config), for what the vitals card reads from it
   about?: Record<string, unknown>;
   step(): Frame | null;
+  // a replay's length in ticks, so a start past the end can be held back (&from)
+  frames?: number;
   label(): string;
   // a live source (a game) can be waiting on its next frames; a replay always has one
   ready?(): boolean;
@@ -80,6 +82,7 @@ function replaySource(replay: Replay, name: string): Source {
   return {
     info: replay.info,
     about: replay.source,
+    frames: replay.frames.length,
     step: () => replay.frames[i++] ?? null,
     label: () => `${name} · ${clock(Math.max(0, i - 1) / hz)} / ${length}`,
   };
@@ -100,6 +103,10 @@ function boot() {
 
   const params = new URLSearchParams(location.search);
   const lite = params.has('lite');
+  // &from=<s>&to=<s>: a replay starts that many seconds in and, with &to, loops back there when it gets that far (the
+  // picker's highlights)
+  const from = Number(params.get('from')) || 0;
+  const to = Number(params.get('to')) || 0;
   const container = document.getElementById('world')!;
   // &turn=degrees: the close-up from another side (a reel's shot of a face)
   const stage = createStage(container, lite, (Number(params.get('turn')) || 0) * Math.PI / 180);
@@ -186,9 +193,22 @@ function boot() {
     tick = first.tick;
     stage.light(first.light);
     if (first.grass) stage.cover(first.grass);
+    if (from && source.frames) skipTo(Math.min(Math.round(from * source.info.tickHz), source.frames - 2));
     sounds.light(first.light, true);
     acc = 0;
     snap = true;
+  }
+
+  // plays the frames up to a tick without drawing them, so droppings, eggs and the rest are as they were by then
+  function skipTo(at: number) {
+    for (let next = source.step(); next; next = source.step()) {
+      view!.push(next);
+      cues.next(next);
+      tick = next.tick;
+      stage.light(next.light);
+      if (next.grass) stage.cover(next.grass);
+      if (tick >= at) break;
+    }
   }
 
   const camButton = document.createElement('button');
@@ -491,7 +511,7 @@ function boot() {
           break;
         }
         const next = source.step();
-        if (!next) {
+        if (!next || (to && source.frames && next.tick >= to * source.info.tickHz)) {
           restart();
           learns.ended();
           if (watching) void openLatest();

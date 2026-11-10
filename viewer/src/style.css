@@ -1394,3 +1394,102 @@ body {
   display: block;
   height: 6px;
 }
+
+/* highlights: a strip of cards you swipe along, the rest folded under "more" (picker.ts, highlights.ts) */
+.picker-highlights {
+  margin: 0 0 10px;
+}
+
+.picker-highlights h3 {
+  margin-left: 2px;
+}
+
+.picker-highlights .picker-about {
+  margin-left: 2px;
+}
+
+#picker .picker-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding: 2px 0 8px;
+}
+
+#picker .picker-strip.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-top: 8px;
+}
+
+.picker-hl {
+  flex: 0 0 210px;
+  scroll-snap-align: start;
+}
+
+.picker-strip.wrap .picker-hl {
+  flex-basis: 200px;
+  flex-grow: 1;
+}
+
+#picker .picker-hl a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border: 1px solid rgb(44 58 51 / 0.14);
+  border-radius: 12px;
+  background: rgb(95 174 79 / 0.06);
+  color: inherit;
+  text-decoration: none;
+}
+
+.picker-hl b {
+  font-size: 14px;
+}
+
+.picker-hl .picker-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.picker-hl-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.picker-hl-meta .picker-tag {
+  justify-self: auto;
+}
+
+.picker-hl-meta .picker-when {
+  font-size: 11px;
+}
+
+.picker-tag.kind-funny {
+  background: rgb(232 190 60 / 0.3);
+}
+
+.picker-tag.kind-cool {
+  background: rgb(80 160 210 / 0.25);
+}
+
+.picker-tag.kind-milestone {
+  background: rgb(95 174 79 / 0.28);
+}
+
+.picker-tag.kind-exploit {
+  background: rgb(214 110 80 / 0.25);
+}
+
+#picker .picker-highlights .picker-fold {
+  margin-left: 0;
+}
