@@ -45,6 +45,8 @@ def padded(make: Make) -> Make:
             return x[..., :len(ACTIONS)]
         if hasattr(act, 'executed'):
             go.executed = act.executed
+        if hasattr(act, 'state'):
+            go.state, go.restore = act.state, act.restore
         return go
     return build
 
