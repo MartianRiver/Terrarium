@@ -273,8 +273,9 @@ def load(path: Path | str, cfg: Config | None = None, replay_journal: bool = Fal
     if doc['format'] != FORMAT:
         raise SaveError(f'save format {doc["format"]}, this code reads {FORMAT}')
     saved_cfg = build(Config, doc['config'])
-    if cfg is not None and cfg.to_dict() != doc['config']:
-        raise Mismatch(f'config differs from the one this world was saved under: {differences(doc["config"], cfg.to_dict())}')
+    # the world saves the config it ran with, a nest grown to its colony included
+    if cfg is not None and (grown := World._nest_sized(cfg).to_dict()) != doc['config']:
+        raise Mismatch(f'config differs from the one this world was saved under: {differences(doc["config"], grown)}')
     cfg = saved_cfg
     head, _ = commit()
     if head != doc['commit']:

@@ -4,6 +4,7 @@
 # meadow feeds nothing. Rays don't see it: the brain feels the cover under it and which way it rises (as smell does).
 import numpy as np
 
+from . import body
 from .log import Logger
 
 TRIES = 100
@@ -99,7 +100,11 @@ class Meadows:
             return
         # lapping the cover takes standing still: the rate falls with speed, to nothing at `still` m/s
         slow = np.clip(1 - np.hypot(w.vel[..., 0], w.vel[..., 1]) / g.still, 0, 1) if g.still > 0 else 1.0
-        gain = np.minimum(g.bite * dt * g.food * slow, 1 - w.energy) * w.alive
+        # with fat on, a nim with a full bar grazes on while its fat has room (what's kept of a bite is `keep` of it)
+        room = 1 - w.energy
+        if w.cfg.fat.on:
+            room = room + (w.cfg.fat.capacity - w.fat) / w.cfg.fat.keep
+        gain = np.minimum(g.bite * dt * g.food * slow, room) * w.alive
         want = gain / g.food * share
         c = self.cell_of(w.pos)
         flat = (np.arange(w.arenas)[:, None] * self.n + c[..., 0]) * self.n + c[..., 1]
@@ -111,12 +116,19 @@ class Meadows:
         gain, want = gain * fair, want * fair
         self.cover -= np.bincount(flat.ravel(), want.ravel(), cells).reshape(self.cover.shape).astype(np.float32)
         np.maximum(self.cover, 0, out=self.cover)
+        ate = gain
+        before = w.energy.copy() if w.cfg.fat.on else None
         w.energy += gain
-        np.clip(w.energy, 0, 1, out=w.energy)
+        if before is not None:
+            body.settle(w)
+            # what stayed in the bar, not what went to fat
+            gain = w.energy - before
+        else:
+            np.clip(w.energy, 0, 1, out=w.energy)
         w.fed += gain
         w.nourished += gain
-        w.grazed += gain
-        w.grazing += dt * (gain > 0)
+        w.grazed += ate
+        w.grazing += dt * (ate > 0)
 
     def sense(self, heading: np.ndarray) -> tuple[np.ndarray, ...]:
         """The cover under each nim, and which way off its heading it rises within FEEL m, as sin and cos (both 0

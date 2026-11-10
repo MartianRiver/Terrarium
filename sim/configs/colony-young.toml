@@ -41,6 +41,26 @@ move = 0.02
 turn = 0.004
 # from one common food
 food = 0.4
+# share of `drain` paid while keeping still (thrust under `still`, or under [tired] still when that's on): resting costs
+# less than walking about, as it does for anything alive. 1 is the same as walking
+rest = 1.0
+# the share paid instead while still in the dark and warm (in the nest or huddled, [night] warmth of 0.5 or more): asleep.
+# -1 follows `rest`; a number here overrides it (asleep can cost less than resting, not more by accident)
+sleep = -1.0
+still = 0.1
+# per second, times kilograms (body, fat, what it carries or holds) and the share of top speed it's actually going: a
+# heavy nim costs more to move, and pushing a wall costs nothing as it doesn't move. 0 leaves moving to move and turn
+work = 0.0
+
+[fat]
+# a reserve beside energy, up to `capacity` (0: none). Food that would take energy past full goes to fat instead, `keep`
+# of it while there's room, and a nim with room in its fat eats with a full bar. Below `below` energy, fat turns back into
+# energy at up to `rate` a second. Each unit weighs `heavy` kg when moving costs by weight ([energy] work)
+capacity = 0.0
+keep = 0.8
+below = 0.5
+rate = 0.02
+heavy = 0.0
 
 [colonies]
 count = 3
@@ -52,6 +72,9 @@ nest_radius = 1.6
 nest_distance = 0.68
 # creatures start on a ring this far from their nest's centre
 spawn_ring = 2.5
+# m² of nest a place needs: the nest grows to hold the whole colony (size + room) if that's more than nest_radius.
+# 0 leaves it at nest_radius
+nest_area = 0.0
 
 [home]
 # the way home is felt in full within `near` m of the nest's centre and fades to nothing by `far` (0: felt
@@ -80,6 +103,8 @@ capacity = 2
 slow = 0.15
 # food in each crop at the start (a training world can start them full)
 start = 0
+# kg each thing carried weighs (food in the crop, a berry or dropping in the jaws), for what moving costs ([energy] work)
+mass = 0.0
 
 [jelly]
 # what one food in the store gives back when eaten, against [energy] food fresh
@@ -159,6 +184,10 @@ rest = 0.0
 still = 0.0
 below = 0.0
 slowest = 1.0
+# resting brings stamina back this many times as fast while warm (in the nest or huddled), and again while still in the
+# dark, so sleeping somewhere warm at night restores it fastest. 1 is no difference
+warm = 1.0
+dark = 1.0
 
 [flowers]
 # now and then by day a nectar flower opens somewhere clear of nests and walls, every every_min to every_max seconds
