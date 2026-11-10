@@ -1,0 +1,1 @@
+The watch page's picker opens on a Highlights row: moments from earlier runs worth watching again (a hack, a first, something funny), newest first as cards you swipe along with the rest behind "more", each playing its replay from the second it happened (`&from=` and `&to=` on a replay link start it there and loop that stretch).

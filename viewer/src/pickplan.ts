@@ -3,6 +3,7 @@
 // a card per family with the question it asks and a row per setup saying what's different and how it did; then the
 // main line's steps from the gallery, newest first. picker.ts draws it.
 import { flatten } from './gallery';
+import type { Highlight } from './highlights';
 import type { QStatus, Ref } from './lines';
 import { CHANNEL, runRow, sentence, watch, when } from './pickshared';
 
@@ -47,7 +48,7 @@ interface Replay { label: string; replay: string; about?: string }
 export interface Item {
   replay: string; title: string; game?: string; samples?: number; took?: string; stages?: Replay[]; earlier?: Replay[];
 }
-export interface Channel { updated: string; games?: Record<string, Game>; items: Item[] }
+export interface Channel { updated: string; games?: Record<string, Game>; items: Item[]; highlights?: Highlight[] }
 interface Brain { name: string; replay: string; world: string; samples: number; total: number; started?: string; finished?: string }
 export interface Gallery {
   updated: string; steps: { title: string; text?: string; brains: Brain[] }[];
