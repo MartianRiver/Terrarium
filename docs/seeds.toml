@@ -252,3 +252,11 @@ use = "confirm"
 what = "the grazing ladder and its controls (finding 0031, anchor_probe.py), fresh after 9,710,000 was also used for reading later rungs, never used for choosing"
 where = "findings/0031"
 date = 2026-11-10
+
+[[block]]
+start = 9_740_000
+size = 64
+use = "confirm"
+what = "far meadows (finding 0033): the 6 m brains at 6 m and the 12 m start-1.0 brains at 12 m, anchor_probe and survival evals, never used for choosing"
+where = "findings/0033"
+date = 2026-11-10
