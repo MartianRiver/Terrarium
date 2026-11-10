@@ -271,7 +271,22 @@ def brain_policy(path: Path | str, mode: str = 'drawn', device: str = 'cpu',
             nonlocal last
             last = actions[..., :2].copy()
 
+        def state() -> dict:
+            if event is not None:
+                # wipe_on's checks remember the last choice in closures of their own
+                raise NotImplementedError('a policy wiped on an event keeps state that save() can\'t reach yet')
+            return {'last': last.copy(), 'held': None if held is None else held.copy(), 'ticks': ticks,
+                    'notes': notes.detach().cpu().numpy().copy(), 'noise': [r.bit_generator.state for r in noise.rngs]}
+
+        def restore(s: dict):
+            nonlocal last, held, ticks, notes
+            last, held, ticks = s['last'].copy(), None if s['held'] is None else s['held'].copy(), s['ticks']
+            notes = torch.from_numpy(s['notes'].copy()).to(notes.device)
+            for r, st in zip(noise.rngs, s['noise']):
+                r.bit_generator.state = st
+
         act.executed = executed
+        act.state, act.restore = state, restore
         return act
     return make
 
