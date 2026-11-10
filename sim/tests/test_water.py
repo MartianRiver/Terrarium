@@ -237,7 +237,7 @@ def test_rays_say_how_far_the_pond_is_as_they_do_a_nest():
 def test_water_is_a_self_input_and_pond_the_last_ray_input():
     w = World(WATER, 1, 0)
     w.water[:] = 0.37
-    assert SELF[-4] == 'water' and RAY[-1] == 'pond'
+    assert RAY[-1] == 'pond'
     assert observe(w, np.zeros((1, 1, 2))).me[0, SELF.index('water')] == pytest.approx(0.37)
 
 

@@ -108,6 +108,20 @@ def test_a_save_is_refused_into_a_different_config(tmp_path):
         load(tmp_path / 'evil.save')
 
 
+def test_a_world_with_fat_and_a_grown_nest_saves_and_loads_under_the_config_it_was_made_from(tmp_path):
+    cfg = colony()
+    cfg = replace(cfg, fat=replace(cfg.fat, capacity=0.3), colonies=replace(cfg.colonies, nest_area=3.0))
+    world = World(cfg, 2, SEED)
+    assert world.cfg.colonies.nest_radius > cfg.colonies.nest_radius
+    for t in range(30):
+        world.step(actions(world, t))
+    world.fat[:] = 0.1
+    saves.save(world, tmp_path / 'w.save')
+    resumed, _ = load(tmp_path / 'w.save', cfg)
+    assert not unlike(fingerprint(world), fingerprint(resumed))
+    assert np.array_equal(resumed.fat, world.fat)
+
+
 @pytest.mark.parametrize('arenas', [1, 4])
 @pytest.mark.parametrize('where', ['nobody near anybody', 'in contact'])
 def test_resume_plays_the_same_ticks_bit_for_bit(tmp_path, arenas, where):

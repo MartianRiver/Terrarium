@@ -208,12 +208,13 @@ def test_the_sense_is_the_cover_under_it_and_which_way_it_rises_off_its_heading(
     # nothing within reach: even all round, so no direction
     put(w, m + (6.0, 6.0) * np.sign(-m))
     assert [float(x[0, 0]) for x in w.grassed()] == [0.0, 0.0, 0.0]
-    # it reaches the brain as the last three inputs, grazing included
+    # it reaches the brain as three inputs together, grazing included
     put(w, m + (-1.8, 0.0))
     w.heading[:] = 0.0
     obs = observe(w, np.zeros((1, 1, 2))).me[0]
-    assert SELF[-3:] == ('grass', 'grass_sin', 'grass_cos')
-    assert obs[-3:] == pytest.approx([0.0, 0.0, 1.0], abs=0.15)
+    k = SELF.index('grass')
+    assert SELF[k:k + 3] == ('grass', 'grass_sin', 'grass_cos')
+    assert obs[k:k + 3] == pytest.approx([0.0, 0.0, 1.0], abs=0.15)
 
 
 def test_a_meadow_is_where_it_should_be():
