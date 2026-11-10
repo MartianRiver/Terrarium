@@ -260,3 +260,91 @@ use = "confirm"
 what = "far meadows (finding 0033): the 6 m brains at 6 m and the 12 m start-1.0 brains at 12 m, anchor_probe and survival evals, never used for choosing"
 where = "findings/0033"
 date = 2026-11-10
+
+[[block]]
+start = 9_910_000
+size = 64
+use = "confirm"
+what = "Codex's dusk intervention test (finding 0036, 64 games × 4 action draws, n52-ctl), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_920_000
+size = 64
+use = "confirm"
+what = "Codex's hold-and-release test (finding 0036, 64 games, n52-ctl), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_930_000
+size = 64
+use = "confirm"
+what = "Codex's value-by-phase test (finding 0036, block 1 of 5, 64 games, n52-ctl and n55), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_931_000
+size = 64
+use = "confirm"
+what = "Codex's value-by-phase test (finding 0036, block 2 of 5, 64 games, n52-ctl and n55), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_932_000
+size = 64
+use = "confirm"
+what = "Codex's value-by-phase test (finding 0036, block 3 of 5, 64 games, n52-ctl and n55), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_933_000
+size = 64
+use = "confirm"
+what = "Codex's value-by-phase test (finding 0036, block 4 of 5, 64 games, n52-ctl and n55), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_934_000
+size = 64
+use = "confirm"
+what = "Codex's value-by-phase test (finding 0036, block 5 of 5, 64 games, n52-ctl and n55), never used for choosing"
+where = "findings/0036"
+date = 2026-11-10
+
+[[block]]
+start = 9_960_000
+size = 256
+use = "confirm"
+what = "the night-spread arms scored once on a fresh block (finding 0035: n49, n52, n53, n54, 12 brains), never used for choosing"
+where = "findings/0035"
+date = 2026-11-10
+
+[[block]]
+start = 9_970_000
+size = 256
+use = "confirm"
+what = "n55 and n57 against the n52-ctl parents in the 60 s night and in the 30 s night with work (finding 0037), never used for choosing"
+where = "findings/0037"
+date = 2026-11-10
+
+[[block]]
+start = 9_980_000
+size = 256
+use = "choosing"
+what = "n58 (cold .03/.06, start at nightfall, matched control) scored in the 60 s night, and death times for n58-ctl and -cold06; chose the next night rungs (n60 to n68): cold, death, sleep, fat, gamma .995, jelly .6, frozen food tests"
+where = "findings/0037, findings/0038, findings/0039"
+date = 2026-11-10
+
+[[block]]
+start = 9_990_000
+size = 256
+use = "confirm"
+what = "the night rungs n58 to n64 (cold, a costlier death, sleep and its six twin pairs) scored once in the 60 s night"
+where = "findings/0038"
+date = 2026-11-11
