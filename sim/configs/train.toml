@@ -45,6 +45,9 @@ needs_lost = 0.0
 # once, on the tick a night ends, to each living nim inside its own nest then: the end of a night spent at home,
 # not each second of it (snug and warm pay by the second, and the brains still walked out into the dark)
 dawn = 0.0
+# hunger hurts all the time: each second a living nim is charged this times (1 - energy) squared, and the same for
+# thirst where a world has water; it fades near full. Not for the dead, the unborn or an arena about to start over
+hunger = 0.0
 
 [ppo]
 # samples to train on in all: one creature making one choice is one sample

@@ -70,12 +70,14 @@ class Ponds:
         """One tick of thirst and drinking for the living; share is what the young pay of each cost."""
         w = self.world
         t, dt = w.cfg.water, w.cfg.dt
-        dried = np.clip(w.water - t.drain * dt * share, 0, 1)
+        # not clipped at 0 yet: a drink has to cover what the drain took past empty, or it dies
+        dried = w.water - t.drain * dt * share
+        floor = np.clip(dried, 0, 1)
         # lapping takes standing still: the rate falls with speed, to nothing at `still` m/s
         slow = np.clip(1 - np.hypot(w.vel[..., 0], w.vel[..., 1]) / t.still, 0, 1) if t.still > 0 else 1.0
-        left = np.clip(dried + t.drink * dt * self.inside() * slow, 0, 1)
-        w.drank += np.where(w.alive, left - dried, 0)
-        w.water = np.where(w.alive, left, w.water)
+        sip = np.clip(floor + t.drink * dt * self.inside() * slow, 0, 1) - floor
+        w.drank += np.where(w.alive, sip, 0)
+        w.water = np.where(w.alive, np.clip(dried + sip, 0, 1), w.water)
 
     def edge(self, origin, dirs, start) -> np.ndarray:
         """(arenas, creatures, rays): how far along each ray a pond's edge is, inf for none; ponds don't stop a ray."""

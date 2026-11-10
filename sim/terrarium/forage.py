@@ -133,11 +133,13 @@ class Forage:
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
         # tick, and an arena where everyone has died only ticks on with nobody in it
-        lived, snug, fun, play, dawned = (np.zeros(alive.shape) for _ in range(5))
+        lived, snug, fun, play, dawned, pang = (np.zeros(alive.shape) for _ in range(6))
         for _ in range(self.repeat):
             dark = w.dark.copy()
             w.step(actions)
             lived += w.alive
+            if r.hunger:
+                pang += w.alive * ((1 - w.energy)**2 + ((1 - w.water)**2 if w.ponds else 0))
             if w.tag:
                 play += w.tag.points(w.alive)
             if w.seek:
@@ -171,6 +173,8 @@ class Forage:
             lost = (1 - before['energy'])**2 - (1 - w.energy + kept)**2
             lost += (1 - before['water'])**2 - (1 - w.water + drunk)**2
             needs += r.needs_lost * lost * (alive & w.alive & ~w.ended[:, None])
+        if r.hunger:
+            needs -= r.hunger * w.cfg.dt * pang * (alive & w.alive & ~w.ended[:, None])
         own = ((r.food * gain - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)

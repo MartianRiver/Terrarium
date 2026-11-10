@@ -285,3 +285,23 @@ def test_grass_comes_off_a_world_with_it_by_zeroing_its_meadows():
     off = meadow(meadows=0)
     w = World(off, 1, 0)
     assert w.grass is None and [float(x[0, 0]) for x in w.grassed()] == [0.0, 0.0, 0.0]
+
+
+def test_a_nim_grazing_less_than_it_spends_starves_and_one_on_a_full_cell_lives():
+    # a cell regrowing 0.001 a tick feeds 0.0004 energy, against 0.0005 spent just being alive
+    w = on_grass(energy=0.0)
+    w.grass.cover[:] = 0
+    w.grass.start[:] = 1
+    idle(w, 3)
+    assert not w.alive[0, 0] and w.energy[0, 0] == 0
+    w = on_grass(energy=0.0)
+    idle(w, 3)
+    assert w.alive[0, 0] and 0 < w.energy[0, 0] <= 1
+    assert w.debt.sum() == 0
+
+
+def test_a_big_meal_covers_what_was_spent_past_empty():
+    w = on_grass(energy=1e-5)
+    w.energy[:] = 1e-5
+    idle(w)
+    assert w.alive[0, 0]

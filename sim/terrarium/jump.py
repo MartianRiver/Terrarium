@@ -17,7 +17,7 @@ def step(world, jump: np.ndarray):
         world.vz[up] = np.sqrt(2 * G * j.height)
         cost = j.energy * np.where(world.young > 0, cfg.young.energy, 1.0) * up
         world.spent += cost
-        world.energy = np.clip(world.energy - cost, 0, 1)
+        world._spend(cost)
         world.jumps += up
     flying = (world.z > 0) | up
     # exactly where gravity has it, so the top of a jump is its height and no higher

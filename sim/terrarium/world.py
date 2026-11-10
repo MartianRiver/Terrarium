@@ -119,6 +119,8 @@ class World:
         # where everyone stands is set by reset() at the end, the same way every later game is
         self.heading = np.zeros((arenas, n))
         self.energy = np.where(self.spare, 0.0, np.full((arenas, n), cfg.energy.start))
+        # spend that came due with nothing left, owed until this tick's food is in (always 0 between steps)
+        self.debt = np.zeros((arenas, n))
         self.alive = np.tile(~self.spare, (arenas, 1))
         # places nobody has been in yet this episode, which replays leave out
         self.unborn = np.tile(self.spare, (arenas, 1))
@@ -452,7 +454,7 @@ class World:
                   + g.energy * self.holding + cfg.carry.energy * laden) * cfg.dt * share
         self.spent += effort
         cold, exposure = self._cold()
-        self.energy = np.clip(self.energy - effort - (e.drain + cold) * cfg.dt * share, 0, 1)
+        self._spend(effort + (e.drain + cold) * cfg.dt * share)
         if cfg.night.cold > 0 and cfg.night.on:
             self.chill += (exposure - self.chill) * min(1.0, cfg.dt / cfg.night.chill_time)
         if cfg.tired.on:
@@ -496,7 +498,11 @@ class World:
             self.tree.step()
         if self.smell:
             self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
-        dying = self.alive & (self.energy <= 0)
+        # a meal has to cover what was spent past empty, or it ends the tick at 0 or less
+        owed = self.energy - self.debt
+        dying = self.alive & (owed <= 0)
+        self.energy = np.clip(owed, 0, 1)
+        self.debt[:] = 0
         if self.ponds:
             dying |= self.alive & (self.water <= 0)
         if dying.any():
@@ -523,6 +529,10 @@ class World:
             self._hatch()
         self.age += 1
         self.tick += 1
+
+    def _spend(self, cost: np.ndarray):
+        self.debt += np.maximum(cost - self.energy, 0)
+        self.energy = np.clip(self.energy - cost, 0, 1)
 
     def _eat(self):
         cfg = self.cfg
@@ -591,7 +601,7 @@ class World:
         if cfg.carry.lift > 0 and lifted.any():
             cost = cfg.carry.lift * np.where(self.young > 0, cfg.young.energy, 1.0) * lifted
             self.spent += cost
-            self.energy = np.clip(self.energy - cost, 0, 1)
+            self._spend(cost)
 
     def _laden(self) -> np.ndarray:
         return (self.load >= 0) | (self.block_load >= 0) | (self.dung.load >= 0 if self.dung else False)

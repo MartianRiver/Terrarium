@@ -292,3 +292,17 @@ def test_with_still_set_walking_through_a_pond_drinks_nothing_and_standing_drink
         gained[thrust] = w.water[0, 0] - before
     assert gained[0.0] == pytest.approx((T.drink - T.drain) * DT)
     assert speed > 0.5 and gained[1.0] == pytest.approx(-T.drain * DT)
+
+
+def test_a_sip_smaller_than_the_drain_does_not_keep_it_alive():
+    cfg = replace(WATER, water=replace(T, drink=T.drain * 0.8))
+    w = World(cfg, 1, 0)
+    put(w, pond=w.pos[0, 0])
+    w.water[:] = 0
+    still(w)
+    assert not w.alive[0, 0]
+    w = World(cfg, 1, 0)
+    put(w, pond=w.pos[0, 0])
+    w.water[:] = 0.5
+    still(w, 20)
+    assert w.alive[0, 0] and w.water[0, 0] < 0.5
