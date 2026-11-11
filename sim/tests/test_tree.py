@@ -264,3 +264,48 @@ def test_the_burrows_carry_is_recorded_and_clears_the_next_step():
     assert world.pos[0, 0] == pytest.approx(world.nests[0])
     world.step(act())
     assert (world.tree.jumped == 0).all()
+
+
+# the trunk's scent: a world with smell on, nobody smelling any apples (night)
+SMELLY = replace(TREE, arena=replace(TREE.arena, size=32.0), smell=replace(TREE.smell, cell=0.5, spread=0.2, fade=0.001, leak=0.1))
+SCENTED = replace(SMELLY, tree=replace(SMELLY.tree, scent=1.0))
+
+
+def smell_for(cfg, ticks, arenas=1):
+    world = World(cfg, arenas, seed=2)
+    assert world.smell
+    nobody = np.zeros_like(world.food_present)
+    for _ in range(ticks):
+        world.smell.step(world.food_pos, nobody, world.block_pos, world.block_angle, cfg.tree.scent)
+    return world
+
+
+def test_no_scent_leaves_the_smell_as_it_was():
+    off = smell_for(SMELLY, 200).smell
+    assert off and not off.smell.any() and off.trunk is None
+    # with apples out it is the same field whether or not the dial is passed
+    a, b = World(SMELLY, 2, seed=2), World(SMELLY, 2, seed=2)
+    assert a.smell and b.smell
+    for _ in range(100):
+        a.smell.step(a.food_pos, a.food_present, a.block_pos, a.block_angle)
+        b.smell.step(b.food_pos, b.food_present, b.block_pos, b.block_angle, 0.0)
+    assert a.smell.smell.any() and (a.smell.smell == b.smell.smell).all()
+
+
+def test_scent_pulls_toward_the_trunk_from_ten_metres():
+    world = smell_for(SCENTED, 600, arenas=4)
+    assert world.smell
+    trunk = world.block_pos[:, SCENTED.tree.trunk]
+    for t in np.linspace(0, 2 * np.pi, 8, endpoint=False):
+        pos = trunk + 10 * np.array([np.cos(t), np.sin(t)])
+        keep = (np.abs(pos) < SCENTED.arena.size / 2 - 0.5).all(1)
+        _, sin, cos = world.smell.sense(pos[:, None], np.zeros((4, 1)))
+        off = np.abs((np.arctan2(sin[:, 0], cos[:, 0]) - (t + np.pi) + np.pi) % (2 * np.pi) - np.pi)
+        assert keep.any() and (off[keep] < np.pi / 4).all()
+
+
+def test_scent_needs_smell_and_the_tree_on():
+    with pytest.raises(ConfigError, match='smell'):
+        World(replace(TREE, tree=replace(TREE.tree, scent=1.0)))
+    with pytest.raises(ConfigError, match='scent'):
+        replace(TREE.tree, points=0.0, scent=1.0)

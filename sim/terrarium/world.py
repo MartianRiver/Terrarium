@@ -236,7 +236,8 @@ class World:
         self.food_by = np.full((arenas, slots), -1)
         # blocks one creature can drag (the vault's doors)
         self.doors = [k for k, b in enumerate(cfg.block) if cfg.grab.on and b.mass * cfg.ground.friction < cfg.grab.grip]
-        self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors) if cfg.smell.on else None
+        self.smell = Field(cfg.smell, arenas, cfg.arena.size, cfg.block, self.doors,
+                           cfg.tree.trunk if cfg.tree.scent > 0 else None) if cfg.smell.on else None
         self.tag = Tag(self) if cfg.tag.on else None
         self.seek = Seek(self) if cfg.seek.on else None
         self.flags = Flags(self) if cfg.flag.on else None
@@ -315,9 +316,12 @@ class World:
             gap = box_gap(self.nests, b)
             if (gap <= reach).any():
                 raise ConfigError(f'block[{i}] at ({b.x}, {b.y}) is close enough to a nest for creatures to spawn inside it')
-        # smell's walls and doors that swing shut go by where blocks are set, not where they're scattered to
-        if self.cfg.arena.scatter and (self.cfg.smell.on or any(b.carry or b.shut for b in self.cfg.block)):
-            raise ConfigError('arena.scatter is for blocks that stay put: not with smell, carry or shut')
+        # doors that swing shut go by where blocks are set, not where they're scattered to (smell redraws its walls from
+        # where blocks stand)
+        if self.cfg.arena.scatter and any(b.carry or b.shut for b in self.cfg.block):
+            raise ConfigError('arena.scatter is for blocks that stay put: not with carry or shut')
+        if self.cfg.tree.scent > 0 and not self.cfg.smell.on:
+            raise ConfigError('[tree] scent needs [smell] on')
         if self.cfg.arena.maze:
             check_maze(self.cfg)
         if self.cfg.colonies.nest_area > 0 and (np.abs(self.nests) + self.cfg.colonies.nest_radius > self.cfg.arena.size / 2).any():
@@ -528,7 +532,7 @@ class World:
         if self.tree:
             self.tree.step()
         if self.smell:
-            self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle)
+            self.smell.step(self.food_pos, self.food_present, self.block_pos, self.block_angle, self.cfg.tree.scent)
         if cfg.fat.on:
             # fat covers what's owed (and tops the bar up to [fat] below), after the meals and before the death check
             body.burn_fat(self)

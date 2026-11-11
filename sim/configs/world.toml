@@ -350,6 +350,8 @@ move = 0.0
 start = 0.0
 # unloading an apple at home takes the carrier down into the nest, and it comes back up at the middle turned any way
 burrow = false
+# the trunk gives off this much smell a tick, day and night, apples or not (0: none; needs [smell] on)
+scent = 0.0
 
 [ground]
 # how fast a sliding block slows, m/s² (friction coefficient times g)
