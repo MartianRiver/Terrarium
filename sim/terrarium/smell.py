@@ -2,7 +2,8 @@
 # little to each neighbouring cell every tick, and fades. Blocks stop it, except the ones a creature can drag (a
 # door), which let some through, as a loose door would. So it reaches round walls and out of a shut room's doors,
 # and tells a creature food is that way before it can see any. A creature senses how strong it is where it stands,
-# and which way it gets stronger.
+# and which way it gets stronger. A tree's trunk can give off smell too ([tree] scent): a landmark that smells all the
+# time. It doesn't stop the smell, which goes round a post, and gives off from the cell it stands in.
 
 import numpy as np
 
@@ -15,8 +16,8 @@ FAINT, STRONG = 1e-4, 10.0
 
 
 class Field:
-    def __init__(self, cfg: Smell, arenas: int, size: float, blocks, leaky: list[int]):
-        self.cfg, self.size = cfg, size
+    def __init__(self, cfg: Smell, arenas: int, size: float, blocks, leaky: list[int], trunk: int | None = None):
+        self.cfg, self.size, self.trunk = cfg, size, trunk
         self.n = int(round(size / cfg.cell))
         self.blocks, self.leaky = blocks, leaky
         self.smell = np.zeros((arenas, self.n, self.n), np.float32)
@@ -36,6 +37,8 @@ class Field:
         x, y = c[None, :, None], c[None, None, :]
         passes = np.ones((len(idx), self.n, self.n), np.float32)
         for k, b in enumerate(self.blocks):
+            if k == self.trunk:
+                continue
             dx, dy = x - block_pos[:, k, 0, None, None], y - block_pos[:, k, 1, None, None]
             cos, sin = np.cos(block_angle[:, k])[:, None, None], np.sin(block_angle[:, k])[:, None, None]
             # a cell counts as in the block when any of it is
@@ -46,7 +49,8 @@ class Field:
         self.gaps[0][idx] = np.minimum(passes[:, 1:], passes[:, :-1])
         self.gaps[1][idx] = np.minimum(passes[:, :, 1:], passes[:, :, :-1])
 
-    def step(self, food_pos: np.ndarray, present: np.ndarray, block_pos: np.ndarray, block_angle: np.ndarray):
+    def step(self, food_pos: np.ndarray, present: np.ndarray, block_pos: np.ndarray, block_angle: np.ndarray,
+             scent: float = 0.0):
         due = np.flatnonzero(self.ticks % REDRAW == 0) if self.blocks else ()
         if len(due):
             self._draw(due, block_pos[due], block_angle[due])
@@ -65,6 +69,9 @@ class Field:
         cell = np.clip(((food_pos + self.size / 2) / self.cfg.cell).astype(int), 0, self.n - 1)
         a, f = np.nonzero(present)
         np.add.at(s, (a, cell[a, f, 0], cell[a, f, 1]), p[a, cell[a, f, 0], cell[a, f, 1]])
+        if scent > 0 and self.trunk is not None:
+            at = np.clip(((block_pos[:, self.trunk] + self.size / 2) / self.cfg.cell).astype(int), 0, self.n - 1)
+            s[np.arange(len(s)), at[:, 0], at[:, 1]] += scent
 
     def sense(self, pos: np.ndarray, heading: np.ndarray) -> tuple[np.ndarray, ...]:
         """How strong the smell is where each creature stands, 0 (faint or none) to 1, and which way off its heading

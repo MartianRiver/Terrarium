@@ -1,0 +1,1 @@
+`[tree] scent` makes the apple tree's trunk give off that much smell a tick, by day and night, apples or not, so it can be smelled from across the arena without seeing it (0, the default, is off; it needs `[smell]`). A trunk doesn't stop smell, and `[arena] scatter` is allowed with smell now, which redraws its walls from where blocks stand.
