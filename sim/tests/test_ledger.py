@@ -66,7 +66,7 @@ def test_a_new_reward_term_or_play_hook_is_never_skipped():
 
 
 def test_every_source_finds_its_line_in_the_step():
-    assert all(ledger.line_of(s.anchor) for s in ledger.REGISTRY)
+    assert all(ledger.line_of(s.anchor, s.module) for s in ledger.REGISTRY)
 
 
 def test_every_reward_term_has_a_source():
@@ -80,3 +80,26 @@ def test_the_table_and_json_render():
     data = ledger.build(WORLD, TRAIN)
     text = ledger.render(data, ('w', 't'))
     assert '| source | when it pays | who gets it | size | delay / weight |' in text and '## Warnings' in text
+
+
+def test_the_body_costs_are_listed_with_what_each_second_of_them_comes_to():
+    world = replace(WORLD, energy=replace(WORLD.energy, drain=0.01, move=0.02, turn=0.004, rest=0.5, sleep=0.2))
+    rows = {x['source']: x for x in ledger.build(world, TRAIN)['rows']}
+    assert {'energy.move', 'energy.turn', 'energy.rest', 'energy.sleep', 'energy.still'} <= set(rows)
+    assert '0.0300 a second' in rows['energy.move']['size']
+    assert '0.0050 a second' in rows['energy.rest']['size']
+    assert '0.0020 a second' in rows['energy.sleep']['size']
+    # needs_lost charges them as the fall in hunger squared; the night recipe has it on, so they say so
+    assert 'needs_lost' in rows['energy.move']['size']
+
+
+def test_a_world_that_costs_nothing_extra_for_the_body_lists_none_of_it():
+    world = replace(WORLD, energy=replace(WORLD.energy, move=0.0, turn=0.0, rest=1.0, sleep=-1.0))
+    assert not [x for x in ledger.build(world, TRAIN)['rows'] if x['source'].startswith(('energy.', 'fat.'))]
+
+
+def test_a_tree_with_no_points_is_no_payoff_and_no_double_pay():
+    train = replace(TRAIN, reward=replace(TRAIN.reward, stored=0.5))
+    world = replace(WORLD, tree=replace(WORLD.tree, points=0.0, exists=True, hop=0.0))
+    assert 'game.tree' not in [x['source'] for x in ledger.build(world, train)['rows']]
+    assert 'double-pay' not in codes(world, train)

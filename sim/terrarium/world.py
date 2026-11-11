@@ -913,10 +913,11 @@ class World:
         gain = np.where(young, np.minimum(1 - self.energy, cfg.jelly.energy), cfg.jelly.energy)
         sated = self.energy.copy()
         for c in range(len(self.nests)):
-            # a bite each, lowest index first, while the store lasts; the last one takes what's left (a young one's
-            # bites can leave part of a jelly)
+            # a bite each while the store lasts, in a random order when it can't go round (from the arena's tie stream,
+            # so no slot is first by being low); the last one takes what's left (a young one's bites can leave part
+            # of a jelly)
             mine = wants & (self.colony == c)
-            before = np.cumsum(bite * mine, 1) - bite * mine
+            before = self._ahead_of(bite * mine, self.store[:, c])
             left = self.store[:, c, None] - before
             gets = mine & (left > 1e-9)
             took = np.where(gets, np.minimum(bite, left), 0.0)
@@ -926,6 +927,21 @@ class World:
             self.jelly[gets] += took[gets]
         body.settle(self)
         self.nourished += self.energy - sated
+
+    def _ahead_of(self, bites: np.ndarray, store: np.ndarray) -> np.ndarray:
+        """How much is asked for ahead of each creature, (arenas, creatures). Slot order, except in an arena whose
+        store is short of the total (and not empty, where nobody is fed), where the order is drawn from its tie stream."""
+        short = np.flatnonzero((bites.sum(1) > store + 1e-9) & (store > 1e-9))
+        if not len(short):
+            return np.cumsum(bites, 1) - bites
+        order = np.tile(np.arange(bites.shape[1]), (len(bites), 1))
+        for a in short:
+            order[a] = self.tie_rngs[a].permutation(bites.shape[1])
+        rank = np.argsort(order, 1)
+        sorted_bites = np.take_along_axis(bites, rank, 1)
+        ahead = np.empty_like(bites)
+        np.put_along_axis(ahead, rank, np.cumsum(sorted_bites, 1) - sorted_bites, 1)
+        return ahead
 
     def _hatch(self):
         h = self.cfg.hatch

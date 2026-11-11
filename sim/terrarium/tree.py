@@ -1,4 +1,4 @@
-# The apple tree, a nursery game for jumping ([tree], points 0 is off). One
+# The apple tree, a nursery game for jumping ([tree], off when points is 0 unless `exists` is set). One
 # block is a tree's trunk, and every apple grows hanging from its branches
 # somewhere round it, `reach` metres above what a nim standing under it can
 # get to: it has to go and stand under one and jump ([jump]). Each apple taken
@@ -37,7 +37,9 @@ class Tree:
             raise ConfigError('[tree] home needs [crop] capacity, to carry an apple in')
         self.world = world
         self.seen = np.zeros((world.alive.shape[0], len(world.nests)))
+        # jumps counted so far, and what they cost that points() hasn't charged yet
         self.hops = np.zeros(world.alive.shape)
+        self.owed = np.zeros(world.alive.shape)
         self.stored = np.zeros(world.alive.shape, int)
         # what didn't go as set, per arena: [tree] start that fell back to the nest spawn (0 or 1), [tree] moves that
         # found nowhere to go
@@ -49,6 +51,7 @@ class Tree:
     def reset(self, idx: np.ndarray):
         self.seen[idx] = 0
         self.hops[idx] = 0
+        self.owed[idx] = 0
         self.stored[idx] = 0
         self.start_fell_back[idx] = 0
         self.moves_failed[idx] = 0
@@ -56,6 +59,8 @@ class Tree:
     def step(self):
         w, t = self.world, self.world.cfg.tree
         self.jumped[:] = 0
+        self.owed += (w.jumps - self.hops) * t.hop
+        self.hops = w.jumps.astype(float)
         if t.burrow:
             self.burrow()
         if t.move <= 0:
@@ -174,6 +179,7 @@ class Tree:
         w, t = self.world, self.world.cfg.tree
         got = w.apples_stored if t.apples else w.stored if t.home else w.meals
         now = np.stack([got[:, w.colony == c].sum(1) for c in range(len(w.nests))], 1).astype(float)
-        out = (now - self.seen)[:, w.colony] * t.points * alive - (w.jumps - self.hops) * t.hop
-        self.seen, self.hops = now, w.jumps.astype(float)
+        out = (now - self.seen)[:, w.colony] * t.points * alive - self.owed
+        self.seen = now
+        self.owed = np.zeros_like(self.owed)
         return out

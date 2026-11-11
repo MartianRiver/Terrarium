@@ -3,6 +3,7 @@
 
 import dataclasses
 import tomllib
+import types
 import typing
 from dataclasses import dataclass
 from pathlib import Path
@@ -442,7 +443,7 @@ class Tree:
     near: float      # apples hang between these distances (m) from the trunk's middle
     far: float
     reach: float     # how high (m) a nim has to jump to take one (0: from the ground)
-    points: float    # for each apple taken (0 is off)
+    points: float    # for each apple taken (0 is off, unless `exists` says there is a tree)
     hop: float       # what each jump costs, in the same points, so hopping all the time doesn't pay
     home: bool       # an apple taken goes in the crop, and pays only once it's unloaded in the nest
     move: float      # the tree moves every this many seconds, where [arena] scatter would put it (0: never)
@@ -450,6 +451,7 @@ class Tree:
     burrow: bool     # unloading an apple at home takes the carrier down into the nest, back up at its middle turned any way
     scent: float = 0.0   # the trunk gives off this much smell a tick, day and night, apples or not (0: none; needs [smell])
     apples: int = 0      # how many of [food] count hang on the tree, the rest growing on the ground as in a world with no tree (0: all of it)
+    exists: bool | None = None   # whether there is a tree at all; left out, it is there when points is above 0, so a tree can grow apples that pay nothing extra
 
     def __post_init__(self):
         if self.apples < 0:
@@ -458,18 +460,18 @@ class Tree:
             raise ConfigError('[tree] apples, with some food on the ground, needs the apples carried home ([tree] home)')
         if self.scent < 0:
             raise ConfigError('[tree] scent can\'t be below 0')
-        if self.scent > 0 and self.points <= 0:
-            raise ConfigError('[tree] scent needs the tree on ([tree] points above 0)')
+        if self.scent > 0 and not self.on:
+            raise ConfigError('[tree] scent needs the tree on ([tree] points above 0, or exists = true)')
         if self.start < 0:
             raise ConfigError('[tree] start can\'t be below 0')
-        if self.start > 0 and self.points <= 0:
-            raise ConfigError('[tree] start needs the tree on ([tree] points above 0)')
-        if self.burrow and not (self.points > 0 and self.home):
-            raise ConfigError('[tree] burrow needs apples carried home ([tree] points above 0 and home)')
+        if self.start > 0 and not self.on:
+            raise ConfigError('[tree] start needs the tree on ([tree] points above 0, or exists = true)')
+        if self.burrow and not (self.on and self.home):
+            raise ConfigError('[tree] burrow needs apples carried home (the tree on, and [tree] home)')
 
     @property
     def on(self) -> bool:
-        return self.points > 0
+        return self.points > 0 if self.exists is None else self.exists
 
 
 @dataclass(frozen=True)
@@ -632,6 +634,9 @@ def convert(kind, value, where):
         if not isinstance(value, (list, tuple)):
             raise ConfigError(f'{where}: expected a list of tables')
         return tuple(convert(item, v, f'{where}[{i}]') for i, v in enumerate(value))
+    if typing.get_origin(kind) in (typing.Union, types.UnionType):
+        # only `bool | None`, a switch that is left to a default when it isn't in the file
+        return value if value is None else convert(bool, value, where)
     if kind is bool:
         if not isinstance(value, bool):
             raise ConfigError(f'{where}: expected true or false, got {value!r}')

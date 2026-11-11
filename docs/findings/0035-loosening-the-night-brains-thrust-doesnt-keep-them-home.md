@@ -1,4 +1,4 @@
-# 0035 Loosening the night brains' thrust doesn't keep them home: a steering-spread reset costs half the survivors, a gentle pull on the thrust mean lifts nothing, and every brain still walks out of the nest in about a second
+# 0035 Loosening the night brains' thrust doesn't keep them home: a steering-spread reset costs half the survivors, a gentle pull on the thrust mean (bound 0.001) lifts nothing, and every brain still walks out of the nest in about a second
 
 date: 2026-11-10 · status: confirmed · seeds: 2,000,000 × 256 (scores, the held-out block, also used for choosing); 9,960,000 × 256 (the same brains scored once on a fresh block, never used for choosing); 9,300,000 to 9,300,002 (thrust probe, 8 games a seed); 9,800,000 and on (dusk probe, 32 games × 8 draws); training seeds 661 and 662 · brains: n49-lost-s1 and -s2 (parents), n52-spread-s1 and -s2 (spread reset to 0.35), n52-ctl-s1 and -s2 (control: n49 + 8M, nothing else), n53-bound-s1 and -s2 (gentle thrust pull), n54-dawn-s1 and -s2 (n53 + a dawn pay), n54-far-s1 and -s2 (n53 + gamma .995), all 8M samples
 

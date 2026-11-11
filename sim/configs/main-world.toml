@@ -294,6 +294,8 @@ energy = 0.01
 # hang 0.8-1.1 m from the trunk, 0.6 m up (a jump of 0.8 gets there), and pay `points` to the colony that carries one home and
 # unloads it; each jump costs `hop` points. 8 of the 30 foods are apples, the other 22 berries. `burrow` stays off: it
 # teleports an unloader to its nest's middle turned any way, a memory test for a one-colony nursery, and the tree is in sight
+# the tree is there whatever it pays, so points can go to 0 and its apples still hang, get jumped for and carried home
+exists = true
 trunk = 2
 near = 0.8
 far = 1.1

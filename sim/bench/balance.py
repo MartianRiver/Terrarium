@@ -124,36 +124,54 @@ def simulate(cfg: Config, policy: str, seeds: int, cycles: float, every: float, 
             'wall': wall, 'world_seconds': ticks * cfg.dt, 'speed': ticks * cfg.dt / wall}
 
 
+# a run shorter than this many days can't show a world holds: the ROADMAP asks for a few days of world time
+MIN_CYCLES = 4
+
+
 def gates(run: dict, start: int, kind: str, cycle: float) -> dict:
-    """The proposed gates (bigworld review) from a run's series: per game, then over games. kind: rich, lean or none."""
-    pop = np.array(run['alive']).sum(-1)                                   # samples, games
+    """The proposed gates (bigworld review) from a run's series: per game, then over games. kind: rich, lean or none.
+    The series keep every colony apart, so a colony dying out in a game the other colony carries still shows; a run
+    shorter than MIN_CYCLES days is 'incomplete', not a pass."""
+    alive = np.array(run['alive'])                                         # samples, games, colonies
+    pop = alive.sum(-1)                                                    # samples, games
     t = np.array(run['t'])
     n = pop.shape[1]
     at = lambda s: pop[min(np.searchsorted(t, s - 1e-6), len(t) - 1)]      # pop at the sample at or after time s
     end, day2 = at(t[-1]), at(2 * cycle)
     died_out = (pop.min(0) == 0)
+    colony_out = (alive.min(0) == 0)                                       # games, colonies
     cycles = t[-1] / cycle
-    out = {'games': n, 'start': start, 'end_median': float(np.median(end)), 'end_share': float(np.median(end) / start),
+    days = [float(np.median(at(d * cycle))) for d in range(1, int(cycles + 1e-9) + 1)]
+    out = {'games': n, 'colonies': alive.shape[2], 'start': start, 'end_median': float(np.median(end)), 'end_share': float(np.median(end) / start),
            'day2_share': float(np.median(day2) / start), 'peak_median': float(np.median(pop.max(0))),
-           'extinct_games': int(died_out.sum()), 'extinct_share': float(died_out.mean()), 'kind': kind, 'cycles': cycles}
+           'extinct_games': int(died_out.sum()), 'extinct_share': float(died_out.mean()),
+           'extinct_colonies': int(colony_out.sum()), 'colony_extinct_share': float(colony_out.mean()),
+           'daily_median': days, 'lowest_median': float(np.median(pop.min(0))), 'kind': kind, 'cycles': cycles}
     # a late decline: nims a cycle lost between the middle of the run and its end, median of games; needs 4+ cycles
     if cycles >= 4:
         mid = np.median(at(t[-1] / 2))
         out['late_slope'] = float((np.median(end) - mid) / (cycles / 2))
     checks = {}
     if kind == 'rich':
-        checks = {'keeps 90% of the start': out['end_share'] >= 0.9, 'no game goes extinct': out['extinct_games'] == 0}
+        checks = {'keeps 90% of the start': out['end_share'] >= 0.9,
+                  'keeps 90% of the start every day': bool(days) and min(days) >= 0.9 * start,
+                  'no game goes extinct': out['extinct_games'] == 0,
+                  'no colony goes extinct': out['extinct_colonies'] == 0}
     elif kind == 'lean':
         checks = {'ends at 50-80% of the start': 0.5 <= out['end_share'] <= 0.8,
                   'keeps 50% through day two': out['day2_share'] >= 0.5,
-                  'extinct in under 10% of games': out['extinct_share'] < 0.1}
+                  'extinct in under 10% of games': out['extinct_share'] < 0.1,
+                  'a colony extinct in under 10% of its games': out['colony_extinct_share'] < 0.1}
     if checks and 'late_slope' in out:
         # steady losing at the end isn't balance: more than 3% of the start a cycle
         checks['no late decline'] = out['late_slope'] > -0.03 * start
     elif checks:
         out['late_slope'] = None
     out['checks'] = checks
-    out['pass'] = all(checks.values()) if checks else None
+    out['complete'] = cycles >= MIN_CYCLES
+    # too few days can't pass or fail a long-world gate; the checks are still there to read
+    out['pass'] = None if not checks or not out['complete'] else all(checks.values())
+    out['status'] = 'no gate' if not checks else 'incomplete' if not out['complete'] else 'pass' if out['pass'] else 'fail'
     return out
 
 
@@ -225,11 +243,11 @@ def main():
 
 def report(r: dict):
     g, s = r['gates'], r['supply']
-    verdict = {None: 'no gate', True: 'PASS', False: 'FAIL'}[g['pass']]
+    verdict = {'no gate': 'no gate', 'pass': 'PASS', 'fail': 'FAIL', 'incomplete': f'INCOMPLETE (under {MIN_CYCLES} days)'}[g['status']]
     late = 'n/a' if g.get('late_slope') is None else f'{g["late_slope"]:+.2f}/cycle'
     print(f'{r["label"]}: ratio {s["ratio"]:.2f} (foods {s["grown"]:.0f}+grass {s["grass"]:.0f} vs need {s["need"]:.0f}) | '
           f'end {g["end_median"]:.0f}/{g["start"]} ({g["end_share"]:.0%}), day2 {g["day2_share"]:.0%}, peak {g["peak_median"]:.0f}, '
-          f'extinct {g["extinct_games"]}/{g["games"]}, late {late}, harvest {s["harvest"]:.0%} | {verdict} '
+          f'extinct {g["extinct_games"]}/{g["games"]} games and {g["extinct_colonies"]}/{g["games"] * g["colonies"]} colonies, late {late}, harvest {s["harvest"]:.0%} | {verdict} '
           f'{[k for k, v in g["checks"].items() if not v] or ""} | {r["speed"]:.0f} world-s/wall-s ({r["args"]["seeds"]} games)')
 
 
