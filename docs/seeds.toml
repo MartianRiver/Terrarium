@@ -364,3 +364,67 @@ use = "test"
 what = "the n73 colony-of-six rung at 12 m read against the 12 m brains frozen and n58-ctl as six; and the n72 tree-scent rung at 4 m against n58-ctl"
 where = "lab/2026-11-10-night-spread"
 date = 2026-11-11
+
+[[block]]
+start = 8_117_000
+size = 1000
+use = "test"
+what = "0.4.1 done-whens on the 12 m brains: eat within 2 s in a stocked nest, daytime away-deaths"
+where = "lab/2026-11-11-donewhens"
+date = 2026-11-11
+
+[[block]]
+start = 8_118_000
+size = 1000
+use = "test"
+what = "n72 tree-scent brains vs n58-ctl in the scent world and the plain 4 m world"
+where = "lab/2026-11-11-scent"
+date = 2026-11-11
+
+[[block]]
+start = 8_119_000
+size = 1000
+use = "confirm"
+what = "0.4.1 exam: all six 12 m brains (n70b s1/s2, n70d s3/s4, n74 s5/s6), two nights, 300 s"
+where = "lab/2026-11-10-night-spread"
+date = 2026-11-11
+
+[[block]]
+start = 8_120_000
+size = 1000
+use = "test"
+what = "frozen diagnosis of the six 12 m night brains' deaths: autopsy, stock/home/dawn counterfactuals, scripted nim"
+where = "lab/2026-11-11-deaths"
+date = 2026-11-11
+
+[[block]]
+start = 8_121_000
+size = 1000
+use = "test"
+what = "skills battery baselines"
+where = "lab/2026-11-11-battery"
+date = 2026-11-11
+
+[[block]]
+start = 8_122_000
+size = 1000
+use = "test"
+what = "main world frozen checks"
+where = "lab/2026-11-11-main"
+date = 2026-11-11
+
+[[block]]
+start = 8_123_000
+size = 1000
+use = "test"
+what = "rest pilots r2: alive and night stillness, own world and plain 12 m"
+where = "lab/2026-11-11-rest"
+date = 2026-11-11
+
+[[block]]
+start = 8_124_000
+size = 1000
+use = "test"
+what = "scripted night check in the main world"
+where = "lab/2026-11-11-mainline"
+date = 2026-11-11
