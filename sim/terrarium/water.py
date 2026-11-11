@@ -1,13 +1,16 @@
 # [water]: thirst as a second need beside energy. Each nim has water (1 full) that falls over time and rises while its
 # centre is in a pond; at 0 it dies where starving would. Ponds are flat ground, so nothing stops at their edge:
 # rays say how far off it is (vision's `pond`, as `own_nest` does for a nest), and food, flowers and moved blocks
-# keep out of them. Going to water is learned; only this is the world's.
+# keep out of them. Going to water is learned; only this is the world's. With several colonies a pond goes where no nest
+# is more than FAIR m nearer it than another, at `distance` from the middle of the nests.
 import numpy as np
 
 from .log import Logger
 from .vision import hit_circles
 
 TRIES = 100
+# how much nearer one colony's nest may be to a pond than another's, m
+FAIR = 1.0
 log = Logger('water')
 
 
@@ -25,13 +28,15 @@ class Ponds:
             self._place(a)
 
     def _place(self, a):
-        """Each pond `distance` from colony 0's nest at a random angle; failing that, anywhere it fits."""
+        """Each pond `distance` from the middle of the nests (colony 0's, with one colony) at a random angle, where no
+        colony is much nearer than another; failing that, anywhere it fits."""
         w, cfg = self.world, self.world.cfg
         t = cfg.water
         rng = w.rngs[a]
         room = cfg.arena.size / 2 - t.radius
         half = np.array([(b.w / 2, b.h / 2) for b in cfg.block]).reshape(-1, 2) + t.radius
         nest_gap = cfg.colonies.nest_radius + t.radius
+        middle = w.nests.mean(0)
         for k in range(t.ponds):
             def clear(p):
                 return ((np.abs(p) <= room).all()
@@ -39,18 +44,22 @@ class Ponds:
                         and not (len(half) and w._on_block(a, p, half))
                         and (np.hypot(*(self.pos[a, :k] - p).T) >= 2 * t.radius).all())
 
+            def fair(p):
+                gap = np.hypot(*(w.nests - p).T)
+                return gap.max() - gap.min() <= FAIR
+
             def at_distance():
                 angle = rng.uniform(0, 2 * np.pi)
-                return w.nests[0] + t.distance * np.array([np.cos(angle), np.sin(angle)])
+                return middle + t.distance * np.array([np.cos(angle), np.sin(angle)])
 
             def anywhere():
                 return rng.uniform(-room, room, 2)
 
-            p = next((p for p in (at_distance() for _ in range(TRIES)) if clear(p)), None)
+            p = next((p for p in (at_distance() for _ in range(TRIES)) if clear(p) and fair(p)), None)
             if p is None:
                 self.fell_back[a] = 1
-                log.warn('pond not placed at its distance from the nest', arena=int(a), pond=k)
-                p = next((p for p in (anywhere() for _ in range(TRIES)) if clear(p)), None)
+                log.warn('pond not placed at its distance from the nests', arena=int(a), pond=k)
+                p = next((p for p in (anywhere() for _ in range(TRIES)) if clear(p) and fair(p)), None)
             if p is None:
                 log.warn('no room for a pond, placing it anyway', arena=int(a), pond=k)
                 p = anywhere()

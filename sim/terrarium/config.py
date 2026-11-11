@@ -179,7 +179,8 @@ class Night:
 class Water:
     ponds: int          # ponds in a game (0: no thirst)
     radius: float
-    distance: float     # from colony 0's nest centre to a pond's centre
+    distance: float     # from colony 0's nest centre to a pond's centre; with several colonies, from the middle of the nests, where
+                        # none is more than a metre or so nearer than another
     drain: float        # water lost a second
     drink: float        # water gained a second with its centre in a pond
     still: float        # drinking slows with speed: all of `drink` at a stop, none at this speed (0: speed doesn't matter)
@@ -207,14 +208,17 @@ class Grass:
     cell: float         # grid cell size, m
     meadows: int        # meadows in a game (0: no grass)
     radius: float
-    distance: float     # from colony 0's nest centre to a meadow's centre
+    distance: float     # from a nest's centre to a meadow's centre: the colonies take the meadows in turn, each its own nest's
     base: float         # cover outside the meadows, 0 to 1
     regrow: float       # cover a cell regains a second, up to its own starting cover
     bite: float         # cover a nim removes a second from the cell it stands on, while its energy is below 1
     still: float        # grazing slows with speed: all of `bite` at a stop, none at this speed (0: speed doesn't matter)
     food: float         # energy per unit of cover eaten (a full cell gives this much, whatever its size)
+    night: float = 1.0  # the share of its regrowth and of a bite the grass keeps in the dark (1: as by day, 0: none grows or feeds)
 
     def __post_init__(self):
+        if not 0 <= self.night <= 1:
+            raise ConfigError('[grass] night is a share, 0 to 1')
         if self.meadows < 0:
             raise ConfigError('[grass] meadows is a count, 0 or more')
         if not 0 <= self.base <= 1:
@@ -445,8 +449,13 @@ class Tree:
     start: float     # every episode starts with each nim this far (m) from the trunk, facing it (0: at the nest)
     burrow: bool     # unloading an apple at home takes the carrier down into the nest, back up at its middle turned any way
     scent: float = 0.0   # the trunk gives off this much smell a tick, day and night, apples or not (0: none; needs [smell])
+    apples: int = 0      # how many of [food] count hang on the tree, the rest growing on the ground as in a world with no tree (0: all of it)
 
     def __post_init__(self):
+        if self.apples < 0:
+            raise ConfigError('[tree] apples is a count, 0 or more')
+        if self.apples and not self.home:
+            raise ConfigError('[tree] apples, with some food on the ground, needs the apples carried home ([tree] home)')
         if self.scent < 0:
             raise ConfigError('[tree] scent can\'t be below 0')
         if self.scent > 0 and self.points <= 0:

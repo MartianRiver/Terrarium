@@ -12,7 +12,9 @@
 # stands has to be found again and remembered afresh. With `start`, each episode starts with the nims ringed
 # round the trunk, facing it, so the first find is free and only the trips after it need remembering. With
 # `burrow`, unloading at home takes the carrier into the nest and back up at its middle turned any way, so the way
-# back out can't be read off where it came in.
+# back out can't be read off where it came in. With `apples`, only that many of the food hang on the tree and the rest
+# grows on the ground as berries do in a world with no tree; an apple pays when it's unloaded, a berry never does.
+# Apples pay the colony that carried them home, not everyone in the arena.
 import numpy as np
 
 from . import scatter
@@ -34,7 +36,7 @@ class Tree:
         if t.home and world.cfg.crop.capacity < 1:
             raise ConfigError('[tree] home needs [crop] capacity, to carry an apple in')
         self.world = world
-        self.seen = np.zeros(world.alive.shape[0])
+        self.seen = np.zeros((world.alive.shape[0], len(world.nests)))
         self.hops = np.zeros(world.alive.shape)
         self.stored = np.zeros(world.alive.shape, int)
         # what didn't go as set, per arena: [tree] start that fell back to the nest spawn (0 or 1), [tree] moves that
@@ -61,7 +63,7 @@ class Tree:
         ticks = max(round(t.move * w.cfg.tick_hz), 1)
         for a in np.nonzero((w.age > 0) & (w.age % ticks == 0))[0]:
             if scatter.move(w, int(a), t.trunk):
-                for f in np.nonzero(w.food_present[a])[0]:
+                for f in np.nonzero(w.food_present[a] & w.apple)[0]:
                     w._grow(a, f)
             else:
                 self.moves_failed[a] += 1
@@ -108,8 +110,9 @@ class Tree:
         """Whoever unloaded an apple at home this tick goes down into the nest and comes back up at its middle, turned
         any way, so where it came in and which way it faced say nothing of where the tree is: only its notes can."""
         w = self.world
-        down = (w.stored > self.stored) & w.alive
-        self.stored = w.stored.copy()
+        delivered = w.apples_stored if w.cfg.tree.apples else w.stored
+        down = (delivered > self.stored) & w.alive
+        self.stored = delivered.copy()
         if not down.any():
             return
         a, c = np.nonzero(down)
@@ -167,9 +170,10 @@ class Tree:
         return middle + t.far * np.array([1.0, 0.0])
 
     def points(self, alive: np.ndarray) -> np.ndarray:
-        """What each creature's arena won since last asked, (arenas, creatures)."""
+        """What each creature's colony won since last asked, (arenas, creatures)."""
         w, t = self.world, self.world.cfg.tree
-        now = (w.stored if t.home else w.meals).sum(1).astype(float)
-        out = (now - self.seen)[:, None] * t.points * alive - (w.jumps - self.hops) * t.hop
+        got = w.apples_stored if t.apples else w.stored if t.home else w.meals
+        now = np.stack([got[:, w.colony == c].sum(1) for c in range(len(w.nests))], 1).astype(float)
+        out = (now - self.seen)[:, w.colony] * t.points * alive - (w.jumps - self.hops) * t.hop
         self.seen, self.hops = now, w.jumps.astype(float)
         return out

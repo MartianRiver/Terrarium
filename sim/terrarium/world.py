@@ -166,6 +166,12 @@ class World:
         self.food_regrow = np.zeros((arenas, slots), int)
         self.food_regrow[:, self.wild:] = EMPTY
         self.tree = Tree(self) if cfg.tree.on else None
+        # which food slots hang on the tree: all of them, jelly's too, or the first [tree] apples
+        self.apple = np.zeros(slots, bool)
+        if self.tree:
+            if cfg.tree.apples > self.wild:
+                raise ConfigError(f'[tree] apples {cfg.tree.apples} is more than [food] count {self.wild}')
+            self.apple[:] = True if not cfg.tree.apples else np.arange(slots) < cfg.tree.apples
         self.eaten = 0
         # food each creature has picked up where it grew (eaten or carried) since its arena started
         self.meals = np.zeros((arenas, n), int)
@@ -183,6 +189,9 @@ class World:
         # jelly, in grown nims' bites (the young take smaller ones)
         self.store = np.zeros((arenas, len(self.nests)))
         self.stored = np.zeros((arenas, n), int)
+        # apples in each crop, and apples each has unloaded in its own nest (the rest of a crop is berries)
+        self.apples_crop = np.zeros((arenas, n), int)
+        self.apples_stored = np.zeros((arenas, n), int)
         self.jelly = np.zeros((arenas, n))
         # ticks left of each creature's sprint, and of its rest before it can sprint again
         self.sprinting = np.zeros((arenas, n), int)
@@ -371,6 +380,8 @@ class World:
         self.grazing[idx] = 0
         self.store[idx] = 0
         self.stored[idx] = 0
+        self.apples_crop[idx] = 0
+        self.apples_stored[idx] = 0
         self.jelly[idx] = 0
         self.sprinting[idx] = 0
         self.resting[idx] = 0
@@ -587,11 +598,12 @@ class World:
         takes = np.where(np.arange(self.food_pos.shape[1]) < self.wild, takes[..., None], wants_jelly[..., None])
         if self.tree:
             # an apple on the tree goes to whoever jumps high enough under it, hungry or not
-            takes = self.tree.reaching()[..., None]
+            takes = np.where(self.apple, self.tree.reaching()[..., None], takes)
         touching = (dx * dx + dy * dy < reach * reach) & self.food_present[:, None] & takes
         if self.tree and cfg.tree.home:
             # one apple a tick each, so a crop with room for one doesn't take two
-            touching &= np.arange(touching.shape[2]) == touching.argmax(2)[..., None]
+            fruit = touching & self.apple
+            touching = (touching & ~self.apple) | (fruit & (np.arange(touching.shape[2]) == fruit.argmax(2)[..., None]))
         eaten = touching.any(1)
         if not eaten.any():
             return
@@ -600,7 +612,8 @@ class World:
         who = self._winners(arena, touching[arena, :, food])
         wild = food < self.wild
         # an apple on its way home goes in the crop, hungry or not
-        eats = hungry[arena, who] & (self.tree is None or not cfg.tree.home) | ~wild
+        up = self.apple[food] & cfg.tree.home
+        eats = hungry[arena, who] & ~up | ~wild
         before = self.energy.copy()
         self._credit(arena, food, who)
         np.add.at(self.energy, (arena[eats], who[eats]), np.where(wild, cfg.energy.food, cfg.jelly.energy)[eats])
@@ -608,9 +621,11 @@ class World:
         self.fed += self.energy - before
         self.nourished += self.energy - before
         np.add.at(self.crop, (arena[~eats], who[~eats]), 1)
+        np.add.at(self.apples_crop, (arena[up & ~eats], who[up & ~eats]), 1)
         np.add.at(self.meals, (arena[wild], who[wild]), 1)
         # two foods on one tick can overfill a crop; the extra is lost
         np.minimum(self.crop, cfg.crop.capacity, out=self.crop)
+        np.minimum(self.apples_crop, self.crop, out=self.apples_crop)
         self.food_regrow[arena, food] = EMPTY
         self.food_regrow[arena[wild], food[wild]] = self._regrow_wait(arena[wild])
         self.eaten += len(arena)
@@ -851,6 +866,8 @@ class World:
         for c in range(len(self.nests)):
             self.store[:, c] += np.where(nest == c, load, 0).sum(1)
         self.stored += np.where(nest == self.colony, load, 0)
+        self.apples_stored += np.where(nest == self.colony, np.where(unload, self.apples_crop, 0), 0)
+        self.apples_crop[unload] = 0
         for a, i in zip(*np.nonzero(unload & (nest < 0))):
             self._drop(a, i, load[a, i])
         self.crop[unload] = 0
@@ -884,6 +901,8 @@ class World:
         self.fed += meal
         self.nourished += meal
         self.crop[own] -= 1
+        # a nim eats its berries before its apples
+        np.minimum(self.apples_crop, self.crop, out=self.apples_crop)
         young = self.young > 0
         # the young eat from it whenever they aren't full, hungry or not, but a bite their size: everything costs them
         # [young] energy of what it costs a grown one, so a jelly goes that much further, and they take only what fits
@@ -943,6 +962,7 @@ class World:
         self.alive[a, i] = True
         self.unborn[a, i] = False
         self.crop[a, i] = 0
+        self.apples_crop[a, i] = 0
         self.sprinting[a, i] = self.resting[a, i] = self.gripping[a, i] = self.nectar[a, i] = 0
         self.stamina[a, i] = 1
         self.chill[a, i] = 0
@@ -1008,7 +1028,7 @@ class World:
 
     def _grow(self, a, f):
         patches = self.cfg.food.patches
-        if self.tree:
+        if self.tree and self.apple[f]:
             self.food_pos[a, f] = self.tree.spot(a)
         else:
             self.food_pos[a, f] = self._open_ground(a, self.patch_pos[a, f % patches] if patches else None)

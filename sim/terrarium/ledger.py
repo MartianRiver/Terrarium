@@ -122,7 +122,7 @@ REGISTRY = [
                          f'for each 10 m nearer; nets 0 over a round trip')),
     Source('game.tree', 'event', '', 'w.tree.points', lambda c, r: c.tree.on,
            lambda c, r: f'{c.tree.points:g} an apple' + (f', -{c.tree.hop:g} a jump' if c.tree.hop else ''),
-           who='every living nim in the arena, in full (the colony blend leaves equal pay as it is)'),
+           who='every living nim of the colony that carried it, in full (the colony blend leaves equal pay as it is)'),
     Source('game.tag', 'per-second', 'every second: it pays, the rest gain', 'w.tag.points', lambda c, r: c.tag.on,
            lambda c, r: f'{c.tag.points:g} a second: it -{c.tag.points:g}, the others +{c.tag.points:g} / (alive - 1) each',
            who='the one that is it pays; the rest of the arena share it'),
@@ -235,8 +235,8 @@ def warnings(c: Config, train: Train, hz: dict, tm: dict) -> list[tuple[str, str
             out.append(('never-dawn', f"reward.dawn = {r.dawn:g} but no training game reaches dawn ({tm['first_dawn_s']:g} s)"))
 
     if r.stored != 0 and c.tree.on and c.tree.home:
-        out.append(('double-pay', f'a food unloaded in the nest is paid by reward.stored ({r.stored:g}) and by [tree] points '
-                    f'({c.tree.points:g} an apple, to every living nim): twice'))
+        out.append(('double-pay', f'{"an apple" if c.tree.apples else "a food"} unloaded in the nest is paid by reward.stored ({r.stored:g}) and by [tree] points '
+                    f'({c.tree.points:g} an apple, to every living nim of the colony): twice'))
     if r.food != 0 and c.tree.on and not c.tree.home:
         out.append(('double-pay', f'an apple eaten is paid by reward.food ({r.food:g}) and by [tree] points ({c.tree.points:g})'))
     if r.needs != 0 and (r.food != 0 or r.jelly != 0):
