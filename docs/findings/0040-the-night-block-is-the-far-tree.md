@@ -1,6 +1,6 @@
 # 0040 The night block is the far tree: dying nests stock too little because the brains can't see a tree 12 m off, and trained with 12 m sight they live the night 90% of the time
 
-date: 2026-11-11 · status: hint · seeds: 9,990,000 (the probes, first use) and 9,980,000 × 256 (the block that chose the night rungs, as in 0039) · brains: n58-ctl-s1 and -s2 frozen; n70 and n70b (8M each from n52-ctl, seeds 661 and 662), one easier world each, against n58-ctl
+date: 2026-11-11 · status: confirmed · seeds: 9,990,000 (the probes; a block 0038 had confirmed on, reused by mistake) and 9,980,000 × 256 (the block that chose the night rungs, as in 0039); confirmed on 9,940,000 × 256 (0041) · brains: n58-ctl-s1 and -s2 frozen; n70 and n70b (8M each from n52-ctl, seeds 661 and 662), one easier world each, against n58-ctl
 
 **Question.** 0039 found the night deaths come down to food. Why do some nests come to nightfall with too little, and is there an easier world where training teaches them to live, to work back from?
 
