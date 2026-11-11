@@ -154,20 +154,35 @@ def test_both_halves_make_the_whole_change_in_hunger_squared():
     assert reward[0] == pytest.approx(0.6**2 - (1 - w.energy[0, 0])**2)
 
 
-def test_a_death_pays_nothing_from_needs_lost():
+def test_a_death_is_charged_the_fall_that_killed_it():
     env = lost_env(0.0, 1.0)
     env.world.energy[:] = 0.6
-    env.world.energy[0, 0] = 1e-9
+    low = 0.5 * CFG.energy.drain * CFG.dt * env.repeat
+    env.world.energy[0, 0] = low
     _, reward, *_ = env.step(np.zeros((env.samples, len(ACTIONS))))
-    assert not env.world.alive[0, 0] and reward[0] == 0
+    assert not env.world.alive[0, 0]
+    # all the way down to empty, hunger 1: nothing of the last interval escapes
+    assert reward[0] == pytest.approx((1 - low)**2 - 1.0, abs=1e-9) and reward[0] < 0
     assert reward[1] < 0
 
 
-def test_a_tick_that_ends_the_arena_pays_nothing_from_needs_lost():
-    env = lost_env(0.0, 1.0)
-    env.world.age[:] = env.world.episode_ticks - env.repeat
-    reward = step_at(env, 0.6)
-    assert (reward == 0).all()
+def test_a_tick_that_ends_the_arena_is_charged_as_any_other_would_be():
+    ended, midway = lost_env(0.0, 1.0), lost_env(0.0, 1.0)
+    ended.world.age[:] = ended.world.episode_ticks - ended.repeat
+    a, b = step_at(ended, 0.6), step_at(midway, 0.6)
+    assert (a < 0).all() and np.allclose(a, b)
+
+
+def test_the_last_interval_of_a_dying_nim_pays_its_hunger_cost_too():
+    train = load_train()
+    zero = {f.name: 0.0 for f in fields(train.reward)}
+    train = replace(train, reward=replace(train.reward, **{**zero, 'hunger': 1.0}))
+    env = Forage(CFG, train, 1, 0)
+    env.world.energy[0, 0] = 0.5 * CFG.energy.drain * CFG.dt * env.repeat
+    _, reward, done, _ = env.step(np.zeros((env.samples, 5)))
+    assert done[0] and not env.world.alive[0, 0]
+    # it was alive for the tick it died in: it pays that tick's (1 - 0)² at least once
+    assert reward[0] <= -CFG.dt * 1.0 + 1e-9
 
 
 def test_needs_lost_zero_is_bit_identical_over_a_rollout():

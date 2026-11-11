@@ -2,6 +2,8 @@
 # a few meadows and `base` elsewhere; a nim whose energy is below 1 eats the cell it stands on by itself, and cover
 # grows back toward what the cell started with. With `still` set grazing takes standing still, so walking over a
 # meadow feeds nothing. Rays don't see it: the brain feels the cover under it and which way it rises (as smell does).
+# With several colonies the meadows are dealt out among them, each near its own nest. `night` is how much of the grass
+# there is in the dark: the share of its regrowth and of a bite it keeps (1 as by day, 0 none), fading with the light.
 import numpy as np
 
 from . import body
@@ -50,7 +52,8 @@ class Meadows:
         self.cover[a] = self.start[a]
 
     def _place(self, a):
-        """Each meadow `distance` from colony 0's nest at a random angle; failing that, anywhere it fits."""
+        """Each meadow `distance` from a nest at a random angle, the nests taking turns (meadow k is colony k's, round
+        again after the last); failing that, anywhere it fits."""
         w, cfg = self.world, self.world.cfg
         t = cfg.grass
         rng = w.rngs[a]
@@ -67,7 +70,7 @@ class Meadows:
 
             def at_distance():
                 angle = rng.uniform(0, 2 * np.pi)
-                return w.nests[0] + t.distance * np.array([np.cos(angle), np.sin(angle)])
+                return w.nests[k % len(w.nests)] + t.distance * np.array([np.cos(angle), np.sin(angle)])
 
             def anywhere():
                 return rng.uniform(-room, room, 2)
@@ -95,11 +98,18 @@ class Meadows:
         """One tick of regrowth and grazing; share is what the young pay of what a grown nim would for the same meal."""
         w = self.world
         g, dt = w.cfg.grass, w.cfg.dt
-        np.minimum(self.cover + np.float32(g.regrow * dt), self.start, out=self.cover)
+        # how much of the grass the light leaves, per arena; by day (or with nights off, or `night` 1) all of it
+        dim = (g.night + (1 - g.night) * w.light()) if g.night < 1 and w.cfg.night.on else None
+        if dim is None:
+            np.minimum(self.cover + np.float32(g.regrow * dt), self.start, out=self.cover)
+        else:
+            np.minimum(self.cover + (g.regrow * dt * dim).astype(np.float32)[:, None, None], self.start, out=self.cover)
         if g.bite <= 0 or g.food <= 0:
             return
         # lapping the cover takes standing still: the rate falls with speed, to nothing at `still` m/s
         slow = np.clip(1 - np.hypot(w.vel[..., 0], w.vel[..., 1]) / g.still, 0, 1) if g.still > 0 else 1.0
+        if dim is not None:
+            slow = slow * dim[:, None]
         # with fat on, a nim with a full bar grazes on while its fat has room (what's kept of a bite is `keep` of it)
         room = 1 - w.energy
         if w.cfg.fat.on:

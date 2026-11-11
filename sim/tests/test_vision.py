@@ -236,3 +236,40 @@ def test_a_dropping_on_the_heap_is_its_own_kind():
     # a loose one in front of the heap is the one seen
     d.left[0, 1], d.pos[0, 1] = 100, (1.0, 0)
     assert seen(world)[1][0, 0, 0] == DUNG
+
+
+def trunk_sweep(cover, rays=17, fov=3.49, trunk_w=0.5, headings=400):
+    """A trunk_w-wide block 10 m ahead of a nim at the centre; for each heading across the fan, whether a ray sees it."""
+    block = replace(CFG.block[0], x=10.0, y=0.0, angle=0.0, w=trunk_w, h=trunk_w)
+    world = alone(rays=rays, blocks=(block,))
+    world.cfg = replace(world.cfg, vision=replace(world.cfg.vision, cover=cover, fov=fov, range=12.0, side=1.0, spread=1.0))
+    out = []
+    # the trunk's bearing from the heading runs across the fan, kept inside its edges
+    for off in np.linspace(-fov / 2 + 0.01, fov / 2 - 0.01, headings):
+        world.heading[:] = -off
+        dist, kind = seen(world)
+        out.append((kind == BLOCK).any())
+    return np.array(out)
+
+
+def test_a_small_trunk_far_off_is_seen_at_every_heading_by_rays_that_cover_the_fan():
+    assert trunk_sweep(cover=1.0).all()
+
+
+def test_a_trunk_between_thin_rays_is_missed_and_covered_rays_only_help():
+    thin, half = trunk_sweep(cover=0.0), trunk_sweep(cover=0.5)
+    assert not thin.all() and thin.mean() < 0.5
+    assert half.mean() > thin.mean() + 0.2
+
+
+def test_a_wide_ray_hits_a_box_from_its_side_not_only_down_the_middle():
+    block = replace(CFG.block[0], x=6.0, y=1.0, angle=0.0, w=1.0, h=1.0)
+    world = alone(rays=1, blocks=(block,))
+    world.cfg = replace(world.cfg, vision=replace(world.cfg.vision, cover=1.0, fov=0.5))
+    dist, kind = seen(world)
+    assert kind[0, 0, 0] == NOTHING
+    world = alone(rays=3, blocks=(block,))
+    world.cfg = replace(world.cfg, vision=replace(world.cfg.vision, cover=1.0, fov=0.6))
+    dist, kind = seen(world)
+    assert (kind == BLOCK).any()
+    assert (dist[kind == BLOCK] > 4.5).all() and (dist[kind == BLOCK] < 7).all()

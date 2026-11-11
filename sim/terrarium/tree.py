@@ -1,4 +1,4 @@
-# The apple tree, a nursery game for jumping ([tree], points 0 is off). One
+# The apple tree, a nursery game for jumping ([tree], off when points is 0 unless `exists` is set). One
 # block is a tree's trunk, and every apple grows hanging from its branches
 # somewhere round it, `reach` metres above what a nim standing under it can
 # get to: it has to go and stand under one and jump ([jump]). Each apple taken
@@ -12,7 +12,9 @@
 # stands has to be found again and remembered afresh. With `start`, each episode starts with the nims ringed
 # round the trunk, facing it, so the first find is free and only the trips after it need remembering. With
 # `burrow`, unloading at home takes the carrier into the nest and back up at its middle turned any way, so the way
-# back out can't be read off where it came in.
+# back out can't be read off where it came in. With `apples`, only that many of the food hang on the tree and the rest
+# grows on the ground as berries do in a world with no tree; an apple pays when it's unloaded, a berry never does.
+# Apples pay the colony that carried them home, not everyone in the arena.
 import numpy as np
 
 from . import scatter
@@ -34,8 +36,10 @@ class Tree:
         if t.home and world.cfg.crop.capacity < 1:
             raise ConfigError('[tree] home needs [crop] capacity, to carry an apple in')
         self.world = world
-        self.seen = np.zeros(world.alive.shape[0])
+        self.seen = np.zeros((world.alive.shape[0], len(world.nests)))
+        # jumps counted so far, and what they cost that points() hasn't charged yet
         self.hops = np.zeros(world.alive.shape)
+        self.owed = np.zeros(world.alive.shape)
         self.stored = np.zeros(world.alive.shape, int)
         # what didn't go as set, per arena: [tree] start that fell back to the nest spawn (0 or 1), [tree] moves that
         # found nowhere to go
@@ -47,6 +51,7 @@ class Tree:
     def reset(self, idx: np.ndarray):
         self.seen[idx] = 0
         self.hops[idx] = 0
+        self.owed[idx] = 0
         self.stored[idx] = 0
         self.start_fell_back[idx] = 0
         self.moves_failed[idx] = 0
@@ -54,6 +59,8 @@ class Tree:
     def step(self):
         w, t = self.world, self.world.cfg.tree
         self.jumped[:] = 0
+        self.owed += (w.jumps - self.hops) * t.hop
+        self.hops = w.jumps.astype(float)
         if t.burrow:
             self.burrow()
         if t.move <= 0:
@@ -61,7 +68,7 @@ class Tree:
         ticks = max(round(t.move * w.cfg.tick_hz), 1)
         for a in np.nonzero((w.age > 0) & (w.age % ticks == 0))[0]:
             if scatter.move(w, int(a), t.trunk):
-                for f in np.nonzero(w.food_present[a])[0]:
+                for f in np.nonzero(w.food_present[a] & w.apple)[0]:
                     w._grow(a, f)
             else:
                 self.moves_failed[a] += 1
@@ -108,8 +115,9 @@ class Tree:
         """Whoever unloaded an apple at home this tick goes down into the nest and comes back up at its middle, turned
         any way, so where it came in and which way it faced say nothing of where the tree is: only its notes can."""
         w = self.world
-        down = (w.stored > self.stored) & w.alive
-        self.stored = w.stored.copy()
+        delivered = w.apples_stored if w.cfg.tree.apples else w.stored
+        down = (delivered > self.stored) & w.alive
+        self.stored = delivered.copy()
         if not down.any():
             return
         a, c = np.nonzero(down)
@@ -167,9 +175,11 @@ class Tree:
         return middle + t.far * np.array([1.0, 0.0])
 
     def points(self, alive: np.ndarray) -> np.ndarray:
-        """What each creature's arena won since last asked, (arenas, creatures)."""
+        """What each creature's colony won since last asked, (arenas, creatures)."""
         w, t = self.world, self.world.cfg.tree
-        now = (w.stored if t.home else w.meals).sum(1).astype(float)
-        out = (now - self.seen)[:, None] * t.points * alive - (w.jumps - self.hops) * t.hop
-        self.seen, self.hops = now, w.jumps.astype(float)
+        got = w.apples_stored if t.apples else w.stored if t.home else w.meals
+        now = np.stack([got[:, w.colony == c].sum(1) for c in range(len(w.nests))], 1).astype(float)
+        out = (now - self.seen)[:, w.colony] * t.points * alive - self.owed
+        self.seen = now
+        self.owed = np.zeros_like(self.owed)
         return out

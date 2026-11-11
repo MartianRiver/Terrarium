@@ -77,14 +77,16 @@ def gate_table(runs: list[dict]) -> str:
             '<th>games extinct</th><th>late trend (nims/day)</th><th>harvest</th><th>verdict</th></tr>']
     for r in runs:
         g, s = r['gates'], r['supply']
-        verdict = '<span class="pass">pass</span>' if g['pass'] else '<span class="fail">fail</span>' if g['pass'] is False else 'no gate'
+        verdict = ('<span class="pass">pass</span>' if g['pass'] else '<span class="fail">fail</span>' if g['pass'] is False
+                   else 'incomplete (too few days)' if g.get('status') == 'incomplete' else 'no gate')
         if g['checks']:
             failed = [k for k, v in g['checks'].items() if not v]
             verdict += f' ({g["kind"]}' + (f'; failed: {html.escape(", ".join(failed))}' if failed else '') + ')'
+        colonies = f', colonies {g["extinct_colonies"]} of {g["games"] * g["colonies"]}' if 'extinct_colonies' in g else ''
         late = 'needs 4+ days' if g.get('late_slope') is None else f'{g["late_slope"]:+.2f}'
         rows.append(f'<tr><td>{html.escape(r["label"])}</td><td>{s["ratio"]:.2f}</td>'
                     f'<td>{g["end_median"]:.0f} of {g["start"]} ({g["end_share"]:.0%})</td><td>{g["day2_share"]:.0%}</td>'
-                    f'<td>{g["peak_median"]:.0f}</td><td>{g["extinct_games"]} of {g["games"]}</td><td>{late}</td>'
+                    f'<td>{g["peak_median"]:.0f}</td><td>{g["extinct_games"]} of {g["games"]}{colonies}</td><td>{late}</td>'
                     f'<td>{s["harvest"]:.0%}</td><td>{verdict}</td></tr>')
     return ''.join(rows) + '</table>'
 

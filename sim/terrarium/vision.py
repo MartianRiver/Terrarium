@@ -86,7 +86,7 @@ def look(world: 'World') -> Sight:
         hit_walls(pos, dirs, cfg.arena.size / 2, start),
         creatures.min(-1),
         hit_circles(pos, dirs, world.food_pos, cfg.food.radius, food, start, wide).min(-1, initial=np.inf),
-        hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start),
+        hit_boxes(pos, dirs, world.block_pos, world.block_angle, half, start, wide),
         hit_circles(pos, dirs, world.flower_pos, cfg.flowers.radius, flowers, start, wide).min(-1, initial=np.inf),
         loose,
         # a flag on its nest or lying where it was put down; a carried one shows as its carrier (`carrier`)
@@ -131,8 +131,37 @@ def hit_circles(origin, dirs, centres, radius, valid, start, wide=None):
     return np.where(ok, np.maximum(along - root, start), np.inf)
 
 
-def hit_boxes(origin, dirs, bpos, bang, half, start):
-    """Slab test in each box's own frame. bpos (A,B,2), bang (A,B), half (B,2)."""
+def hit_boxes(origin, dirs, bpos, bang, half, start, wide=None):
+    """Slab test in each box's own frame. bpos (A,B,2), bang (A,B), half (B,2). With wide (R,), the tan of each ray's
+    half-width, a ray hits a box anywhere in its slice of the fan, as with circles: where the middle of the ray hits it,
+    where either edge of the slice does, or where a corner of it lies inside the slice (a small box between the
+    edges). Those are all the ways a box can meet a slice, and the one that is nearest along the ray counts."""
+    near = slab(origin, dirs, bpos, bang, half, start)
+    if wide is None:
+        return near.min(-1, initial=np.inf)
+    turn = np.arctan(wide)[:, None]
+    sides = []
+    for sign in (-1, 1):
+        a = np.arctan2(dirs[..., 1], dirs[..., 0]) + sign * turn[:, 0]
+        edge = np.stack([np.cos(a), np.sin(a)], -1)
+        # measured along the middle of the ray, as a circle is
+        sides.append(slab(origin, edge, bpos, bang, half, start) * np.cos(turn[:, 0])[:, None])
+    # corners of each box, in the world: A,B,4,2
+    c, s = np.cos(bang)[..., None, None], np.sin(bang)[..., None, None]
+    local = np.array([(sx * h[0], sy * h[1]) for h in half for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]).reshape(-1, 4, 2)
+    corners = bpos[:, :, None] + np.stack([c[..., 0] * local[..., 0] - s[..., 0] * local[..., 1],
+                                           s[..., 0] * local[..., 0] + c[..., 0] * local[..., 1]], -1)
+    rx = corners[:, None, :, :, 0] - origin[:, :, None, None, 0]             # A,N,B,4
+    ry = corners[:, None, :, :, 1] - origin[:, :, None, None, 1]
+    along = dirs[..., 0, None, None] * rx[:, :, None] + dirs[..., 1, None, None] * ry[:, :, None]   # A,N,R,B,4
+    side2 = (rx * rx + ry * ry)[:, :, None] - along * along
+    inside = (along > start) & (side2 < (along * wide[:, None, None]) ** 2)
+    seen = np.where(inside, along, np.inf).min(-1)
+    return np.minimum(np.minimum(near, np.minimum(*sides)), seen).min(-1, initial=np.inf)
+
+
+def slab(origin, dirs, bpos, bang, half, start):
+    """Where each ray hits each box, (A,N,R,B), inf for none."""
     c, s = np.cos(bang)[:, None], np.sin(bang)[:, None]             # A,1,B
     rel = origin[:, :, None] - bpos[:, None]                         # A,N,B,2
     ox = (c * rel[..., 0] + s * rel[..., 1])[:, :, None]             # A,N,1,B
@@ -146,7 +175,7 @@ def hit_boxes(origin, dirs, bpos, bang, half, start):
     near = np.maximum(np.minimum(tx1, tx2), np.minimum(ty1, ty2))
     far = np.minimum(np.maximum(tx1, tx2), np.maximum(ty1, ty2))
     ok = (near <= far) & (far > start)
-    return np.where(ok, np.maximum(near, start), np.inf).min(-1, initial=np.inf)
+    return np.where(ok, np.maximum(near, start), np.inf)
 
 
 def hit_walls(origin, dirs, half, start):

@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from . import forage
+from . import body as body_module, forage, world
+from .budget import body as body_rates
 from .config import Config, Reward, Train, load, load_train
 
 SEEN = (10, 30, 60)
@@ -47,6 +48,7 @@ class Source:
     size: Callable[[Config, Reward], str]
     who: str = 'own'    # own: the nim's own, through the colony blend; else a sentence
     delay: Callable[[Config, Reward], tuple[float, str] | None] = lambda c, r: None
+    module: object = forage     # where `anchor` is found: forage.py for what pays, world.py for what the body costs
 
 
 def meal(c: Config, e: float) -> float:
@@ -91,9 +93,10 @@ REGISTRY = [
            lambda c, r: r.death != 0, lambda c, r: f'{r.death:g} once', delay=death_delay),
     Source('reward.alive', 'per-second', 'every second alive', 'r.alive * lived',
            lambda c, r: r.alive != 0, lambda c, r: f'{r.alive:g} a second'),
-    Source('reward.effort', 'per-second', 'energy spent, drain included', 'r.effort * (w.spent',
+    Source('reward.effort', 'per-second', 'energy spent moving (thrust, turn, sprint, grab, carry, jump), not the drain or the cold', 'r.effort * (w.spent',
            lambda c, r: r.effort != 0,
-           lambda c, r: f'-{r.effort:g} per {c.energy.food:g} energy ({r.effort * c.energy.drain / c.energy.food:g} a second at rest)'),
+           lambda c, r: (f'-{r.effort:g} per {c.energy.food:g} energy: {r.effort * c.energy.move / c.energy.food:.4f} a second at full thrust, '
+                         f'0 at rest')),
     Source('reward.snug', 'per-second', 'warmth: in its nest, or with mates close', 'r.snug + r.warm',
            lambda c, r: r.snug != 0, lambda c, r: f'{r.snug:g} a second at full warmth'),
     Source('reward.warm', 'per-second', 'warmth in the dark, times how dark', 'r.snug + r.warm',
@@ -120,9 +123,9 @@ REGISTRY = [
            lambda c, r: r.home != 0,
            lambda c, r: (f'{r.home:g} x food carried x (1 - distance / {c.arena.size:g}): a food {r.home * 10 / c.arena.size:.3f} '
                          f'for each 10 m nearer; nets 0 over a round trip')),
-    Source('game.tree', 'event', '', 'w.tree.points', lambda c, r: c.tree.on,
+    Source('game.tree', 'event', '', 'w.tree.points', lambda c, r: c.tree.on and (c.tree.points > 0 or c.tree.hop > 0),
            lambda c, r: f'{c.tree.points:g} an apple' + (f', -{c.tree.hop:g} a jump' if c.tree.hop else ''),
-           who='every living nim in the arena, in full (the colony blend leaves equal pay as it is)'),
+           who='every living nim of the colony that carried it, in full (the colony blend leaves equal pay as it is)'),
     Source('game.tag', 'per-second', 'every second: it pays, the rest gain', 'w.tag.points', lambda c, r: c.tag.on,
            lambda c, r: f'{c.tag.points:g} a second: it -{c.tag.points:g}, the others +{c.tag.points:g} / (alive - 1) each',
            who='the one that is it pays; the rest of the arena share it'),
@@ -140,14 +143,63 @@ REGISTRY = [
            lambda c, r: f'{c.dung.points:g} a dropping', who="every living member of the dropper's colony"),
 ]
 
+def felt(c: Config, r: Reward, effort: float, total: float) -> str:
+    """How a cost of `total` energy a second reaches the reward, `effort` of it through reward.effort (which sees only
+    what moving spends) and all of it through reward.needs_lost, at energy 0.5 where hunger squared falls twice as fast
+    as the bar."""
+    bits = []
+    if r.effort != 0 and effort:
+        bits.append(f'reward.effort -{r.effort * effort / c.energy.food:.4f}')
+    if r.needs_lost != 0 and total:
+        bits.append(f'reward.needs_lost about -{r.needs_lost * total:.4f} at energy 0.5')
+    return '; felt as ' + ' and '.join(bits) + ' a second' if bits else '; not charged by this recipe, only the death clock feels it'
+
+
+def rates(c: Config) -> dict:
+    return body_rates(c)
+
+
+BODY = 'the nim\'s own energy, felt through the reward terms named'
+REGISTRY += [
+    Source('energy.move', 'per-second', 'moving: thrust, on top of the drain', 'moving = (e.move', lambda c, r: c.energy.move != 0,
+           lambda c, r: (f'{c.energy.move:g} a second at full thrust: walking costs {rates(c)["walking"]:.4f} a second, '
+                         f'{rates(c)["walking"] / max(rates(c)["resting"], 1e-12):.1f}x resting' + felt(c, r, c.energy.move, c.energy.move)),
+           who=BODY, module=world),
+    Source('energy.turn', 'per-second', 'turning, times how hard squared', 'moving = (e.move', lambda c, r: c.energy.turn != 0,
+           lambda c, r: (f'{c.energy.turn:g} a second at full turn, {c.energy.turn / 4:.4f} at half' + felt(c, r, c.energy.turn, c.energy.turn)),
+           who=BODY, module=world),
+    Source('energy.work', 'per-second', 'moving a body, its load and fat, by weight and speed', 'e.work * body.mass', lambda c, r: c.energy.work > 0,
+           lambda c, r: (f'{c.energy.work:g} a second per kg at full speed: {c.energy.work * c.creature.mass:.4f} for the bare body, '
+                         f'laden walking {rates(c)["walking laden"]:.4f} in all' + felt(c, r, c.energy.work * c.creature.mass, c.energy.work * c.creature.mass)),
+           who=BODY, module=world),
+    Source('energy.still', 'per-second', 'what counts as still: thrust below this', 'still = np.abs(thrust)', lambda c, r: c.energy.rest != 1 or c.energy.asleep != 1,
+           lambda c, r: f'thrust under {c.tired.still if c.tired.on else c.energy.still:g} of full ({"[tired] still, tired is on" if c.tired.on else "[energy] still"}); '
+                        'steering without thrust is still too, and costs only the turn',
+           who=BODY, module=body_module),
+    Source('energy.rest', 'per-second', 'keeping still, awake', 'return np.where(asleep', lambda c, r: c.energy.rest != 1,
+           lambda c, r: (f'{c.energy.rest:g} of the drain ({c.energy.drain:g} a second): {rates(c)["resting"]:.4f} a second, '
+                         f'{rates(c)["resting"] / max(rates(c)["walking"], 1e-12):.2f} of walking' + felt(c, r, 0, rates(c)['resting'])),
+           who=BODY, module=body_module),
+    Source('energy.sleep', 'per-second', 'keeping still in the dark, warm (in its nest or huddled)', 'asleep = still', lambda c, r: c.energy.asleep != 1 and c.night.on,
+           lambda c, r: (f'{c.energy.asleep:g} of the drain: {rates(c)["asleep warm"]:.4f} a second in the nest (the night\'s cold left after the nest '
+                         f'included), against {rates(c)["resting"]:.4f} resting by day' + felt(c, r, 0, rates(c)['asleep warm'])),
+           who=BODY, module=body_module),
+    Source('fat.store', 'event', 'food past a full bar kept as fat, and burnt back when energy is low', 'if f.on:', lambda c, r: c.fat.on,
+           lambda c, r: (f'{c.fat.keep:g} of the food past full is kept, up to {c.fat.capacity:g}; below {c.fat.below:g} energy it turns back at up to '
+                         f'{c.fat.rate:g} a second: {c.fat.capacity / max(rates(c)["resting"], 1e-12):.0f} s resting on a full reserve'
+                         + (f', {c.fat.heavy:g} kg a unit to carry' if c.fat.heavy else ', weightless')
+                         + '; not in the reward, it only delays the death clock'),
+           who=BODY, module=body_module),
+]
+
 DEFAULT_WHEN = {'game.tree': tree_when}
 
 WHEN = {'event': 'at the event', 'per-second': 'each second', 'potential': 'each step, as the crop gets nearer',
         'terminal': 'at the end'}
 
 
-def line_of(anchor: str) -> int | None:
-    lines = inspect.getsource(forage).splitlines()
+def line_of(anchor: str, module=forage) -> int | None:
+    lines = inspect.getsource(module).splitlines()
     return next((i + 1 for i, text in enumerate(lines) if anchor in text), None)
 
 
@@ -188,7 +240,7 @@ def rows(c: Config, r: Reward, h: dict) -> list[Row]:
     for s in REGISTRY:
         if not s.on(c, r):
             continue
-        line = line_of(s.anchor)
+        line = line_of(s.anchor, s.module)
         when = s.when or DEFAULT_WHEN[s.key](c)
         delay = WHEN[s.kind]
         got = s.delay(c, r)
@@ -196,7 +248,7 @@ def rows(c: Config, r: Reward, h: dict) -> list[Row]:
             sec, what = got
             delay += f'; payoff sits {sec:g} s on ({what}), weight {h['gamma'] ** (sec / h['step_s']):.2f}'
         who = blend(c, r) if s.who == 'own' else s.who
-        out.append(Row(s.key, when, s.kind, who, s.size(c, r), delay, f'forage.py:{line}' if line else 'forage.py'))
+        out.append(Row(s.key, when, s.kind, who, s.size(c, r), delay, f'{s.module.__name__.split(".")[-1]}.py:{line}' if line else f'{s.module.__name__.split(".")[-1]}.py'))
     return out
 
 
@@ -234,21 +286,21 @@ def warnings(c: Config, train: Train, hz: dict, tm: dict) -> list[tuple[str, str
         if r.dawn != 0 and not tm['dawn_reached']:
             out.append(('never-dawn', f"reward.dawn = {r.dawn:g} but no training game reaches dawn ({tm['first_dawn_s']:g} s)"))
 
-    if r.stored != 0 and c.tree.on and c.tree.home:
-        out.append(('double-pay', f'a food unloaded in the nest is paid by reward.stored ({r.stored:g}) and by [tree] points '
-                    f'({c.tree.points:g} an apple, to every living nim): twice'))
-    if r.food != 0 and c.tree.on and not c.tree.home:
+    if r.stored != 0 and c.tree.on and c.tree.points > 0 and c.tree.home:
+        out.append(('double-pay', f'{"an apple" if c.tree.apples else "a food"} unloaded in the nest is paid by reward.stored ({r.stored:g}) and by [tree] points '
+                    f'({c.tree.points:g} an apple, to every living nim of the colony): twice'))
+    if r.food != 0 and c.tree.on and c.tree.points > 0 and not c.tree.home:
         out.append(('double-pay', f'an apple eaten is paid by reward.food ({r.food:g}) and by [tree] points ({c.tree.points:g})'))
     if r.needs != 0 and (r.food != 0 or r.jelly != 0):
         who = '/'.join(k for k, v in (('food', r.food), ('jelly', r.jelly)) if v)
         out.append(('double-pay', f'a meal is paid by reward.needs ({r.needs:g}, the hunger it ends) and by reward.{who}'))
 
     paid = []
-    if r.stored == 0 and c.tree.on and c.tree.home:
+    if r.stored == 0 and c.tree.on and c.tree.points > 0 and c.tree.home:
         paid.append('delivery (food unloaded in the nest) is paid by [tree] points, though reward.stored = 0')
     if r.food == 0 and r.needs != 0:
         paid.append('eating is paid by reward.needs, though reward.food = 0')
-    if r.food == 0 and c.tree.on and not c.tree.home:
+    if r.food == 0 and c.tree.on and c.tree.points > 0 and not c.tree.home:
         paid.append('taking an apple is paid by [tree] points, though reward.food = 0')
     if r.jelly == 0 and r.needs != 0:
         paid.append("eating the store's jelly is paid by reward.needs (a store's jelly counts), though reward.jelly = 0")

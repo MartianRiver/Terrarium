@@ -128,7 +128,7 @@ class Forage:
         w, r = self.world, self.reward
         began, rays, physics = clock.now(), clock.spent['rays'], clock.spent['physics']
         actions = np.clip(actions, -1, 1).reshape(*self.last.shape[:2], -1)
-        before = {k: getattr(w, k).copy() for k in ('fed', 'nourished', 'spent', 'stored', 'jelly', 'hatched', 'alive', 'energy', 'water', 'drank')}
+        before = {k: getattr(w, k).copy() for k in ('fed', 'nourished', 'spent', 'stored', 'jelly', 'hatched', 'alive', 'energy', 'water', 'drank', 'creature_id')}
         alive = before['alive']
         worth = carried_worth(w, r)
         # held for `repeat` ticks; episodes are a whole number of choices long, so a time limit lands on the last
@@ -136,10 +136,12 @@ class Forage:
         lived, snug, fun, play, dawned, pang = (np.zeros(alive.shape) for _ in range(6))
         for _ in range(self.repeat):
             dark = w.dark.copy()
+            up = w.alive.copy()
             w.step(actions)
             lived += w.alive
             if r.hunger:
-                pang += w.alive * ((1 - w.energy)**2 + ((1 - w.water)**2 if w.ponds else 0))
+                # a tick it died in counts: the cost of the last tick of a life is the cost of dying hungry
+                pang += up * ((1 - w.energy)**2 + ((1 - w.water)**2 if w.ponds else 0))
             if w.tag:
                 play += w.tag.points(w.alive)
             if w.seek:
@@ -165,16 +167,18 @@ class Forage:
         kept = w.nourished - before['nourished']
         needs = r.needs * kept * (2 * (1 - w.energy) + kept)
         # what the drain, the cold and effort took, as the same square: hunger had no meal been eaten, less before.
-        # Not for the dead, the unborn or an arena about to start over, whose energy jumps
+        # Not for the unborn or a slot that hatched anew in the interval, whose energy jumps; a nim that died or whose
+        # game ended in it is charged to the last tick, since its reward is the last it gets
         # thirst the same way: a drink pays its fall in thirst squared, what the drain took is charged
         drunk = w.drank - before['drank']
         needs += r.needs * drunk * (2 * (1 - w.water) + drunk)
+        same = alive & (w.creature_id == before['creature_id'])
         if r.needs_lost:
             lost = (1 - before['energy'])**2 - (1 - w.energy + kept)**2
             lost += (1 - before['water'])**2 - (1 - w.water + drunk)**2
-            needs += r.needs_lost * lost * (alive & w.alive & ~w.ended[:, None])
+            needs += r.needs_lost * lost * same
         if r.hunger:
-            needs -= r.hunger * w.cfg.dt * pang * (alive & w.alive & ~w.ended[:, None])
+            needs -= r.hunger * w.cfg.dt * pang * same
         own = ((r.food * gain - r.effort * (w.spent - before['spent'])) / w.cfg.energy.food
                + r.stored * (w.stored - before['stored']) + r.jelly * (w.jelly - before['jelly'])
                + r.hatch * (w.hatched - before['hatched'])[:, w.colony] * alive + r.death * (alive & ~w.alive)

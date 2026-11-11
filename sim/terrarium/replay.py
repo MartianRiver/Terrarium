@@ -106,13 +106,15 @@ def frame(world: World, a: int) -> dict:
         for c, water in zip(creatures, world.water[a][born]):
             c['water'] = _r(water)
     here = world.food_present[a]
-    kinds = np.where(np.arange(len(here)) < world.wild, 'common', 'jelly')[here]
+    slots = np.arange(len(here))
+    kinds = np.where(slots < world.wild, 'common', 'jelly')[here]
     food = [{'id': int(i), 'kind': str(k), 'x': _r(x), 'y': _r(y)}
             for i, k, (x, y) in zip(world.food_id[a][here], kinds, world.food_pos[a][here])]
     if world.tree:
-        # the tree's berries are apples, hanging this far above a standing nim's reach
-        for f in food:
-            if f['kind'] == 'common':
+        # the tree's food is apples, hanging this far above a standing nim's reach (with [tree] apples, the first few
+        # foods; the rest are berries on the ground)
+        for f, apple in zip(food, world.apple[here]):
+            if f['kind'] == 'common' and apple:
                 f.update(kind='apple', z=cfg.tree.reach)
     if world.peek and world.peek.hidden[a]:
         # peekaboo's berry, out of sight

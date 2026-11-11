@@ -36,6 +36,16 @@ def test_a_jump_rises_its_height_and_comes_back_down():
     assert world.z[0, 0] == 0 and world.jumps[0, 0] == 1
 
 
+def test_a_jump_is_counted_and_costed_when_it_happens_and_charged_whenever_points_is_asked():
+    world = World(TREE)
+    world.step(act(True))
+    for _ in range(30):
+        world.step(act())
+    assert world.tree.hops[0, 0] == world.jumps[0, 0] == 1
+    assert world.tree.points(world.alive)[0, 0] == pytest.approx(-TREE.tree.hop)
+    assert world.tree.points(world.alive)[0, 0] == 0
+
+
 def test_no_jump_from_the_air():
     world = World(TREE)
     world.step(act(True))
@@ -101,6 +111,30 @@ def test_an_apple_going_home_is_carried_and_pays_only_once_unloaded_in_the_nest(
     world.step(unload)
     assert world.crop[0, 0] == 0 and world.stored[0, 0] == 1
     assert world.tree.points(world.alive)[0, 0] == HOME.tree.points
+
+
+def test_a_tree_that_exists_with_no_points_still_grows_apples_to_carry_home_and_pays_nothing():
+    cfg = replace(HOME, tree=replace(HOME.tree, points=0.0, hop=0.0, exists=True))
+    assert cfg.tree.on and not replace(HOME.tree, points=0.0).on and replace(HOME.tree, points=0.0, exists=None).on is False
+    world = World(cfg)
+    assert world.tree and world.apple.any()
+    world.energy[:] = 0.2
+    under_an_apple(world)
+    world.step(act(True))
+    for _ in range(20):
+        world.step(act())
+    assert world.meals[0, 0] == 1 and world.crop[0, 0] == 1
+    world.physics.place(np.array([0]), world.nests[None, :1].copy())
+    unload = act()
+    unload[..., UNLOAD] = 1.0
+    world.step(unload)
+    assert world.stored[0, 0] == 1
+    assert world.tree.points(world.alive)[0, 0] == 0
+
+
+def test_a_tree_switched_off_stays_off_whatever_it_pays():
+    assert not replace(HOME.tree, exists=False).on
+    assert World(replace(HOME, tree=replace(HOME.tree, exists=False))).tree is None
 
 
 def test_a_full_crop_takes_no_apple():

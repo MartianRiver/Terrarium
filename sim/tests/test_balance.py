@@ -80,3 +80,35 @@ def test_gates_judge_rich_and_lean_runs():
 
 def gates_of(run, kind):
     return balance.gates(run, 18, kind, 120.0)
+
+
+def test_a_colony_dying_out_is_not_hidden_by_the_one_that_carries_the_arena():
+    t = list(np.arange(0, 1201, 120.0))
+    # two games, two colonies: colony 1 of the second game is gone after day two, the arena never empties
+    alive = [[[[9, 9], [9, 9 if i < 3 else 0]]] [0] for i in range(11)]
+    run = {'t': t, 'alive': alive}
+    g = gates_of(run, 'rich')
+    assert g['extinct_games'] == 0 and g['extinct_colonies'] == 1
+    assert not g['checks']['no colony goes extinct'] and g['pass'] is False and g['status'] == 'fail'
+    # the old arena total alone would have passed this far
+    assert g['checks']['no game goes extinct']
+
+
+def test_a_rich_world_has_to_hold_every_day_not_only_the_last():
+    t = list(np.arange(0, 1201, 120.0))
+    dip = [18, 18, 10, 10, 18, 18, 18, 18, 18, 18, 18]
+    g = gates_of({'t': t, 'alive': [[[x // 2, x - x // 2]] * 2 for x in dip]}, 'rich')
+    assert g['checks']['keeps 90% of the start'] and not g['checks']['keeps 90% of the start every day']
+    assert g['status'] == 'fail'
+
+
+def test_a_run_too_short_to_judge_is_incomplete_not_a_pass():
+    t = list(np.arange(0, 241, 120.0))
+    g = gates_of({'t': t, 'alive': [[[9, 9]] * 2] * 3}, 'rich')
+    assert g['status'] == 'incomplete' and g['pass'] is None and all(g['checks'].values())
+
+
+def test_a_long_enough_steady_run_passes_with_its_days_listed():
+    t = list(np.arange(0, 1201, 120.0))
+    g = gates_of({'t': t, 'alive': [[[9, 9]] * 2] * 11}, 'rich')
+    assert g['status'] == 'pass' and len(g['daily_median']) == 10 and g['extinct_colonies'] == 0
