@@ -57,3 +57,4 @@ Line 1 is `# NNNN Title`, line 3 is `date: … · status: … · seeds: … · b
 - [0039](0039-the-night-deaths-come-down-to-food.md) The night deaths come down to food: 84% of the dead die with the store empty, the untrained brains live a third more with more food, and training in a richer world, a fat reserve or a longer horizon lifts nothing past that. *hint*
 - [0040](0040-the-night-block-is-the-far-tree.md) The night block is the far tree: dying nests stock too little because the brains can't see a tree 12 m off, and trained with 12 m sight they live the night 90% of the time. *confirmed*
 - [0041](0041-sight-does-the-work.md) Sight does the work: the 12 m night brains live as long as they can see, and training at 8, 6 or 4 m doesn't teach them to make up for it. *confirmed*
+- [0042](0042-the-12-m-brains-die-two-ways.md) The 12 m night brains die two ways, out in the first night and short of stock into the second dawn; two of six pass 85%. *confirmed*
