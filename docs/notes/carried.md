@@ -9,14 +9,16 @@ The main world was the 12 m night world (`world-vision12`, train `train-needs`) 
 ## Not yet
 
 - thrust that can sample a stop: bound on the thrust mean | 0028, 0032 | not yet | `[ppo] bound 0.01`, `bound_for ["thrust"]`; night brains' thrust std .145, turn .028, mean past the clip; 0035 tried only 0.001; r2 (2M, s1): 92 vs 90% alive, night-1 deaths 0.2 vs 2.9%, home 26 vs 17% of the night, still only 6%: harmless, leans right; into the main world | 11 Nov, r2
-- steering spread reset (turn-only, or 0.10–0.35) | 0032, 0034 | not yet | a checkpoint edit of `log_std`; 0.35 on both cost the 4 m night brains half their survivors (0035); 0.2 at 12 m cost them too at 2M (r2: 56 and 82% against 90/94): leave out of the main world for now | 11 Nov, r2
+- steering spread reset (turn-only, or 0.10–0.35) | 0032, 0034, 0044 | not yet | a checkpoint edit of `log_std`; 0.35 on both cost the 4 m night brains half their survivors (0035); 0.2 at 12 m cost them too at 2M (r2: 56 and 82% against 90/94); on the colony brain in the main world 0.2 keeps every skill on the battery (m8, m11): a step for the colony donor, not the night brains | 12 Nov, m8/m11
 - stopping pays: rest and sleep | 0028 (colony c29 rests 16–21 s a minute) | not yet | `[energy] rest 0.5`, `sleep 0.2`, `still 0.1`; useless on a pinned thrust; with the bound, into the main world | 11 Nov, r2
 - walking costs | 0026, colony 9 Nov | not yet | `[energy] move 0.01`; frozen on pinned night brains it took s1/s2 from 90/94 to 36/42% alive, so only after the unpin | 11 Nov
 - training games hold the whole exam | 0023, ledger 11 Nov | not yet | `[episode] seconds` 180 in training, 300 in the exam: night 2 is never trained | 11 Nov
-- hunger felt all the time | 0030, 0031 | not yet | `[reward] hunger 1`; scale `[tree] points` with any `needs` x3–6 or delivery shrinks | 11 Nov
+- hunger felt all the time | 0030, 0031, 0044 | not yet | `[reward] hunger 1`; scale `[tree] points` with any `needs` x3–6 or delivery shrinks; in the main world it teaches drinking and pulls them out at night to drink (m9, m12: the dark spent at home .81 to .004, chilled 345): not in this form | 12 Nov, m9/m12
 - a fresh brain beside the fork | efficiency.md, 0.4 | not yet | the night line is all forks; one fresh run, 4 m, 0% | 11 Nov
 - a wider brain beside the working one | standing rule, widen.py | not yet | night brains are width 64, colony 128; the main line trains 256 beside | 11 Nov
 - state-dependent spread | (design) | not yet | branch in ../Terrarium-statespread, unreviewed | 11 Nov
+- water rests like energy | 0044 | not yet | `[water] rest 0.5`, `asleep 0.2` (branch water-rest, default 1): 4 to 22 of 64 colonies live where none did; an easier world, so a rung to work back from, not yet the main world's; ledger and budget don't know it | 12 Nov, m11
+- inputs a donor never had: wake them | 0044 | not yet | new first-layer columns load at zero and stay there at lr 5e-5 (water .01 after 8M); `lab/2026-11-11-mainline/wake.py` sets them to norm 1 with the bias taking their usual value; a load option would carry it | 12 Nov, m6
 
 ## Carried
 
