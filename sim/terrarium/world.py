@@ -189,7 +189,9 @@ class World:
         # jelly, in grown nims' bites (the young take smaller ones)
         self.store = np.zeros((arenas, len(self.nests)))
         self.stored = np.zeros((arenas, n), int)
-        # apples in each crop, and apples each has unloaded in its own nest (the rest of a crop is berries)
+        # apples in each crop, apples each has taken off the tree, and apples each has unloaded in its own nest (the rest
+        # of a crop is berries)
+        self.apples_taken = np.zeros((arenas, n), int)
         self.apples_crop = np.zeros((arenas, n), int)
         self.apples_stored = np.zeros((arenas, n), int)
         self.jelly = np.zeros((arenas, n))
@@ -381,6 +383,7 @@ class World:
         self.store[idx] = 0
         self.stored[idx] = 0
         self.apples_crop[idx] = 0
+        self.apples_taken[idx] = 0
         self.apples_stored[idx] = 0
         self.jelly[idx] = 0
         self.sprinting[idx] = 0
@@ -623,6 +626,8 @@ class World:
         np.add.at(self.crop, (arena[~eats], who[~eats]), 1)
         np.add.at(self.apples_crop, (arena[up & ~eats], who[up & ~eats]), 1)
         np.add.at(self.meals, (arena[wild], who[wild]), 1)
+        hung = wild & self.apple[food]
+        np.add.at(self.apples_taken, (arena[hung], who[hung]), 1)
         # two foods on one tick can overfill a crop; the extra is lost
         np.minimum(self.crop, cfg.crop.capacity, out=self.crop)
         np.minimum(self.apples_crop, self.crop, out=self.apples_crop)

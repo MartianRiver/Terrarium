@@ -428,3 +428,27 @@ use = "test"
 what = "scripted night check in the main world"
 where = "lab/2026-11-11-mainline"
 date = 2026-11-11
+
+[[block]]
+start = 8_125_000
+size = 1000
+use = "test"
+what = "skills battery baselines under the new box rays, and again with the battery fixes (cohort survival, apple counters, pond water)"
+where = "lab/2026-11-11-battery, lab/2026-11-11-batteryfix"
+date = 2026-11-11
+
+[[block]]
+start = 8_126_000
+size = 1000
+use = "test"
+what = "frozen water check: n70b-s1 and c2x9-more-s1 in the main world at water drain .012/.006/0, 16 games each"
+where = "lab/2026-11-11-mainline"
+date = 2026-11-11
+
+[[block]]
+start = 8_127_000
+size = 1000
+use = "test"
+what = "main-world runs m1 to m12 frozen (probe, pond start, skills battery), at drain .012 and in the water-rest world"
+where = "lab/2026-11-11-mainline"
+date = 2026-11-11
