@@ -15,6 +15,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 from typing import Callable
 
 from . import body as body_module, forage, world
@@ -48,7 +49,7 @@ class Source:
     size: Callable[[Config, Reward], str]
     who: str = 'own'    # own: the nim's own, through the colony blend; else a sentence
     delay: Callable[[Config, Reward], tuple[float, str] | None] = lambda c, r: None
-    module: object = forage     # where `anchor` is found: forage.py for what pays, world.py for what the body costs
+    module: ModuleType = forage     # where `anchor` is found: forage.py for what pays, world.py for what the body costs
 
 
 def meal(c: Config, e: float) -> float:
@@ -64,7 +65,9 @@ def starve(c: Config) -> list[tuple[float, str]]:
     if c.night.on and c.night.cold > 0:
         out.append((c.night.length, "a night's cold"))
     if c.water.on and c.water.drain > 0:
-        out.append((c.water.start / c.water.drain, 'thirst'))
+        # moving; a still or sleeping nim lasts longer when water rests ([water] rest / asleep below 1)
+        what = 'thirst' if c.water.rest >= 1 else f'thirst ({c.water.start / (c.water.drain * c.water.rest):.0f} s still)'
+        out.append((c.water.start / c.water.drain, what))
     return out
 
 

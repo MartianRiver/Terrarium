@@ -97,3 +97,12 @@ def test_a_world_with_only_grass_prints_without_a_food_trip():
     assert b['meadow']['p50'] == pytest.approx(4.0) and 'day' not in b
     text = show(cfg, b)
     assert 'a full cell lasts one nim' in text and 'no food but the grass' in text
+
+
+def test_water_that_rests_lasts_longer_still_and_asleep():
+    wet = replace(CFG, water=replace(CFG.water, ponds=1, radius=1.5, distance=5.0, drain=0.01, drink=0.27, rest=0.5,
+                                     asleep=0.2))
+    w = budget(wet, arenas=4)['groups']['adult']['water']
+    assert w['full'] == pytest.approx(100)
+    assert w['still']['full'] == pytest.approx(200) and w['asleep']['full'] == pytest.approx(500)
+    assert 'still' not in budget(replace(wet, water=replace(wet.water, rest=1.0, asleep=1.0)), arenas=4)['groups']['adult']['water']

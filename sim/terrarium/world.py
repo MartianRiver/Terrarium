@@ -506,7 +506,7 @@ class World:
         if cfg.tired.on:
             tired.tire(self, thrust, bursting)
         if self.ponds:
-            self.ponds.step(share)
+            self.ponds.step(share, body.thirst(self, thrust))
         np.maximum(self.young - 1, 0, out=self.young)
         np.maximum(self.stooping - 1, 0, out=self.stooping)
         self.sprinting[bursting] -= 1

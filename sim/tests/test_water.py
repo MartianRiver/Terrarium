@@ -306,3 +306,58 @@ def test_a_sip_smaller_than_the_drain_does_not_keep_it_alive():
     w.water[:] = 0.5
     still(w, 20)
     assert w.alive[0, 0] and w.water[0, 0] < 0.5
+
+
+def sleeper(**water):
+    """One nim in a night world, a pond far off, water falling .02 a second."""
+    cfg = load(CONFIGS / 'night.toml')
+    cfg = replace(cfg, colonies=replace(cfg.colonies, count=1, size=1, room=0), food=replace(cfg.food, count=0),
+                  night=replace(cfg.night, cold=0.0), energy=replace(cfg.energy, drain=0.0, move=0.0),
+                  young=replace(cfg.young, energy=0.5), water=replace(T, ponds=1, drain=0.02, **water))
+    w = World(cfg, 1, 0)
+    assert w.ponds
+    w.ponds.pos[0, 0] = (50.0, 50.0)
+    w.physics.bodies[0][0].position = tuple(w.nests[0])
+    w.physics.read()
+    return w
+
+
+def lost(w, thrust=0.0, ticks=20):
+    before = w.water[0, 0]
+    x = np.zeros((1, 1, 2))
+    x[..., 0] = thrust
+    for _ in range(ticks):
+        w.step(x)
+    return before - w.water[0, 0]
+
+
+def test_water_drains_less_still_and_less_again_asleep():
+    w = sleeper(rest=0.5, asleep=0.2)
+    drain = 0.02 * 20 * DT
+    assert lost(w) == pytest.approx(drain * 0.5)
+    assert lost(w, thrust=1.0) == pytest.approx(drain)
+    # night, back in the nest: asleep
+    w.physics.bodies[0][0].position = tuple(w.nests[0])
+    w.physics.read()
+    w.age[:] = round(70.0 * w.cfg.tick_hz)
+    assert lost(w) == pytest.approx(drain * 0.2)
+    # night, out in the cold with nobody near is only resting
+    w.physics.bodies[0][0].position = tuple(w.nests[0] + (6.0, 0.0))
+    w.physics.read()
+    assert lost(w) == pytest.approx(drain * 0.5)
+    w.young[:] = 100
+    assert lost(w) == pytest.approx(drain * 0.5 * 0.5)
+
+
+def test_water_rest_and_asleep_default_to_the_whole_drain():
+    assert T.rest == 1 and T.asleep == 1
+    w = sleeper()
+    assert lost(w) == pytest.approx(0.02 * 20 * DT)
+    w.age[:] = round(70.0 * w.cfg.tick_hz)
+    assert lost(w) == pytest.approx(0.02 * 20 * DT)
+
+
+def test_water_rest_and_asleep_are_shares_of_the_drain():
+    for bad in ({'rest': -0.1}, {'rest': 1.5}, {'asleep': -0.1}, {'asleep': 2.0}):
+        with pytest.raises(ConfigError, match='rest and asleep'):
+            replace(T, **bad)
