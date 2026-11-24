@@ -4,7 +4,8 @@
 #
 #   uv run python -m terrarium.battery CKPT [CKPT ...] --games 64 --seed 8121000 --out battery.json
 #
-# CKPT is a .pt, a run's folder or its checkpoints folder (the last checkpoint), or NAME=that. The worlds are in
+# CKPT is a .pt, a run's folder or its checkpoints folder (the last checkpoint), or NAME=that; results are keyed
+# NAME@samples, so checkpoints of one run sit side by side. The worlds are in
 # configs/battery/ (--world SKILL=PATH swaps one, e.g. the main world); --only names the skills to run. Every test is a
 # frozen play: notes kept, the brain's own action noise (sampled for graze and pond, as the findings behind them were,
 # drawn for the rest, as the scorer's 'kept' mode does), the same seeds for every brain.
@@ -13,7 +14,7 @@
 #   pond      drinks still            speed in the pond, visit length, seconds drinking a game (0030)
 #   tree      jumps for apples        apples picked and brought home a minute
 #   displace  goes to remembered tree the first trip to where the tree stood, kept notes minus wiped ones (0005)
-#   night     stays home at night     alive at the end, still at home in the dark, nest exits a night
+#   night     stays home at night     starting cohort alive at the end, still at home in the dark, nest exits a night
 import argparse
 import json
 import re
@@ -24,6 +25,7 @@ import torch
 
 from .battery_displace import displace
 from .battery_skills import graze, night, pond, tree
+from .brain import brain_id
 from .config import load
 
 CONFIGS = Path(__file__).resolve().parent.parent / 'configs' / 'battery'
@@ -37,13 +39,25 @@ def find_brain(arg: str) -> tuple[str, Path]:
     path = Path(spec)
     if path.is_dir():
         path = path / 'checkpoints' if (path / 'checkpoints').is_dir() else path
-        path = sorted(path.glob('*.pt'))[-1]
+        found = sorted(path.glob('*.pt'))
+        if not found:
+            raise SystemExit(f'no checkpoint in {path}')
+        path = found[-1]
     if not path.is_file():
         raise SystemExit(f'no checkpoint at {spec}')
     if not name:
         run = path.parent.parent.name if path.parent.name == 'checkpoints' else path.stem
         name = re.sub(r'-[0-9a-f]{12}$', '', re.sub(r'^\d{8}-\d{6}-', '', run))
     return name, path
+
+
+def identify(name: str, path: Path) -> tuple[str, dict]:
+    """What a result is keyed by, run name @ samples, so two checkpoints of one run don't collide, and the fields that
+    say which checkpoint it was."""
+    meta = torch.load(path, weights_only=True).get('meta', {})
+    samples = meta.get('samples')
+    key = f'{name}@{samples if samples is not None else path.stem}'
+    return key, {'run': name, 'samples': samples, 'id': brain_id(path)[:12], 'checkpoint': str(path)}
 
 
 def run_brain(path: Path, worlds: dict, skills: list[str], games: int, seed: int, displace_games: int) -> dict:
@@ -61,7 +75,7 @@ def f(x, spec='', none='-') -> str:
 
 
 def line(name: str, r: dict) -> str:
-    parts = [f'{name:28s}']
+    parts = [f'{name:36s}']
     for skill, fmt in LINES.items():
         if skill in r:
             parts.append(na(r[skill]) or fmt(r[skill]))
@@ -76,11 +90,13 @@ def na(r: dict) -> str:
 LINES = {
     'graze': lambda r: f"graze anchored {f(r['anchored'], '.0%')} extent {f(r['extent_m'] and r['extent_m'][1], '.2f')} m",
     'pond': lambda r: f"pond {f(r['pond_speed'], '.2f')} m/s, visit {f(r['visit_s'] and r['visit_s'][1], '.1f')} s, "
-                      f"drinks {r['drink_s_game']:.0f} s/game",
+                      f"drinks {r['drink_s_game']:.0f} s/game, {f(r['water_visit'], '.2f')} water a visit, "
+                      f"{r['never_pond']:.0%} never reached it, {r['thirst_deaths']:.0%} died of thirst",
     'tree': lambda r: f"tree {r['picked_min']:.2f} picked, {r['home_min']:.2f} home /min",
     'displace': lambda r: f"displace old spot {r['kept']:.0%} kept, {r['wiped']:.0%} wiped, {r['diff'] * 100:+.0f} "
                           f"[{r['diff_ci'][0] * 100:+.0f}, {r['diff_ci'][1] * 100:+.0f}] ({r['trips']} trips)",
-    'night': lambda r: f"night alive {r['alive']:.0%}, still at home {f(r['still_home'], '.0%')}, "
+    'night': lambda r: f"night cohort alive {r['alive']:.0%} (living {r['living']:.1f}/{r['cohort']:.1f} a game, "
+                       f"{r['colonies_alive']:.0%} of colonies), still at home {f(r['still_home'], '.0%')}, "
                        f"exits {f(r['exits_night'], '.1f')} a night",
 }
 
@@ -105,12 +121,16 @@ def main():
     bad = [k for k in skills if k not in SKILLS]
     if bad:
         raise SystemExit(f'no such skill: {", ".join(bad)} (there are {", ".join(SKILLS)})')
+    found = [find_brain(arg) for arg in a.brains]
+    ids = [identify(name, path) for name, path in found]
+    twice = sorted({k for k, _ in ids if [j for j, _ in ids].count(k) > 1})
+    if twice:
+        raise SystemExit(f'the same name and samples twice: {", ".join(twice)} (give one of them its own NAME=)')
     results = {}
-    for arg in a.brains:
-        name, path = find_brain(arg)
+    for (name, path), (key, who) in zip(found, ids):
         r = run_brain(path, worlds, skills, a.games, a.seed, a.displace_games or DISPLACE_GAMES * a.games)
-        results[name] = {'checkpoint': str(path), **r}
-        print(line(name, r), flush=True)
+        results[key] = {**who, **r}
+        print(line(key, r), flush=True)
         if a.out:
             a.out.write_text(json.dumps({'seed': a.seed, 'games': a.games, 'worlds': {k: str(worlds[k]) for k in skills},
                                          'brains': results}, indent=1) + '\n')
