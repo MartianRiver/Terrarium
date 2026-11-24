@@ -17,9 +17,7 @@ def widen(old: Brain, width: int, noise: float = 0.0, seed: int = 0) -> Brain:
     w, k = old.shape['width'], width // old.shape['width']
     if width % w or k < 2:
         raise ValueError(f'width {width} has to be a multiple of {w}, at least twice it')
-    if old.memory:
-        raise ValueError("widening a brain with memory isn't written yet: widen first, then add memory")
-    new = Brain(width, old.shape['layers'], old.shape['heads'] * k, old.schema, old.yes_no)
+    new = Brain(width, old.shape['layers'], old.shape['heads'] * k, old.schema, old.yes_no, old.memory)
     state = new.state_dict()
 
     def rows(t):
@@ -34,6 +32,14 @@ def widen(old: Brain, width: int, noise: float = 0.0, seed: int = 0) -> Brain:
         if name.startswith(('policy.', 'value.', 'log_std')):
             # the heads read the stream and write actions and the value, which don't widen
             out = cols(t) if name.endswith('weight') else t
+        elif name == 'gru.weight_ih':
+            # the notes stay as many as they were: they read the stream (cols) and write back into it (recall, below)
+            out = cols(t)
+        elif name.startswith('gru.'):
+            out = t
+        elif name == 'recall.weight':
+            # the notes write the stream, so only its rows copy
+            out = rows(t)
         elif name == 'kind.weight':
             out = t.repeat(1, k)
         elif name.endswith('in_proj_weight'):
@@ -49,8 +55,9 @@ def widen(old: Brain, width: int, noise: float = 0.0, seed: int = 0) -> Brain:
         state[name] = out
     if noise:
         g = torch.Generator().manual_seed(seed)
-        for t in state.values():
-            if t.dim() == 2:
+        for name, t in state.items():
+            # weight_hh isn't copied, so noise would only perturb it
+            if t.dim() == 2 and name != 'gru.weight_hh':
                 t += torch.randn(t.shape, generator=g) * noise * t.std()
     new.load_state_dict(state)
     return new
