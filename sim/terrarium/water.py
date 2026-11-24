@@ -75,12 +75,13 @@ class Ponds:
         d = self.world.pos[:, :, None] - self.pos[:, None]                    # A,N,P,2
         return ((d[..., 0] ** 2 + d[..., 1] ** 2) < self.world.cfg.water.radius ** 2).any(-1)
 
-    def step(self, share: np.ndarray | float):
-        """One tick of thirst and drinking for the living; share is what the young pay of each cost."""
+    def step(self, share: np.ndarray | float, burn: np.ndarray | float = 1.0):
+        """One tick of thirst and drinking for the living; share is what the young pay of each cost, burn the share of
+        the drain paid at rest or asleep (body.thirst)."""
         w = self.world
         t, dt = w.cfg.water, w.cfg.dt
         # not clipped at 0 yet: a drink has to cover what the drain took past empty, or it dies
-        dried = w.water - t.drain * dt * share
+        dried = w.water - t.drain * dt * share * burn
         floor = np.clip(dried, 0, 1)
         # lapping takes standing still: the rate falls with speed, to nothing at `still` m/s
         slow = np.clip(1 - np.hypot(w.vel[..., 0], w.vel[..., 1]) / t.still, 0, 1) if t.still > 0 else 1.0

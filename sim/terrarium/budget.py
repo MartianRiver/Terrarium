@@ -129,6 +129,10 @@ def budget(cfg: Config, arenas: int = 64, seed: int = 0) -> dict:
         if cfg.water.on:
             drain = cfg.water.drain * share
             g['water'] = {'start': lasts(cfg.water.start, drain), 'full': lasts(1.0, drain)}
+            # water rests like energy when [water] rest / asleep are below 1
+            for state, k in (('still', cfg.water.rest), ('asleep', cfg.water.asleep)):
+                if k < 1:
+                    g['water'][state] = {'start': lasts(cfg.water.start, drain * k), 'full': lasts(1.0, drain * k)}
         if cfg.grass.on:
             g['grass'] = grazing(cfg, share)
         out['groups'][name] = g
@@ -202,6 +206,10 @@ def show(cfg: Config, b: dict, name: str = '') -> str:
                 lines.append(f'    {what}'.ljust(34) + fmt(rate, 4).rjust(11) + secs(lasts(1.0 + cfg.fat.capacity * ('fat' in what), rate)).rjust(11))
         if 'water' in g:
             lines.append(f'  water lasts, seconds'.ljust(34) + secs(g['water']['start']).rjust(11) + secs(g['water']['full']).rjust(11))
+            for state in ('still', 'asleep'):
+                if state in g['water']:
+                    w = g['water'][state]
+                    lines.append(f'    {state}'.ljust(34) + secs(w['start']).rjust(11) + secs(w['full']).rjust(11))
         if 'grass' in g:
             r = g['grass']
             still = f'none at {cfg.grass.still:g} m/s' if cfg.grass.still > 0 else 'any speed'

@@ -186,6 +186,9 @@ class Water:
     drink: float        # water gained a second with its centre in a pond
     still: float        # drinking slows with speed: all of `drink` at a stop, none at this speed (0: speed doesn't matter)
     start: float
+    # share of `drain` paid while still (as [energy] rest has it), and while asleep: still in the dark and warm
+    rest: float = 1.0
+    asleep: float = 1.0
 
     def __post_init__(self):
         if self.ponds < 0:
@@ -194,6 +197,8 @@ class Water:
             raise ConfigError('[water] drain and drink are per second, 0 or more')
         if self.still < 0:
             raise ConfigError('[water] still is a speed, 0 or more')
+        if not (0 <= self.rest <= 1 and 0 <= self.asleep <= 1):
+            raise ConfigError('[water] rest and asleep are shares of the drain, 0 to 1')
         if not 0 <= self.start <= 1:
             raise ConfigError('[water] start is a share, 0 to 1')
         if self.ponds and (self.radius <= 0 or self.distance < 0):
@@ -653,7 +658,7 @@ SINCE = {'arena': {'scatter': 0.0, 'maze': 0},
          'colonies': {'room': 0},
          'vision': {'cover': 0.0, 'spread': 1.0, 'side': 1.0},
          'night': {'cycle': 0.0, 'length': 0.0, 'dusk': 0.0, 'cold': 0.0, 'nest': 0.0, 'huddle': 0.0, 'reach': 0.0, 'start_dark': 0.0, 'chill_time': 20.0},
-         'water': {'ponds': 0, 'radius': 0.0, 'distance': 0.0, 'drain': 0.0, 'drink': 0.0, 'still': 0.0, 'start': 1.0},
+         'water': {'ponds': 0, 'radius': 0.0, 'distance': 0.0, 'drain': 0.0, 'drink': 0.0, 'still': 0.0, 'start': 1.0, 'rest': 1.0, 'asleep': 1.0},
          'grass': {'cell': 0.5, 'meadows': 0, 'radius': 0.0, 'distance': 0.0, 'base': 0.0, 'regrow': 0.0, 'bite': 0.0, 'still': 0.0, 'food': 0.0},
          'energy': {'turn': 0.0},
          'hatch': {'cost': 0, 'threshold': 0, 'seconds': 0.0},

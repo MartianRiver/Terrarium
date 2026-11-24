@@ -30,15 +30,31 @@ def in_dark(world) -> np.ndarray:
     return night.dark(world.age / world.cfg.tick_hz + world.clock, world.cfg.night)
 
 
+def stillness(world, thrust: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(arenas, creatures) twice: who keeps still, and who sleeps (still in the dark and warm). Still is as [tired] has
+    it when that's on."""
+    e, t = world.cfg.energy, world.cfg.tired
+    still = np.abs(thrust) < (t.still if t.on else e.still)
+    return still, still & in_dark(world)[:, None] & warm(world)
+
+
 def burn(world, thrust: np.ndarray) -> np.ndarray | float:
     """The share of `drain` each nim pays this tick: [energy] rest while it keeps still, sleep while it does in the
-    dark and warm. Still is as [tired] has it when that's on."""
-    e, t = world.cfg.energy, world.cfg.tired
+    dark and warm."""
+    e = world.cfg.energy
     if e.rest == 1 and e.asleep == 1:
         return 1.0
-    still = np.abs(thrust) < (t.still if t.on else e.still)
-    asleep = still & in_dark(world)[:, None] & warm(world)
+    still, asleep = stillness(world, thrust)
     return np.where(asleep, e.asleep, np.where(still, e.rest, 1.0))
+
+
+def thirst(world, thrust: np.ndarray) -> np.ndarray | float:
+    """The same for [water] drain: its rest while still, its asleep while asleep."""
+    t = world.cfg.water
+    if t.rest == 1 and t.asleep == 1:
+        return 1.0
+    still, asleep = stillness(world, thrust)
+    return np.where(asleep, t.asleep, np.where(still, t.rest, 1.0))
 
 
 def mass(world) -> np.ndarray:
